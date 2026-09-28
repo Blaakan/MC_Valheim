@@ -8,26 +8,27 @@
       <Guid>/<Version>/nexus-page.md            every page/file field to fill in, test status, upload checklist
       <Guid>/<Version>/thumbnail.png            gallery image + thumbnail (1920x1080, placeholder)
       <Guid>/<Version>/header.png               page header (1300x372, placeholder)
-      _Pack/<PackVersion>/...                   same for the pack (every mod in one zip; packaging/nexus/pack.json)
+      _Pack/<PackVersion>/...                   same for the pack: EVERY mod in one zip (packaging/nexus/pack.json)
+    A dry run of an already-released version writes to <Version>-dev instead, never over released files.
     Nothing is uploaded: create/update the Nexus pages by hand with these files (docs/publishing/nexus.md).
 .PARAMETER Mod
-    Only mods whose project name contains one of these strings. Without -Mod: every mod + the pack.
-.PARAMETER Pack
-    Also build the pack when -Mod is used.
+    Only package mods whose project name contains one of these strings (no pack then: the pack always holds
+    every mod). Without -Mod: every mod + the pack.
 .PARAMETER Release
-    Release gate: clean git tree, version not released before (git tag nexus/<Guid>/v<Version>), CHANGELOG entry,
-    no failed test, no untested item (unless -AllowPending). On success, tags the commit locally.
+    Release gate: clean git tree, CHANGELOG entry, no failed test, no untested item (unless -AllowPending), valid
+    names for Nexus. A mod already released (git tag nexus/<Guid>/v<Version>) must be unchanged since that tag: then
+    it is reused in the pack and not re-tagged; if it changed, bump its <Version>. On success, tags locally.
 .PARAMETER AllowPending
-    With -Release: allow untested TESTING.md items; they are listed on the page sheet.
+    With -Release: allow untested items (mod TESTING.md + framework src/Shared/TESTING.md); they are listed.
 .PARAMETER Thunderstore
     Also build Thunderstore zips in dist/thunderstore (not our target for now).
 .EXAMPLE
     ./tools/Package-Mod.ps1                        # everything, as a dry run
     ./tools/Package-Mod.ps1 -Mod Crossbow
-    ./tools/Package-Mod.ps1 -Release -AllowPending # real release, multiplayer untested
+    ./tools/Package-Mod.ps1 -Release -AllowPending # real release, some tests untested
 #>
 [CmdletBinding()]
-param([string[]]$Mod, [switch]$Pack, [switch]$Release, [switch]$AllowPending, [switch]$Thunderstore)
+param([string[]]$Mod, [switch]$Release, [switch]$AllowPending, [switch]$Thunderstore)
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'lib\Common.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'lib\BBCode.psm1') -Force
@@ -40,9 +41,10 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 $author = Get-ModAuthor
 $collection = Get-ModCollectionFolder
 $dot = [char]0x00B7
-$buildPack = (-not $Mod) -or $Pack
+$buildPack = -not $Mod
 
-$projects = Get-ModProjects $Mod
+$allProjects = @(Get-ModProjects)
+$projects = @(Get-ModProjects $Mod)
 if ($projects.Count -eq 0) { Write-Fail 'No mod projects matched.'; exit 1 }
 Assert-ModRequiresAcyclic
 $pages = [IO.File]::ReadAllText((Join-Path $nexusDir 'pages.json')) | ConvertFrom-Json
@@ -57,13 +59,36 @@ $nexusCategory = @{
 # Nexus field rules (upload form, 2026).
 $nameRegex = "^[a-zA-Z0-9 _'().-]+$"
 $versionRegex = '^[a-zA-Z0-9.-]+$'
+# Code that go into every mod dll: a change here since a release = that mod needs a new version.
+$sharedCodePaths = @('src/Shared', 'Directory.Build.props', 'Directory.Build.targets')
 
 if ($Release) {
     $dirty = @(& git -C $root status --porcelain)
     if ($dirty.Count -gt 0) { Write-Fail 'Release needs a clean git tree (commit first): the zip must match a commit.'; exit 1 }
 }
-$buildId = (& git -C $root rev-parse --short HEAD 2>$null)
-if (-not $buildId) { $buildId = 'local' }
+
+# Build id like Directory.Build.targets: short hash, +dirty when build inputs changed; 'local' without git.
+$buildId = 'local'
+try {
+    $h = @(& git -C $root rev-parse --short HEAD 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $h.Count -gt 0 -and "$($h[0])" -match '^[0-9a-f]{7,}$') {
+        $buildId = "$($h[0])"
+        $d = @(& git -C $root status --porcelain -- src tests Directory.Build.props Directory.Build.targets 2>$null)
+        if ($d.Count -gt 0) { $buildId += '+dirty' }
+    }
+} catch { $buildId = 'local' }
+
+# Framework code ship in every dll: its tests count for every mod. Install tests: listed, not a gate.
+$frameworkTests = @()
+$sharedTesting = Join-Path $root 'src\Shared\TESTING.md'
+if (Test-Path $sharedTesting) {
+    $frameworkTests = @(Get-TestItems $sharedTesting | ForEach-Object { $_.Text = "(framework) $($_.Text)"; $_ })
+}
+$installTests = @()
+$docsTesting = Join-Path $root 'docs\testing'
+if (Test-Path $docsTesting) { foreach ($f in Get-ChildItem $docsTesting -Filter '*.md') { $installTests += @(Get-TestItems $f.FullName | Where-Object { $_.Mark -ne 'x' -and $_.Mark -ne '-' }) } }
+if ($installTests.Count) { Write-Warn2 "$($installTests.Count) install/publishing test(s) not done (docs/testing): listed on the sheets" }
+
 $failed = 0
 $packaged = New-Object System.Collections.Generic.List[object]
 $tagsToCreate = New-Object System.Collections.Generic.List[object]
@@ -77,20 +102,28 @@ function Reset-StageDir([string]$Path) {
 }
 
 function Test-TagExists([string]$Tag) { @(& git -C $root tag -l $Tag).Count -gt 0 }
+function Test-TagName([string]$Tag) { & git -C $root check-ref-format "refs/tags/$Tag"; $LASTEXITCODE -eq 0 }
+
+# True when code compiled into this mod changed since the tag (working tree vs tag).
+function Test-ChangedSince([string]$Tag, [string]$ModDir) {
+    $rel = $ModDir.Substring($root.Length).TrimStart('\') -replace '\\', '/'
+    & git -C $root diff --quiet $Tag -- $rel @sharedCodePaths
+    $LASTEXITCODE -ne 0
+}
 
 function Get-ChangelogSection([string]$Path, [string]$Version) {
     $text = [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8) -replace "`r", ''
-    $m = [regex]::Match($text, "(?ms)^## $([regex]::Escape($Version))\b[^\n]*\n(.*?)(?=^## |\z)")
+    $m = [regex]::Match($text, "(?ms)^## $([regex]::Escape($Version))(?=\s|$)[^\n]*\n(.*?)(?=^## |\z)")
     if ($m.Success) { $m.Groups[1].Value.Trim() } else { $null }
 }
 
 function Expand-Install([hashtable]$Tokens) {
     $t = $installTemplate
     foreach ($k in $Tokens.Keys) { $t = $t.Replace("{{$k}}", $Tokens[$k]) }
-    $t
+    [regex]::Replace(($t -replace "`r", ''), "\n{3,}", "`n`n")
 }
 
-# README with its "Installation" section replaced by the shared Nexus install text.
+# README with its "Installation" section replaced by the given install text.
 function Merge-Readme([string]$ReadmeText, [string]$InstallText) {
     $parts = Split-MarkdownSections $ReadmeText
     $out = New-Object System.Collections.Generic.List[string]
@@ -107,9 +140,14 @@ function Format-TestStatus($items) {
     $pass = @($items | Where-Object { $_.Mark -eq 'x' }).Count
     $todo = @($items | Where-Object { $_.Mark -eq ' ' })
     $fail = @($items | Where-Object { $_.Mark -eq '!' })
-    $lines = @("- $pass passed, $($todo.Count) not tested, $($fail.Count) failed.")
+    $lines = @("- $pass passed, $($todo.Count) not tested, $($fail.Count) failed (mod + framework tests).")
     foreach ($t in $fail) { $lines += "- FAILED: $($t.Text)" }
     foreach ($t in $todo) { $lines += "- Not tested: $($t.Text)" }
+    if ($installTests.Count) {
+        $lines += ''
+        $lines += 'Install/publishing checks not done yet (docs/testing):'
+        foreach ($t in $installTests) { $lines += "- $($t.Text)" }
+    }
     $lines -join "`n"
 }
 
@@ -130,7 +168,12 @@ $permissions = @'
 | AI tags (required) | **AI Assisted** and **AI Media** (description and placeholder images are AI-made). Nexus accepts AI Assisted only with visible evidence of human-led development (design decisions, development history or commit history, in-game testing): keep that on the page, or moderators may switch the tag. |
 '@
 
-foreach ($p in $projects) {
+$serverText = @'
+**Dedicated server / host:** this mod must also be installed where the world runs. For a dedicated server, install BepInExPack_Valheim in the dedicated server folder (the one with `valheim_server.exe`), then extract this same zip there. To check it loaded, look for the mod's name in `BepInEx/LogOutput.log` in that folder (the MC Mods button only shows your own game's mods).
+'@
+
+$toPack = if ($buildPack) { $allProjects } else { $projects }
+foreach ($p in $toPack) {
     Write-Step "Nexus package: $($p.BaseName)"
     & dotnet build $p.FullName -c Release -nologo -v q -p:DeployToGame=false | Out-Null
     if ($LASTEXITCODE -ne 0) { Write-Fail 'build failed'; $failed++; continue }
@@ -140,6 +183,9 @@ foreach ($p in $projects) {
     $version = $props.Version
     $folderRel = "BepInEx/plugins/$collection/$($props.ModCategory)/$guid/"
     $fileDescription = "Extract into your Valheim folder (creates $folderRel). Needs BepInExPack_Valheim."
+    $tag = "nexus/$guid/v$version"
+    $released = Test-TagExists $tag
+    $reused = $false
 
     # Me check package bits before zip.
     $problems = @(Test-NexusFields $props.ModName $props.ModDescription $version $fileDescription)
@@ -148,39 +194,51 @@ foreach ($p in $projects) {
     $changelog = Join-Path $dir 'CHANGELOG.md'
     $testing = Join-Path $dir 'TESTING.md'
     $icon = Join-Path $dir 'icon.png'
+    if (-not (Test-TagName $tag)) { $problems += "version '$version' gives an invalid git tag name ($tag)" }
     if (-not (Test-Path $readme)) { $problems += 'README.md missing' }
-    elseif ((Get-Content $readme -Raw -Encoding UTF8) -match '(?m)^- TODO') { $problems += 'README.md still has TODO' }
+    else {
+        $readmeRaw = Get-Content $readme -Raw -Encoding UTF8
+        if ($readmeRaw -match '(?m)^- TODO') { $problems += 'README.md still has TODO' }
+        if ($readmeRaw -match '!\[[^\]]*\]\((?!https?://)[^)\s]+\)') { $warnings += 'README.md has a relative image: Nexus needs absolute image URLs, it is dropped from the description' }
+    }
     $changes = $null
     if (-not (Test-Path $changelog)) { $problems += 'CHANGELOG.md missing' }
     else {
         $changes = Get-ChangelogSection $changelog $version
         if (-not $changes) { $problems += "CHANGELOG.md has no '## $version' entry" }
     }
-    $tests = @()
-    if (Test-Path $testing) { $tests = @(Get-TestItems $testing) } else { $problems += 'TESTING.md missing' }
+    $modTests = @()
+    if (Test-Path $testing) {
+        $modTests = @(Get-TestItems $testing)
+        if ($modTests.Count -eq 0) { $problems += 'TESTING.md has no test items' }
+    } else { $problems += 'TESTING.md missing' }
+    $tests = @($modTests) + @($frameworkTests)
     $failedTests = @($tests | Where-Object { $_.Mark -eq '!' })
     $pendingTests = @($tests | Where-Object { $_.Mark -eq ' ' })
-    if ($failedTests.Count) { $problems += "$($failedTests.Count) failed test(s) in TESTING.md" }
+    if ($failedTests.Count) { $problems += "$($failedTests.Count) failed test(s) (mod or framework TESTING.md)" }
     if ($pendingTests.Count) {
-        $msg = "$($pendingTests.Count) untested item(s) in TESTING.md"
+        $msg = "$($pendingTests.Count) untested item(s) (mod + framework)"
         if ($Release -and -not $AllowPending) { $problems += "$msg (use -AllowPending to release anyway; they will be listed)" } else { $warnings += $msg }
     }
-    $tag = "nexus/$guid/v$version"
-    if ($Release -and (Test-TagExists $tag)) { $problems += "version $version already released ($tag): bump <Version> and add a CHANGELOG entry" }
+    if ($released) {
+        $changed = Test-ChangedSince $tag $dir
+        if ($Release -and $changed) { $problems += "version $version was released ($tag) but its code changed since: bump <Version> and add a CHANGELOG entry" }
+        elseif ($Release) { $reused = $true; $warnings += "$version already released ($tag) and unchanged: reused in the pack, not re-tagged, page files not rebuilt" }
+        else { $warnings += "$version already released ($tag)$(if ($changed) { ' and its code changed since' }): dry run writes to $version-dev, released files untouched" }
+    }
     $warnings | ForEach-Object { Write-Warn2 $_ }
     if ($problems) { $problems | ForEach-Object { Write-Fail $_ }; $failed++; continue }
 
-    $out = Join-Path $dist "nexus\$guid\$version"
-    Reset-StageDir $out
     $tree = "$collection/`n        $($props.ModCategory)/`n          $guid/`n            $guid.dll"
     $install = Expand-Install @{
         BEPINEX_LINK = $pages.bepinex; FOLDER = $folderRel; CONFIG = "$guid.cfg"; WHAT = "**$($props.ModName)** is"; TREE = $tree
-        VORTEX = "**Vortex:** Mod Manager Download works too. Vortex puts the mod in ``BepInEx/plugins/$guid/`` instead of the folder above, which is fine. Do not mix a Vortex install and a manual install of the same mod."
+        VORTEX = "**Vortex:** Mod Manager Download works too. Vortex puts the mod in ``BepInEx/plugins/$guid/`` instead of the folder above, which is fine. With Vortex, update and remove the mod from Vortex's Mods page; the Updating and Uninstalling steps below are for manual installs. Do not mix a Vortex install and a manual install of the same mod."
+        SERVER = $(if ($props.ModSide -eq 'Client') { '' } else { $serverText.Trim() })
         UPDATE = 'Extract the new version over the old one (if the changelog says a folder moved, delete the old folder first).'
     }
     $readmeText = Merge-Readme ([IO.File]::ReadAllText($readme, [Text.Encoding]::UTF8)) $install
 
-    # Zip: rooted at the Valheim folder.
+    # Zip staging: rooted at the Valheim folder. Pack reuse the same staged folder.
     $stage = Join-Path $dist "staging\nexus-$guid"
     Reset-StageDir $stage
     $modDir = Join-Path (Join-Path $stage 'BepInEx\plugins') (Get-ModInstallRelPath $guid)
@@ -190,6 +248,13 @@ foreach ($p in $projects) {
     Copy-Item $changelog $modDir
     $contentDir = Join-Path $dir 'Content'
     if (Test-Path $contentDir) { Copy-Item (Join-Path $contentDir '*') $modDir -Recurse }
+    $packaged.Add([pscustomobject]@{ Props = $props; ModDir = $modDir; Pending = $pendingTests.Count })
+
+    # Reused (released, unchanged) mods: only staged for the pack, no page files.
+    if ($reused) { continue }
+    $outName = if (-not $Release -and $released) { "$version-dev" } else { $version }
+    $out = Join-Path $dist "nexus\$guid\$outName"
+    Reset-StageDir $out
     $zipName = "$($props.ModPackageName)-$version.zip"
     New-ZipFromDirectory $stage (Join-Path $out $zipName)
 
@@ -209,12 +274,14 @@ foreach ($p in $projects) {
         if ($pages.mods.PSObject.Properties[$req.Trim()]) { $u = [string]$pages.mods.($req.Trim()) }
         $requires += "$($req.Trim()) (MC mod$(if ($u) { ": $u" } else { ', page not created yet: publish it first' }))"
     }
+    foreach ($dep in ($props.ModDependencies -split ';' | Where-Object { $_.Trim() })) { $requires += "$($dep.Trim()) (external)" }
     $sideLine = @{ Client = 'Client-side only (players who want it install it; works on vanilla servers)'
                    Server = 'Server-side (install on the host/dedicated server)'
                    Both   = 'Server and every player must install it' }[$props.ModSide]
+    $dryNote = if (-not $Release -and $released) { "`n**DRY RUN of an already-released version (build $buildId): do not upload. Released files are in $version\.**`n" } elseif ($buildId -match 'dirty') { "`n**Dry run from uncommitted changes (build $buildId): do not upload; commit and run with -Release.**`n" } else { '' }
     $sheet = @"
 # Nexus page: $($props.ModName) $version
-
+$dryNote
 $(if ($pageUrl) { "Existing page: $pageUrl -> upload a new version of the main file." } else { 'No page yet: create a new mod page (Valheim), then put its URL in packaging/nexus/pages.json.' })
 
 ## Page (General step)
@@ -252,13 +319,14 @@ $permissions
 | File description (max 255) | $fileDescription |
 | Allow mod manager download | Yes (Vortex installs it to BepInEx/plugins/$guid/, which works) |
 | Set as primary file for download | Yes |
+| Display requirements popup on download | Yes (prompts manual downloaders for BepInExPack_Valheim) |
 | Build | $buildId |
 
-## Changelog for $version (one line per entry on Nexus)
+## Changelog for $version (paste: one line = one Nexus entry)
 
-$changes
+$(Format-NexusChangelog $changes)
 
-## Test status (TESTING.md)
+## Test status
 
 $(Format-TestStatus $tests)
 
@@ -267,49 +335,62 @@ $(Format-TestStatus $tests)
 - [ ] Page fields filled (name, author, version, category, summary, tags incl. AI tags)
 - [ ] Description pasted in source mode, preview checked (lists, links, code)
 - [ ] thumbnail.png uploaded and set as thumbnail (header.png optional)
-- [ ] BepInExPack_Valheim added as requirement
+- [ ] BepInExPack_Valheim added as requirement, "Display requirements popup on download" ticked
 - [ ] Permissions set
 - [ ] File uploaded (new file / update of previous), version $version, category Main
 - [ ] Changelog lines added for $version
 - [ ] Published; page URL saved in packaging/nexus/pages.json (first release only)
 "@
     [IO.File]::WriteAllText((Join-Path $out 'nexus-page.md'), $sheet, $utf8)
-    Write-Ok "dist\nexus\$guid\$version\ ($zipName, description, page sheet, thumbnail, header)"
+    Write-Ok "dist\nexus\$guid\$outName\ ($zipName, description, page sheet, thumbnail, header)"
 
     if ($Thunderstore) {
         $tsStage = Join-Path $dist "staging\ts-$guid"
         Reset-StageDir $tsStage
         $tsPlugin = Join-Path $tsStage "plugins\$guid"
         New-Item -ItemType Directory -Force $tsPlugin | Out-Null
+        $deps = @($props.BepInExPackDependency) + @($props.ModDependencies -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        foreach ($req in @($props.ModRequires -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+            $rp = $allProjects | Where-Object { $_.BaseName -eq $req } | Select-Object -First 1
+            if ($rp) { $rq = Get-ModProperties $rp.FullName 'Release'; $deps += "$($rq.ModAuthor)-$($rq.ModPackageName)-$($rq.Version)" }
+            else { Write-Warn2 "Thunderstore: ModRequires '$req' is not a mod in this repo; put its Thunderstore string in <ModDependencies>" }
+        }
         $manifest = [ordered]@{ name = $props.ModPackageName; version_number = $version; website_url = [string]$props.ModWebsiteUrl
-                                description = $props.ModDescription; dependencies = @($props.BepInExPackDependency) }
+                                description = $props.ModDescription; dependencies = $deps }
         [IO.File]::WriteAllText((Join-Path $tsStage 'manifest.json'), ($manifest | ConvertTo-Json -Depth 3), $utf8)
-        [IO.File]::WriteAllText((Join-Path $tsStage 'README.md'), $readmeText, $utf8)
+        $tsReadme = Merge-Readme ([IO.File]::ReadAllText($readme, [Text.Encoding]::UTF8)) "## Installation`n`nInstall with r2modman, Gale or Thunderstore Mod Manager."
+        [IO.File]::WriteAllText((Join-Path $tsStage 'README.md'), $tsReadme, $utf8)
         Copy-Item $changelog, $icon $tsStage
         Copy-Item $props.TargetPath $tsPlugin
+        if (Test-Path $contentDir) { Copy-Item (Join-Path $contentDir '*') $tsPlugin -Recurse }
         New-Item -ItemType Directory -Force (Join-Path $dist 'thunderstore') | Out-Null
         New-ZipFromDirectory $tsStage (Join-Path $dist "thunderstore\$author-$($props.ModPackageName)-$version.zip")
         Write-Ok "dist\thunderstore\$author-$($props.ModPackageName)-$version.zip"
     }
 
-    $packaged.Add([pscustomobject]@{ Props = $props; ModDir = $modDir; Changes = $changes; Pending = $pendingTests.Count })
-    $tagsToCreate.Add([pscustomobject]@{ Tag = $tag; Message = "$($props.ModName) $version (Nexus)" })
+    if (-not $released) { $tagsToCreate.Add([pscustomobject]@{ Tag = $tag; Message = "$($props.ModName) $version (Nexus)" }) }
 }
-if ($failed) { Write-Fail "$failed mod(s) not packaged"; exit 1 }
+if ($failed) { Write-Fail "$failed mod(s) not packaged: nothing tagged"; exit 1 }
 
+$packTag = $null
 if ($buildPack) {
     Write-Step 'Nexus package: all-mods pack'
+    if ($packaged.Count -ne $allProjects.Count) { Write-Fail "pack would hold $($packaged.Count) of $($allProjects.Count) mods: refusing"; exit 1 }
     $packInfo = [IO.File]::ReadAllText((Join-Path $nexusDir 'pack.json')) | ConvertFrom-Json
     $packVersion = $packInfo.version
     $packChanges = Get-ChangelogSection (Join-Path $nexusDir 'PACK_CHANGELOG.md') $packVersion
     $packTag = "nexus/pack/v$packVersion"
+    $packReleased = Test-TagExists $packTag
     $packFileDescription = "Every MC mod. Manual install: extract into your Valheim folder (creates BepInEx/plugins/$collection/). Vortex users: install the single mods instead."
     $packProblems = @(Test-NexusFields $packInfo.name $packInfo.summary $packVersion $packFileDescription)
+    if (-not (Test-TagName $packTag)) { $packProblems += "pack version '$packVersion' gives an invalid git tag name ($packTag): fix packaging/nexus/pack.json" }
     if (-not $packChanges) { $packProblems += "packaging/nexus/PACK_CHANGELOG.md has no '## $packVersion' entry" }
-    if ($Release -and (Test-TagExists $packTag)) { $packProblems += "pack $packVersion already released ($packTag): bump version in packaging/nexus/pack.json" }
-    if ($packProblems) { $packProblems | ForEach-Object { Write-Fail $_ }; exit 1 }
+    if ($Release -and $packReleased) { $packProblems += "pack $packVersion already released ($packTag): bump version in packaging/nexus/pack.json" }
+    if ($packProblems) { $packProblems | ForEach-Object { Write-Fail $_ }; Write-Fail 'nothing tagged'; exit 1 }
+    if (-not $Release -and $packReleased) { Write-Warn2 "pack $packVersion already released: dry run writes to $packVersion-dev" }
 
-    $out = Join-Path $dist "nexus\_Pack\$packVersion"
+    $packOutName = if (-not $Release -and $packReleased) { "$packVersion-dev" } else { $packVersion }
+    $out = Join-Path $dist "nexus\_Pack\$packOutName"
     Reset-StageDir $out
     $mods = @($packaged | Sort-Object { $_.Props.ModCategory }, { $_.Props.ModName })
 
@@ -334,9 +415,11 @@ if ($buildPack) {
     }
     $md.Add('')
     $packTree = "$collection/`n        README.md`n        <Category>/`n          <one folder per mod>/"
+    $anyServer = @($mods | Where-Object { $_.Props.ModSide -ne 'Client' }).Count -gt 0
     $md.Add((Expand-Install @{
         BEPINEX_LINK = $pages.bepinex; FOLDER = "BepInEx/plugins/$collection/"; CONFIG = 'MC.*.cfg'; WHAT = 'the mods are'; TREE = $packTree
         VORTEX = '**Vortex:** this pack is for manual installation only (Vortex would install only one of the mods from it). With Vortex, install the individual mods from their own pages instead. Do not mix both ways.'
+        SERVER = $(if ($anyServer) { $serverText.Trim() -replace 'this mod must', 'some of these mods must' -replace 'this same zip', 'this same pack' } else { '' })
         UPDATE = "Delete the ``BepInEx/plugins/$collection`` folder, then extract the new pack."
     }).Trim())
     $packReadme = ($md -join "`n") + "`n"
@@ -355,13 +438,14 @@ if ($buildPack) {
     $zipName = "$($packInfo.fileBaseName)-$packVersion.zip"
     New-ZipFromDirectory $stage (Join-Path $out $zipName)
     [IO.File]::WriteAllText((Join-Path $out 'description.bbcode.txt'), (ConvertTo-NexusBBCode $packReadme -DropTitle), $utf8)
-    New-ModThumbnail -Path (Join-Path $out 'thumbnail.png') -Category 'Core' -FeatureId 'MC.Valheim'
+    New-ModThumbnail -Path (Join-Path $out 'thumbnail.png') -Category 'Core' -FeatureId 'MC.Valheim' -Label 'All Mods'
     New-ModHeader -Path (Join-Path $out 'header.png') -Category 'Core' -Label "MC Valheim  $dot  All Mods"
 
     $contents = ($mods | ForEach-Object { "| $($_.Props.ModName) | $($_.Props.Version) | $($_.Props.ModCategory) | $(if ($_.Pending) { "$($_.Pending) untested" } else { 'all tested' }) |" }) -join "`n"
+    $packDryNote = if (-not $Release -and $packReleased) { "`n**DRY RUN of an already-released pack (build $buildId): do not upload.**`n" } elseif ($buildId -match 'dirty') { "`n**Dry run from uncommitted changes (build $buildId): do not upload; commit and run with -Release.**`n" } else { '' }
     $sheet = @"
 # Nexus page: $($packInfo.name) $packVersion
-
+$packDryNote
 $(if ($pages.pack) { "Existing page: $($pages.pack) -> upload a new version of the main file." } else { 'No page yet: create a new mod page (Valheim), then put its URL in packaging/nexus/pages.json "pack".' })
 
 ## Page (General step)
@@ -379,7 +463,7 @@ $(if ($pages.pack) { "Existing page: $($pages.pack) -> upload a new version of t
 
 | Field | Value |
 |---|---|
-| Gallery | thumbnail.png (set as thumbnail) |
+| Gallery | thumbnail.png (set as thumbnail; 16:9 placeholder) + in-game screenshots if you have them |
 | Header (optional) | header.png |
 | Requirements | BepInExPack_Valheim ($($pages.bepinex)), minimum version 5.4.2350 |
 $permissions
@@ -395,6 +479,7 @@ $permissions
 | File category | Main |
 | File description (max 255) | $packFileDescription |
 | Allow mod manager download | **No** (Vortex's Valheim extension would install only one mod from the pack) |
+| Display requirements popup on download | Yes (prompts manual downloaders for BepInExPack_Valheim) |
 | Build | $buildId |
 
 ## Contents
@@ -403,30 +488,37 @@ $permissions
 |---|---|---|---|
 $contents
 
-## Changelog for $packVersion
+## Changelog for $packVersion (paste: one line = one Nexus entry)
 
-$packChanges
+$(Format-NexusChangelog $packChanges)
 
 ## Checklist
 
 - [ ] Every included mod published first (its page and version exist)
 - [ ] Page fields filled, description pasted in source mode, AI tags set
 - [ ] thumbnail.png set as thumbnail
-- [ ] File uploaded, version $packVersion, category Main, mod manager download OFF
+- [ ] File uploaded, version $packVersion, category Main, mod manager download OFF, requirements popup ON
 - [ ] Changelog lines added
 "@
     [IO.File]::WriteAllText((Join-Path $out 'nexus-page.md'), $sheet, $utf8)
-    Write-Ok "dist\nexus\_Pack\$packVersion\ ($zipName, description, page sheet, thumbnail, header)"
+    Write-Ok "dist\nexus\_Pack\$packOutName\ ($zipName, description, page sheet, thumbnail, header)"
     $tagsToCreate.Add([pscustomobject]@{ Tag = $packTag; Message = "$($packInfo.name) $packVersion (Nexus): " + (($mods | ForEach-Object { "$($_.Props.ModGuid) $($_.Props.Version)" }) -join ', ') })
 }
 
 if ($Release) {
-    Write-Step 'Tag release (local git tags)'
+    Write-Step 'Tag release (local git tags, all or nothing)'
+    $created = @()
     foreach ($t in $tagsToCreate) {
         & git -C $root tag -a $t.Tag -m $t.Message
-        if ($LASTEXITCODE -ne 0) { Write-Fail "could not tag $($t.Tag)"; exit 1 }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Fail "could not tag $($t.Tag); removing tags made in this run"
+            foreach ($c in $created) { & git -C $root tag -d $c | Out-Null }
+            exit 1
+        }
+        $created += $t.Tag
         Write-Ok $t.Tag
     }
+    if ($created.Count -eq 0) { Write-Warn2 'nothing new to tag (every mod already released and unchanged)' }
 }
 Write-Host ''
 Write-Host 'Done. Files and page texts are in dist\nexus\ (open each nexus-page.md; guide: docs\publishing\nexus.md).' -ForegroundColor Green

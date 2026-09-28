@@ -89,9 +89,10 @@ function New-ModBanner([string]$Path, [string]$Title, [string]$Subtitle, [string
 }
 
 # Nexus images. Thumbnail = gallery image shown in 16:9 tiles (Nexus guide: little or no text, readable small):
-# gradient + big initials + category word. Header = 1300x372 strip across page top, page title overlay it:
-# decorative, small label only, keep middle free.
-function New-ModThumbnail([string]$Path, [string]$Category, [string]$FeatureId, [int]$Width = 1920, [int]$Height = 1080) {
+# gradient + big initials + a label (default: category word). Header = 1300x372 strip across page top; page
+# buttons and title overlay its edges, so keep content central: decorative, small centred label only.
+function New-ModThumbnail([string]$Path, [string]$Category, [string]$FeatureId, [string]$Label, [int]$Width = 1920, [int]$Height = 1080) {
+    if (-not $Label) { $Label = $Category }
     Add-Type -AssemblyName System.Drawing
     $hex = $script:CategoryColors[$Category]
     if (-not $hex) { $hex = '#333333' }
@@ -110,7 +111,7 @@ function New-ModThumbnail([string]$Path, [string]$Category, [string]$FeatureId, 
         $small = New-Object System.Drawing.Font 'Segoe UI', ([float](72 * $s)), ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
         $g.DrawString((Get-FeatureInitials $FeatureId), $big, [System.Drawing.Brushes]::White, (New-Object System.Drawing.RectangleF 0, 0, $Width, ($Height * 0.8)), $fmt)
         $soft = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(200, 255, 255, 255))
-        $g.DrawString($Category.ToUpper(), $small, $soft, (New-Object System.Drawing.RectangleF 0, ($Height * 0.7), $Width, ($Height * 0.2)), $fmt)
+        $g.DrawString($Label.ToUpper(), $small, $soft, (New-Object System.Drawing.RectangleF 0, ($Height * 0.7), $Width, ($Height * 0.2)), $fmt)
         $bmp.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
     } finally { $g.Dispose(); $bmp.Dispose() }
 }
@@ -132,9 +133,9 @@ function New-ModHeader([string]$Path, [string]$Category, [string]$Label, [int]$W
         for ($x = -$Height; $x -lt $Width; $x += 70) { $g.DrawLine($stripe, $x, $Height, $x + $Height, 0) }
         $font = New-Object System.Drawing.Font 'Segoe UI', 26, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
         $fmt = New-Object System.Drawing.StringFormat
-        $fmt.Alignment = 'Far'; $fmt.LineAlignment = 'Far'
+        $fmt.Alignment = 'Center'; $fmt.LineAlignment = 'Center'
         $soft = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(210, 255, 255, 255))
-        $g.DrawString($Label, $font, $soft, (New-Object System.Drawing.RectangleF 0, 0, ($Width - 40), ($Height - 28)), $fmt)
+        $g.DrawString($Label, $font, $soft, (New-Object System.Drawing.RectangleF 0, 0, $Width, $Height), $fmt)
         $bmp.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
     } finally { $g.Dispose(); $bmp.Dispose() }
 }

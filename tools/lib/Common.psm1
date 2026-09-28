@@ -133,16 +133,19 @@ function New-ZipFromDirectory([string]$SourceDir, [string]$ZipPath) {
 }
 
 # Me read a TESTING.md: one object per checkbox item. Mark: ' ' todo, 'x' pass, '!' fail, '-' skip.
+# Any other mark (or empty []) count as todo: unknown = not proven tested.
 function Get-TestItems([string]$Path) {
-    $lines = Get-Content $Path -Encoding UTF8
+    $lines = @(Get-Content $Path -Encoding UTF8)
     $section = ''
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $line = $lines[$i]
         if ($line -match '^##+ (.+)') { $section = $Matches[1]; continue }
-        if ($line -match '^\s*- \[(.)\] (.+)') {
+        if ($line -match '^\s*[-*+] \[(.?)\] (.+)') {
             $mark = $Matches[1]; $text = $Matches[2]
+            if ($mark -eq 'X') { $mark = 'x' }
+            if (@('x', '!', '-', ' ') -notcontains $mark) { $mark = ' ' }
             # Me glue wrapped lines (indented, not new item).
-            while ($i + 1 -lt $lines.Count -and $lines[$i + 1] -match '^\s{2,}\S' -and $lines[$i + 1] -notmatch '^\s*- \[') { $i++; $text += ' ' + $lines[$i].Trim() }
+            while ($i + 1 -lt $lines.Count -and $lines[$i + 1] -match '^\s{2,}\S' -and $lines[$i + 1] -notmatch '^\s*[-*+] \[') { $i++; $text += ' ' + $lines[$i].Trim() }
             $id = ''
             if ($text -match '^\*\*([A-Z]+\d+)') { $id = $Matches[1] }
             [pscustomobject]@{ Section = $section; Mark = $mark; Id = $id; Text = $text }
