@@ -4,7 +4,11 @@
     <ModName>Crossbow Stays Loaded</ModName>
     <Version>0.1.0</Version>
     <ModScope>QoL</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Crossbow revamp</ModIdea>
     <ModSide>Client</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Only you need it; it works on vanilla servers. Other players see your crossbow's loaded state as usual. A loaded crossbow you give to a friend stays loaded if they have the mod; without it they reload as usual. Once anyone fires it, it counts as unloaded.</ModMultiplayerNotes>
     <ModDescription>Crossbows keep their bolt loaded when you put them away, switch weapons, swim or sit down. Re-equip and fire right away; firing still uses the loaded bolt as usual.</ModDescription>
   </PropertyGroup>
 </Project>

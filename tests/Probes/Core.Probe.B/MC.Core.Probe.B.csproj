@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = test probe that need Probe A. Turn A off -> me go inactive, turn A on -> me come back. -->
+  <PropertyGroup>
+    <ModName>Probe B</ModName>
+    <Version>0.0.1</Version>
+    <ModScope>QoL</ModScope>
+    <ModSide>Client</ModSide>
+    <ModRequires>MC.Core.Probe.A</ModRequires>
+    <ModDescription>Framework test probe that requires Probe A.</ModDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\ProbePatch.cs" />
+  </ItemGroup>
+</Project>

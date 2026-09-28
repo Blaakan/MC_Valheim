@@ -13,16 +13,17 @@
     <ModAuthor>MC</ModAuthor>
     <ModWebsiteUrl></ModWebsiteUrl>
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
-    <!-- Thunderstore dependency string for BepInEx pack. Keep in sync with docs/modding/toolchain.md. -->
-    <BepInExPackDependency>denikson-BepInExPack_Valheim-5.4.2333</BepInExPackDependency>
+    <!-- Thunderstore dependency string for BepInEx pack. Match installed pack (LogOutput.log line: BepInExPack Valheim version). 5.4.2350 = first pack for Valheim 1.0. -->
+    <BepInExPackDependency>denikson-BepInExPack_Valheim-5.4.2350</BepInExPackDependency>
   </PropertyGroup>
 
   <PropertyGroup Label="Game paths">
     <ValheimDir Condition="'$(ValheimDir)' == ''">$(VALHEIM_DIR)</ValheimDir>
     <ValheimDir Condition="'$(ValheimDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimDir>
-    <ValheimDir>$([MSBuild]::EnsureTrailingSlash('$(ValheimDir)'))</ValheimDir>
-    <ValheimManagedDir>$(ValheimDir)valheim_Data\Managed\</ValheimManagedDir>
-    <BepInExDir>$(ValheimDir)BepInEx\</BepInExDir>
+    <!-- Separate prop: -p:ValheimDir=... is global, so me cannot fix its trailing slash in place. -->
+    <ValheimRoot>$([MSBuild]::EnsureTrailingSlash('$(ValheimDir)'))</ValheimRoot>
+    <ValheimManagedDir>$(ValheimRoot)valheim_Data\Managed\</ValheimManagedDir>
+    <BepInExDir>$(ValheimRoot)BepInEx\</BepInExDir>
   </PropertyGroup>
 
   <PropertyGroup Label="Mod identity">
@@ -36,6 +37,11 @@
   <PropertyGroup Condition="'$(IsMod)' == 'true' and $(ModId.Contains('.'))">
     <ModCategory>$(ModId.Substring(0, $(ModId.IndexOf('.'))))</ModCategory>
     <ModFeatureId>$(ModId.Substring($([MSBuild]::Add($(ModCategory.Length), 1))))</ModFeatureId>
+    <!--
+      Namespace != guid on purpose. Namespace MC.UX.Inventory.Sort would hide game class Inventory (CS0118).
+      Me squash feature + "Mod" suffix (no game type end in Mod): MC.Combat.CrossbowStaysLoadedMod.
+    -->
+    <RootNamespace>$(ModAuthor).$(ModCategory).$(ModFeatureId.Replace('.', ''))Mod</RootNamespace>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">

@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = tiny lib Probe A reference but never deployed. JitCheck must fail on it (negative test). -->
+</Project>

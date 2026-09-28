@@ -23,8 +23,7 @@ $names = @()
 if ($Mine) {
     # Me collect plugin display names; BepInEx log source = plugin name.
     $names = Get-ModProjects | ForEach-Object {
-        $x = [xml](Get-Content $_.FullName -Raw)
-        $n = $x.Project.PropertyGroup | ForEach-Object { $_.ModName } | Where-Object { $_ } | Select-Object -First 1
+        $n = Get-CsprojProp $_.FullName 'ModName'
         if ($n) { [regex]::Escape($n) }
     }
 }

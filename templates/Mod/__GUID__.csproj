@@ -5,6 +5,9 @@
     <Version>0.1.0</Version>
     <ModScope>__SCOPE__</ModScope>
     <ModSide>__SIDE__</ModSide>
+    <ModMultiplayer>__MULTIPLAYER__</ModMultiplayer>
+    <ModMultiplayerNotes>__MULTIPLAYER_NOTES__</ModMultiplayerNotes>
+    <ModRequires>__REQUIRES__</ModRequires>
     <ModDescription>__DESCRIPTION__</ModDescription>
   </PropertyGroup>
 </Project>

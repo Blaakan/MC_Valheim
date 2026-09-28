@@ -9,14 +9,21 @@ __DESCRIPTION__
 ## Configuration
 
 The config file `BepInEx/config/__GUID__.cfg` is created the first time you launch the game with the mod.
+Every setting can also be changed in-game: open the menu (Esc) and click **MC Mods**, or use ConfigurationManager.
 
 | Section | Setting | Default | Description |
 |---|---|---|---|
-| General | Enabled | `true` | Turn the mod on or off. |
+| General | Enabled | `true` | Turn the feature on or off. Takes effect immediately. |
+| General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
 
 ## Multiplayer
 
-__SIDE_TEXT__
+- **Who needs it:** __SIDE_TEXT__
+- **Multiplayer support:** __MULTIPLAYER_TEXT__
+
+__MULTIPLAYER_NOTES__
+
+__REQUIRES_TEXT__
 
 ## Installation
 

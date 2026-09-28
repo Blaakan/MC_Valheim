@@ -8,39 +8,104 @@
     <!-- Thunderstore name no allow dots. Me smash feature id: Crossbow.StaysLoaded -> CrossbowStaysLoaded. -->
     <ModPackageName Condition="'$(ModPackageName)' == '' and '$(ModFeatureId)' != ''">$(ModFeatureId.Replace('.', ''))</ModPackageName>
     <ModSide Condition="'$(ModSide)' == ''">Client</ModSide>
+    <ModMultiplayer Condition="'$(ModMultiplayer)' == ''">Compatible</ModMultiplayer>
+    <!-- Bump when RPC names/payloads or ZDO keys/format change (Both mods: client and server must match). -->
+    <ModNetworkVersion Condition="'$(ModNetworkVersion)' == ''">1</ModNetworkVersion>
     <DeployToGame Condition="'$(DeployToGame)' == '' and '$(Configuration)' == 'Debug'">true</DeployToGame>
     <DeployToGame Condition="'$(DeployToGame)' == ''">false</DeployToGame>
     <ModDeployDir>$(BepInExDir)plugins\$(ModGuid)\</ModDeployDir>
     <ModInfoFile>$(IntermediateOutputPath)ModInfo.g.cs</ModInfoFile>
+    <!--
+      Publicizer 0.4.3 rewrite IgnoresAccessChecksTo.cs EVERY build (File.WriteAllText, no compare), so CoreCompile
+      always rerun and deploy always recopy (locked-dll warnings while game run). Me send its output to a raw file
+      and copy to stable file only when content change (StabilizeIgnoresAccessChecksTo).
+    -->
+    <GeneratedIgnoresAccessChecksToFile>$(IntermediateOutputPath)$(MSBuildProjectName).IgnoresAccessChecksTo.raw.cs</GeneratedIgnoresAccessChecksToFile>
+    <_IactStableFile>$(IntermediateOutputPath)$(MSBuildProjectName).IgnoresAccessChecksTo.cs</_IactStableFile>
   </PropertyGroup>
 
   <!-- Me check metadata early, before ref resolve spit confusing errors. -->
   <Target Name="ValidateMod" BeforeTargets="ResolveAssemblyReferences;CoreCompile" Condition="'$(IsMod)' == 'true'">
+    <ItemGroup>
+      <_ModRequireCheck Include="$(ModRequires)" />
+    </ItemGroup>
     <Error Condition="!Exists('$(ValheimManagedDir)assembly_valheim.dll')"
-           Text="Valheim not found at '$(ValheimDir)'. Run tools/Setup.ps1, or set VALHEIM_DIR, or pass -p:ValheimDir=..." />
+           Text="Valheim not found at '$(ValheimRoot)'. Run tools/Setup.ps1, or set VALHEIM_DIR, or pass -p:ValheimDir=..." />
     <Error Condition="!Exists('$(BepInExDir)core\BepInEx.dll')"
-           Text="BepInEx not installed in '$(ValheimDir)'. Install BepInExPack_Valheim first." />
+           Text="BepInEx not installed in '$(ValheimRoot)'. Install BepInExPack_Valheim first." />
     <Error Condition="'$(ModCategory)' == ''"
            Text="Mod project name must be $(ModAuthor).&lt;Category&gt;.&lt;System&gt;.&lt;Feature&gt; (got '$(MSBuildProjectName)')." />
     <Error Condition="'$(ModCategory)' != '' and !$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModCategory)', '^(Combat|Exploration|Farming|Cooking|Building|Crafting|UX|Core)$'))"
            Text="Unknown category '$(ModCategory)'. Use Combat, Exploration, Farming, Cooking, Building, Crafting, UX (or Core for shared framework mods)." />
-    <Error Condition="'$(ModName)' == ''" Text="Set &lt;ModName&gt; in $(MSBuildProjectFile)." />
-    <Error Condition="'$(ModDescription)' == ''" Text="Set &lt;ModDescription&gt; in $(MSBuildProjectFile)." />
-    <Error Condition="'$(ModDescription)' != '' and $(ModDescription.Length) &gt; 250"
+    <!-- Free text may hold apostrophes, which break '$(X)' == '' conditions. Me compare .Length instead. -->
+    <Error Condition="'$(ModName.Length)' == '0'" Text="Set &lt;ModName&gt; in $(MSBuildProjectFile)." />
+    <Error Condition="'$(ModDescription.Length)' == '0'" Text="Set &lt;ModDescription&gt; in $(MSBuildProjectFile)." />
+    <Error Condition="$(ModDescription.Length) &gt; 250"
            Text="ModDescription is $(ModDescription.Length) chars; Thunderstore max is 250." />
     <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(Version)', '^\d+\.\d+\.\d+$'))"
            Text="Version must be Major.Minor.Patch (got '$(Version)')." />
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModNetworkVersion)', '^\d+$'))"
+           Text="ModNetworkVersion must be a whole number (got '$(ModNetworkVersion)')." />
     <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModScope)', '^(QoL|Revamp|New)$'))"
            Text="ModScope must be QoL, Revamp or New (got '$(ModScope)')." />
     <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModSide)', '^(Client|Server|Both)$'))"
            Text="ModSide must be Client (only the user needs it), Server (host/server needs it) or Both (everyone needs it). Got '$(ModSide)'." />
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModMultiplayer)', '^(Compatible|Limited|SinglePlayer)$'))"
+           Text="ModMultiplayer must be Compatible, Limited (explain in ModMultiplayerNotes) or SinglePlayer. Got '$(ModMultiplayer)'." />
+    <Error Condition="'$(ModMultiplayer)' != 'Compatible' and '$(ModMultiplayerNotes.Length)' == '0'"
+           Text="ModMultiplayer is '$(ModMultiplayer)': explain why in &lt;ModMultiplayerNotes&gt; (shown to players)." />
+    <Error Condition="'$(ModSide)' != 'Client' and '$(ModMultiplayerNotes.Length)' == '0'"
+           Text="ModSide is '$(ModSide)': explain in &lt;ModMultiplayerNotes&gt; why it cannot be client-side only (shown to players)." />
+    <Error Condition="$(ModName.Contains('&quot;')) or $(ModDescription.Contains('&quot;')) or $(ModMultiplayerNotes.Contains('&quot;')) or $(ModName.Contains('`')) or $(ModMultiplayerNotes.Contains('`'))"
+           Text="ModName, ModDescription and ModMultiplayerNotes cannot contain double quotes or backticks." />
+    <!-- Per item, exact compare: substring check wrongly hit MC.X.Pins vs MC.X.PinsCore, and let comma lists through. -->
+    <Error Condition="'%(_ModRequireCheck.Identity)' == '$(ModGuid)'" Text="A mod cannot require itself." />
+    <Error Condition="'@(_ModRequireCheck)' != '' and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ModRequireCheck.Identity)', '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$'))"
+           Text="ModRequires entry '%(_ModRequireCheck.Identity)' is not a mod GUID. Separate GUIDs with ';'." />
     <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModPackageName)', '^[A-Za-z0-9_]+$'))"
            Text="ModPackageName '$(ModPackageName)' must match [A-Za-z0-9_]+ (Thunderstore rule)." />
   </Target>
 
-  <!-- Me write ModInfo consts so plugin code never hardcode guid/name/version. -->
-  <Target Name="GenerateModInfo" BeforeTargets="CoreCompile" DependsOnTargets="ValidateMod" Condition="'$(IsMod)' == 'true'">
+  <!-- Me stamp build with git commit (+dirty) so test reports point at exact code. No git = "local". -->
+  <Target Name="GetModBuildId" Condition="'$(IsMod)' == 'true'">
+    <Exec Command="git rev-parse --short HEAD" WorkingDirectory="$(RepoRoot)" ConsoleToMSBuild="true" IgnoreExitCode="true"
+          StandardOutputImportance="low" StandardErrorImportance="low" EchoOff="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitHash" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitHashExit" />
+    </Exec>
+    <Exec Command="git status --porcelain -- src tests Directory.Build.props Directory.Build.targets" WorkingDirectory="$(RepoRoot)"
+          ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" EchoOff="true"
+          Condition="'$(_GitHashExit)' == '0'">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitDirty" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitDirtyExit" />
+    </Exec>
     <PropertyGroup>
+      <ModBuildId>local</ModBuildId>
+      <ModBuildId Condition="'$(_GitHashExit)' == '0' and $([System.Text.RegularExpressions.Regex]::IsMatch('$(_GitHash)', '^[0-9a-f]{7,}$'))">$(_GitHash)</ModBuildId>
+      <ModBuildId Condition="'$(ModBuildId)' != 'local' and '$(_GitDirtyExit)' == '0' and '$(_GitDirty.Length)' != '0'">$(ModBuildId)+dirty</ModBuildId>
+    </PropertyGroup>
+  </Target>
+
+  <!--
+    Me write ModInfo consts + descriptor, and plugin attributes on partial class Plugin
+    (BepInPlugin, BepInProcess for client mods, soft BepInDependency per ModRequires).
+    Csproj = one truth. Plugin code never hardcode guid/name/version/deps.
+  -->
+  <Target Name="GenerateModInfo" BeforeTargets="CoreCompile" DependsOnTargets="ValidateMod;GetModBuildId" Condition="'$(IsMod)' == 'true'">
+    <ItemGroup>
+      <_ModRequire Include="$(ModRequires)" />
+    </ItemGroup>
+    <PropertyGroup>
+      <!--
+        Free text -> C# string: me squash newlines/tabs to one space, and double backslash. Backticks around the
+        argument because text holds apostrophes/commas. '%5C%5C' not '\\': MSBuild collapse '\\' in arguments.
+        Property-function result come out escaped, so ';' no split WriteLinesToFile.
+      -->
+      <_ModNameCs>$([System.Text.RegularExpressions.Regex]::Replace(`$(ModName)`, `\s+`, ` `).Trim().Replace(`\`, `%5C%5C`))</_ModNameCs>
+      <_ModNotesCs>$([System.Text.RegularExpressions.Regex]::Replace(`$(ModMultiplayerNotes)`, `\s+`, ` `).Trim().Replace(`\`, `%5C%5C`))</_ModNotesCs>
+      <_ModRequiresCs>@(_ModRequire->'"%(Identity)"', ', ')</_ModRequiresCs>
+      <_ModDependencyAttrs>@(_ModRequire->'[global::BepInEx.BepInDependency("%(Identity)", global::BepInEx.BepInDependency.DependencyFlags.SoftDependency)]', ' ')</_ModDependencyAttrs>
+      <_ModProcessAttr Condition="'$(ModSide)' == 'Client'">[global::BepInEx.BepInProcess("valheim.exe")]</_ModProcessAttr>
       <_ModInfoText>// &lt;auto-generated/&gt;
 // Me made by Directory.Build.targets from csproj props. No edit, me overwrite every build.
 namespace $(RootNamespace)
@@ -48,12 +113,28 @@ namespace $(RootNamespace)
     internal static class ModInfo
     {
         public const string Guid = "$(ModGuid)"%3B
-        public const string Name = "$(ModName)"%3B
+        public const string Name = "$(_ModNameCs)"%3B
         public const string Version = "$(Version)"%3B
+        public const string Build = "$(ModBuildId)"%3B
         public const string Author = "$(ModAuthor)"%3B
         public const string Category = "$(ModCategory)"%3B
         public const string Scope = "$(ModScope)"%3B
         public const string Side = "$(ModSide)"%3B
+        public const string Multiplayer = "$(ModMultiplayer)"%3B
+        public const string MultiplayerNotes = "$(_ModNotesCs)"%3B
+        public const int NetworkVersion = $(ModNetworkVersion)%3B
+        public static readonly string[] Requires = new string[] { $(_ModRequiresCs) }%3B
+
+        public static readonly global::MC.Shared.ModDescriptor Descriptor = new global::MC.Shared.ModDescriptor(
+            Guid, Name, Version, Build, Category, Scope, Side, Multiplayer, MultiplayerNotes, Requires, NetworkVersion)%3B
+    }
+
+    [global::BepInEx.BepInPlugin(ModInfo.Guid, ModInfo.Name, ModInfo.Version)]
+    $(_ModProcessAttr)
+    $(_ModDependencyAttrs)
+    internal sealed partial class Plugin
+    {
+        protected override global::MC.Shared.ModDescriptor Descriptor =&gt; ModInfo.Descriptor%3B
     }
 }
 </_ModInfoText>
@@ -62,6 +143,19 @@ namespace $(RootNamespace)
     <ItemGroup>
       <Compile Include="$(ModInfoFile)" />
       <FileWrites Include="$(ModInfoFile)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Me copy publicizer output to stable file only when content change, and compile the stable one. -->
+  <Target Name="StabilizeIgnoresAccessChecksTo" AfterTargets="Publicize" Condition="'$(IsMod)' == 'true' and Exists('$(GeneratedIgnoresAccessChecksToFile)')">
+    <ReadLinesFromFile File="$(GeneratedIgnoresAccessChecksToFile)">
+      <Output TaskParameter="Lines" ItemName="_IactLine" />
+    </ReadLinesFromFile>
+    <WriteLinesToFile File="$(_IactStableFile)" Lines="@(_IactLine)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Remove="$(GeneratedIgnoresAccessChecksToFile)" />
+      <Compile Include="$(_IactStableFile)" />
+      <FileWrites Include="$(_IactStableFile)" />
     </ItemGroup>
   </Target>
 

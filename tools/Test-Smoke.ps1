@@ -33,6 +33,11 @@ $projects = Get-ModProjects $Mod
 if ($projects.Count -eq 0) { Write-Fail 'No mod projects matched.'; exit 1 }
 if (Get-ValheimProcess) { Write-Fail 'Valheim is running. Close it first (the smoke test needs a fresh log).'; exit 1 }
 
+Write-Step 'Check tool scripts + ModRequires graph'
+if (-not (Test-ScriptsParse)) { Write-Fail 'tool scripts are broken (see above)'; exit 1 }
+Assert-ModRequiresAcyclic
+Write-Ok 'scripts parse, no dependency cycle'
+
 if (-not $NoBuild) {
     Write-Step 'Build + deploy (Debug)'
     foreach ($p in $projects) {
@@ -44,8 +49,7 @@ if (-not $NoBuild) {
 # Me know what to expect: guid -> display name.
 $expected = [ordered]@{}
 foreach ($p in $projects) {
-    $x = [xml](Get-Content $p.FullName -Raw)
-    $name = $x.Project.PropertyGroup | ForEach-Object { $_.ModName } | Where-Object { $_ } | Select-Object -First 1
+    $name = Get-CsprojProp $p.FullName 'ModName'
     $expected[$p.BaseName] = $name
     $dll = Join-Path $game "BepInEx\plugins\$($p.BaseName)\$($p.BaseName).dll"
     if (-not (Test-Path $dll)) { Write-Fail "not deployed: $dll"; exit 1 }

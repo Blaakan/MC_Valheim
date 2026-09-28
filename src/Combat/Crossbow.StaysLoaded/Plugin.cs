@@ -1,32 +1,42 @@
-using BepInEx;
 using BepInEx.Configuration;
-using HarmonyLib;
 using MC.Shared;
 
-namespace MC.Combat.Crossbow.StaysLoaded;
+namespace MC.Combat.CrossbowStaysLoadedMod;
 
-[BepInPlugin(ModInfo.Guid, ModInfo.Name, ModInfo.Version)]
-[BepInProcess("valheim.exe")]
-public sealed class Plugin : BaseUnityPlugin
+// Me = plugin. Attributes, guid, descriptor come from csproj (ModInfo.g.cs). Life cycle from ModPlugin.
+internal sealed partial class Plugin : ModPlugin
 {
-    internal static ConfigEntry<bool> Enabled;
+    internal static ConfigEntry<bool> ShowLoadedInTooltip;
 
-    private Harmony _harmony;
-
-    private void Awake()
+    protected override void BindConfig()
     {
-        Log.Init(Logger);
-
-        Enabled = Config.Bind("General", "Enabled", true, "Turn the mod on or off.");
-
-        // Me patch every [HarmonyPatch] class in this dll. Harmony id = mod guid.
-        _harmony = Harmony.CreateAndPatchAll(typeof(Plugin).Assembly, ModInfo.Guid);
-
-        Log.Ready(ModInfo.Guid, ModInfo.Version);
+        ShowLoadedInTooltip = Config.Bind("UI", "ShowLoadedInTooltip", true,
+            "Show \"Loaded\" in the tooltip of a crossbow that still holds a bolt.");
     }
 
-    private void OnDestroy()
+    // Me just turned on (maybe mid-game). Catch up on what happened while me was off.
+    protected override void OnActivated()
     {
-        _harmony?.UnpatchSelf();
+        var player = Player.m_localPlayer;
+        if (player == null)
+        {
+            return;
+        }
+
+        // Crossbow reloaded while me was off: stamp it now, so stand/logout keep it.
+        var weapon = player.m_weaponLoaded;
+        if (weapon != null && LoadedState.IsEligible(weapon))
+        {
+            LoadedState.Mark(weapon);
+        }
+
+        // Stamps gone stale while me was off (fired): drop them before a repair could make them look valid.
+        foreach (var item in player.GetInventory().GetAllItems())
+        {
+            if (!ReferenceEquals(item, weapon) && LoadedState.HasStamp(item) && !LoadedState.IsLoaded(item))
+            {
+                LoadedState.Clear(item);
+            }
+        }
     }
 }

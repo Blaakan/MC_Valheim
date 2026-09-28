@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = test probe for framework (tools/Test-Framework.ps1). Never shipped: lives outside src/. -->
+  <PropertyGroup>
+    <ModName>Probe A</ModName>
+    <Version>0.0.1</Version>
+    <ModScope>QoL</ModScope>
+    <ModSide>Client</ModSide>
+    <ModDescription>Framework test probe. Other probes depend on it.</ModDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\ProbePatch.cs" />
+    <!-- Private=false: lib never copied/deployed, so JitCheck negative test fire. -->
+    <ProjectReference Include="..\ProbeMissingLib\ProbeMissingLib.csproj" Private="false" />
+  </ItemGroup>
+</Project>

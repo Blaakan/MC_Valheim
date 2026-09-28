@@ -16,11 +16,21 @@ systems that build on the vanilla experience. Built on BepInEx 5 and HarmonyX.
 Each mod is tagged with a scope: **QoL** (improves a system without changing its rules), **Revamp** (changes a core
 mechanic) or **New** (adds a new system or content).
 
+## Pick what you want
+
+Install one mod, a few, or the whole collection. Every feature can be turned on or off on its own, live, from the
+in-game **MC Mods** panel (main menu or Esc menu), from its config file, or from your mod manager's config editor.
+If a feature needs another one that is turned off, it stays inactive and tells you why instead of breaking, and it
+comes back by itself when you re-enable the other one. Mods are client-side whenever possible; each one says
+clearly who needs to install it and how it behaves in multiplayer. Details: [docs/modding/framework.md](docs/modding/framework.md).
+
 ## Mods
 
-| Mod | Category | Scope | Multiplayer | Status |
-|---|---|---|---|---|
-| [Crossbow Stays Loaded](src/Combat/Crossbow.StaysLoaded) | Combat | QoL | client-side | in development |
+| Mod | Category | Scope | Who needs it | Multiplayer | Status |
+|---|---|---|---|---|---|
+| [Crossbow Stays Loaded](src/Combat/Crossbow.StaysLoaded) | Combat | QoL | only you (client-side) | works | in development |
+
+The full list of planned ideas, with feasibility and existing mods, is in [docs/backlog.md](docs/backlog.md).
 
 ## Why one repository
 

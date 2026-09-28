@@ -14,7 +14,7 @@ internal static class Log
     public static void Init(ManualLogSource source) => _source = source;
 
     // Plugin call this at end of Awake, after patch done. Smoke test know mod alive.
-    public static void Ready(string guid, string version) => Info($"{ReadyMarker} {guid} {version}");
+    public static void Ready(string guid, string version, string build) => Info($"{ReadyMarker} {guid} {version} build {build}");
 
     public static void Debug(object message) => _source?.LogDebug(message);
     public static void Info(object message) => _source?.LogInfo(message);
