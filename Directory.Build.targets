@@ -1,0 +1,85 @@
+<Project>
+  <!--
+    Me run after csproj body, so me can see ModName, Version, etc.
+    Me do: check mod metadata, make ModInfo.g.cs, copy mod dll into game BepInEx/plugins.
+  -->
+
+  <PropertyGroup Condition="'$(IsMod)' == 'true'">
+    <!-- Thunderstore name no allow dots. Me smash feature id: Crossbow.StaysLoaded -> CrossbowStaysLoaded. -->
+    <ModPackageName Condition="'$(ModPackageName)' == '' and '$(ModFeatureId)' != ''">$(ModFeatureId.Replace('.', ''))</ModPackageName>
+    <ModSide Condition="'$(ModSide)' == ''">Client</ModSide>
+    <DeployToGame Condition="'$(DeployToGame)' == '' and '$(Configuration)' == 'Debug'">true</DeployToGame>
+    <DeployToGame Condition="'$(DeployToGame)' == ''">false</DeployToGame>
+    <ModDeployDir>$(BepInExDir)plugins\$(ModGuid)\</ModDeployDir>
+    <ModInfoFile>$(IntermediateOutputPath)ModInfo.g.cs</ModInfoFile>
+  </PropertyGroup>
+
+  <!-- Me check metadata early, before ref resolve spit confusing errors. -->
+  <Target Name="ValidateMod" BeforeTargets="ResolveAssemblyReferences;CoreCompile" Condition="'$(IsMod)' == 'true'">
+    <Error Condition="!Exists('$(ValheimManagedDir)assembly_valheim.dll')"
+           Text="Valheim not found at '$(ValheimDir)'. Run tools/Setup.ps1, or set VALHEIM_DIR, or pass -p:ValheimDir=..." />
+    <Error Condition="!Exists('$(BepInExDir)core\BepInEx.dll')"
+           Text="BepInEx not installed in '$(ValheimDir)'. Install BepInExPack_Valheim first." />
+    <Error Condition="'$(ModCategory)' == ''"
+           Text="Mod project name must be $(ModAuthor).&lt;Category&gt;.&lt;System&gt;.&lt;Feature&gt; (got '$(MSBuildProjectName)')." />
+    <Error Condition="'$(ModCategory)' != '' and !$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModCategory)', '^(Combat|Exploration|Farming|Cooking|Building|Crafting|UX|Core)$'))"
+           Text="Unknown category '$(ModCategory)'. Use Combat, Exploration, Farming, Cooking, Building, Crafting, UX (or Core for shared framework mods)." />
+    <Error Condition="'$(ModName)' == ''" Text="Set &lt;ModName&gt; in $(MSBuildProjectFile)." />
+    <Error Condition="'$(ModDescription)' == ''" Text="Set &lt;ModDescription&gt; in $(MSBuildProjectFile)." />
+    <Error Condition="'$(ModDescription)' != '' and $(ModDescription.Length) &gt; 250"
+           Text="ModDescription is $(ModDescription.Length) chars; Thunderstore max is 250." />
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(Version)', '^\d+\.\d+\.\d+$'))"
+           Text="Version must be Major.Minor.Patch (got '$(Version)')." />
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModScope)', '^(QoL|Revamp|New)$'))"
+           Text="ModScope must be QoL, Revamp or New (got '$(ModScope)')." />
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModSide)', '^(Client|Server|Both)$'))"
+           Text="ModSide must be Client (only the user needs it), Server (host/server needs it) or Both (everyone needs it). Got '$(ModSide)'." />
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModPackageName)', '^[A-Za-z0-9_]+$'))"
+           Text="ModPackageName '$(ModPackageName)' must match [A-Za-z0-9_]+ (Thunderstore rule)." />
+  </Target>
+
+  <!-- Me write ModInfo consts so plugin code never hardcode guid/name/version. -->
+  <Target Name="GenerateModInfo" BeforeTargets="CoreCompile" DependsOnTargets="ValidateMod" Condition="'$(IsMod)' == 'true'">
+    <PropertyGroup>
+      <_ModInfoText>// &lt;auto-generated/&gt;
+// Me made by Directory.Build.targets from csproj props. No edit, me overwrite every build.
+namespace $(RootNamespace)
+{
+    internal static class ModInfo
+    {
+        public const string Guid = "$(ModGuid)"%3B
+        public const string Name = "$(ModName)"%3B
+        public const string Version = "$(Version)"%3B
+        public const string Author = "$(ModAuthor)"%3B
+        public const string Category = "$(ModCategory)"%3B
+        public const string Scope = "$(ModScope)"%3B
+        public const string Side = "$(ModSide)"%3B
+    }
+}
+</_ModInfoText>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(ModInfoFile)" Lines="$(_ModInfoText)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Include="$(ModInfoFile)" />
+      <FileWrites Include="$(ModInfoFile)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Me copy dll + pdb (+ ModContent files) into BepInEx/plugins/<Guid>/. Game running = dll locked = warning only. -->
+  <Target Name="DeployMod" AfterTargets="Build" Condition="'$(IsMod)' == 'true' and '$(DeployToGame)' == 'true'">
+    <ItemGroup>
+      <_ModDeployFile Include="$(TargetPath)" />
+      <_ModDeployFile Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ModDeployFile)" DestinationFolder="$(ModDeployDir)" SkipUnchangedFiles="true" Retries="0" ContinueOnError="WarnAndContinue" />
+    <Copy SourceFiles="@(ModContent)" DestinationFiles="@(ModContent->'$(ModDeployDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" Retries="0" ContinueOnError="WarnAndContinue" Condition="'@(ModContent)' != ''" />
+    <Message Importance="high" Text="$(ModGuid) -> $(ModDeployDir)" />
+  </Target>
+
+  <!-- dotnet build -t:UndeployMod : me remove mod from game plugins folder. -->
+  <Target Name="UndeployMod" Condition="'$(IsMod)' == 'true'">
+    <RemoveDir Directories="$(ModDeployDir)" Condition="Exists('$(ModDeployDir)')" />
+    <Message Importance="high" Text="Removed $(ModDeployDir)" />
+  </Target>
+</Project>

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/Combat/">
+    <Project Path="src/Combat/Crossbow.StaysLoaded/MC.Combat.Crossbow.StaysLoaded.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="CLAUDE.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

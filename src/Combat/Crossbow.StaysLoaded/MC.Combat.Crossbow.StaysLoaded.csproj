@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Crossbow Stays Loaded</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <ModSide>Client</ModSide>
+    <ModDescription>Crossbows keep their bolt loaded when you put them away, switch weapons, swim or sit down. Re-equip and fire right away; firing still uses the loaded bolt as usual.</ModDescription>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,21 @@
+# Build output
+bin/
+obj/
+dist/
+*.user
+*.suo
+.vs/
+.idea/
+*.DotSettings.user
+
+# Machine-local settings (game path etc.), created by tools/Setup.ps1
+Local.props
+
+# Game-derived files: decompiled source, publicized assemblies, version stamps.
+# Copyrighted game code, never commit.
+.ref/
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,89 @@
+<Project>
+  <!--
+    Me hold build rules for every project in repo.
+
+    Mod project = csproj named "<ModAuthor>.<Category>.<System>.<Feature>.csproj" under src/<Category>/.
+    Me read guid, id, category from project file name. Csproj only say name, version, description, scope, side.
+  -->
+
+  <!-- Local.props = machine stuff (ValheimDir). tools/Setup.ps1 make it. Git no see it. -->
+  <Import Project="$(MSBuildThisFileDirectory)Local.props" Condition="Exists('$(MSBuildThisFileDirectory)Local.props')" />
+
+  <PropertyGroup Label="Collection">
+    <ModAuthor>MC</ModAuthor>
+    <ModWebsiteUrl></ModWebsiteUrl>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <!-- Thunderstore dependency string for BepInEx pack. Keep in sync with docs/modding/toolchain.md. -->
+    <BepInExPackDependency>denikson-BepInExPack_Valheim-5.4.2333</BepInExPackDependency>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Game paths">
+    <ValheimDir Condition="'$(ValheimDir)' == ''">$(VALHEIM_DIR)</ValheimDir>
+    <ValheimDir Condition="'$(ValheimDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimDir>
+    <ValheimDir>$([MSBuild]::EnsureTrailingSlash('$(ValheimDir)'))</ValheimDir>
+    <ValheimManagedDir>$(ValheimDir)valheim_Data\Managed\</ValheimManagedDir>
+    <BepInExDir>$(ValheimDir)BepInEx\</BepInExDir>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Mod identity">
+    <IsMod Condition="'$(IsMod)' == '' and $(MSBuildProjectName.StartsWith('$(ModAuthor).'))">true</IsMod>
+    <IsMod Condition="'$(IsMod)' == ''">false</IsMod>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsMod)' == 'true'">
+    <ModGuid>$(MSBuildProjectName)</ModGuid>
+    <ModId>$(MSBuildProjectName.Substring($([MSBuild]::Add($(ModAuthor.Length), 1))))</ModId>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsMod)' == 'true' and $(ModId.Contains('.'))">
+    <ModCategory>$(ModId.Substring(0, $(ModId.IndexOf('.'))))</ModCategory>
+    <ModFeatureId>$(ModId.Substring($([MSBuild]::Add($(ModCategory.Length), 1))))</ModFeatureId>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Build">
+    <!-- Valheim code target .NET Fx profile (mscorlib 4.0). Unity modules need game netstandard 2.1 facade, see refs below. -->
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Deterministic>true</Deterministic>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Game ship own netstandard 2.1 facade. Me no want .NET Fx 2.0 facades fight it. -->
+    <ImplicitlyExpandNETStandardFacades>false</ImplicitlyExpandNETStandardFacades>
+    <!-- MSB3277: Unity modules and .NET Fx disagree on System.* versions. Harmless for us. -->
+    <NoWarn>$(NoWarn);MSB3277;CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- Game + BepInEx refs. Private=false: never copy game dlls to output. -->
+  <ItemGroup Condition="'$(IsMod)' == 'true'">
+    <Reference Include="$(BepInExDir)core\BepInEx.dll" Private="false" />
+    <Reference Include="$(BepInExDir)core\0Harmony.dll" Private="false" />
+    <Reference Include="$(ValheimManagedDir)assembly_valheim.dll" Private="false" Publicize="true" />
+    <Reference Include="$(ValheimManagedDir)assembly_utils.dll" Private="false" Publicize="true" />
+    <Reference Include="$(ValheimManagedDir)assembly_guiutils.dll" Private="false" />
+    <Reference Include="$(ValheimManagedDir)gui_framework.dll" Private="false" />
+    <Reference Include="$(ValheimManagedDir)SoftReferenceableAssets.dll" Private="false" />
+    <Reference Include="$(ValheimManagedDir)Splatform.dll" Private="false" />
+    <Reference Include="$(ValheimManagedDir)netstandard.dll" Private="false" />
+    <Reference Include="$(ValheimManagedDir)UnityEngine.dll" Private="false" />
+    <Reference Include="$(ValheimManagedDir)UnityEngine.*.dll" Private="false" />
+    <Reference Include="$(ValheimManagedDir)Unity.TextMeshPro.dll" Private="false" />
+    <Reference Include="$(ValheimManagedDir)Unity.InputSystem.dll" Private="false" />
+    <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Shared code live in src/Shared. Me compile it into each mod as internal. No runtime dependency. -->
+  <ItemGroup Condition="'$(IsMod)' == 'true'">
+    <Compile Include="$(RepoRoot)src\Shared\**\*.cs" Link="Shared\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- Extra mod files (translations, asset bundles) go in <mod>/Content/. Me ship them next to dll. -->
+  <ItemGroup Condition="'$(IsMod)' == 'true'">
+    <ModContent Include="Content\**\*" />
+  </ItemGroup>
+</Project>

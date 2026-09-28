@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>__NAME__</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>__SCOPE__</ModScope>
+    <ModSide>__SIDE__</ModSide>
+    <ModDescription>__DESCRIPTION__</ModDescription>
+  </PropertyGroup>
+</Project>
