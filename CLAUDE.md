@@ -68,6 +68,7 @@ dist/                     packaged zips (git-ignored)
 | Smoke test (launch game, check mods load + patch cleanly, close) | `./tools/Test-Smoke.ps1 [-Mod Crossbow] [-KeepRunning]` |
 | Framework test (probe mods: live toggle, config watch, dependency gating) | `./tools/Test-Framework.ps1` |
 | **In-game test to-do list** | `./tools/Get-TestTodo.ps1 [-Mod X] [-All]` |
+| Tooling regression tests (after changing tools/) | `./tools/Test-Tools.ps1` |
 | Regenerate the idea backlog from the sheet | `./tools/Update-Backlog.ps1` |
 | Launch game | `./tools/Start-Game.ps1 [-Vanilla] [-DebugMono [-Suspend]]` |
 | Follow log | `./tools/Watch-Log.ps1 -Mine` |

@@ -12,10 +12,14 @@ September 2026 (see `docs/research/` for the research notes).
 2. Bump `<Version>` in the mod's csproj and add a `## x.y.z` entry to its `CHANGELOG.md`
    (one line per change; Nexus shows changelogs one line per entry).
 3. Pack: bump `version` in `packaging/nexus/pack.json` and add an entry to `packaging/nexus/PACK_CHANGELOG.md`.
-4. Commit, then run `./tools/Package-Mod.ps1 -Release` (all mods + pack) or `-Mod X` for one mod.
-   The release gate refuses: a dirty git tree, a version already released (git tag), a missing changelog entry,
-   failed tests, untested items (without `-AllowPending`), and names/versions/texts that break Nexus rules.
-   On success it creates local tags `nexus/<GUID>/v<version>` and `nexus/pack/v<version>`.
+4. Commit, then run `./tools/Package-Mod.ps1 -Release` (all mods + pack) or `-Mod X` for one mod (no pack then:
+   the pack always contains every mod).
+   The release gate refuses: a dirty git tree, a missing changelog entry, failed tests, untested items (mod and
+   framework tests, without `-AllowPending`), names/versions/texts that break Nexus rules, a pack version already
+   released, and a mod whose code changed since its released version (bump its version). A mod already released
+   and unchanged is simply reused in the pack. On success it creates local tags `nexus/<GUID>/v<version>` and
+   `nexus/pack/v<version>` (all or nothing). A dry run of an already-released version writes to `<version>-dev`,
+   never over the released files; a sheet built from uncommitted changes says "do not upload".
 
 ## 2. Create or update the page
 
