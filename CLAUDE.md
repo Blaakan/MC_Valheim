@@ -12,7 +12,7 @@ Google Sheet, CSV export: https://docs.google.com/spreadsheets/d/1nd_oWjYyphCcjt
 - **User-facing text stays normal, clear English:** mod README/CHANGELOG, Thunderstore descriptions, BepInEx
   config descriptions, in-game strings, and everything under `docs/`.
 - **Never credit Claude in commits** (no `Co-Authored-By`, no "Generated with" lines).
-- Commit locally at each milestone. There is no remote; never push.
+- Commit locally at each milestone. Remote `origin` = https://github.com/Blaakan/MC_Valheim (GitHub): push only when the user asks.
 - **Never commit game code.** Decompiled source lives in `.ref/` (git-ignored). In docs, cite `Class.Method`
   instead of pasting game code (at most ~5 lines when truly essential).
 
