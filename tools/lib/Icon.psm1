@@ -51,4 +51,41 @@ function New-ModIcon([string]$Path, [string]$Category, [string]$FeatureId) {
     }
 }
 
-Export-ModuleMember -Function New-ModIcon, Get-FeatureInitials
+# Me draw placeholder page banner: category-colored gradient, big title, summary, small footer label.
+# Real screenshots are better; this just make sure every page has a clean primary image.
+function New-ModBanner([string]$Path, [string]$Title, [string]$Subtitle, [string]$Category, [string]$Footer,
+                       [int]$Width = 1280, [int]$Height = 720) {
+    Add-Type -AssemblyName System.Drawing
+    $hex = $script:CategoryColors[$Category]
+    if (-not $hex) { $hex = '#333333' }
+    $base = [System.Drawing.ColorTranslator]::FromHtml($hex)
+    $dark = [System.Drawing.Color]::FromArgb(255, [int]($base.R * 0.35), [int]($base.G * 0.35), [int]($base.B * 0.35))
+    $bmp = New-Object System.Drawing.Bitmap $Width, $Height
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    try {
+        $g.SmoothingMode = 'AntiAlias'
+        $g.TextRenderingHint = 'AntiAliasGridFit'
+        $rect = New-Object System.Drawing.Rectangle 0, 0, $Width, $Height
+        $grad = New-Object System.Drawing.Drawing2D.LinearGradientBrush $rect, $base, $dark, 35.0
+        $g.FillRectangle($grad, $rect)
+        $s = $Height / 720.0
+        $white = [System.Drawing.Brushes]::White
+        $soft = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(215, 255, 255, 255))
+        $fmt = New-Object System.Drawing.StringFormat
+        $fmt.Alignment = 'Near'; $fmt.LineAlignment = 'Near'; $fmt.Trimming = 'EllipsisWord'
+        $titleFont = New-Object System.Drawing.Font 'Segoe UI', ([float](84 * $s)), ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
+        $subFont = New-Object System.Drawing.Font 'Segoe UI', ([float](34 * $s)), ([System.Drawing.FontStyle]::Regular), ([System.Drawing.GraphicsUnit]::Pixel)
+        $footFont = New-Object System.Drawing.Font 'Segoe UI', ([float](28 * $s)), ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
+        $pad = 80 * $s
+        $g.DrawString($Title, $titleFont, $white, (New-Object System.Drawing.RectangleF $pad, (150 * $s), ($Width - 2 * $pad), (210 * $s)), $fmt)
+        $g.DrawString($Subtitle, $subFont, $soft, (New-Object System.Drawing.RectangleF $pad, (370 * $s), ($Width - 2 * $pad), (220 * $s)), $fmt)
+        $band = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(90, 0, 0, 0))
+        $g.FillRectangle($band, 0, [int]($Height - 90 * $s), $Width, [int](90 * $s))
+        $g.DrawString($Footer, $footFont, $white, (New-Object System.Drawing.RectangleF $pad, ($Height - 70 * $s), ($Width - 2 * $pad), (60 * $s)), $fmt)
+        $bmp.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        $g.Dispose(); $bmp.Dispose()
+    }
+}
+
+Export-ModuleMember -Function New-ModIcon, Get-FeatureInitials, New-ModBanner

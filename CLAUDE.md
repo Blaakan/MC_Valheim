@@ -68,7 +68,7 @@ dist/                     packaged zips (git-ignored)
 | Regenerate the idea backlog from the sheet | `./tools/Update-Backlog.ps1` |
 | Launch game | `./tools/Start-Game.ps1 [-Vanilla] [-DebugMono [-Suspend]]` |
 | Follow log | `./tools/Watch-Log.ps1 -Mine` |
-| Package for Thunderstore + Nexus | `./tools/Package-Mod.ps1 -Mod Crossbow` → `dist/` (`-Pack` also builds the all-mods bundles) |
+| Nexus release files (zip + BBCode description + page sheet + banner, per mod and the all-mods pack) | `./tools/Package-Mod.ps1 [-Mod X] [-Release [-AllowPending]]` → `dist/nexus/` |
 | After a Valheim update | `./tools/Update-GameRefs.ps1` (re-decompiles, lists changed classes that we patch) |
 | List mods | `./tools/Get-Mods.ps1 \| Format-Table` |
 
@@ -129,6 +129,13 @@ when `src/Shared` changes) + in-game tests.
   others reference with `[BepInDependency]`.
 - Every mod has: `README.md` (features, config table, multiplayer section), `CHANGELOG.md` (`## x.y.z` per
   version), `icon.png` 256×256, `TESTING.md`, and `docs/design/<category>-<feature>.md`.
-- Release: all `TESTING.md` items for that version passed; bump `<Version>` + CHANGELOG entry; `Package-Mod.ps1`.
-  **Thunderstore and Nexus require AI-generated/assisted content to be tagged** (Thunderstore category
-  "AI Generated", Nexus AI tag), and untested AI mods count as spam: tag every release.
+- **Publishing target: Nexus Mods only (for now)**: each mod as its own page + one "all mods" pack page
+  (`packaging/nexus/`: `pack.json`, `PACK_CHANGELOG.md`, shared `install.md`, `pages.json` with page URLs).
+  Thunderstore packaging still exists behind `Package-Mod.ps1 -Thunderstore`.
+- Release flow: all `TESTING.md` items pass (or release with `-AllowPending`, which lists the untested ones on the
+  page sheet); bump `<Version>` + CHANGELOG entry (pack: bump `pack.json` version + PACK_CHANGELOG); commit;
+  `./tools/Package-Mod.ps1 -Release` (refuses a dirty tree, an already-released version, failed tests; tags
+  `nexus/<GUID>/v<ver>` and `nexus/pack/v<ver>` locally); then follow each `dist/nexus/.../nexus-page.md`
+  (docs/publishing/nexus.md). After a first upload, save the page URL in `packaging/nexus/pages.json`.
+  **Nexus requires AI-generated/assisted content to be tagged**, and untested AI mods count as spam: tag every
+  release and never publish without the in-game tests.

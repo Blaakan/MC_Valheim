@@ -1,0 +1,8 @@
+{
+  "_comment": "Nexus page URL of each mod (by GUID) and of the pack, once the pages exist. Used to cross-link descriptions. Empty = page not created yet.",
+  "bepinex": "https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/",
+  "pack": "",
+  "mods": {
+    "MC.Combat.Crossbow.StaysLoaded": ""
+  }
+}

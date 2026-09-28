@@ -5,7 +5,7 @@
 .PARAMETER All
     Also show passed/skipped items.
 .PARAMETER Mod
-    Only mods whose folder/path contains one of these strings.
+    Only files whose path contains one of these strings.
 .EXAMPLE
     ./tools/Get-TestTodo.ps1
     ./tools/Get-TestTodo.ps1 -Mod Crossbow -All
@@ -22,38 +22,26 @@ $docsTesting = Join-Path $root 'docs\testing'
 if (Test-Path $docsTesting) { $files += Get-ChildItem $docsTesting -Filter '*.md' }
 if ($Mod) { $files = $files | Where-Object { $path = $_.FullName; @($Mod | Where-Object { $path -like "*$_*" }).Count -gt 0 } }
 
+$labels = @{ ' ' = 'TODO'; '!' = 'FAIL'; 'x' = 'PASS'; '-' = 'SKIP' }
 $totalPending = 0; $totalFailed = 0
 foreach ($f in $files) {
-    $lines = Get-Content $f.FullName -Encoding UTF8
-    $title = ($lines | Where-Object { $_ -match '^# ' } | Select-Object -First 1) -replace '^# ', ''
-    $section = ''
-    $out = New-Object System.Collections.Generic.List[string]
+    $title = (Get-Content $f.FullName -Encoding UTF8 | Where-Object { $_ -match '^# ' } | Select-Object -First 1) -replace '^# ', ''
+    $items = @(Get-TestItems $f.FullName)
+    $totalPending += @($items | Where-Object { $_.Mark -eq ' ' }).Count
+    $totalFailed += @($items | Where-Object { $_.Mark -eq '!' }).Count
+    $shown = @($items | Where-Object { $All -or $_.Mark -eq ' ' -or $_.Mark -eq '!' })
+    if ($shown.Count -eq 0) { continue }
+
+    Write-Host ''
+    Write-Host "$title  ($($f.FullName.Substring($root.Length + 1)))" -ForegroundColor Cyan
     $lastSection = $null
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        $line = $lines[$i]
-        if ($line -match '^##+ (.+)') { $section = $Matches[1]; continue }
-        if ($line -match '^\s*- \[(.)\] (.+)') {
-            $mark = $Matches[1]; $text = $Matches[2]
-            # Me glue wrapped lines (indented, not new item).
-            while ($i + 1 -lt $lines.Count -and $lines[$i + 1] -match '^\s{2,}\S' -and $lines[$i + 1] -notmatch '^\s*- \[') { $i++; $text += ' ' + $lines[$i].Trim() }
-            $show = $All -or $mark -eq ' ' -or $mark -eq '!'
-            if ($mark -eq ' ') { $totalPending++ }
-            if ($mark -eq '!') { $totalFailed++ }
-            if (-not $show) { continue }
-            if ($section -ne $lastSection) { $out.Add("  [$section]"); $lastSection = $section }
-            $label = @{ ' ' = 'TODO'; '!' = 'FAIL'; 'x' = 'PASS'; '-' = 'SKIP' }[$mark]
-            if (-not $label) { $label = $mark }
-            $out.Add("    $label  $text")
-        }
-    }
-    if ($out.Count) {
-        Write-Host ''
-        Write-Host "$title  ($($f.FullName.Substring($root.Length + 1)))" -ForegroundColor Cyan
-        $out | ForEach-Object {
-            $color = 'Gray'
-            if ($_ -match '^\s+FAIL') { $color = 'Red' } elseif ($_ -match '^\s+TODO') { $color = 'White' } elseif ($_ -match '^\s+PASS') { $color = 'Green' }
-            Write-Host $_ -ForegroundColor $color
-        }
+    foreach ($it in $shown) {
+        if ($it.Section -ne $lastSection) { Write-Host "  [$($it.Section)]"; $lastSection = $it.Section }
+        $label = $labels[$it.Mark]
+        if (-not $label) { $label = $it.Mark }
+        $color = @{ TODO = 'White'; FAIL = 'Red'; PASS = 'Green'; SKIP = 'Gray' }[$label]
+        if (-not $color) { $color = 'Gray' }
+        Write-Host "    $label  $($it.Text)" -ForegroundColor $color
     }
 }
 Write-Host ''
