@@ -39,12 +39,14 @@ then cross-link: each mod's description links to the pack, the pack lists each m
 
 ## 3. AI tags (mandatory)
 
-Nexus requires correct **Generative AI Usage** tags and moderates wrong or missing ones:
+Nexus requires correct **Generative AI Usage** tags and moderates wrong or missing ones. Our tags (decided
+2026-09-28):
 
-- **AI-Generated Content**: the mod code is AI-written.
+- **AI Assisted**: development is led by the author (design, decisions, in-game testing) with AI help on the code.
+  Nexus only accepts this tag with visible evidence of human-led development: development history, commit
+  history or design notes, and the author must be able to explain the mod if asked. Keep such evidence on or linked
+  from the page, otherwise moderators may switch the tag to "AI-Generated Content".
 - **AI Media**: the description text and the placeholder images are AI-made.
-- ("AI Assisted" is only for developer-led work with limited AI involvement, and needs visible evidence such as
-  a public repository and commit history.)
 
 Never publish a mod whose in-game tests have not been run: untested AI mods are treated as spam.
 

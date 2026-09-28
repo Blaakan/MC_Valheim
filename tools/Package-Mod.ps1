@@ -127,7 +127,7 @@ function Test-NexusFields([string]$Name, [string]$Summary, [string]$Version, [st
 $permissions = @'
 | Permissions | "Use recommended settings" (re-upload: not allowed, conversion: not allowed, modification: ask me, asset use: ask me, donation points: not allowed, monetisation: not allowed), or pick your own |
 | Third-party content | No (all content is ours; the zip contains no game files) |
-| AI tags (required) | **AI-Generated Content** (the code is AI-written) and **AI Media** (this description and the placeholder images are AI-made). Nexus moderates wrong or missing AI tags. |
+| AI tags (required) | **AI Assisted** and **AI Media** (description and placeholder images are AI-made). Nexus accepts AI Assisted only with visible evidence of human-led development (design decisions, development history or commit history, in-game testing): keep that on the page, or moderators may switch the tag. |
 '@
 
 foreach ($p in $projects) {

@@ -140,5 +140,5 @@ when `src/Shared` changes) + in-game tests.
   `./tools/Package-Mod.ps1 -Release` (refuses a dirty tree, an already-released version, failed tests; tags
   `nexus/<GUID>/v<ver>` and `nexus/pack/v<ver>` locally); then follow each `dist/nexus/.../nexus-page.md`
   (step-by-step guide: `docs/publishing/nexus.md`). After a first upload, save the page URL in `packaging/nexus/pages.json`.
-  **Nexus requires AI-generated/assisted content to be tagged**, and untested AI mods count as spam: tag every
+  **Nexus AI tags for every page: "AI Assisted" + "AI Media"** (AI Assisted needs visible evidence of human-led development on the page), and untested AI mods count as spam: tag every
   release and never publish without the in-game tests.
