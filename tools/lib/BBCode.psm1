@@ -46,8 +46,13 @@ function Convert-Table([string[]]$rows) {
     $out
 }
 
-function ConvertTo-NexusBBCode([string]$Markdown) {
+# -DropTitle: skip the first "# Title" line (the Nexus page already shows the mod name).
+function ConvertTo-NexusBBCode([string]$Markdown, [switch]$DropTitle) {
     $lines = ($Markdown -replace "`r", '') -split "`n"
+    if ($DropTitle) {
+        $first = [array]::FindIndex($lines, [Predicate[string]] { param($l) $l.Trim().Length -gt 0 })
+        if ($first -ge 0 -and $lines[$first] -match '^#\s') { $lines = @($lines | Select-Object -Skip ($first + 1)) }
+    }
     $out = New-Object System.Collections.Generic.List[string]
     $i = 0
     while ($i -lt $lines.Count) {
@@ -60,10 +65,12 @@ function ConvertTo-NexusBBCode([string]$Markdown) {
             $out.Add('[code]' + ($block -join "`n") + '[/code]')
             $i++; continue
         }
+        # Nexus has no heading tags; its own template use [size=4][b]. H1 5, H2 4, deeper = bold only.
         if ($line -match '^(#{1,6})\s+(.*)$') {
-            $size = @{ 1 = 6; 2 = 5; 3 = 4 }[$Matches[1].Length]
-            if (-not $size) { $size = 3 }
-            $out.Add("[size=$size][b]$(Convert-Inline $Matches[2])[/b][/size]")
+            $size = @{ 1 = 5; 2 = 4 }[$Matches[1].Length]
+            $inner = "[b]$(Convert-Inline $Matches[2])[/b]"
+            if ($size) { $inner = "[size=$size]$inner[/size]" }
+            $out.Add($inner)
             $i++; continue
         }
         if ($line -match '^\s*(-{3,}|\*{3,})\s*$') { $out.Add('[line]'); $i++; continue }

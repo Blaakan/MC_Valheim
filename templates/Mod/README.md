@@ -27,8 +27,7 @@ __REQUIRES_TEXT__
 
 ## Installation
 
-- **Mod manager (r2modman / Thunderstore Mod Manager):** install it from the mod list.
-- **Manual (Nexus download):** install [BepInExPack Valheim](https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/), then extract the zip into your `Valheim` folder (it creates `BepInEx/plugins/MC_Valheim/__CATEGORY__/__GUID__/`).
+Download from Nexus Mods and extract the zip into your Valheim folder. Full steps are added here when the mod is packaged (from packaging/nexus/install.md).
 
 ## Compatibility
 

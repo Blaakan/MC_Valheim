@@ -1,0 +1,405 @@
+{
+    "page":  {
+                 "fields":  [
+                                {
+                                    "field":  "Game",
+                                    "required":  true,
+                                    "limit":  "Select one game",
+                                    "notes":  "Valheim: domain \u0027valheim\u0027, game_id 3667. Chosen in the \u0027Create draft\u0027 modal. After that the page is edited at /games/valheim/mods/{modId}/edit/{general|media|files|requirements|permissions|articles}."
+                                },
+                                {
+                                    "field":  "Mod name",
+                                    "required":  true,
+                                    "limit":  "1-250 chars. Regex ^[a-zA-Z0-9 _\u0027().-]+$",
+                                    "notes":  "Only ASCII letters, digits, space and _ \u0027 ( ) . - are allowed. The site rejects : \u0026 + , [ ] ! / and accents. Duplicate names are rejected server-side with the message \u0027A mod with this name already exists\u0027. Source: the live form\u0027s zod schema (\u0027Mod name must be 250 characters or less\u0027)."
+                                },
+                                {
+                                    "field":  "Short description (summary)",
+                                    "required":  true,
+                                    "limit":  "Max 350 chars (SHORT_DESCRIPTION_MAX_LENGTH = 350)",
+                                    "notes":  "Plain text. On blur the form collapses line breaks and repeated whitespace into single spaces (stripLineBreaks). Shown on mod tiles (line-clamped) and in \u0027About this mod\u0027. Publishing requires it."
+                                },
+                                {
+                                    "field":  "Category",
+                                    "required":  true,
+                                    "limit":  "Exactly one category",
+                                    "notes":  "See valheim_categories. A \u0027Suggest a new category\u0027 option exists, and staff review suggestions. The draft modal requires a category."
+                                },
+                                {
+                                    "field":  "Author or team name (createdBy)",
+                                    "required":  true,
+                                    "limit":  "1-255 chars. Regex ^[a-zA-Z0-9 _-]+$",
+                                    "notes":  "Defaults to the account username. Apostrophes and periods are NOT allowed here. \u0027MC\u0027 is valid."
+                                },
+                                {
+                                    "field":  "Mod version",
+                                    "required":  true,
+                                    "limit":  "Form schema allows up to 255 chars. Regex ^[a-zA-Z0-9.-]+$",
+                                    "notes":  "Only letters, digits, \u0027.\u0027 and \u0027-\u0027 (\u00270.15.2-beta\u0027 is OK, \u0027+build\u0027 is not). File, changelog and API versions are capped at 50 chars, so keep this at 50 or less. The in-form guide recommends semver starting at 1.0.0. Can be synced automatically from a file (\u0027Update mod version to match this file\u0027s version\u0027)."
+                                },
+                                {
+                                    "field":  "Language",
+                                    "required":  false,
+                                    "limit":  "One value from a list",
+                                    "notes":  "Defaults to \u00270\u0027. The Aug 2026 roundup says the list grows from 16 to 48 languages."
+                                },
+                                {
+                                    "field":  "Is translation + Original mod",
+                                    "required":  false,
+                                    "limit":  "Boolean. Original mod is required when the flag is true",
+                                    "notes":  "Not relevant for original mods."
+                                },
+                                {
+                                    "field":  "Tags",
+                                    "required":  false,
+                                    "limit":  "Picked from the site tag list; no numeric cap found in client code",
+                                    "notes":  "Accurate tagging is mandatory by policy, including the Generative AI Usage tags. Adult tags hide the mod from users who have not opted in. \u0027Allow users to add tags\u0027 (community tagging) sits in Extra options. The tag list comes from GraphQL legacyTags(gameId:3667)."
+                                },
+                                {
+                                    "field":  "Full description",
+                                    "required":  true,
+                                    "limit":  "BBCode. Min 1 char and must differ from the default template. No client-side max length found (not verified server-side)",
+                                    "notes":  "SCEditor-based editor with WYSIWYG and \u0027source\u0027 (raw BBCode) modes. To paste raw BBCode, switch to source mode. The default template uses [size=4][b]Section[/b][/size] headings followed by grey [size=3][color=#D4D4D8] hint lines. Images can be dragged in, and they are saved as hidden gallery images."
+                                },
+                                {
+                                    "field":  "Extra options (general step)",
+                                    "required":  false,
+                                    "limit":  "Toggles",
+                                    "notes":  "Allow comments; Allow discussions; Bug tracker (public-open default / public-closed / private-closed / none); Allow users to add tags; Display donation button (default on); Display donation message; allow user images/videos with approval \u0027auto\u0027 or manual."
+                                },
+                                {
+                                    "field":  "Gallery images",
+                                    "required":  true,
+                                    "limit":  "At least 1 to publish. JPG/PNG/GIF only, max 8 MB each (IMAGE_MAX_SIZE_BYTES 8388608)",
+                                    "notes":  "The UI recommends 1920x1080. The first five images show without scrolling. Images can be hidden from the gallery and still be used inline in the description. Before/after \u0027comparison\u0027 pairs are supported. On a published mod the last image cannot be deleted."
+                                },
+                                {
+                                    "field":  "Thumbnail",
+                                    "required":  true,
+                                    "limit":  "Must be one of the gallery images (\u0027Set as thumbnail\u0027)",
+                                    "notes":  "Mod tiles render it in a 16:9 (aspect-video) box. The in-form guide says to avoid text on thumbnails."
+                                },
+                                {
+                                    "field":  "Header image",
+                                    "required":  false,
+                                    "limit":  "Recommended 1300x372 (~3.49:1). Cropper min width 1300. Input JPG/PNG/GIF up to 8 MB. Re-encoded in the browser to WebP of at most 768,000 bytes",
+                                    "notes":  "This is the \u0027banner\u0027 across the top of the mod page. Page buttons and title overlay it, so keep key content away from the edges. Older community sources cite 1400x400; the current form uses 1300x372."
+                                },
+                                {
+                                    "field":  "Videos",
+                                    "required":  false,
+                                    "limit":  "YouTube URL. Video description max 350 chars",
+                                    "notes":  "Title field plus an optional description."
+                                },
+                                {
+                                    "field":  "File archive (per file)",
+                                    "required":  true,
+                                    "limit":  "At least 1 non-archived file to publish. Extensions .zip .7z .rar .exe .omod. Client max 0x500000000 bytes (20 GiB)",
+                                    "notes":  "Help Center recommends ZIP or 7z; RAR can cause false positives. Nested archives cannot be scanned and password-protected archives are rejected. Both can lead to quarantine. Nexus renames downloaded files: since June/July 2026 names include game-scoped IDs and timestamps."
+                                },
+                                {
+                                    "field":  "File name (display name)",
+                                    "required":  true,
+                                    "limit":  "Max 50 chars (MOD_FILE_NAME_MAX_LENGTH). Regex ^[a-zA-Z0-9 _\u0027().-]+$",
+                                    "notes":  "The in-form guide says to use a descriptive name without the version, because other authors pick it when setting file-to-file requirements. API rename (PUT /mod-files/{id}) allows up to 255 chars with the same regex."
+                                },
+                                {
+                                    "field":  "File version",
+                                    "required":  true,
+                                    "limit":  "Max 50 chars. Regex ^[a-zA-Z0-9.-]+$",
+                                    "notes":  "Mod managers rely on sequential, consistent versions."
+                                },
+                                {
+                                    "field":  "File category",
+                                    "required":  true,
+                                    "limit":  "Add-file options: Main, Optional, Miscellaneous, Update",
+                                    "notes":  "Existing files can also be Old (old_version) or Archived (listed but not downloadable). Deleted = removed. The v3 API accepts only main | optional | miscellaneous."
+                                },
+                                {
+                                    "field":  "Update existing file / Add as new file",
+                                    "required":  true,
+                                    "limit":  "Choice. \u0027Archive existing file\u0027 checkbox",
+                                    "notes":  "Links versions into an update chain (update group) so Vortex and other managers detect updates. Mark new uploads as updates of the previous file."
+                                },
+                                {
+                                    "field":  "Update mod version to match this file\u0027s version",
+                                    "required":  false,
+                                    "limit":  "Checkbox",
+                                    "notes":  "Also exposed in the API as update_mod_version."
+                                },
+                                {
+                                    "field":  "File description",
+                                    "required":  false,
+                                    "limit":  "Max 255 chars (BBCode editor with maxLength 255, no toolbar)",
+                                    "notes":  "A 2023 staff/forum thread states BBCode markup counts toward the limit. Placeholder text: \u0027Provide additional information for this specific file if relevant\u0027."
+                                },
+                                {
+                                    "field":  "Allow mod manager download",
+                                    "required":  false,
+                                    "limit":  "Checkbox, default true",
+                                    "notes":  "API: allow_mod_manager_download."
+                                },
+                                {
+                                    "field":  "Set as primary file for download",
+                                    "required":  false,
+                                    "limit":  "Checkbox, main files only",
+                                    "notes":  "API: primary_mod_manager_download."
+                                },
+                                {
+                                    "field":  "Display requirements popup on download",
+                                    "required":  false,
+                                    "limit":  "Checkbox, default false",
+                                    "notes":  "API: show_requirements_pop_up."
+                                },
+                                {
+                                    "field":  "Changelog entry",
+                                    "required":  false,
+                                    "limit":  "Version max 50 chars, regex ^[a-zA-Z0-9.-]+$. Text min 1 char, one line per entry. API: 1-65,535 chars per call",
+                                    "notes":  "Added in the Documents step or while uploading a file. Entries are keyed by version. The API call POST /mods/{id}/changelogs appends and never replaces."
+                                },
+                                {
+                                    "field":  "Readme (Documents step)",
+                                    "required":  false,
+                                    "limit":  "Not verified",
+                                    "notes":  "The Documents step stores readme content and a filename. Accepted formats and size could not be verified from public code."
+                                },
+                                {
+                                    "field":  "Articles",
+                                    "required":  false,
+                                    "limit":  "Title 1-250 chars. Regex ^[a-zA-Z0-9 _\u0027():.-]+$",
+                                    "notes":  "Separate tab on the mod page for FAQs, guides or long compatibility lists."
+                                },
+                                {
+                                    "field":  "Permissions mode",
+                                    "required":  true,
+                                    "limit":  "recommended | custom | write-own",
+                                    "notes":  "The \u0027Use recommended settings\u0027 hint reads: Re-upload Not allowed, Conversion Not allowed, Modification Ask me, Asset use Ask me, Earning DP Not allowed, Monetisation Not allowed. \u0027custom\u0027 opens six cards: Re-upload, Conversion (other games), Modification, Asset use, Earning donation points (using assets), Monetisation (third-party). With \u0027write-own\u0027 the license text (permNotes) is required before the form will save."
+                                },
+                                {
+                                    "field":  "Third-party content",
+                                    "required":  false,
+                                    "limit":  "\u0027No (all content is mine)\u0027 | \u0027Yes (I have permission)\u0027",
+                                    "notes":  "Stored as licensing.permOthers."
+                                },
+                                {
+                                    "field":  "Credits / permission notes",
+                                    "required":  false,
+                                    "limit":  "Free text; no limit found",
+                                    "notes":  "Placeholders: \u0027Provide credits for assets used\u0027 and \u0027Provide additional instructions for your permissions/license\u0027."
+                                },
+                                {
+                                    "field":  "Requirement method",
+                                    "required":  true,
+                                    "limit":  "File-to-file (recommended) OR Mod requirements (legacy)",
+                                    "notes":  "Only the selected method is active and shown to users."
+                                },
+                                {
+                                    "field":  "Nexus mod requirement (legacy)",
+                                    "required":  false,
+                                    "limit":  "Mod picked by search. Note max 255 chars",
+                                    "notes":  "Example: BepInExPack_Valheim is on Nexus at https://www.nexusmods.com/valheim/mods/3605 (Azumatt, updated 2026-09-24)."
+                                },
+                                {
+                                    "field":  "Off-site requirement (legacy)",
+                                    "required":  false,
+                                    "limit":  "Resource name 1-255 chars; URL (http/https); note max 255 chars",
+                                    "notes":  "Example: the Thunderstore denikson BepInExPack_Valheim page, which is what Jotunn lists."
+                                },
+                                {
+                                    "field":  "File-to-file requirements",
+                                    "required":  false,
+                                    "limit":  "Per file version: requirement definitions (AND), each with alternative files (OR) and min/max version ranges inside one mod file",
+                                    "notes":  "Default since 2026. Shown on the files tab and download dialogs. Vortex 2.6 Health Check uses them."
+                                },
+                                {
+                                    "field":  "DLC requirements",
+                                    "required":  false,
+                                    "limit":  "List of the game\u0027s DLC IDs",
+                                    "notes":  "Not applicable to Valheim in practice."
+                                },
+                                {
+                                    "field":  "Download mirrors",
+                                    "required":  false,
+                                    "limit":  "Mirror name (min 1 char) + valid http(s) URL",
+                                    "notes":  "Shown in the Mirrors section. Example: GitHub releases."
+                                },
+                                {
+                                    "field":  "Team members",
+                                    "required":  false,
+                                    "limit":  "Invite by username",
+                                    "notes":  "Team members can also use their own API keys to push updates."
+                                }
+                            ],
+                 "bbcode_supported":  [
+                                          "Headings: no h1-h6 tags exist. The convention, and the default template Nexus inserts, is [size=4][b]Title[/b][/size] or [size=5][b]Title[/b][/size]",
+                                          "[heading]Text[/heading]: defined in the 2026 editor as \u003ch2\u003e but not on the toolbar. Rendering on the live mod page was NOT verified, so prefer the size+bold convention",
+                                          "[b]..[/b], [i]..[/i], [u]..[/u], [s]..[/s] (strike)",
+                                          "[size=N]..[/size] with N from 1 to 6 (editor mapping: 1=10px, 2=13px, 3=14px normal, 4=18px, 5=24px, 6=32px)",
+                                          "[color=#RRGGBB]..[/color] (the editor palette uses hex values)",
+                                          "[font=Name]..[/font] (depends on the reader\u0027s installed fonts)",
+                                          "[left]..[/left], [center]..[/center], [right]..[/right]",
+                                          "[url]https://..[/url] and [url=https://..]text[/url]",
+                                          "[img]URL[/img], plus [img width=W,height=H]URL[/img] (the editor caps at 3600px). Absolute URLs only",
+                                          "[aimg=left|right]URL[/aimg]: floated image (custom tag in the new editor)",
+                                          "[compare before=URL1 width=N]URL2[/compare]: before/after slider (added Aug 2026)",
+                                          "[youtube]VIDEO_ID[/youtube]: ID only, not the full URL",
+                                          "[video]URL[/video], [soundcloud]URL[/soundcloud], [twitter]handle[/twitter]: custom tags defined in the editor",
+                                          "[list][*]item[/list] (bulleted) and [list=1][*]item[/list] (numbered)",
+                                          "[code]..[/code]: always renders as a block \u003cpre\u003e\u003ccode\u003e, even inline",
+                                          "[quote]..[/quote] and [quote=Author]..[/quote]",
+                                          "[spoiler]..[/spoiler]: collapsible. Formatting inside must be self-contained (strict nesting since the Dec 2023 parser)",
+                                          "[line]: horizontal rule (self-closing)",
+                                          "Tables: NOT supported (no [table]/[tr]/[td])"
+                                      ],
+                 "bbcode_not_supported":  [
+                                              "[table], [tr], [th], [td]: no tables (staff 2019 \u0027we\u0027ll consider\u0027; community tools such as MarkdownToNexusMods still state that Nexus does not support tables)",
+                                              "Markdown of any kind (#, **, `, |tables|, [text](url)): the parser shows it as literal text",
+                                              "Raw HTML tags",
+                                              "[h1]..[h6] heading tags (use [size=N][b] instead)",
+                                              "Inline code: [code] always becomes a block",
+                                              "Nested lists ([list] inside [list]): reported to break the parser in the Dec 2023 guidance thread",
+                                              "Overlapping or badly nested tags, for example [i][spoiler]..[/i][/spoiler]: since the 20 Dec 2023 parser update they break rendering (empty spoiler, content spilling out)",
+                                              "Relative image URLs (only absolute URLs work)",
+                                              "Not in the editor toolbar and rendering unverified: [justify], [sub], [sup], [email], [hr], [indent]. Avoid them",
+                                              "Short description (summary) field: plain text only, and line breaks are collapsed",
+                                              "File description: BBCode is accepted but counts toward the 255-char limit"
+                                          ],
+                 "images":  "These come from the live 2026 upload form code (www.nexusmods.com/_next chunks) and its in-form guides.\n\nGallery images:\n- JPG, PNG or GIF (IMAGE_ACCEPTED_TYPES), at most 8 MB each.\n- UI hint: \u0027Recommended 1920x1080\u0027 (16:9).\n- At least one gallery image is required to publish.\n- The first five images show without scrolling.\n- Images can be hidden from the gallery and used only inline in the description.\n\nThumbnail:\n- Must be one of the gallery images (\u0027Set as thumbnail\u0027). Publishing requires it.\n- Rendered in a 16:9 \u0027aspect-video\u0027 tile on listings, so use a 16:9 image (1920x1080 works).\n- In-form guide: avoid text overlays and make it readable at small sizes.\n\nHeader (mod page banner):\n- Optional.\n- Recommended 1300x372 (ASPECT_RATIO = 1300/372, about 3.49:1). The cropper enforces a minimum crop width of 1300px.\n- Upload JPG/PNG/GIF of at most 8 MB. The browser re-encodes the crop to WebP of at most 768,000 bytes.\n- Overlaid page elements cover parts of it, so keep important content central. Older third-party sources cite 1400x400, which is outdated.\n\nInline description images: [img] tags with absolute URLs, max 3600px on either side in the editor. Drag-and-dropped images are stored as hidden gallery images.\n\nVideo descriptions: 350 chars max.\n\nContent rules: no nudity outside adult-tagged mods; images must be relevant and not misleading. AI-made thumbnails, banners or promo art need the \u0027AI Media\u0027 tag.",
+                 "ai_content_rules":  "Current as of the File Submission Guidelines and the staff forum post \u0027An update on Generative AI Categorisation \u0026 Tagging\u0027 (2026-07-29).\n\nTag group \u0027Generative AI Usage\u0027 (tag id 4899) contains three tags:\n1. \u0027AI-Generated Content\u0027 (id 4488): AI-generated code, UI elements, voices, dialogue, translations, music, or in-game AI-generated assets.\n2. \u0027AI Media\u0027 (id 4905): AI promotional art, thumbnails, videos, mod page descriptions, or other media outside the in-game mod content.\n3. \u0027AI Assisted\u0027 (id 4902): developer-led code, content or assets with limited AI involvement, AI texture or audio upscaling/cleaning, or AI concept art not in the final content.\n\nRules:\n- A mod primarily generated with AI must carry \u0027AI-Generated Content\u0027. Moderators apply it when it is missing.\n- \u0027AI Assisted\u0027 requires significant evidence shown on the page: development history (project history, version-control commit history, other evidence of human-led design), and genuine understanding of the code, which the author may have to explain in moderation disputes. Prior Nexus mod or software work is considered. Without that evidence, moderators may replace the tag.\n- Guideline text: \u0027Failure to correctly tag mods, including undisclosed generative AI usage, may be subject to moderation action.\u0027 Purposeful tag abuse is punished.\n- Authors are responsible for the accuracy of every claim on the page, including text written by AI tools. Unsubstantiated performance/FPS claims are banned.\n- AI content is not otherwise banned, but it can be removed after a credible complaint from an affected rights holder.\n- The report category \u0027AI-Generated Content\u0027 was replaced by a \u0027mistagged content\u0027 report. Users can block these tags (they are \u0027blockable\u0027).\n\nImplication for this pipeline:\n- An AI-written BBCode description or an AI-made banner needs at least \u0027AI Media\u0027.\n- AI-written plugin code needs \u0027AI-Generated Content\u0027, unless development is demonstrably human-led, in which case \u0027AI Assisted\u0027 plus visible evidence such as a public repo and commit history.\n- Several tags can be applied at once. Nothing I read limits the Generative AI group to one tag.",
+                 "valheim_categories":  [
+                                            "Armour (category id 11)",
+                                            "Audio (5)",
+                                            "Character Appearance (4)",
+                                            "Construction (10)",
+                                            "Gameplay (9)",
+                                            "Miscellaneous (2); note that the upload form\u0027s PLACEHOLDER_CATEGORY_ID is also 2",
+                                            "Models and Textures (8)",
+                                            "User Interface (6)",
+                                            "Utilities (7)",
+                                            "Visuals and Graphics (3)",
+                                            "Weapons (12)",
+                                            "World Saves (13)",
+                                            "The root category \u0027Valheim\u0027 (1) has 0 files and is not a real choice. Source: https://www.nexusmods.com/valheim/mods/categories, read 2026-09-28. Valheim game_id = 3667"
+                                        ],
+                 "requirements_mechanism":  "The Requirements step offers two methods, and only one is active.\n\n1. \u0027File-to-file requirements (recommended)\u0027: the 2026 default, live for all users since about April-June 2026.\n   - Each file version declares requirement definitions. Separate definitions mean AND; alternatives inside one definition mean OR.\n   - Each definition points at specific files of another mod, with a min and an optional max version inside the same update chain.\n   - DLC requirements per file were added in July-August 2026.\n   - The requirements appear on the files tab, file cards and download dialogs.\n   - API equivalents: PUT /v3/mod-file-versions/{id}/dependencies/ranges (body dependency_definitions[].ranges[].{min_version_id, max_version_id|null}) and PUT /v3/mod-file-versions/{id}/dependencies/dlc. PUT /v3/mods/{id}/toggle-legacy-mod-requirements switches between the two methods.\n\n2. \u0027Mod requirements (legacy)\u0027:\n   - Nexus requirements: pick a mod, plus a note of at most 255 chars.\n   - Off-site requirements: resource name (1-255 chars), http(s) URL, note of at most 255 chars.\n   - Required DLCs.\n   - Shown on the page under \u0027Requirements\u0027 as a \u0027Nexus requirements\u0027 table (Mod name, Notes) and an \u0027Off-site requirements\u0027 table (Mod name, Notes).\n\nOther related settings:\n- \u0027Mods using this mod\u0027 was moved out of Requirements into its own section.\n- Download mirrors (name + URL) are separate from requirements.\n- Per-file \u0027Display requirements popup on download\u0027 shows the requirements when someone clicks download.\n\nNothing auto-installs from the website. Vortex 2.6\u0027s \u0027Requirements Health Check\u0027 (announced Aug 2026) uses file-level requirements to flag missing dependencies and offers one-click installs for Premium users. Nexus\u0027s own best-practice article says to list required mods so users are prompted to get them.\n\nFor these mods:\n- BepInExPack_Valheim exists on Nexus: https://www.nexusmods.com/valheim/mods/3605 (Azumatt, updated 2026-09-24). Declare it as a Nexus or file-to-file requirement, and optionally the Thunderstore denikson pack as an off-site requirement.\n- Also say in the description that the zip extracts into the game folder (BepInEx/plugins/...).",
+                 "versioning_and_files":  "File categories:\n- Stored categories (CATEGORY_LABELS): Main, Optional, Miscellaneous, Update, Old (old_version), Archived (listed but not downloadable), Deleted (removed).\n- When adding a file you can pick Main, Optional, Miscellaneous or Update. The v3 API accepts only main | optional | miscellaneous.\n- In-form guide: \u0027Main: Your primary file. Most mods only need one main file\u0027. Optional is for variants and patches. Miscellaneous is lower priority. Update is incremental on top of main (use sparingly). Old is for previous versions. Archived keeps a record without a download.\n\nFiles tab layout: Main files, then Old files, plus a \u0027Version history\u0027 page per file (June 2026). Old and archived files sit in a separate section of the form.\n\nUpdate chains (update groups):\n- When uploading, choose \u0027Update existing file\u0027 (select the prior file, optionally tick \u0027Archive existing file\u0027) or \u0027Add as new file\u0027.\n- The in-form guide says to always mark new uploads as updates so Vortex and other mod managers detect them.\n\nPer-file fields:\n- File name: at most 50 chars, regex ^[a-zA-Z0-9 _\u0027().-]+$. Guide: no version in the name.\n- File version: at most 50 chars, regex ^[a-zA-Z0-9.-]+$.\n- Description: at most 255 chars.\n- Checkboxes: Allow mod manager download (default on), Set as primary file for download, Display requirements popup, Update mod version to match this file\u0027s version.\n\nAccepted archives: .zip .7z .rar .exe .omod, client limit 20 GiB. Help Center prefers ZIP/7z. Nested archives or password-protected files can be quarantined. So the \u0027all mods\u0027 pack must be one flat zip, never a zip of zips.\n\nVersioning guidance: the in-form guide recommends semantic versioning (1.0.0, then 1.0.1 for fixes, 1.1.0 for features, 2.0.0 for overhauls) that is sequential and consistent.\n\nChangelogs:\n- Per mod, keyed by version (at most 50 chars, same regex), one line per entry.\n- Added in the Documents step or during a file upload, and shown on the mod page under \u0027Changelogs\u0027.\n- API: POST /v3/mods/{id}/changelogs {version, changelog (1-65,535 chars)} appends and never replaces.\n- A Readme can also be attached in the Documents step.\n\nDownload filenames: since June/July 2026 Nexus renames downloads to include game-scoped IDs and timestamps. The uploaded filename is only the Content-Disposition name, so keep it clean but do not rely on it.\n\nMod status values: Unpublished 0, Published 1, Awaiting approval 2, Hidden 3, Moderated 4.\n\nTo publish, the page needs all of the following:\n- Name, author and version.\n- Game and category.\n- A short description, and a full description that differs from the template.\n- At least one gallery image and a thumbnail.\n- At least one non-archived file.",
+                 "upload_automation":  "Yes: there is an official Upload API (v3) and an official GitHub Action. There is no official standalone CLI; none was found.\n\nTimeline:\n- Open beta announced 2026-03-17 (news 15454), first focused on updating existing mods.\n- June 2026: all website uploads go through the Upload API.\n- July 2026: changelog endpoint added.\n- Docs: https://api-docs.nexusmods.com/ (\u0027Nexus Mods API (3.0.0)\u0027). Spec: https://api.nexusmods.com/openapi.yaml. Base URL: https://api.nexusmods.com/v3.\n\nAuthentication:\n- Header `apikey: \u003cpersonal API key\u003e`, key created at https://www.nexusmods.com/settings/api-keys.\n- Or `Authorization: Bearer \u003cJWT\u003e` (user token).\n- A ServiceJwtAuth scheme exists only for Nexus moderation services.\n- Each team member can use their own key.\n- The API Acceptable Use Policy (2020) limits personal keys to personal use; public apps must register and send Application-Name/Application-Version headers. For v3 I could not verify whether those headers are required. The upload-action sends \u0027User-Agent: Nexus-Mods/upload-action\u0027.\n- Rate limits (help article updated 2026-06-03): 20,000 requests/day, then 500/hour. It does not say whether this applies to v3.\n\nUpload flow:\n1. POST /uploads {filename, size_bytes, md5?} for files up to 100 MiB. You get a presigned PUT URL. The PUT must send `Content-Disposition: attachment; filename=\"\u003csame name\u003e\"`. From 2026-12-01 single-part uploads must include md5 (hex in the body, base64 in a Content-MD5 header on the PUT).\n   Or POST /uploads/multipart for files over 100 MiB (required above that): S3 multipart with parts of part_size_bytes, collect ETags, POST CompleteMultipartUpload XML to complete_presigned_url.\n2. POST /uploads/{id}/finalise.\n3. Poll GET /uploads/{id} until state == \u0027available\u0027.\n4. Then either:\n   - POST /mod-files {upload_id, mod_id, name (50 or less, regex), version (50 or less, regex), file_category main|optional|miscellaneous, description, primary_mod_manager_download, allow_mod_manager_download, show_requirements_pop_up, update_mod_version}. This creates a brand-new file on an EXISTING mod.\n   - Or POST /mod-files/{file_id}/versions (same fields plus archive_existing_file, previous_version_id). This adds a new version to an existing file\u0027s update chain.\n\nOther endpoints:\n- GET /games/valheim/mods/{game_scoped_id}: resolves the internal mod id from the URL number.\n- GET /mods/{id}/files, GET/PUT /mod-files/{id} (rename only).\n- POST /mods/{id}/changelogs.\n- Dependency range and DLC endpoints.\n- POST /mod-file-versions/move and move-to-new-mod-file.\n- The old POST /mod-file-update-groups/{group_id}/versions was deprecated on 2026-06-11 and may be removed on or after 2026-09-09.\n\nStability: all mod and mod-file endpoints carry the \u0027Experimental\u0027 badge (\u0027May change significantly or be removed\u0027). Uploads and collections are stable or beta. Beta deprecations give 10 days\u0027 notice, stable ones 90 days.\n\nNOT possible via the API:\n- Creating a mod page.\n- Editing name, summary, description, category, tags, images, permissions or mirrors.\nThe first page setup and all page text must be done in the web form. After that, files, versions, changelogs and requirements can be automated.\n\nGitHub Action: https://github.com/Nexus-Mods/upload-action (Marketplace \u0027Upload to Nexus Mods\u0027), latest release v1.0.0-beta.10 (2026-07-27), Node 24, MIT license.\n- Required inputs: api_key, file_id, filename, version.\n- Optional inputs: display_name, description, category (default main), archive_existing_version, primary_mod_manager_download, allow_mod_manager_download, show_requirements_pop_up, update_mod_version, mod_id + changelog.\n- Output: version_id.\n- Base URL can be overridden with NEXUSMODS_API_BASE.\n- It only adds versions to an existing file. The file must first be uploaded once by hand. file_id is shown under the Files tab\u0027s \u0027Advanced\u0027 or \u0027File Details\u0027 (File ID / Short Unique File ID).\n- Sample workflows: https://github.com/Nexus-Mods/API-Example and https://github.com/bengosneynexusmods/API-Example (release-triggered, secret NEXUSMODS_API_KEY, vars NEXUSMODS_FILE_ID and NEXUSMODS_MOD_ID).\n\nUnverified: server-side file size cap for API uploads (the web client caps at 20 GiB), and whether rate limits apply to v3.",
+                 "permissions_and_rules":  "Mod-page permissions (Permissions step): see the fields list.\n- Modes: \u0027Use recommended settings\u0027, \u0027Pick your own\u0027 (six cards), or \u0027Write your own (custom)\u0027 license text.\n- Recommended defaults per the hint: Re-upload Not allowed, Conversion Not allowed, Modification Ask me, Asset use Ask me, Earning DP Not allowed, Monetisation Not allowed.\n- There is a Third-party content declaration and a Credits field.\n- Staff enforce stated permissions, and permissions already granted cannot be revoked once another author has released a file. An MIT or other license can be written as a custom license, as Jotunn does.\n\nFile Submission Guidelines, the parts relevant to us (https://help.nexusmods.com/article/28-file-submission-guidelines):\n- No copyrighted content without permission. That includes game files, so never ship Valheim assemblies such as assembly_valheim.dll, publicized DLLs or game assets inside the zips.\n- Credit others; permission is still needed on top of credit.\n- \u0027Compilations must provide functionality beyond repackaging\u0027 (\u0027more than the sum of its parts\u0027). This targets repacks of other authors\u0027 work. I could not verify how it applies to a single author bundling their own mods; the best-practices article actually encourages consolidating related mods into hub pages. Low risk, but frame the pack as a convenience bundle of our own mods.\n- Files must be public, functional and in good faith. No placeholders, no password-protected files; a page without working files must stay unpublished or hidden.\n- All uploads are virus-scanned and may be quarantined. Quarantine causes: multiple VirusTotal hits, nested archives, password protection, self-extractors, RAR false positives. Use ZIP/7z and do not delete quarantined files; contact support@nexusmods.com (article updated 2026-09-22).\n- Executables or DLLs that connect to the internet are prohibited unless crucial; \u0027auto update\u0027 does not count.\n- Files disruptive to any persistent multiplayer environment are prohibited. This is relevant to Valheim dedicated servers.\n- No advertising other sites or services. Linking to off-site downloads of content not allowed on Nexus is prohibited.\n- Tactful thanks are OK, but actively soliciting endorsements or donations is prohibited.\n- Names, descriptions, images and tags must be accurate and not misleading. Claims such as FPS gains must be substantiated.\n- Correct category and tags are required, including Generative AI tags and Adult tags where applicable.\n- US sociopolitical mods are banned; \u0027Real World Issues\u0027 content must be tagged.\n- Emulator-only content is not allowed.\n\nDonation Points rules apply if DP is enabled. Moderation follows the Moderation Policy (https://help.nexusmods.com/article/27-moderation-policy).",
+                 "sources":  [
+                                 "https://help.nexusmods.com/article/28-file-submission-guidelines",
+                                 "https://help.nexusmods.com/article/136-best-practices-for-mod-authors",
+                                 "https://help.nexusmods.com/article/117-why-has-my-mod-been-quarantined",
+                                 "https://help.nexusmods.com/article/114-api-acceptable-use-policy",
+                                 "https://help.nexusmods.com/article/105-i-have-reached-a-daily-or-hourly-limit-api-requests-have-been-consumed-rate-limit-exceeded-what-does-this-mean",
+                                 "https://forums.nexusmods.com/topic/13542525-an-update-on-generative-ai-categorisation-tagging/",
+                                 "https://www.nexusmods.com/news/15454",
+                                 "https://www.nexusmods.com/news/15463",
+                                 "https://www.nexusmods.com/news/15491",
+                                 "https://www.nexusmods.com/news/15494",
+                                 "https://www.nexusmods.com/news/15521",
+                                 "https://www.nexusmods.com/news/15549",
+                                 "https://www.nexusmods.com/news/15594",
+                                 "https://www.nexusmods.com/news/14897",
+                                 "https://forums.nexusmods.com/topic/13458901-guidance-to-update-your-bbcode-december-2023/",
+                                 "https://forums.nexusmods.com/topic/8019598-tables-in-bbcode/",
+                                 "https://forums.nexusmods.com/topic/12751482-file-description-character-limit/",
+                                 "https://api-docs.nexusmods.com/",
+                                 "https://api.nexusmods.com/openapi.yaml",
+                                 "https://github.com/Nexus-Mods/upload-action",
+                                 "https://github.com/Nexus-Mods/upload-action/blob/main/README.md",
+                                 "https://raw.githubusercontent.com/Nexus-Mods/upload-action/main/action.yml",
+                                 "https://raw.githubusercontent.com/Nexus-Mods/upload-action/main/src/index.ts",
+                                 "https://api.github.com/repos/Nexus-Mods/upload-action/releases",
+                                 "https://github.com/Nexus-Mods/API-Example",
+                                 "https://github.com/bengosneynexusmods/API-Example",
+                                 "https://www.nexusmods.com/valheim/mods/categories",
+                                 "https://www.nexusmods.com/games/valheim/mods",
+                                 "https://www.nexusmods.com/valheim/mods/1138 (Jotunn page: live example of the Requirements/Off-site/Permissions/Changelogs layout and rendered BBCode)",
+                                 "https://www.nexusmods.com/valheim/mods/3605 (BepInExPack_Valheim on Nexus, found via the public GraphQL API)",
+                                 "https://api.nexusmods.com/v2/graphql (public legacyTags query for gameId 3667: tag names and IDs)",
+                                 "Live upload-form client code: https://www.nexusmods.com/_next/static/chunks/314_h3e1lv0h-.js, 32r3pahh9_wg6.js and the chunks referenced by https://www.nexusmods.com/games/valheim/mods/1138/edit/{general,media,files,requirements,permissions,articles}. Field limits, regexes, image limits, BBCode editor definitions, permission cards and in-form guides were read from these on 2026-09-28",
+                                 "https://github.com/NBKRedSpy/MarkdownToNexusMods",
+                                 "https://modding.wiki/en/hogwartslegacy/developers/uploadingtonexus (legacy form walkthrough, for context only)",
+                                 "Not accessible (Cloudflare challenge, not bypassed): https://wiki.nexusmods.com/index.php/Formating_and_BBCode_in_Descriptions"
+                             ]
+             },
+    "install":  {
+                    "vortex_valheim_status":  "Summary: Vortex itself is actively maintained. Valheim support comes from a community game extension that works but has not been updated for Valheim 1.0, and it does not keep our folder layout (see vortex_archive_handling).\n\n1) Vortex core. Actively developed. v2.7.1 stable shipped 2026-09-24 and v2.8.0-beta.1 on 2026-09-22 (GitHub releases). Nexus stopped developing the Nexus Mods App and names Vortex as its only manager (help article 164, updated 2026-01-14; it also says Linux support is still experimental).\n\n2) Valheim support is not part of Vortex core. The Nexus-Mods/Vortex master tree has no Valheim code. Support comes from the downloadable game extension \"Valheim Support\" (https://www.nexusmods.com/site/mods/210, category Game Extension).\n- It is now created and uploaded by community member sqrrlmstr: v1.1.4, last updated 2025-12-08.\n- v1.1.3 (2025-12-06) was \"First upload of the new version of the extension\". It replaced the Nexus-authored extension.\n- Source: https://github.com/sqrrlmstr/Valheim-Extension (MIT, info.json v1.1.4 \"Game: Valheim\", last commit 2025-12-10). It was first proposed to Nexus as issue Nexus-Mods/Vortex#18054 (Aug 2025, closed).\n- The old official repo Nexus-Mods/game-valheim was \"archived by the owner on May 20, 2026\" (read-only; last push Aug 2025). That old extension forced its own BepInEx 5.4.22 payload plus denikson\u0027s unstripped DLLs and InSlimVML, and had long-standing complaints.\n\n3) Status after Valheim 1.0 (released 2026-09-09):\n- No extension update since Dec 2025. The page has a \"1.0 Important Info\" note saying Nexus now hosts a proper BepInEx pack that the extension does not yet handle, so users must uninstall any earlier BepInEx updates. The author says a fix is in progress.\n- On first setup, if BepInEx/core/BepInEx.Preloader.dll is missing, the extension copies its bundled \"BepinExInstaller\" folder straight into the game folder. Vortex does not manage those files, so Purge will not remove them.\n- The bundled BepInEx is older than the 1.0 pack. Its changelog reads \"3 commits since v5.4.23.2\" with Doorstop 4.4.0; the 1.0 pack is 5.4.2350+ (BepInEx 5.4.23.5).\n- It adds a \"Download BepInEx Pack\" button that downloads the latest denikson/BepInExPack_Valheim from the Thunderstore API (currently 5.4.2351) into Vortex downloads, for install through its \"bepinex-pack\" installer.\n- The Nexus BepInExPack (mod 3605) is also recognized by that installer, because its folder name matches /bepinexpack.*valheim/i, and it is deployed to the game root.\n\n4) Is it still usable? Yes, with caveats: one volunteer maintainer, no 1.0-specific update, and older complaints in the comments about stray files (manifest.json, icon.png) and conflicts.\n- The Nexus BepInEx page itself tells players to use Gale, r2modman or Thunderstore Mod Manager, and the pack maintainers answer support questions with \"Use Gale\".\n- Expect a large share of Nexus Valheim players to install manually, and write every page for both paths.\n\nNot verified: I did not run Vortex. Everything here comes from reading source code and pages. I matched the Nexus 1.1.4 file to the GitHub repo by version number and description only; the Nexus file-contents preview is not available for extensions.",
+                    "vortex_archive_handling":  "From the Vortex source (src/renderer/src/extensions/mod_management/InstallManager.ts) and the extension\u0027s index.js:\n\n(a) How Vortex runs installers:\n- It extracts the archive and builds the file list with path.normalize(path.relative(...)). On Windows that gives backslash paths, and folders get a trailing path.sep.\n- Installers are sorted by ascending priority (a lower number is tried first).\n- Vortex\u0027s own FOMOD XML installer has priority 10 and runs for any game before the Valheim extension\u0027s installers: \"bepinex-dll-mod\" (25), \"bepinex-config-mod\" (25) and \"bepinex-pack\" (30).\n\n(b) BepInEx-pack detection (testBepInExPackSync). The archive is treated as a BepInEx pack if any path contains one of these indicators:\n- \"BepInEx/core/BepInEx.dll\", \"BepInEx/core/BepInEx.Preloader.dll\", \"BepInEx/plugins/\" (forward slashes), \"doorstop_config.ini\" or \"winhttp.dll\";\n- a path matching /denikson-bepinexpack_valheim|bepinexpack.*valheim|valheim.*bepinexpack/i;\n- or both BepInEx/core/ and winhttp.dll/doorstop_config.ini are present.\n\nOn Windows our backslash paths (BepInEx\\plugins\\MC_Valheim\\...) do not match the forward-slash \"BepInEx/plugins/\" indicator, so our zips go to the regular DLL installer. On a platform with forward-slash paths (Linux Vortex, which is experimental) the same zip would be classed as a BepInEx pack and deployed to the game root with its structure kept. Rules for the pipeline:\n- Never ship winhttp.dll, doorstop_config.ini or anything under BepInEx/core.\n- Never name the pack zip or any folder \"BepInExPack...Valheim\".\n\n(c) Regular DLL installer (installContent). This is what happens to our zips on Windows:\n- It takes the first .dll in the file list.\n- It keeps only the files inside that DLL\u0027s folder.\n- It rewrites each destination to \u003ccleanModName(dll base name)\u003e/\u003cpath relative to the DLL folder\u003e.\n- The \"bepinex-dll-modtype\" mod type then deploys that to \u003cgame\u003e/BepInEx/plugins.\n\nResults:\n- Single-mod zip. BepInEx/plugins/MC_Valheim/\u003cCategory\u003e/\u003cGUID\u003e/\u003cGUID\u003e.dll + README.md + CHANGELOG.md is deployed as BepInEx/plugins/\u003cGUID\u003e/\u003cGUID\u003e.dll + README.md + CHANGELOG.md. The nested MC_Valheim/\u003cCategory\u003e/ folders are not kept. The README says \"Preserves BepInEx/** folder structures\", but for regular mods the code flattens them. The mod still works, because BepInEx scans plugins recursively (TypeLoader uses SearchOption.AllDirectories). However, the Vortex path differs from the manual path.\n- cleanModName also strips trailing -version/-digit groups, long numeric IDs and invalid characters, and turns spaces into underscores. GUID-style DLL names such as MC.Valheim.Foo are left unchanged.\n- ALL-MODS PACK zip: broken under Vortex. Only the first DLL\u0027s folder is installed and every other mod is silently dropped. A second pitfall: files are filtered by substring match on the DLL folder path, so a sibling folder whose name starts with the same string (e.g. GUID_A and GUID_A.Extra) would be pulled in.\n- If we ever ship .cfg files, a config-only archive goes to BepInEx/config with folders flattened.\n\n(d) Options for the pack:\n1. Add fomod/ModuleConfig.xml. Vortex\u0027s FOMOD installer (priority 10) takes over before the Valheim installers. Map the source BepInEx/plugins/MC_Valheim/\u003cCat\u003e/\u003cGUID\u003e/... to the destination MC_Valheim/\u003cCat\u003e/\u003cGUID\u003e/..., relative to plugins, because the extension\u0027s DLL mod type deploys under BepInEx/plugins. This would let Vortex users pick mods with checkboxes and would keep the nested layout. It is untested, and manual users would see a harmless fomod/ folder at the zip root.\n2. Tell Vortex users (or hide the mod-manager button, if the upload form allows it for this file) to install the individual pages instead. You could also publish a Nexus Collection of the single mods, which is Vortex\u0027s native way to install a bundle. There are 447 Valheim collections; the top one is by sqrrlmstr and was updated for 1.0.\n\nSingle-mod zips can ship as they are; state on the page that Vortex installs them to BepInEx/plugins/\u003cGUID\u003e/.\n\n(e) The extension sets mergeMods:true. Two Vortex mods deploying the same file (e.g. a single mod and the pack) cause a Vortex file-conflict prompt.\n\nNot verified: no install was actually run; these conclusions come from reading the code.",
+                    "bepinex_on_nexus":  "Page: \"BepInExPack_Valheim\", https://www.nexusmods.com/valheim/mods/3605 (mod id 3605, Nexus game_id 3667, domain \"valheim\").\n\nAuthor and maintenance:\n- Created and uploaded by Azumatt. The pack is maintained by Azumatt, Vapok and Margmas.\n- It mirrors Thunderstore denikson/BepInExPack_Valheim; the source is github.com/AzumattDev/BepInEx (v5-lts branch).\n- Summary text: \"BepInEx pack for Valheim. Preconfigured with the correct entry point for mods and preferred defaults for the community.\"\n- Category Utilities for Players; virus scan \"Safe to use\".\n- About 297 endorsements, 43.5k downloads, 115 \"mods using this mod\".\n\nVersions:\n- Original upload 2026-09-08 (5.4.2333, now in Old files).\n- 5.4.2350 on 2026-09-09, the day Valheim 1.0 released (file_id 21340). Updated to BepInEx 5.4.23.5; semver plugin versions now load; unified Unity 6 log fix.\n- 5.4.2351 on 2026-09-24 (file_id 23245, 686 KB, current main file). Log lines now show the GUID; a startup summary gives loaded/skipped/failed counts; duplicate-GUID warnings now show both paths; the Linux libdoorstop is now the stock UnityDoorstop 4.5.0 build.\n\nIs it current? Yes. The Thunderstore API shows latest 5.4.2351 created 2026-09-24T06:11Z, and the Nexus copy was updated at 06:13Z, so the two are in sync. Azumatt said on 13 Sep: \"There aren\u0027t any updates needed to the pack.\"\n\nCaveats for our pages:\n- The Nexus description still says \"BepInEx 5.4.23.3\", even though the 5.4.2350 changelog says it moved to 5.4.23.5.\n- Its install text is copied from Thunderstore. \"Automated\" means Gale, r2modman or Thunderstore Mod Manager, not Vortex. Some BBCode renders badly (e.g. the Linux script name shows as startgamebepinex.sh; the real name is start_game_bepinex.sh).\n- The archive is not rooted at the game folder. It holds BepInExPack_Valheim/ (BepInEx/config, BepInEx/core, doorstop_libs, winhttp.dll, doorstop_config.ini, .doorstop_version, start_*_bepinex.sh, changelog.txt), plus README.md, CHANGELOG.md, icon.png and manifest.json at the zip root. Manual users must move the contents of BepInExPack_Valheim into the Valheim folder.\n- It ships no BepInEx/plugins folder; that folder is created on first launch.\n\nRecommendation: list mod 3605 as the on-site \"Nexus requirement\" on every page, and optionally Thunderstore as an off-site one. Many popular pages still link BepInEx off-site to Thunderstore (Plant Everything, Epic Loot, Adventure Backpacks). Do not use the 2021 \"Valheim Unstripped DLLs\" (valheim/mods/15). There is no other current BepInEx pack for Valheim on Nexus (GraphQL name search).",
+                    "manual_install_conventions":  "What 1.0-updated Valheim mods on Nexus actually ship, from the Nexus file-contents manifests:\n- (1) A bare DLL at the zip root, \"put it in BepInEx/plugins\". This is the most common: Plant Everything, Server devcommands, Valheim Configuration Manager, Seasons, Traders Extended, My Little UI, Infinity Hammer, Upgrade World, Longship Upgrades, Atze\u0027s Build Camera.\n- (2) A Thunderstore package mirrored to Nexus: manifest.json, icon.png, README.md and CHANGELOG.md, plus plugins/X.dll or X.dll at the root. Examples: Epic Loot, Adventure Backpacks, Valheim Armory, Cheb\u0027s Necromancy, Valharvest, Valheim Community Patch, MultiCraft, Drop That, Automatic Fuel.\n- (3) A single named folder (Jotunn/...) that goes into BepInEx/plugins.\n- (4) Rooted at the game folder, \"extract into the Valheim folder\". This is our layout: No Rain Damage ships BepInEx/plugins/Jowleth/NoRainDamage.dll, an author-namespaced folder like our MC_Valheim; Valheim Performance Optimizations ships BepInEx/ plus valheim_Data/ with the one-line instruction to drop BepInEx and valheim_Data \"into the game\u0027s root folder\"; V+ has a \"Bundled with BepInEx\" file.\n\nSo our layout is established but not the default. Players will not assume it, and the page must say it explicitly.\n\nWhat to say:\n- \"Extract the zip into your Valheim folder (the one containing valheim.exe) so that BepInEx/plugins/MC_Valheim/\u003cCategory\u003e/\u003cGUID\u003e/\u003cGUID\u003e.dll exists.\"\n- Include a directory tree (Plant Everything uses one).\n- Give the Steam path: Steam \u003e right-click Valheim \u003e Manage \u003e Browse local files.\n- State that BepInExPack_Valheim (Nexus 3605) must be installed first and the game launched once.\n- Say whether the mod is needed on client, server or both, and note that mods cannot be used on a crossplay server.\n\nCommon mistakes to address:\n- Extracting our zip into BepInEx/plugins by habit. This gives plugins/BepInEx/plugins/..., which still loads because BepInEx scans plugins recursively, but it is messy.\n- Extracting into the BepInEx folder, giving BepInEx/BepInEx/plugins. This does not load.\n- Extracting the BepInEx pack zip as-is. This leaves a BepInExPack_Valheim/ folder (and winhttp.dll) in the wrong place, so BepInEx never starts. Players must move its contents next to valheim.exe.\n- \"There is no plugins folder\": it is created on first launch, and our zip also creates it.\n- Antivirus quarantining winhttp.dll, or blocking the server folder.\n- Linux: use start_game_bepinex.sh with a native (not Proton) build.\n- Old pre-1.0 mods spamming the console, which gets blamed on BepInEx.\n- Mixing a Vortex install with manual files.\n\nKeep the single-mod zips and the pack zip byte-identical in paths. Then extracting the pack over singles (or singles over the pack) just overwrites the same files and creates no duplicates.",
+                    "upgrade_uninstall":  "Vortex:\n- How mods are placed. Mods sit in a staging folder and are deployed into the game folder, by hardlink by default.\n- Updating. When a new file is installed, Vortex looks for the previous version (InstallManager.findPreviousVersionMod):\n  - First, a mod whose update check reported newestFileId equal to the new file id. This comes from the Nexus file-update chain.\n  - Otherwise, a mod from the same Nexus mod page with the same logicalFileName (the Nexus file \"Name\").\n  - If found and there is one profile, Vortex automatically chooses \"Replace\". It emits remove-mod, undeploys the old version so no links are left dangling, then does a clean install with the same mod id. With several profiles it asks: Replace, or install alongside.\n  - So renamed or moved files are cleaned up correctly in Vortex, but only if Vortex recognizes the update. Keep each file\u0027s Nexus \"Name\" stable across versions (e.g. \"MC ModName\"; Server devcommands, Plant Everything and Jotunn do this) and put the version only in the version field. Epic Loot\u0027s \"EpicLoot-0.14.13.zip\"-style names break the name fallback. Also mark new uploads as updates of the old file.\n- Uninstalling. Remove or Purge deletes the deployed links. Runtime-generated BepInEx/config/\u003cGUID\u003e.cfg files are not managed and stay, which is usually what players want.\n- Files outside Vortex\u0027s control:\n  - The extension\u0027s bundled BepInEx is copied straight into the game folder, not managed, and Purge does not remove it.\n  - Manually copied files are invisible to Vortex.\n- Single mods plus the pack in Vortex. These come from different Nexus pages, so they are separate Vortex mods and overlapping files trigger conflict prompts. Because of the Valheim extension, the pack also installs only one mod (see vortex_archive_handling).\n\nManual:\n- Updating means extracting over the old files, so anything renamed or moved (a DLL, a GUID folder, or a Category change in MC_Valheim/\u003cCategory\u003e/) leaves the old copy behind.\n- BepInEx (AzumattDev fork, Chainloader.cs) groups plugins by GUID and loads only the highest version. Other copies are skipped with warnings: \"because a newer version exists\" or \"because a duplicate of it was already loaded\", and from 5.4.2351 both paths are shown.\n- So a stale copy with the same GUID is harmless noise. Two different GUIDs, or a stale helper DLL without a plugin, would both load and double-patch.\n- Uninstalling means deleting BepInEx/plugins/MC_Valheim/\u003cCategory\u003e/\u003cGUID\u003e/ and optionally BepInEx/config/\u003cGUID\u003e.cfg.\n\nPipeline recommendations:\n- Never change a GUID.\n- Keep the Category folder for a mod fixed. If one must move, say in the changelog: \"delete BepInEx/plugins/MC_Valheim/\u003cOldCategory\u003e/\u003cGUID\u003e before installing\".\n- On the pack page, advise deleting the whole BepInEx/plugins/MC_Valheim folder before extracting a new pack version. This is a clean, safe update because configs live in BepInEx/config.\n- Tell players not to mix a Vortex install with manual installs of the same mods. Vortex puts them at plugins/\u003cGUID\u003e/ while the manual layout uses plugins/MC_Valheim/\u003cCat\u003e/\u003cGUID\u003e/, so a player can end up with two copies.",
+                    "popular_examples":  [
+                                             {
+                                                 "name":  "Plant Everything (Advize), mod 1042. About 12.9k endorsements, v1.21.3, updated 2026-09-25.",
+                                                 "url":  "https://www.nexusmods.com/valheim/mods/1042",
+                                                 "what_to_copy":  "A feature list with bold headings. Pins the exact requirement (\"Requires BepInEx - Valheim 5.4.2351\"). A short Installation section with an ASCII directory tree (BepInEx -\u003e plugins -\u003e Advize_PlantEverything.dll). Separate \"In multiplayer environments\" (client/server) and \"Compatibility\" (known conflicts, e.g. V+) sections. Spoilers for long prefab lists and screenshots. Translations are uploaded as optional files. The main file has a stable name (\"Plant Everything\"), which helps Vortex spot updates. Do not copy its off-site Thunderstore BepInEx link; link Nexus 3605 instead."
+                                             },
+                                             {
+                                                 "name":  "BepInExPack_Valheim (Azumatt), mod 3605. The requirement to link.",
+                                                 "url":  "https://www.nexusmods.com/valheim/mods/3605",
+                                                 "what_to_copy":  "Sections split by audience: game (automated), server (automated), manual, then Windows, Linux game and Linux server configuration. Includes \"how to check it loaded\" (console window, LogOutput.log, what the colors mean) and a clear \"where to ask for help\" warning. Good to copy for a troubleshooting block. Avoid its mistakes: Thunderstore-only mod-manager text, a stale version in the prose, and BBCode that mangles underscores in file names (use [code] blocks)."
+                                             },
+                                             {
+                                                 "name":  "Valheim Performance Optimizations (ontrigger), mod 1360. v1.2.3, updated 2026-09-26.",
+                                                 "url":  "https://www.nexusmods.com/valheim/mods/1360",
+                                                 "what_to_copy":  "The closest match to our archive layout: the zip is rooted at the game folder (BepInEx/plugins/... plus valheim_Data/...), with a one-line install: drop BepInEx and valheim_Data \"into the game\u0027s root folder\". Puts \"[1.0 Compatible]\" in the page heading. Has a \"REPORT ALL ISSUES HERE\" link, per-version \"Changes in x.y.z\" sections, and a Configuration section. Ships README.md, CHANGELOG.md and manifest.json alongside, like our zips."
+                                             },
+                                             {
+                                                 "name":  "Server devcommands (Jere Kuusela), mod 1308. v1.115, updated 2026-09-26.",
+                                                 "url":  "https://www.nexusmods.com/valheim/mods/1308",
+                                                 "what_to_copy":  "A minimal page that works well for small utility mods: one line on where to install (admin client, and optionally the server), a link to a wiki or GitHub for docs, a Discord link, and a \"Manual installation: put the .dll in Valheim\\BepInEx\\plugins\" line. A stable file name (\"Server Devcommands\") with frequent version bumps. A good template for our many small single-mod pages."
+                                             },
+                                             {
+                                                 "name":  "Jotunn, the Valheim Library (Valheim Modding team), mod 1138. v2.30.2.",
+                                                 "url":  "https://www.nexusmods.com/valheim/mods/1138",
+                                                 "what_to_copy":  "An Installation section that opens with \"If you\u0027re using a mod installer, you can likely ignore this section\", then a two-step manual run-down (install BepInEx into the Valheim folder, then place the zip contents into BepInEx/plugins/Jotunn) with a link to a fuller manual-install guide. Requirements table links on-site and off-site (GitHub, NuGet, Thunderstore). A good pattern for a mod-manager plus manual dual path."
+                                             },
+                                             {
+                                                 "name":  "Adventure Backpacks (Vapok), mod 2204. v2.2.1, updated 2026-09-28.",
+                                                 "url":  "https://www.nexusmods.com/valheim/mods/2204",
+                                                 "what_to_copy":  "Polished visual structure: emoji section headings (How to Use, Catalogue, Controls, Advanced Mechanics, Installation \u0026 Server Setup), inline images per item, and an explicit \"Required on Both Client \u0026 Server\" line with ServerSync and version-check notes. The footer has credits, source, Discord and release-notes links. Requirements table includes the Nexus Jotunn page. A good model for the pack page\u0027s per-mod catalogue. Do not copy its r2modman-only install advice."
+                                             }
+                                         ],
+                    "sources":  [
+                                    "https://www.nexusmods.com/valheim/mods/3605",
+                                    "https://www.nexusmods.com/valheim/mods/3605?tab=files",
+                                    "https://www.nexusmods.com/valheim/mods/3605?tab=posts",
+                                    "https://www.nexusmods.com/Core/Libs/Common/Widgets/ModChangeLogPopUp?mod_id=3605\u0026game_id=3667\u0026version=5.4.2351",
+                                    "https://www.nexusmods.com/Core/Libs/Common/Widgets/ModChangeLogPopUp?mod_id=3605\u0026game_id=3667\u0026version=5.4.2350",
+                                    "https://thunderstore.io/api/experimental/package/denikson/BepInExPack_Valheim/",
+                                    "https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/",
+                                    "https://www.nexusmods.com/site/mods/210",
+                                    "https://www.nexusmods.com/site/mods/210?tab=files",
+                                    "https://www.nexusmods.com/site/mods/210?tab=posts",
+                                    "https://github.com/sqrrlmstr/Valheim-Extension",
+                                    "https://raw.githubusercontent.com/sqrrlmstr/Valheim-Extension/main/index.js",
+                                    "https://raw.githubusercontent.com/sqrrlmstr/Valheim-Extension/main/info.json",
+                                    "https://raw.githubusercontent.com/sqrrlmstr/Valheim-Extension/main/BepinExInstaller/changelog.txt",
+                                    "https://github.com/Nexus-Mods/Vortex/issues/18054",
+                                    "https://github.com/Nexus-Mods/game-valheim",
+                                    "https://github.com/Nexus-Mods/Vortex/releases",
+                                    "https://raw.githubusercontent.com/Nexus-Mods/Vortex/master/src/renderer/src/extensions/mod_management/InstallManager.ts",
+                                    "https://raw.githubusercontent.com/Nexus-Mods/Vortex/master/src/renderer/src/extensions/installer_fomod_native/index.ts",
+                                    "https://raw.githubusercontent.com/Nexus-Mods/Vortex/master/src/renderer/src/extensions/installer_fomod_ipc/index.ts",
+                                    "https://github.com/Nexus-Mods/Vortex/wiki/MODDINGWIKI-Users-GameGuides-Modding-Valheim-with-Vortex",
+                                    "https://github.com/Nexus-Mods/Vortex/wiki/MODDINGWIKI-Users-General-Deployment-Methods",
+                                    "https://github.com/Nexus-Mods/Vortex/wiki/MODDINGWIKI-Users-FAQ",
+                                    "https://help.nexusmods.com/article/164-discontinuing-the-nexus-mods-app-faq",
+                                    "https://help.nexusmods.com/article/115-guidelines-for-collections",
+                                    "https://raw.githubusercontent.com/AzumattDev/BepInEx/v5-lts/BepInEx/Bootstrap/Chainloader.cs",
+                                    "https://raw.githubusercontent.com/AzumattDev/BepInEx/v5-lts/BepInEx/Bootstrap/TypeLoader.cs",
+                                    "https://api.nexusmods.com/v2/graphql (public queries: Valheim mods sorted by updatedAt, name search for BepInEx, Valheim collectionsV2)",
+                                    "https://www.nexusmods.com/valheim/mods/1042",
+                                    "https://www.nexusmods.com/valheim/mods/1360",
+                                    "https://www.nexusmods.com/valheim/mods/1308",
+                                    "https://www.nexusmods.com/valheim/mods/1138",
+                                    "https://www.nexusmods.com/valheim/mods/2204",
+                                    "https://www.nexusmods.com/valheim/mods/387",
+                                    "https://www.nexusmods.com/valheim/mods/200",
+                                    "https://www.nexusmods.com/valheim/mods/2323",
+                                    "https://www.nexusmods.com/news/15491",
+                                    "https://www.valheimcompanion.com/valheim-1-0/mods-compatibility"
+                                ]
+                }
+}

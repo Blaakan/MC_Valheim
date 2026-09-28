@@ -1,12 +1,23 @@
 ## Installation
 
-1. Install [BepInExPack for Valheim]({{BEPINEX_LINK}}) (version 5.4.2350 or newer).
-2. Download the main file and extract it into your **Valheim folder** (the folder that contains `valheim.exe`). It creates `{{FOLDER}}`.
-3. Start the game. In the main menu or the pause menu (Esc), click **MC Mods** to check that {{WHAT}} active.
+1. Install [BepInExPack_Valheim]({{BEPINEX_LINK}}) (5.4.2350 or newer) and start the game once.
+2. Open your Valheim folder: in Steam, right-click Valheim > Manage > Browse local files (the folder with `valheim.exe`).
+3. Extract the downloaded zip **into that Valheim folder** (not into `BepInEx/plugins`). The result is shown below.
+4. Start the game. In the main menu or the pause menu (Esc), click **MC Mods** (top right) to check that {{WHAT}} active.
+
+```
+Valheim/
+  valheim.exe
+  BepInEx/
+    plugins/
+      {{TREE}}
+```
+
+{{VORTEX}}
 
 ## Updating
 
-Extract the new version over the old one. Your settings are kept.
+{{UPDATE}} Your settings are kept: they live in `BepInEx/config/`.
 
 ## Uninstalling
 

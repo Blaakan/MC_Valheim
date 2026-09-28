@@ -6,9 +6,10 @@
                                                 BepInEx/plugins/MC_Valheim/<Category>/<Guid>/ (dll, README.md, CHANGELOG.md)
       <Guid>/<Version>/description.bbcode.txt   page description (README + shared install text, as Nexus BBCode)
       <Guid>/<Version>/nexus-page.md            every page/file field to fill in, test status, upload checklist
-      <Guid>/<Version>/banner.png               placeholder primary image
+      <Guid>/<Version>/thumbnail.png            gallery image + thumbnail (1920x1080, placeholder)
+      <Guid>/<Version>/header.png               page header (1300x372, placeholder)
       _Pack/<PackVersion>/...                   same for the pack (every mod in one zip; packaging/nexus/pack.json)
-    Nothing is uploaded: you create/update the Nexus pages by hand with these files.
+    Nothing is uploaded: create/update the Nexus pages by hand with these files (docs/publishing/nexus.md).
 .PARAMETER Mod
     Only mods whose project name contains one of these strings. Without -Mod: every mod + the pack.
 .PARAMETER Pack
@@ -31,7 +32,6 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'lib\Common.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'lib\BBCode.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'lib\Icon.psm1') -Force
-Add-Type -AssemblyName System.Drawing
 
 $root = Get-RepoRoot
 $dist = Join-Path $root 'dist'
@@ -48,11 +48,15 @@ Assert-ModRequiresAcyclic
 $pages = [IO.File]::ReadAllText((Join-Path $nexusDir 'pages.json')) | ConvertFrom-Json
 $installTemplate = [IO.File]::ReadAllText((Join-Path $nexusDir 'install.md'), [Text.Encoding]::UTF8)
 
-# Nexus has its own category list; me suggest the closest. Author picks the final one on the page.
+# Nexus Valheim categories (2026): Armour, Audio, Character Appearance, Construction, Gameplay, Miscellaneous,
+# Models and Textures, User Interface, Utilities, Visuals and Graphics, Weapons, World Saves. Me suggest closest.
 $nexusCategory = @{
-    Combat = 'Gameplay'; Exploration = 'Gameplay'; Farming = 'Gameplay'; Cooking = 'Gameplay'
-    Building = 'Building'; Crafting = 'Crafting'; UX = 'User Interface'; Core = 'Utilities'
+    Combat = 'Gameplay'; Exploration = 'Gameplay'; Farming = 'Gameplay'; Cooking = 'Gameplay'; Crafting = 'Gameplay'
+    Building = 'Construction'; UX = 'User Interface'; Core = 'Utilities'
 }
+# Nexus field rules (upload form, 2026).
+$nameRegex = "^[a-zA-Z0-9 _'().-]+$"
+$versionRegex = '^[a-zA-Z0-9.-]+$'
 
 if ($Release) {
     $dirty = @(& git -C $root status --porcelain)
@@ -109,6 +113,23 @@ function Format-TestStatus($items) {
     $lines -join "`n"
 }
 
+# Me check Nexus field limits. Return list of problems.
+function Test-NexusFields([string]$Name, [string]$Summary, [string]$Version, [string]$FileDescription) {
+    $p = @()
+    if ($Name -notmatch $nameRegex) { $p += "name '$Name' has characters Nexus refuses (allowed: letters, digits, space _ ' ( ) . -)" }
+    if ($Name.Length -gt 50) { $p += "name '$Name' is $($Name.Length) chars; the file name (= mod name) must be 50 or less" }
+    if ($Summary.Length -gt 350) { $p += "summary is $($Summary.Length) chars; Nexus max is 350" }
+    if ($Version -notmatch $versionRegex -or $Version.Length -gt 50) { $p += "version '$Version' not valid for Nexus (letters, digits, . - ; max 50)" }
+    if ($FileDescription.Length -gt 255) { $p += "file description is $($FileDescription.Length) chars; Nexus max is 255" }
+    $p
+}
+
+$permissions = @'
+| Permissions | "Use recommended settings" (re-upload: not allowed, conversion: not allowed, modification: ask me, asset use: ask me, donation points: not allowed, monetisation: not allowed), or pick your own |
+| Third-party content | No (all content is ours; the zip contains no game files) |
+| AI tags (required) | **AI-Generated Content** (the code is AI-written) and **AI Media** (this description and the placeholder images are AI-made). Nexus moderates wrong or missing AI tags. |
+'@
+
 foreach ($p in $projects) {
     Write-Step "Nexus package: $($p.BaseName)"
     & dotnet build $p.FullName -c Release -nologo -v q -p:DeployToGame=false | Out-Null
@@ -117,9 +138,11 @@ foreach ($p in $projects) {
     $dir = $p.DirectoryName
     $guid = $props.ModGuid
     $version = $props.Version
+    $folderRel = "BepInEx/plugins/$collection/$($props.ModCategory)/$guid/"
+    $fileDescription = "Extract into your Valheim folder (creates $folderRel). Needs BepInExPack_Valheim."
 
     # Me check package bits before zip.
-    $problems = @()
+    $problems = @(Test-NexusFields $props.ModName $props.ModDescription $version $fileDescription)
     $warnings = @()
     $readme = Join-Path $dir 'README.md'
     $changelog = Join-Path $dir 'CHANGELOG.md'
@@ -149,9 +172,11 @@ foreach ($p in $projects) {
 
     $out = Join-Path $dist "nexus\$guid\$version"
     Reset-StageDir $out
-    $folderRel = "BepInEx/plugins/$collection/$($props.ModCategory)/$guid/"
+    $tree = "$collection/`n        $($props.ModCategory)/`n          $guid/`n            $guid.dll"
     $install = Expand-Install @{
-        BEPINEX_LINK = $pages.bepinex; FOLDER = $folderRel; CONFIG = "$guid.cfg"; WHAT = "**$($props.ModName)** is"
+        BEPINEX_LINK = $pages.bepinex; FOLDER = $folderRel; CONFIG = "$guid.cfg"; WHAT = "**$($props.ModName)** is"; TREE = $tree
+        VORTEX = "**Vortex:** Mod Manager Download works too. Vortex puts the mod in ``BepInEx/plugins/$guid/`` instead of the folder above, which is fine. Do not mix a Vortex install and a manual install of the same mod."
+        UPDATE = 'Extract the new version over the old one (if the changelog says a folder moved, delete the old folder first).'
     }
     $readmeText = Merge-Readme ([IO.File]::ReadAllText($readme, [Text.Encoding]::UTF8)) $install
 
@@ -168,53 +193,68 @@ foreach ($p in $projects) {
     $zipName = "$($props.ModPackageName)-$version.zip"
     New-ZipFromDirectory $stage (Join-Path $out $zipName)
 
-    # Description: README (install section swapped) + link to the pack.
+    # Description: README (install section swapped, title dropped: page show the name) + link to the pack.
     $descMd = $readmeText
     if ($pages.pack) { $descMd += "`n## All MC mods`n`nWant every MC mod at once? Get the [all-mods pack]($($pages.pack)).`n" }
-    [IO.File]::WriteAllText((Join-Path $out 'description.bbcode.txt'), (ConvertTo-NexusBBCode $descMd), $utf8)
+    [IO.File]::WriteAllText((Join-Path $out 'description.bbcode.txt'), (ConvertTo-NexusBBCode $descMd -DropTitle), $utf8)
 
-    $side = @{ Client = 'Client-side'; Server = 'Server-side'; Both = 'Server + clients' }[$props.ModSide]
-    New-ModBanner -Path (Join-Path $out 'banner.png') -Title $props.ModName -Subtitle $props.ModDescription -Category $props.ModCategory `
-        -Footer "MC Valheim  |  $($props.ModCategory)  |  $($props.ModScope)  |  $side"
+    New-ModThumbnail -Path (Join-Path $out 'thumbnail.png') -Category $props.ModCategory -FeatureId $props.ModFeatureId
+    New-ModHeader -Path (Join-Path $out 'header.png') -Category $props.ModCategory -Label "MC Valheim  $dot  $($props.ModCategory)"
 
     $pageUrl = ''
     if ($pages.mods.PSObject.Properties[$guid]) { $pageUrl = [string]$pages.mods.$guid }
-    $requires = @("BepInExPack for Valheim 5.4.2350 or newer ($($pages.bepinex))")
+    $requires = @("BepInExPack_Valheim ($($pages.bepinex)): file-to-file requirement on the main file, minimum version 5.4.2350")
     foreach ($req in ($props.ModRequires -split ';' | Where-Object { $_.Trim() })) {
         $u = ''
         if ($pages.mods.PSObject.Properties[$req.Trim()]) { $u = [string]$pages.mods.($req.Trim()) }
-        $requires += "$($req.Trim()) (MC mod$(if ($u) { ": $u" } else { ', page not created yet: create it first' }))"
+        $requires += "$($req.Trim()) (MC mod$(if ($u) { ": $u" } else { ', page not created yet: publish it first' }))"
     }
+    $sideLine = @{ Client = 'Client-side only (players who want it install it; works on vanilla servers)'
+                   Server = 'Server-side (install on the host/dedicated server)'
+                   Both   = 'Server and every player must install it' }[$props.ModSide]
     $sheet = @"
 # Nexus page: $($props.ModName) $version
 
-$(if ($pageUrl) { "Existing page: $pageUrl (upload a new file version)" } else { 'No page yet: create a new mod page (then put its URL in packaging/nexus/pages.json).' })
+$(if ($pageUrl) { "Existing page: $pageUrl -> upload a new version of the main file." } else { 'No page yet: create a new mod page (Valheim), then put its URL in packaging/nexus/pages.json.' })
+
+## Page (General step)
 
 | Field | Value |
 |---|---|
 | Mod name | $($props.ModName) |
-| Summary | $($props.ModDescription) |
-| Category (suggested) | $($nexusCategory[$props.ModCategory]) (our category: $($props.ModCategory), scope: $($props.ModScope)) |
-| Version | $version |
 | Author | $author |
-| Primary image | banner.png (placeholder; in-game screenshots are better) |
-| Description | paste description.bbcode.txt |
+| Version | $version (tick "Update mod version to match this file's version" when uploading) |
+| Category | $($nexusCategory[$props.ModCategory]) (suggested; our category: $($props.ModCategory), scope: $($props.ModScope)) |
+| Summary (plain text, max 350) | $($props.ModDescription) |
+| Description | switch the editor to source mode, paste description.bbcode.txt, check the preview |
+| Tags | relevant gameplay tags + the AI tags below |
+
+## Media, requirements, permissions
+
+| Field | Value |
+|---|---|
+| Gallery | thumbnail.png (set as thumbnail; 16:9 placeholder) + in-game screenshots if you have them |
+| Header (optional) | header.png (1300x372) |
 | Requirements | $($requires -join '; ') |
-| AI content | Required tag: mark the mod as AI-generated/AI-assisted content (Nexus rule). |
-| Permissions | your choice (suggested: ask before re-uploading; modding/converting allowed with credit) |
+| Who needs it | $sideLine |
+$permissions
 
 ## File upload
 
 | Field | Value |
 |---|---|
 | File | $zipName |
-| File category | Main Files (move the previous version to Old Files) |
+| First upload | "Add as new file" |
+| Later versions | "Update existing file" = the previous main file, tick "Archive existing file" (Vortex detects updates through this chain) |
+| File name (stable, no version, max 50) | $($props.ModName) |
 | File version | $version |
-| File name | $($props.ModName) $version |
-| File description | Extract into your Valheim folder (creates $folderRel). Needs BepInExPack for Valheim. |
+| File category | Main |
+| File description (max 255) | $fileDescription |
+| Allow mod manager download | Yes (Vortex installs it to BepInEx/plugins/$guid/, which works) |
+| Set as primary file for download | Yes |
 | Build | $buildId |
 
-## Changelog for $version
+## Changelog for $version (one line per entry on Nexus)
 
 $changes
 
@@ -224,14 +264,17 @@ $(Format-TestStatus $tests)
 
 ## Checklist
 
-- [ ] Page fields filled (name, summary, category, requirements, AI tag, permissions)
-- [ ] Description pasted (preview it: lists and links render)
-- [ ] File uploaded as Main Files, version $version, old file moved to Old Files
-- [ ] Changelog entry added on the page for $version
-- [ ] Page URL saved in packaging/nexus/pages.json (first release only)
+- [ ] Page fields filled (name, author, version, category, summary, tags incl. AI tags)
+- [ ] Description pasted in source mode, preview checked (lists, links, code)
+- [ ] thumbnail.png uploaded and set as thumbnail (header.png optional)
+- [ ] BepInExPack_Valheim added as requirement
+- [ ] Permissions set
+- [ ] File uploaded (new file / update of previous), version $version, category Main
+- [ ] Changelog lines added for $version
+- [ ] Published; page URL saved in packaging/nexus/pages.json (first release only)
 "@
     [IO.File]::WriteAllText((Join-Path $out 'nexus-page.md'), $sheet, $utf8)
-    Write-Ok "dist\nexus\$guid\$version\ ($zipName, description, page sheet, banner)"
+    Write-Ok "dist\nexus\$guid\$version\ ($zipName, description, page sheet, thumbnail, header)"
 
     if ($Thunderstore) {
         $tsStage = Join-Path $dist "staging\ts-$guid"
@@ -260,20 +303,21 @@ if ($buildPack) {
     $packVersion = $packInfo.version
     $packChanges = Get-ChangelogSection (Join-Path $nexusDir 'PACK_CHANGELOG.md') $packVersion
     $packTag = "nexus/pack/v$packVersion"
-    $packProblems = @()
+    $packFileDescription = "Every MC mod. Manual install: extract into your Valheim folder (creates BepInEx/plugins/$collection/). Vortex users: install the single mods instead."
+    $packProblems = @(Test-NexusFields $packInfo.name $packInfo.summary $packVersion $packFileDescription)
     if (-not $packChanges) { $packProblems += "packaging/nexus/PACK_CHANGELOG.md has no '## $packVersion' entry" }
     if ($Release -and (Test-TagExists $packTag)) { $packProblems += "pack $packVersion already released ($packTag): bump version in packaging/nexus/pack.json" }
     if ($packProblems) { $packProblems | ForEach-Object { Write-Fail $_ }; exit 1 }
 
     $out = Join-Path $dist "nexus\_Pack\$packVersion"
     Reset-StageDir $out
-    $mods = $packaged | Sort-Object { $_.Props.ModCategory }, { $_.Props.ModName }
+    $mods = @($packaged | Sort-Object { $_.Props.ModCategory }, { $_.Props.ModName })
 
     # Pack README: what is inside, how to pick features, per-mod summary.
     $md = New-Object System.Collections.Generic.List[string]
     $md.Add("# $($packInfo.name)")
     $md.Add('')
-    $md.Add($packInfo.summary)
+    $md.Add("$($packInfo.summary) A convenience bundle of our own mods: the same files as the individual downloads.")
     $md.Add('')
     $md.Add('## Pick what you want')
     $md.Add('')
@@ -289,7 +333,12 @@ if ($buildPack) {
         $md.Add("- **$($pp.ModName)** $($pp.Version) $dot $($pp.ModCategory) $dot $($pp.ModScope) $dot $sideText$link. $($pp.ModDescription)")
     }
     $md.Add('')
-    $md.Add((Expand-Install @{ BEPINEX_LINK = $pages.bepinex; FOLDER = "BepInEx/plugins/$collection/"; CONFIG = 'MC.*.cfg'; WHAT = 'the mods are' }).Trim())
+    $packTree = "$collection/`n        README.md`n        <Category>/`n          <one folder per mod>/"
+    $md.Add((Expand-Install @{
+        BEPINEX_LINK = $pages.bepinex; FOLDER = "BepInEx/plugins/$collection/"; CONFIG = 'MC.*.cfg'; WHAT = 'the mods are'; TREE = $packTree
+        VORTEX = '**Vortex:** this pack is for manual installation only (Vortex would install only one of the mods from it). With Vortex, install the individual mods from their own pages instead. Do not mix both ways.'
+        UPDATE = "Delete the ``BepInEx/plugins/$collection`` folder, then extract the new pack."
+    }).Trim())
     $packReadme = ($md -join "`n") + "`n"
 
     $stage = Join-Path $dist 'staging\nexus-pack'
@@ -305,36 +354,47 @@ if ($buildPack) {
     [IO.File]::WriteAllText((Join-Path $collectionDir 'README.md'), $packReadme, $utf8)
     $zipName = "$($packInfo.fileBaseName)-$packVersion.zip"
     New-ZipFromDirectory $stage (Join-Path $out $zipName)
-    [IO.File]::WriteAllText((Join-Path $out 'description.bbcode.txt'), (ConvertTo-NexusBBCode $packReadme), $utf8)
-    New-ModBanner -Path (Join-Path $out 'banner.png') -Title $packInfo.name -Subtitle $packInfo.summary -Category 'Core' `
-        -Footer "MC Valheim  |  $($mods.Count) mod(s)  |  pick features in game"
+    [IO.File]::WriteAllText((Join-Path $out 'description.bbcode.txt'), (ConvertTo-NexusBBCode $packReadme -DropTitle), $utf8)
+    New-ModThumbnail -Path (Join-Path $out 'thumbnail.png') -Category 'Core' -FeatureId 'MC.Valheim'
+    New-ModHeader -Path (Join-Path $out 'header.png') -Category 'Core' -Label "MC Valheim  $dot  All Mods"
 
     $contents = ($mods | ForEach-Object { "| $($_.Props.ModName) | $($_.Props.Version) | $($_.Props.ModCategory) | $(if ($_.Pending) { "$($_.Pending) untested" } else { 'all tested' }) |" }) -join "`n"
     $sheet = @"
 # Nexus page: $($packInfo.name) $packVersion
 
-$(if ($pages.pack) { "Existing page: $($pages.pack) (upload a new file version)" } else { 'No page yet: create a new mod page (then put its URL in packaging/nexus/pages.json "pack").' })
+$(if ($pages.pack) { "Existing page: $($pages.pack) -> upload a new version of the main file." } else { 'No page yet: create a new mod page (Valheim), then put its URL in packaging/nexus/pages.json "pack".' })
+
+## Page (General step)
 
 | Field | Value |
 |---|---|
 | Mod name | $($packInfo.name) |
-| Summary | $($packInfo.summary) |
-| Category (suggested) | Gameplay |
-| Version | $packVersion |
 | Author | $author |
-| Primary image | banner.png |
-| Description | paste description.bbcode.txt |
-| Requirements | BepInExPack for Valheim 5.4.2350 or newer ($($pages.bepinex)) |
-| AI content | Required tag: mark the mod as AI-generated/AI-assisted content (Nexus rule). |
+| Version | $packVersion |
+| Category | Gameplay (suggested) |
+| Summary (plain text, max 350) | $($packInfo.summary) |
+| Description | switch the editor to source mode, paste description.bbcode.txt, check the preview |
+
+## Media, requirements, permissions
+
+| Field | Value |
+|---|---|
+| Gallery | thumbnail.png (set as thumbnail) |
+| Header (optional) | header.png |
+| Requirements | BepInExPack_Valheim ($($pages.bepinex)), minimum version 5.4.2350 |
+$permissions
 
 ## File upload
 
 | Field | Value |
 |---|---|
-| File | $zipName |
-| File category | Main Files (move the previous version to Old Files) |
+| File | $zipName (one flat zip: Nexus quarantines zips inside zips) |
+| First upload | "Add as new file"; later: "Update existing file" + "Archive existing file" |
+| File name (stable, no version) | $($packInfo.name) |
 | File version | $packVersion |
-| File description | Every MC mod. Extract into your Valheim folder (creates BepInEx/plugins/$collection/). Needs BepInExPack for Valheim. |
+| File category | Main |
+| File description (max 255) | $packFileDescription |
+| Allow mod manager download | **No** (Vortex's Valheim extension would install only one mod from the pack) |
 | Build | $buildId |
 
 ## Contents
@@ -349,13 +409,14 @@ $packChanges
 
 ## Checklist
 
-- [ ] Every included mod released first (so its page and version exist)
-- [ ] Page fields filled, description pasted, AI tag set
-- [ ] File uploaded as Main Files, version $packVersion, old file moved to Old Files
-- [ ] Changelog entry added on the page
+- [ ] Every included mod published first (its page and version exist)
+- [ ] Page fields filled, description pasted in source mode, AI tags set
+- [ ] thumbnail.png set as thumbnail
+- [ ] File uploaded, version $packVersion, category Main, mod manager download OFF
+- [ ] Changelog lines added
 "@
     [IO.File]::WriteAllText((Join-Path $out 'nexus-page.md'), $sheet, $utf8)
-    Write-Ok "dist\nexus\_Pack\$packVersion\ ($zipName, description, page sheet, banner)"
+    Write-Ok "dist\nexus\_Pack\$packVersion\ ($zipName, description, page sheet, thumbnail, header)"
     $tagsToCreate.Add([pscustomobject]@{ Tag = $packTag; Message = "$($packInfo.name) $packVersion (Nexus): " + (($mods | ForEach-Object { "$($_.Props.ModGuid) $($_.Props.Version)" }) -join ', ') })
 }
 
@@ -368,4 +429,4 @@ if ($Release) {
     }
 }
 Write-Host ''
-Write-Host "Done. Upload files and page texts are in dist\nexus\ (open each nexus-page.md)." -ForegroundColor Green
+Write-Host 'Done. Files and page texts are in dist\nexus\ (open each nexus-page.md; guide: docs\publishing\nexus.md).' -ForegroundColor Green

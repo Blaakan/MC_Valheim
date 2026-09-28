@@ -34,6 +34,9 @@ docs/backlog.md           GENERATED idea backlog (tools/Update-Backlog.ps1): fea
 docs/game/                game-systems knowledge base per category + core-engine.md (read before designing)
 docs/research/            existing-mod surveys + idea-research.json (data behind the backlog)
 docs/modding/             framework.md (how toggles/deps/multiplayer work), toolchain-research.md
+docs/publishing/          nexus.md: how to publish (page fields, AI tags, pack rules, Vortex behaviour)
+docs/testing/             cross-cutting test lists (publishing.md: install tests for the Nexus zips)
+packaging/nexus/          pack.json, PACK_CHANGELOG.md, install.md (shared install text), pages.json (page URLs)
 docs/design/              one design doc per mod (decisions, edge cases, open questions)
 .ref/decompiled/          decompiled game source (git-ignored, nested local git = one commit per game version)
 dist/                     packaged zips (git-ignored)
@@ -136,6 +139,6 @@ when `src/Shared` changes) + in-game tests.
   page sheet); bump `<Version>` + CHANGELOG entry (pack: bump `pack.json` version + PACK_CHANGELOG); commit;
   `./tools/Package-Mod.ps1 -Release` (refuses a dirty tree, an already-released version, failed tests; tags
   `nexus/<GUID>/v<ver>` and `nexus/pack/v<ver>` locally); then follow each `dist/nexus/.../nexus-page.md`
-  (docs/publishing/nexus.md). After a first upload, save the page URL in `packaging/nexus/pages.json`.
+  (step-by-step guide: `docs/publishing/nexus.md`). After a first upload, save the page URL in `packaging/nexus/pages.json`.
   **Nexus requires AI-generated/assisted content to be tagged**, and untested AI mods count as spam: tag every
   release and never publish without the in-game tests.
