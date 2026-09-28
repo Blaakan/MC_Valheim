@@ -13,6 +13,8 @@ Google Sheet, CSV export: https://docs.google.com/spreadsheets/d/1nd_oWjYyphCcjt
   config descriptions, in-game strings, and everything under `docs/`.
 - **Never credit Claude in commits** (no `Co-Authored-By`, no "Generated with" lines).
 - Commit locally at each milestone. Remote `origin` = https://github.com/Blaakan/MC_Valheim (GitHub): push only when the user asks.
+  Exception: the backlog mod workflow (below) commits nothing before its pause; the user's OK there covers the
+  commit, the push and the test issue.
 - **Never commit game code.** Decompiled source lives in `.ref/` (git-ignored). In docs, cite `Class.Method`
   instead of pasting game code (at most ~5 lines when truly essential).
 
@@ -93,11 +95,79 @@ when `src/Shared` changes) + in-game tests.
   results, tick the boxes (keep IDs stable). When code changes a behaviour, reset its tests to `[ ]`.
 - New behaviour → new test items in the same change. Multiplayer hand-off cases (items/structures reaching a
   player without the mod) always get a test.
+- A mod's pending tests can also be mirrored in a GitHub issue (backlog mod workflow, step 8). `TESTING.md` stays
+  the source of truth; when ticking it, tick the issue too.
+
+## Backlog mod workflow (implement an idea end to end)
+
+Use it when the user assigns a backlog idea, usually "implement <idea> from the backlog" plus a list of expected
+behaviours. One pause: **nothing is committed, pushed or posted until the user says OK**, and that one OK covers the
+commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no feature branch, no pull request).
+
+1. **Understand.** First run `git status` and `git log --oneline origin/main..HEAD`: if the tree is dirty or commits
+   are waiting to be pushed, tell the user and ask whether they belong to this run. Read the idea's section in
+   `docs/backlog.md` and `docs/research/existing-mods-*.md`, its notes in `docs/game/<chapter>.md`, the `.ref` code
+   of every method involved (callers, guards, messages), and the MC mods that patch the same methods or touch the same
+   items/state. Look at how existing mods hook it (GitHub source, Thunderstore "source" pages) and for compatibility
+   traps (other mods patching the same methods). Number the expected behaviours: they become the design doc's Goal
+   and each one gets at least one test; they are the scope (backlog extras only if small, listed as "added beyond the
+   request" at the pause). Ask only when blocked. If a behaviour conflicts with a vanilla rule, pick the
+   vanilla-consistent option, write it under Decisions in the design doc, and flag it at the pause.
+2. **Scaffold.** Pick `<System>.<Feature>` (the GUID is permanent), run `./tools/New-Mod.ps1`, add `<ModIdea>` with
+   the exact sheet idea name to the csproj.
+3. **Implement** per "Mod code conventions". Prefer calling the vanilla method in a loop or wrapper over copying its
+   logic: other mods' patches on it keep working. `dotnet build ValheimMods.slnx`, then
+   `./tools/Test-Smoke.ps1 -Mod <Feature>` (one word of `<System>.<Feature>`, e.g. `Repair`: `-Mod` matches the
+   project name in Test-Smoke and the `TESTING.md` path in Get-TestTodo). The game must be closed (if it is running,
+   ask the user); the smoke test takes up to ~5 min, so give the command a long timeout.
+4. **Review** the change: correctness against `.ref`, other mods patching the same methods, and whether every claim
+   in the docs and tests is true. Names and values that are not in `.ref` (spawn/prefab/piece names, station levels,
+   capacities) must be checked (wiki, game data, runtime log) or marked "(unverified)" in `TESTING.md` and listed at
+   the pause. Fix, rebuild, re-run the smoke test. When multi-agent workflows are allowed, fan out research (step 1)
+   and review, and have each finding checked by an agent that tries to refute it.
+5. **Document**, all in the same change:
+   - mod folder: `README.md` (no `TODO`; features, config table, multiplayer, good to know, compatibility with other
+     mods), `CHANGELOG.md`, `TESTING.md` ("Build under test": version, "build id = the commit in the `[MC:ready]` log
+     line", smoke-test result; Setup with checked spawn names; items for every expected behaviour, live toggle,
+     `Enabled = false` + restart, clean log; multiplayer incl. a hand-off item; cross-mod items for MC mods that
+     patch the same methods or touch the same items);
+   - `docs/design/<category>-<feature>.md`, same outline as the existing design docs;
+   - root `README.md` mods table; `packaging/nexus/pages.json` (empty URL); `packaging/nexus/PACK_CHANGELOG.md`
+     (list the mod in the top entry if that pack version has no `nexus/pack/v*` tag yet, else in a new entry);
+   - `docs/game/<chapter>.md`: vanilla facts learned, and a status link on the idea's feature note;
+   - `./tools/Update-Backlog.ps1 -Offline`, then check the idea's rows in `docs/backlog.md` link the mod (a `ModIdea`
+     typo fails silently);
+   - `CLAUDE.md` or other docs when a rule or fact turned out wrong.
+6. **Pause.** Do not commit. Give the user: what was built and how; the GUID and display name (permanent after
+   release); decisions, assumptions and extras to confirm; the files changed (`git status`); what was verified (build,
+   smoke test) and what was not (in-game, "(unverified)" names); the test list (`./tools/Get-TestTodo.ps1 -Mod
+   <Feature>`); the proposed commit message(s); what the push will publish (this run's commit(s) plus any commit
+   already in `git log --oneline origin/main..HEAD`). Then say exactly what the OK does: "commit on main, push to
+   origin (public repo) and open the public issue 'In-game tests: <ModName> <Version>'". Wait for an explicit OK. On
+   change requests: apply, re-verify, pause again.
+7. **Commit and push** after the OK: stage this run's files by path (never `git add -A`), caveman commit message(s),
+   no Claude credit (in commits and in the issue), `git push origin main`. Then rebuild (`dotnet build
+   ValheimMods.slnx`) so the deployed DLL's build id is the pushed commit, not `<hash>+dirty`.
+8. **Test list as a GitHub issue**, after the push so the commit and file paths resolve on GitHub:
+   `gh issue create --repo Blaakan/MC_Valheim --title "In-game tests: <ModName> <Version>" --body-file <scratch file>`.
+   Body in normal English: build under test (commit hash), `TESTING.md` as the source of truth, the design doc path,
+   the Setup, then every pending item as a `- [ ]` task list grouped like `TESTING.md`. Give the user the link.
+   `gh` not found: try `& "C:\Program Files\GitHub CLI\gh.exe"` (a shell started before the install has an old
+   PATH). Not installed or not logged in: ask the user to run `winget install GitHub.cli`, then `gh auth login`
+   (interactive) in a new terminal.
+9. **Results** (often a later session; find the issue by its title with `gh issue list --search`). The user may
+   report in chat or tick boxes and comment on the issue: read `gh issue view <n> --comments` first and merge both.
+   Tick `TESTING.md` (keep IDs; it is what `Package-Mod.ps1` reads), then rewrite the issue body from it
+   (`gh issue edit <n> --body-file`): `[x]` = `- [x]`, `[!]` = `- [ ] ... **FAILED:** <note>`, `[-]` =
+   `- [x] ~~...~~ (skipped: <why>)`. Commit (push only when asked). A failure that needs a code fix goes back
+   through steps 3-6 (pause before commit); reset the affected tests to `[ ]` in both places and update the issue's
+   build under test after the push. Close the issue when every item is `[x]` or `[-]`.
 
 ## Game code reference
 
 - `.ref/decompiled/assembly_valheim/<Class>.cs` (global namespace; nested types live in the parent's file, e.g.
-  `ItemDrop.ItemData` is in `ItemDrop.cs`). Game version stamp: `.ref/game-version.json`.
+  `ItemDrop.ItemData` is in `ItemDrop.cs`). Game version stamp: `.ref/game-version.json` (written by
+  `Update-GameRefs.ps1`; if missing, read `Version.CurrentVersion` in `.ref/decompiled/assembly_valheim/Version.cs`).
 - Start from `docs/game/<chapter>.md`, then confirm in `.ref`. Valheim changed a lot through 1.0 (Ashlands,
   Bog Witch, Deep North, trinkets, adrenaline…): never trust memory of older versions; verify every name.
 
