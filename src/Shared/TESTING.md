@@ -12,7 +12,7 @@ Automated coverage: `./tools/Test-Framework.ps1` (live toggle, config watching, 
   world. It does not show during normal play.
 - [ ] **F02 Panel content:** click it. Each MC mod appears under its category with a toggle, version + build id, scope,
   who needs it, multiplayer support, a coloured status line, and its multiplayer notes.
-- [ ] **F03 Live toggle:** in a world, pause → MC Mods → untick Crossbow Stays Loaded. Status turns grey "Off".
+- [x] **F03 Live toggle:** (passed 2026-09-28 as crossbow T21, build f15f765) in a world, pause → MC Mods → untick Crossbow Stays Loaded. Status turns grey "Off".
   Resume: crossbow behaves like vanilla (reload after swap). Tick it again: the mod works again, no restart.
 - [ ] **F04 Clicks don't leak:** with the panel open over the pause menu, clicking toggles never triggers the game
   buttons behind (Logout, Settings...). Clicking the MC Mods button itself never clicks what is under it. Closing

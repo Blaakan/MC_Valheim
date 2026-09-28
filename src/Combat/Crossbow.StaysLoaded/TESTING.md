@@ -11,8 +11,12 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
   the "Loaded" tooltip, the Debug `[reload weapon]` dump, and the framework (live toggle, MC Mods panel).
   Tests marked **(v0.2)** and the R-tests need this build.
 
-**Results so far:** 2026-09-28 on the *draft* build: T01-T17 passed (T14 = unloads, kept on purpose). T18 and T21 were
-not in the draft (v0.2 only). Multiplayer not tested yet. Last session log clean (no exceptions from the mod).
+**Results so far:**
+- 2026-09-28, *draft* build: T01-T17 passed (T14 = unloads, kept on purpose).
+- 2026-09-28, v0.2 build `f15f765`: T18-T22 and R01-R05 passed. Log clean (0 exceptions; live toggle seen twice).
+  T22 dump: 9 crossbows (equip 0.2 s, reload 3.5 s), GrapplingHook (reload 2 s), StaffLightning/Dundr (reload 1.9 s,
+  25 eitr) are all reload weapons and all currently keep their load.
+- Multiplayer: not tested yet.
 
 **Setup:** press F5 for the console → `devcommands` → `spawn Crossbow` + Tab to autocomplete the crossbow name, then
 `spawn Bolt` + Tab for bolts (spawn a stack, e.g. `spawn <BoltName> 50`). Spawn two different crossbows for the
@@ -45,15 +49,15 @@ two-crossbow tests. Keep `./tools/Watch-Log.ps1 -Mine` open, or check `BepInEx/L
   game. Expected: vanilla behaviour (reload after every swap).
 - [x] **T17 Clean log:** after a session, no errors or exceptions mentioning `Crossbow Stays Loaded` or `MC.` in
   `BepInEx/LogOutput.log`.
-- [ ] **T18 Tooltip (v0.2):** hover a loaded crossbow in the inventory: the tooltip ends with an orange "Loaded". Fire
+- [x] **T18 Tooltip (v0.2):** hover a loaded crossbow in the inventory: the tooltip ends with an orange "Loaded". Fire
   it: the line disappears. `UI.ShowLoadedInTooltip = false` hides it.
-- [ ] **T19 Blocking while loaded (v0.2):** with a loaded crossbow, block a few hits (if crossbows can block), swap
+- [x] **T19 Blocking while loaded (v0.2):** with a loaded crossbow, block a few hits (if crossbows can block), swap
   away and back. Expected: still loaded.
-- [ ] **T20 Item stand / armor stand (v0.2):** put a loaded crossbow on an item stand (and an armor stand), take it
+- [x] **T20 Item stand / armor stand (v0.2):** put a loaded crossbow on an item stand (and an armor stand), take it
   back, equip. Expected: loaded.
-- [ ] **T21 Live toggle (v0.2):** Esc → MC Mods → untick Crossbow Stays Loaded → swap weapons: vanilla (reload). Tick it
+- [x] **T21 Live toggle (v0.2):** Esc → MC Mods → untick Crossbow Stays Loaded → swap weapons: vanilla (reload). Tick it
   again → swap: stays loaded again, no restart.
-- [ ] **T22 Reload weapon list (v0.2, Debug build):** after spawning, `BepInEx/LogOutput.log` has `[reload weapon]`
+- [x] **T22 Reload weapon list (v0.2, Debug build):** after spawning, `BepInEx/LogOutput.log` has `[reload weapon]`
   lines. Check which items are listed (crossbows only? also Dundr / grappling hook?) and note equip vs reload times:
   (several pre-loaded crossbows are allowed on purpose). Tell me which items are listed: decide whether non-crossbow
   reload weapons should keep their load too.
@@ -62,13 +66,13 @@ two-crossbow tests. Keep `./tools/Watch-Log.ps1 -Mine` open, or check `BepInEx/L
 
 Quick re-run of the draft tests that touch the new logic.
 
-- [ ] **R01 Basics:** T01 swap and back, T03 holster, T05 two crossbows, T02 fire still consumes. Expected: as before.
-- [ ] **R02 Block then save hops:** load a crossbow, **block one hit with it**, then: swap away and back; chest
+- [x] **R01 Basics:** T01 swap and back, T03 holster, T05 two crossbows, T02 fire still consumes. Expected: as before.
+- [x] **R02 Block then save hops:** load a crossbow, **block one hit with it**, then: swap away and back; chest
   round-trip; drop and pick up; logout/login while holding it. Expected: loaded every time.
-- [ ] **R03 Repair:** repair a damaged loaded crossbow. Expected: still loaded. Then fire it, swap away before the
+- [x] **R03 Repair:** repair a damaged loaded crossbow. Expected: still loaded. Then fire it, swap away before the
   reload finishes, repair it, equip. Expected: must reload (a fired crossbow is never revived by a repair).
-- [ ] **R04 Death:** T15 again (die, recover tombstone). Expected: loaded.
-- [ ] **R05 Mod off, fire, mod on:** untick the mod in MC Mods, fire the loaded crossbow, swap away before the reload
+- [x] **R04 Death:** T15 again (die, recover tombstone). Expected: loaded.
+- [x] **R05 Mod off, fire, mod on:** untick the mod in MC Mods, fire the loaded crossbow, swap away before the reload
   finishes, tick the mod again, repair, equip. Expected: must reload.
 
 ## 0.1.0 — multiplayer (needs a second player)

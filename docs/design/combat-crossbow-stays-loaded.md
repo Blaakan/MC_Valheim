@@ -255,7 +255,7 @@ without the mod, or while the mod is off, cannot be detected. Our own shots alwa
 With the stamp per item, a player can pre-load several crossbows and fire them in quick succession by swapping
 (each swap costs the equip time `E` instead of the reload time `R`). The gain is a one-time opener of
 `(N−1)·(R−E)` that must be prepared out of combat; the sustained fire rate never beats vanilla, and each extra
-crossbow costs weight and a slot. Decision: allowed (user, 2026-09-28).
+crossbow costs weight and a slot. Measured: `E` = 0.2 s, `R` = 3.5 s (1.75 s at skill 100), so each extra pre-loaded crossbow saves about 3.3 s (1.55 s at skill 100). Decision: allowed anyway (user, 2026-09-28).
 The Debug-build `[reload weapon]` log gives the real `E` and `R`. If the burst is too strong, a
 `Balance.OnlyLastReloaded` option can keep only the most recently reloaded crossbow loaded.
 
