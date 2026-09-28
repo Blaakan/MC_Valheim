@@ -5,6 +5,9 @@
   <Folder Name="/Crafting/">
     <Project Path="src/Crafting/Repair.OneClickAll/MC.Crafting.Repair.OneClickAll.csproj" />
   </Folder>
+  <Folder Name="/Exploration/">
+    <Project Path="src/Exploration/Stats.PerCreature/MC.Exploration.Stats.PerCreature.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="CLAUDE.md" />

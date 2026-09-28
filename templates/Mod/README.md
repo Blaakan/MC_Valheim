@@ -9,7 +9,8 @@ __DESCRIPTION__
 ## Configuration
 
 The config file `BepInEx/config/__GUID__.cfg` is created the first time you launch the game with the mod.
-Every setting can also be changed in-game: open the menu (Esc) and click **MC Mods**, or use ConfigurationManager.
+To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. Every setting can be changed in-game with
+ConfigurationManager, or by editing the file (the game picks up the change while it runs).
 
 | Section | Setting | Default | Description |
 |---|---|---|---|
