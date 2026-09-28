@@ -10,7 +10,8 @@ away; firing still uses the loaded bolt as usual.
 - Re-equipping a loaded crossbow costs **no reload time, stamina or eitr**. It only takes the normal equip time.
 - **Firing works exactly like vanilla**: the shot uses the load, and the next reload takes the usual time and cost.
 - The tooltip of a crossbow that still holds a bolt shows **Loaded**.
-- Works for every weapon that must be reloaded before firing (all crossbows), including ones added by other mods.
+- Works for all crossbows (including crossbows added by other mods) and the grappling hook. You choose the list:
+  add other reload weapons by name (e.g. `StaffLightning` for Dundr, or weapons from other mods) or exclude some.
 
 ## Configuration
 
@@ -22,6 +23,9 @@ ConfigurationManager.
 |---|---|---|---|
 | General | Enabled | `true` | Turn the feature on or off. Takes effect immediately. |
 | General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
+| Weapons | Crossbows | `true` | All crossbows keep their load (every weapon using the Crossbows skill, including modded ones). |
+| Weapons | ExtraItems | `GrapplingHook` | Other reload weapons that keep their load, as comma-separated item names (the spawn command names), e.g. `GrapplingHook, StaffLightning`. |
+| Weapons | ExcludedItems | *(empty)* | Weapons that never keep their load, as comma-separated item names. Wins over the settings above. |
 | UI | ShowLoadedInTooltip | `true` | Show "Loaded" in the tooltip of a crossbow that still holds a bolt. |
 
 ## Multiplayer

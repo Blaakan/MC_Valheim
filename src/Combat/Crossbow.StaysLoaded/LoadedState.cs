@@ -14,11 +14,14 @@ internal static class LoadedState
     internal const string Key = ModInfo.Guid + ".Loaded";
     private const string Prefix = "v1:";
 
-    // Me = weapon that can keep a load: needs reload, and no eat itself when fired.
-    public static bool IsEligible(ItemDrop.ItemData item)
+    // Me = weapon that can keep a load: needs reload, no eat itself when fired, and allowed by Weapons config.
+    public static bool IsEligible(ItemDrop.ItemData item) =>
+        item != null && IsEligible(WeaponFilter.PrefabName(item), item.m_shared);
+
+    public static bool IsEligible(string prefabName, ItemDrop.ItemData.SharedData shared)
     {
-        var attack = item?.m_shared?.m_attack;
-        return attack != null && attack.m_requiresReload && !attack.m_consumeItem;
+        var attack = shared?.m_attack;
+        return attack != null && attack.m_requiresReload && !attack.m_consumeItem && WeaponFilter.Allows(prefabName, shared);
     }
 
     public static bool HasStamp(ItemDrop.ItemData item) =>

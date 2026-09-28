@@ -7,12 +7,29 @@ namespace MC.Combat.CrossbowStaysLoadedMod;
 internal sealed partial class Plugin : ModPlugin
 {
     internal static ConfigEntry<bool> ShowLoadedInTooltip;
+    internal static ConfigEntry<bool> KeepCrossbows;
+    internal static ConfigEntry<string> ExtraItems;
+    internal static ConfigEntry<string> ExcludedItems;
 
     protected override void BindConfig()
     {
+        KeepCrossbows = Config.Bind("Weapons", "Crossbows", true,
+            "All crossbows keep their load: every weapon that uses the Crossbows skill, including crossbows added by other mods.");
+        ExtraItems = Config.Bind("Weapons", "ExtraItems", "GrapplingHook",
+            "Other weapons that must be reloaded and should also keep their load: comma-separated item names, as used by "
+            + "the spawn command. Examples: GrapplingHook, StaffLightning (Dundr), or reload weapons from other mods.");
+        ExcludedItems = Config.Bind("Weapons", "ExcludedItems", "",
+            "Weapons that must never keep their load: comma-separated item names. Wins over the two settings above.");
         ShowLoadedInTooltip = Config.Bind("UI", "ShowLoadedInTooltip", true,
             "Show \"Loaded\" in the tooltip of a crossbow that still holds a bolt.");
+
+        // Me rebuild name lists now and on every change (panel, ConfigurationManager, file edit).
+        RebuildWeaponFilter();
+        ExtraItems.SettingChanged += (_, _) => RebuildWeaponFilter();
+        ExcludedItems.SettingChanged += (_, _) => RebuildWeaponFilter();
     }
+
+    private static void RebuildWeaponFilter() => WeaponFilter.Rebuild(ExtraItems.Value, ExcludedItems.Value);
 
     // Me just turned on (maybe mid-game). Catch up on what happened while me was off.
     protected override void OnActivated()

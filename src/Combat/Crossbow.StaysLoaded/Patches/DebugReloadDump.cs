@@ -47,7 +47,7 @@ internal static class DebugReloadDump
                 Log.Info($"[reload weapon] {prefab.name}: equip {shared.m_equipDuration}s, reload {a.m_reloadTime}s "
                          + $"(half at skill 100), reload stamina {a.m_reloadStaminaDrain}, reload eitr {a.m_reloadEitrDrain}, "
                          + $"durability/shot {shared.m_useDurabilityDrain}, skill {shared.m_skillType}, "
-                         + $"consumes itself {a.m_consumeItem}, eligible {LoadedState.IsEligible(drop.m_itemData)}");
+                         + $"consumes itself {a.m_consumeItem}, keeps load (config) {LoadedState.IsEligible(prefab.name, shared)}");
             }
         }
         catch (Exception e)

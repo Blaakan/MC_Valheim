@@ -206,7 +206,7 @@ timestamps or counters.
 - Key: `MC.Combat.Crossbow.StaysLoaded.Loaded` (namespaced by GUID).
 - Value: `v1:<durability>` (invariant culture, round-trip format). Anything else = not loaded.
 - Valid when `|stamped − current durability| < 0.0001`.
-- Eligible items: primary attack has `m_requiresReload` and not `m_consumeItem` (`LoadedState.IsEligible`).
+- Eligible items: primary attack has `m_requiresReload`, not `m_consumeItem`, and the item is allowed by the `Weapons` config (`LoadedState.IsEligible` + `WeaponFilter`).
 
 ### 3.3 Patches (`Patches/CrossbowLoadPatches.cs`)
 
@@ -232,6 +232,9 @@ of an unloaded weapon (the prefix requires `m_weaponLoaded == item`).
 |---|---|---|---|
 | General | Enabled | true | Framework toggle (live). |
 | General | Status | — | Framework status line (read-only). |
+| Weapons | Crossbows | true | Every weapon using the Crossbows skill keeps its load (modded crossbows too). |
+| Weapons | ExtraItems | GrapplingHook | More reload weapons by prefab name or `$item_` token (e.g. StaffLightning). |
+| Weapons | ExcludedItems | (empty) | Never keep a load; wins over the two above. |
 | UI | ShowLoadedInTooltip | true | Show "Loaded" in the tooltip of a crossbow that holds a bolt. |
 
 ### 3.5 Multiplayer and client-side
@@ -298,10 +301,10 @@ Decided by the user (2026-09-28):
 2. **Upgrade: unloads** (the game creates a new item). Kept as is.
 3. **Death: the load is kept** in the tombstone.
 
-Still open:
-
-4. **Which weapons**: once the `[reload weapon]` log (T22) shows the real list, keep all reload weapons (e.g. Dundr,
-   grappling hook if they qualify) or crossbows only?
+4. **Which weapons: crossbows + grappling hook by default, configurable.** Dundr (StaffLightning) back to vanilla by
+   default (its reload costs 25 eitr). `Weapons.Crossbows` (every weapon using the Crossbows skill, so modded
+   crossbows are included), `Weapons.ExtraItems` (default `GrapplingHook`; add `StaffLightning` or other mods' reload
+   weapons by prefab name) and `Weapons.ExcludedItems` (wins). Implemented in `WeaponFilter.cs`, read live.
 
 ## 6. Tests
 

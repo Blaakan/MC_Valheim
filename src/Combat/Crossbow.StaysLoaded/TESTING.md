@@ -62,6 +62,19 @@ two-crossbow tests. Keep `./tools/Watch-Log.ps1 -Mine` open, or check `BepInEx/L
   (several pre-loaded crossbows are allowed on purpose). Tell me which items are listed: decide whether non-crossbow
   reload weapons should keep their load too.
 
+## 0.1.0 — weapon selection (v0.3: Weapons config)
+
+- [ ] **W01 Defaults:** crossbows and the grappling hook keep their load across swaps; Dundr (StaffLightning) does
+  NOT: swap away and back, it reloads and costs eitr again (vanilla).
+- [ ] **W02 Add Dundr live:** in the cfg (or MC Mods / ConfigurationManager) set `Weapons.ExtraItems` to
+  `GrapplingHook, StaffLightning` while in game. Dundr now keeps its charge across swaps, no restart.
+- [ ] **W03 Exclude one crossbow:** set `Weapons.ExcludedItems = CrossbowArbalest`. The Arbalest reloads after every
+  swap; other crossbows still keep their load. Clear it again: the Arbalest keeps its load.
+- [ ] **W04 Crossbows off:** `Weapons.Crossbows = false`: crossbows reload as vanilla, the grappling hook still keeps
+  its load. Back to `true` afterwards.
+- [ ] **W05 Debug list:** the `[reload weapon]` log lines show `keeps load (config) True` for crossbows and the
+  grappling hook, `False` for StaffLightning (with defaults).
+
 ## 0.1.0 — v0.2 regression (the loaded check changed: durability stamp, block/repair re-stamp)
 
 Quick re-run of the draft tests that touch the new logic.
