@@ -3,6 +3,7 @@
   "bepinex": "https://www.nexusmods.com/valheim/mods/3605",
   "pack": "",
   "mods": {
-    "MC.Combat.Crossbow.StaysLoaded": ""
+    "MC.Combat.Crossbow.StaysLoaded": "",
+    "MC.Crafting.Repair.OneClickAll": ""
   }
 }

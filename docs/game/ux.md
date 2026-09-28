@@ -163,7 +163,7 @@ Local. Container edits are legal only because the panel is shown only while the 
   - Multi-craft ×`m_multiCraftAmount` (5) applies when AltPlace (Shift) or JoyLStick is held.
   - Durations: `m_craftDuration` 2 s, `m_multiCraftDuration` 6 s, upgrader `m_upgraderDuration` 8 s + 1 s per level. All are reduced by skill factor × `m_craftDurationSkillMaxDecrease` (0.6).
 - `OnCraftPressed` → timer → `DoCrafting(player)` *(private)*. That method revalidates, rolls the bonus (`m_craftBonusChance` 0.25 × skill factor, stackables only), calls `Inventory.AddItem(name, …)`, then `Player.ConsumeResources`, raises the skill and records stats.
-- **Repair.** `OnRepairPressed` → `RepairOneItem()` repairs **one** item per click. `CanRepair(item)` accepts an item whose repair or crafting station name matches and where `min(stationLevel, 4) >= m_minStationLevel`. Items from a lower world level are also accepted.
+- **Repair.** `OnRepairPressed` → `RepairOneItem()` repairs **one** item per click. `CanRepair(item)` accepts an item whose repair or crafting station name matches and where `min(stationLevel, 4) >= m_minStationLevel`. Items from a lower world level are also accepted. Under `nocost` every repairable item is accepted, and the button also shows without a station. Details: [building-crafting.md §9](building-crafting.md); mod: [One Click Repair All](../../src/Crafting/Repair.OneClickAll).
 
 ### Data and persistence
 The sort choice lives in player unique keys, which are saved in the character. `s_FilterCraft` is static and unsaved, and it survives across screens.

@@ -108,7 +108,8 @@ when `src/Shared` changes) + in-game tests.
   `BepInPlugin` / `BepInProcess` (Client mods) / soft `BepInDependency` attributes from the csproj. Never
   hardcode GUID/name/version.
 - csproj metadata (single source of truth, validated by the build): `ModName`, `Version`, `ModScope`, `ModIdea`
-  (sheet idea name), `ModSide` (`Client` | `Server` | `Both`), `ModMultiplayer` (`Compatible` | `Limited` |
+  (sheet idea name; NOT checked by the build, a typo just leaves the backlog row as "idea": check `docs/backlog.md`
+  after `./tools/Update-Backlog.ps1 -Offline`), `ModSide` (`Client` | `Server` | `Both`), `ModMultiplayer` (`Compatible` | `Limited` |
   `SinglePlayer`), `ModMultiplayerNotes` (player-facing; required unless Client + Compatible), `ModRequires`
   (GUIDs of MC mods needed at runtime, `;`-separated, no cycles), `ModDependencies` (external Thunderstore strings),
   `ModNetworkVersion` (Both mods: bump when RPC names/payloads or ZDO keys/formats change), `ModDescription`.

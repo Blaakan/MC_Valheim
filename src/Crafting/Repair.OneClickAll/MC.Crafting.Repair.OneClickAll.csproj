@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>One Click Repair All</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>One click repair all</ModIdea>
+    <ModSide>Client</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Only you need it; it works on vanilla servers and with friends who do not have it. Repairing only changes the items in your own inventory, exactly like clicking the repair button several times.</ModMultiplayerNotes>
+    <ModRequires></ModRequires>
+    <ModDescription>The repair button at a crafting station repairs every item that station can repair in one click, instead of one item per click. Also works with the devcommands nocost mode.</ModDescription>
+  </PropertyGroup>
+</Project>

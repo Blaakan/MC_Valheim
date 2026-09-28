@@ -15,7 +15,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 
 | Idea | Category | Feasibility | Existing mods | Status |
 |---|---|---|---|---|
-| [One click repair all](#one-click-repair-all) | Crafting | trivial | full | idea |
+| [One click repair all](#one-click-repair-all) | Crafting | trivial | full | [One Click Repair All 0.1.0](../src/Crafting/Repair.OneClickAll) (in development) |
 | [Per creature kill count](#per-creature-kill-count) | Exploration | trivial | partial | idea |
 | [Crossbow revamp](#crossbow-revamp) | Combat | easy | full | [Crossbow Stays Loaded 0.1.0](../src/Combat/Crossbow.StaysLoaded) (in development) |
 | [Shift + E to feed 5 items to furnaces and kilns](#shift--e-to-feed-5-items-to-furnaces-and-kilns) | Crafting | easy | full | idea |
@@ -78,7 +78,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | Building | Place sign on chest | QoL | medium | Both | no | partial | idea |
 | Building | Ward revamp | New | hard | Both | no | partial | idea |
 | Building | Magic applied to non combat (craft, farming, cooking, sailing, etc,) | New | very-hard | Depends | yes | partial | idea |
-| Crafting | One click repair all | QoL | trivial | Client | no | full | idea |
+| Crafting | One click repair all | QoL | trivial | Client | no | full | [One Click Repair All 0.1.0](../src/Crafting/Repair.OneClickAll) (in development) |
 | Crafting | Shift + E to feed 5 items to furnaces and kilns | QoL | easy | Client | no | full | idea |
 | Crafting | Forge of potential revamp | QoL | medium | Client | no | partial | idea |
 | Crafting | Gemstone revamp | New | easy | Depends | no | partial | idea |
@@ -1063,7 +1063,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 
 ### One click repair all
 
-- **Scope:** QoL · **Feasibility:** trivial · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
+- **Scope:** QoL · **Feasibility:** trivial · **Who needs it:** Client · **Custom assets:** no · **Status:** [One Click Repair All 0.1.0](../src/Crafting/Repair.OneClickAll) (in development)
 - **Approach:** A postfix on OnRepairPressed loops the vanilla RepairOneItem while HaveRepairableItems is true (safety cap) and shows one summary message. Optional hotkey and optional 'any station in range' extension of CanRepair.
 - **Hooks:** `InventoryGui.OnRepairPressed`, `InventoryGui.RepairOneItem`, `InventoryGui.HaveRepairableItems`, `InventoryGui.CanRepair`, `InventoryGui.Update`
 - **Risks:** Minimal. Must coexist with repair-cost mods; calling the vanilla method in a loop keeps their patches active. Suppress the per-item message spam. It still repairs only items valid for the current station.
