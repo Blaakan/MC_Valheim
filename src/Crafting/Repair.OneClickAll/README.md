@@ -20,8 +20,8 @@ per click. Also works with the devcommands nocost mode.
 ## Configuration
 
 The config file `BepInEx/config/MC.Crafting.Repair.OneClickAll.cfg` is created the first time you launch the game
-with the mod. Every setting can also be changed in-game: open the menu (Esc) and click **MC Mods**, or use
-ConfigurationManager.
+with the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (or use
+ConfigurationManager, or edit the file: the game picks up the change while it runs).
 
 | Section | Setting | Default | Description |
 |---|---|---|---|
