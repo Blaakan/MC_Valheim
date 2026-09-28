@@ -6,9 +6,10 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
 **Builds:**
 - *Draft* — deployed 2026-09-28 (built from `645be49` + local changes). The one being tested first. T01–T17, M01–M05.
-- *v0.2 code* (still version 0.1.0, not deployed yet) — adds the durability stamp, re-stamp on put-away and repair,
-  the "Loaded" tooltip and the framework (live toggle, MC Mods panel). The build id is in the `[MC:ready]` log line
-  and in the MC Mods panel. Tests marked **(v0.2)** need this build; the others apply to both.
+- *v0.2* (still version 0.1.0) — **deployed 2026-09-28 evening**, build id = the git commit shown in the `[MC:ready]`
+  log line and next to the mod in the MC Mods panel. Adds the durability stamp, re-stamp on block/put-away/repair,
+  the "Loaded" tooltip, the Debug `[reload weapon]` dump, and the framework (live toggle, MC Mods panel).
+  Tests marked **(v0.2)** and the R-tests need this build.
 
 **Results so far:** 2026-09-28 on the *draft* build: T01-T17 passed (T14 = unloads, kept on purpose). T18 and T21 were
 not in the draft (v0.2 only). Multiplayer not tested yet. Last session log clean (no exceptions from the mod).
