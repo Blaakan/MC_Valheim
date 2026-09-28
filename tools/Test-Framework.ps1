@@ -123,10 +123,16 @@ finally {
     if (-not $KeepProbes -and -not $KeepRunning) {
         Write-Step 'Remove probes'
         foreach ($p in $probes) {
-            $dir = Join-Path $game "BepInEx\plugins\$p"
-            if (Test-Path $dir) { [IO.Directory]::Delete($dir, $true) }
+            foreach ($dir in @((Get-ModDeployDir $p), (Join-Path $game "BepInEx\plugins\$p"))) {
+                if (Test-Path $dir) { [IO.Directory]::Delete($dir, $true) }
+            }
             $cfg = Join-Path $cfgDir "$p.cfg"
             if (Test-Path $cfg) { [IO.File]::Delete($cfg) }
+        }
+        # Me also drop category/collection folders left empty.
+        $collection = Join-Path $game ("BepInEx\plugins\" + (Get-ModCollectionFolder))
+        foreach ($dir in @((Join-Path $collection 'Core'), $collection)) {
+            if ((Test-Path $dir) -and -not (Get-ChildItem $dir -Force)) { [IO.Directory]::Delete($dir) }
         }
         Write-Ok 'probes removed'
     }

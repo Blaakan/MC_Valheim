@@ -17,6 +17,25 @@ function Get-ModAuthor {
     throw 'ModAuthor not found in Directory.Build.props'
 }
 
+# Me read <ModCollectionFolder> (the one folder under plugins/ holding all our mods).
+function Get-ModCollectionFolder {
+    $props = Get-Content (Join-Path $script:RepoRoot 'Directory.Build.props') -Raw
+    if ($props -match '<ModCollectionFolder>([^<]+)</ModCollectionFolder>') { return $Matches[1].Trim() }
+    throw 'ModCollectionFolder not found in Directory.Build.props'
+}
+
+# Me give relative install path of a mod under BepInEx/plugins: <Collection>\<Category>\<Guid>
+# (guid = <Author>.<Category>.<...>). Same rule as ModDeployDir in Directory.Build.targets.
+function Get-ModInstallRelPath([string]$Guid) {
+    $category = ($Guid -split '\.')[1]
+    Join-Path (Join-Path (Get-ModCollectionFolder) $category) $Guid
+}
+
+# Me give full deploy folder of a mod in the game.
+function Get-ModDeployDir([string]$Guid) {
+    Join-Path (Join-Path (Get-ValheimDir) 'BepInEx\plugins') (Get-ModInstallRelPath $Guid)
+}
+
 # Me find Steam libraries from registry + libraryfolders.vdf.
 function Get-SteamLibraries {
     $libs = New-Object System.Collections.Generic.List[string]

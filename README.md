@@ -53,7 +53,7 @@ Requirements: Windows, Valheim with BepInExPack_Valheim installed, .NET SDK 9.0.
 
 ```powershell
 ./tools/Setup.ps1                 # find the game, write Local.props, decompile game reference source
-dotnet build ValheimMods.slnx     # Debug builds copy each mod into <Valheim>/BepInEx/plugins/<GUID>/
+dotnet build ValheimMods.slnx     # Debug builds copy each mod into <Valheim>/BepInEx/plugins/MC_Valheim/<Category>/<GUID>/
 ./tools/Test-Smoke.ps1            # launch the game, check every mod loads and patches cleanly, close it
 ./tools/Package-Mod.ps1           # Thunderstore + Nexus zips in dist/
 ```

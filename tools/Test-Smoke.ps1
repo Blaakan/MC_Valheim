@@ -51,7 +51,7 @@ $expected = [ordered]@{}
 foreach ($p in $projects) {
     $name = Get-CsprojProp $p.FullName 'ModName'
     $expected[$p.BaseName] = $name
-    $dll = Join-Path $game "BepInEx\plugins\$($p.BaseName)\$($p.BaseName).dll"
+    $dll = Join-Path (Get-ModDeployDir $p.BaseName) "$($p.BaseName).dll"
     if (-not (Test-Path $dll)) { Write-Fail "not deployed: $dll"; exit 1 }
 }
 Write-Ok ("expecting: " + ($expected.Keys -join ', '))

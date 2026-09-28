@@ -13,7 +13,10 @@
     <ModNetworkVersion Condition="'$(ModNetworkVersion)' == ''">1</ModNetworkVersion>
     <DeployToGame Condition="'$(DeployToGame)' == '' and '$(Configuration)' == 'Debug'">true</DeployToGame>
     <DeployToGame Condition="'$(DeployToGame)' == ''">false</DeployToGame>
-    <ModDeployDir>$(BepInExDir)plugins\$(ModGuid)\</ModDeployDir>
+    <!-- BepInEx scan plugins/ recursively, so nesting is fine. One tidy folder for the whole collection. -->
+    <ModDeployDir>$(BepInExDir)plugins\$(ModCollectionFolder)\$(ModCategory)\$(ModGuid)\</ModDeployDir>
+    <!-- Old flat place. Two copies of one guid = BepInEx load only one (maybe the stale one), so deploy remove it. -->
+    <_ModLegacyDeployDir>$(BepInExDir)plugins\$(ModGuid)\</_ModLegacyDeployDir>
     <ModInfoFile>$(IntermediateOutputPath)ModInfo.g.cs</ModInfoFile>
     <!--
       Publicizer 0.4.3 rewrite IgnoresAccessChecksTo.cs EVERY build (File.WriteAllText, no compare), so CoreCompile
@@ -159,8 +162,13 @@ namespace $(RootNamespace)
     </ItemGroup>
   </Target>
 
-  <!-- Me copy dll + pdb (+ ModContent files) into BepInEx/plugins/<Guid>/. Game running = dll locked = warning only. -->
+  <!-- Me copy dll + pdb (+ ModContent files) into BepInEx/plugins/<Collection>/<Category>/<Guid>/. Game running = dll locked = warning only. -->
   <Target Name="DeployMod" AfterTargets="Build" Condition="'$(IsMod)' == 'true' and '$(DeployToGame)' == 'true'">
+    <PropertyGroup>
+      <_ModHadLegacy Condition="Exists('$(_ModLegacyDeployDir)')">true</_ModHadLegacy>
+    </PropertyGroup>
+    <RemoveDir Directories="$(_ModLegacyDeployDir)" Condition="'$(_ModHadLegacy)' == 'true'" ContinueOnError="WarnAndContinue" />
+    <Message Importance="high" Text="Removed old flat install $(_ModLegacyDeployDir)" Condition="'$(_ModHadLegacy)' == 'true' and !Exists('$(_ModLegacyDeployDir)')" />
     <ItemGroup>
       <_ModDeployFile Include="$(TargetPath)" />
       <_ModDeployFile Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
@@ -173,7 +181,7 @@ namespace $(RootNamespace)
 
   <!-- dotnet build -t:UndeployMod : me remove mod from game plugins folder. -->
   <Target Name="UndeployMod" Condition="'$(IsMod)' == 'true'">
-    <RemoveDir Directories="$(ModDeployDir)" Condition="Exists('$(ModDeployDir)')" />
+    <RemoveDir Directories="$(ModDeployDir);$(_ModLegacyDeployDir)" />
     <Message Importance="high" Text="Removed $(ModDeployDir)" />
   </Target>
 </Project>

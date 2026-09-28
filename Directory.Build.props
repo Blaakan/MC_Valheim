@@ -11,6 +11,8 @@
 
   <PropertyGroup Label="Collection">
     <ModAuthor>MC</ModAuthor>
+    <!-- All our mods live under BepInEx/plugins/<ModCollectionFolder>/<Category>/<Guid>/ (direct/Nexus installs). -->
+    <ModCollectionFolder>MC_Valheim</ModCollectionFolder>
     <ModWebsiteUrl></ModWebsiteUrl>
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
     <!-- Thunderstore dependency string for BepInEx pack. Match installed pack (LogOutput.log line: BepInExPack Valheim version). 5.4.2350 = first pack for Valheim 1.0. -->

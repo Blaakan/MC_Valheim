@@ -46,6 +46,11 @@ dist/                     packaged zips (git-ignored)
 - Root namespace is derived, not the GUID: `MC.<Category>.<SystemFeature>Mod` (e.g. `MC.Combat.CrossbowStaysLoadedMod`),
   so a `<System>` like `Inventory` never hides the game class `Inventory`.
 - Folder: `src/<Category>/<System>.<Feature>/`.
+- Install location (dev deploy, Nexus zips, all-in-one bundle): `BepInEx/plugins/MC_Valheim/<Category>/<GUID>/`
+  (`ModCollectionFolder` in Directory.Build.props). BepInEx scans `plugins/` recursively. Thunderstore installs go
+  where the mod manager puts them (`plugins/MC-<Package>/`). Config files stay flat in `BepInEx/config/<GUID>.cfg`
+  (where mod managers and ConfigurationManager expect them). Mod code finds its own files with `ModFolder`, never a
+  hardcoded path.
 - Categories: Combat, Exploration, Farming, Cooking, Building, Crafting, UX (+ Core for shared runtime/framework
   mods). Categories are soft; pick the main one. Scope: `QoL` | `Revamp` | `New`.
 - Thunderstore package name is derived by removing dots (`CrossbowStaysLoaded`); override with `<ModPackageName>`.
@@ -56,7 +61,7 @@ dist/                     packaged zips (git-ignored)
 |---|---|
 | First-time setup | `./tools/Setup.ps1 [-DevBepInExConfig]` |
 | New mod | `./tools/New-Mod.ps1 -Category Combat -Feature Crossbow.StaysLoaded -Name '...' -Scope QoL -Side Client [-Multiplayer Compatible] [-MultiplayerNotes '...'] [-Requires MC.X.Y] -Description '...'` |
-| Build all (Debug deploys to `<Valheim>/BepInEx/plugins/<GUID>/`) | `dotnet build ValheimMods.slnx` |
+| Build all (Debug deploys to `<Valheim>/BepInEx/plugins/MC_Valheim/<Category>/<GUID>/`) | `dotnet build ValheimMods.slnx` |
 | Smoke test (launch game, check mods load + patch cleanly, close) | `./tools/Test-Smoke.ps1 [-Mod Crossbow] [-KeepRunning]` |
 | Framework test (probe mods: live toggle, config watch, dependency gating) | `./tools/Test-Framework.ps1` |
 | **In-game test to-do list** | `./tools/Get-TestTodo.ps1 [-Mod X] [-All]` |

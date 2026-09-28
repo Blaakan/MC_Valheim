@@ -32,6 +32,10 @@ internal abstract class ModPlugin : BaseUnityPlugin
     public bool IsActive => State == ModState.Active;
     protected Harmony Harmony { get; private set; }
 
+    // Folder of this mod's dll. Me use it for mod files (translations, asset bundles): install place differ
+    // (plugins/MC_Valheim/<Category>/<Guid>/ direct/Nexus, plugins/MC-<Package>/ mod managers). Never hardcode.
+    protected string ModFolder => Path.GetDirectoryName(Info.Location);
+
     // Mod bind own settings here (after General.Enabled).
     protected virtual void BindConfig()
     {

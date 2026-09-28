@@ -117,3 +117,6 @@ Each mod has a `TESTING.md` checklist (single-player and multiplayer). The frame
 - Mod namespace is not the GUID: `MC.<Category>.<Feature without dots>Mod` (e.g. `MC.Combat.CrossbowStaysLoadedMod`),
   because a namespace segment like `Inventory` would hide the game class of the same name.
 - The panel blocks clicks to the game's buttons behind it with an invisible top-most canvas while it is open.
+- Install layout: direct/Nexus installs put every mod in `BepInEx/plugins/MC_Valheim/<Category>/<GUID>/`; mod
+  managers use their own `plugins/MC-<Package>/` folders. BepInEx loads both (it scans `plugins/` recursively).
+  Mod code must find its own files through `ModFolder` (the DLL's folder), never a fixed path.

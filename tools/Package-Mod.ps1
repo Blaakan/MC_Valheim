@@ -2,9 +2,10 @@
 .SYNOPSIS
     Build mods in Release and make upload-ready zips in dist/:
       dist/thunderstore/<Author>-<Package>-<Version>.zip  (manifest.json, README.md, CHANGELOG.md, icon.png, plugins/<Guid>/...)
-      dist/nexus/<Package>-<Version>.zip                  (BepInEx/plugins/<Guid>/... for manual/Vortex install)
+      dist/nexus/<Package>-<Version>.zip                  (BepInEx/plugins/<Collection>/<Category>/<Guid>/... for manual/Vortex install)
     With -Pack, also the "whole collection" bundles:
-      dist/nexus/<Author>-AllMods-<PackVersion>.zip        (every mod, one download, BepInEx/plugins/<Guid>/...)
+      dist/nexus/<Author>-AllMods-<PackVersion>.zip        (every mod, one download, same layout)
+    Thunderstore keeps plugins/<Guid>/: mod managers always install each package in its own plugins/<Team>-<Package>/.
       dist/thunderstore/<Author>-ModPack-<PackVersion>.zip (Thunderstore modpack: depends on every mod)
     Players who install everything pick features in-game (Esc > MC Mods) or in each mod's config file.
 .PARAMETER Mod
@@ -101,10 +102,10 @@ foreach ($p in $projects) {
     New-ZipFromDirectory $stage $tsZip
     Write-Ok $tsZip
 
-    # Me stage Nexus layout: BepInEx/plugins/<Guid>/...
+    # Me stage Nexus layout: BepInEx/plugins/<Collection>/<Category>/<Guid>/... (same as our dev deploy)
     $nexusStage = Join-Path $dist "staging\nexus-$($props.ModGuid)"
     Reset-StageDir $nexusStage
-    $nexusPlugin = Join-Path $nexusStage "BepInEx\plugins\$($props.ModGuid)"
+    $nexusPlugin = Join-Path (Join-Path $nexusStage 'BepInEx\plugins') (Get-ModInstallRelPath $props.ModGuid)
     New-Item -ItemType Directory -Force $nexusPlugin | Out-Null
     Copy-Item (Join-Path $pluginDir '*') $nexusPlugin -Recurse
     $nxDir = Join-Path $dist 'nexus'
@@ -144,11 +145,14 @@ if ($Pack) {
     $allStage = Join-Path $dist 'staging\all-mods'
     Reset-StageDir $allStage
     foreach ($m in $packaged) {
-        $target = Join-Path $allStage "BepInEx\plugins\$($m.Props.ModGuid)"
+        $target = Join-Path (Join-Path $allStage 'BepInEx\plugins') (Get-ModInstallRelPath $m.Props.ModGuid)
         New-Item -ItemType Directory -Force $target | Out-Null
         Copy-Item (Join-Path $m.PluginDir '*') $target -Recurse
     }
-    [IO.File]::WriteAllText((Join-Path $allStage 'README.md'), $packReadme, $utf8)
+    # README inside the collection folder: zip extract into the Valheim folder, so no clutter next to valheim.exe.
+    $collectionDir = Join-Path $allStage ('BepInEx\plugins\' + (Get-ModCollectionFolder))
+    New-Item -ItemType Directory -Force $collectionDir | Out-Null
+    [IO.File]::WriteAllText((Join-Path $collectionDir 'README.md'), $packReadme, $utf8)
     $allZip = Join-Path $dist "nexus\$author-AllMods-$PackVersion.zip"
     New-ZipFromDirectory $allStage $allZip
     Write-Ok $allZip

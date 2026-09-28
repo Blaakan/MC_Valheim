@@ -14,7 +14,7 @@ foreach ($p in Get-ModProjects $Mod) {
     # Me read csproj xml direct. Fast, no msbuild.
     $prop = { param($n) Get-CsprojProp $p.FullName $n }
     $deployed = $false
-    if ($game) { $deployed = Test-Path (Join-Path $game "BepInEx\plugins\$($p.BaseName)\$($p.BaseName).dll") }
+    if ($game) { $deployed = Test-Path (Join-Path (Get-ModDeployDir $p.BaseName) "$($p.BaseName).dll") }
     [pscustomobject]@{
         Guid     = $p.BaseName
         Name     = & $prop 'ModName'

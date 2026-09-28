@@ -48,7 +48,7 @@ anyone fires it, with or without the mod, it counts as unloaded.
 ## Installation
 
 - **Mod manager (r2modman / Thunderstore Mod Manager):** install it from the mod list.
-- **Manual:** install [BepInExPack Valheim](https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/), then copy the `MC.Combat.Crossbow.StaysLoaded` folder into `Valheim/BepInEx/plugins/`.
+- **Manual (Nexus download):** install [BepInExPack Valheim](https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/), then extract the zip into your `Valheim` folder (it creates `BepInEx/plugins/MC_Valheim/Combat/MC.Combat.Crossbow.StaysLoaded/`).
 
 ## Compatibility
 
