@@ -22,7 +22,11 @@ internal static class MessageHudPatches
         }
         try
         {
-            BulkRepair.LastMuted = text;
+            // Vanilla "nothing left" come last when a cost mod say no inside CanRepair: never hide the real reason.
+            if (BulkRepair.LastMuted == null || text != BulkRepair.VanillaNothingLeft)
+            {
+                BulkRepair.LastMuted = text;
+            }
             return false;
         }
         catch (Exception e)

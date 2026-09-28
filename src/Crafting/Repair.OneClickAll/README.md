@@ -10,8 +10,8 @@ per click. Also works with the devcommands nocost mode.
 - **Same rules as vanilla**: an item is repaired only if the current station can repair it (its recipe uses this
   station, and the station level is high enough). Items that need another station stay damaged: repair your bronze
   gear at the forge and your leather gear at the workbench.
-- **One sound and one message** for the whole click, e.g. "Repaired Bronze sword, Bronze buckler, Leather tunic +2",
-  in your game language.
+- **One sound and one message** for the whole click, e.g. "Repaired Bronze sword, Bronze buckler, Bronze plate
+  cuirass +2", in your game language.
 - **Crafting skill** rises exactly as if you had clicked once per item.
 - **devcommands `nocost`** is supported: the repair button in your inventory (shown with no station nearby) also
   repairs everything in one click.
@@ -34,7 +34,7 @@ ConfigurationManager.
 - **Multiplayer support:** works in multiplayer.
 
 Repairing only changes the items in your own inventory, exactly like clicking the repair button several times.
-Players near you hear one repair sound instead of several.
+Repaired items are ordinary items: you can give them to players who don't have the mod.
 
 ## Good to know
 
@@ -62,5 +62,5 @@ Built for Valheim 1.0.16. Safe to add or remove at any time: it stores nothing o
   everything is already repaired, so this mod has nothing left to do.
 - **Other "repair all" button mods** (e.g. FastRepairButton, RhythmicRepairs): that mod handles the click; this one
   does nothing extra. Keep only one of them.
-- Works with UI mods that keep the vanilla repair button (tested by design with the vanilla UI; Auga and SeneaL UI
-  call the same button code).
+- UI mods: Auga and SeneaL UI call the same repair button code as the vanilla UI, so they should work too (not
+  tested in game yet).

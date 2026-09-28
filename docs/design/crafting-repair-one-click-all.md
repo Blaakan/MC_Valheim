@@ -89,7 +89,9 @@ modifier `NoCraftCost` does not touch repair at all.
 ### 1.7 Multiplayer
 
 Repair is 100% local: it changes durability of items in the local player's inventory (saved in the character file).
-Effects are created locally, as in vanilla.
+The repair effects are spawned by the local client, as in vanilla; whether nearby players hear them depends on the
+effect prefab (a prefab with a `ZNetView` is replicated). With the mod there is one effect per click instead of one
+per item either way.
 
 ### 1.8 Other item repair paths
 
@@ -134,8 +136,9 @@ Crossbow Stays Loaded's re-stamp).
   in our own list (never `m_tempWornItems`, which vanilla clears on every call). Fewer than 2 worn items: do nothing.
 - **Postfix**: if the click repaired nothing (durability of the snapshot unchanged: no station, unusable station, a
   cost mod refused), stop — the next press would be refused too. Otherwise, for at most `snapshot count − 1` more
-  presses and while `HaveRepairableItems()`: call `RepairOneItem()` then `UpdateRepair()`; if the total durability
-  of the snapshot did not rise, the press was blocked: stop. The cap guarantees termination even with odd mods.
+  presses and while `HaveRepairableItems()`: call `RepairOneItem()` then `UpdateRepair()`; if no snapshot item's
+  durability rose during that press (compared per item, not as a float sum, so even a tiny repair counts), the press
+  was blocked: stop. The cap guarantees termination even with odd mods.
 - After extra repairs: `UpdateCraftingPanel()` once more (the upgrade list's durability bars were built after the
   first repair only), then one summary message.
 - An exception from inside a press (another mod's broken patch) stops the loop, is reported once (`PatchGuard`), and
@@ -150,7 +153,8 @@ Crossbow Stays Loaded's re-stamp).
   it is translated like the vanilla message. Shown only when the loop repaired at least one extra item; with a single
   repair the vanilla message stays exactly as it was.
 - If a press was blocked and the swallowed Center message explains why (cost mod), it is re-shown TopLeft (the
-  Center line holds the summary). Vanilla's "No more item to repair" is never re-shown.
+  Center line holds the summary). Vanilla's "No more item to repair" is never re-shown, and it never replaces a
+  reason swallowed earlier in the same press (a cost mod refusing inside `CanRepair` makes vanilla print it last).
 - Effects: during the extra presses the station's `m_repairItemDoneEffects` is swapped for an empty `EffectList` and
   restored in `finally`, same frame. Result: one repair sound per click. No transpiler, no global `EffectList.Create`
   patch.
@@ -176,8 +180,9 @@ vanilla rules and needs no tuning.
 
 ### 3.6 Multiplayer and client-side
 
-Client-side, compatible. Nothing is stored on items, nothing is sent over the network. Other players see nothing
-different except one repair sound instead of several. Items repaired by the mod are ordinary items for everyone.
+Client-side, compatible. Nothing is stored on items, nothing is sent over the network by the mod itself. Other
+players see nothing different (at most one repair effect per click instead of one per item, see 1.7). Items
+repaired by the mod are ordinary items for everyone (hand-off test M02).
 
 ---
 

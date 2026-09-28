@@ -16,7 +16,7 @@ internal static class BulkRepair
     private const int NamesInSummary = 3;
 
     // Vanilla say this (not localized) when a press find nothing. Never a real reason for a block.
-    private const string VanillaNothingLeft = "No more item to repair";
+    internal const string VanillaNothingLeft = "No more item to repair";
 
     private static readonly EffectList NoEffects = new EffectList();
 
@@ -92,14 +92,18 @@ internal static class BulkRepair
             Muting = true;
 
             // Each good press fix at least one item, so never more presses than worn items: no endless loop.
+            var before = new float[snapshot.Items.Count];
             for (var i = 1; i < snapshot.Items.Count && gui.HaveRepairableItems(); i++)
             {
-                var before = TotalDurability(snapshot);
+                for (var k = 0; k < before.Length; k++)
+                {
+                    before[k] = snapshot.Items[k].m_durability;
+                }
                 LastMuted = null;
                 gui.RepairOneItem();
                 // Vanilla click do this after each repair. Cost mods refresh their own list here too.
                 gui.UpdateRepair();
-                if (TotalDurability(snapshot) <= before)
+                if (!AnyRose(snapshot, before))
                 {
                     // Press fix nothing: something block it (cost mod, no more materials). Stop, else loop forever.
                     blockReason = LastMuted;
@@ -178,13 +182,16 @@ internal static class BulkRepair
         return count;
     }
 
-    private static float TotalDurability(Snapshot snapshot)
+    // Press did something = at least one item got more durability. Per item, not a float sum: tiny wear still count.
+    private static bool AnyRose(Snapshot snapshot, float[] before)
     {
-        var total = 0f;
-        foreach (var item in snapshot.Items)
+        for (var i = 0; i < before.Length; i++)
         {
-            total += item.m_durability;
+            if (snapshot.Items[i].m_durability > before[i])
+            {
+                return true;
+            }
         }
-        return total;
+        return false;
     }
 }
