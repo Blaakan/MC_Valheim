@@ -347,6 +347,27 @@ The owner spawns drops and the picked state. The picker decides the bonus and ra
   - Progress is stored in `s_tameTimeLeft` (default `m_tamingTime`, 1800 s).
   - At 0 it calls `Tame()`, which runs `MonsterAI.MakeTame` (tamed, alert cleared, targets cleared) and messages
     the closest player.
+- **`Tameable.Tame()` in detail** (private):
+  - It first calls `Game.IncrementPlayerStat(PlayerStatType.CreatureTamed)` **unconditionally**, on the machine
+    running it (the owner): the vanilla total goes to the owner's player, even when the call tames nothing.
+  - Then the guard `m_nview.IsValid() && IsOwner() && m_monsterAI && m_character && !IsTamed()`. `MakeTame` →
+    `Character.SetTamed` sends `RPC_SetTamed` to the owner, which is this machine, so it runs synchronously:
+    `IsTamed()` is already true when `Tame()` returns.
+  - The message goes to `Player.GetClosestPlayer(position, 30f)` only (closest loaded player strictly within 30 m;
+    `Player.s_players` also holds remote players loaded near the owner): Center `m_character.m_name + " $hud_tamedone"`
+    ("Boar has been tamed"). Nobody within 30 m = no message. This is the only use of `$hud_tamedone` in the game code.
+    It reaches a remote player through `Player.Message` → ZNetView RPC `"Message"` → `Player.RPC_Message` on their
+    client (see [ux.md §6](ux.md)).
+- **Nobody records who fed the creature**: `ItemDrop` stores no dropper, and the owner is whoever holds the ZDO
+  (`ZDOMan.ReleaseNearbyZDOS`: a peer keeps it while it stays in its active area), not necessarily the player at the
+  pen. Vanilla keeps **no per-creature tame data**: only the `CreatureTamed` total (plus `TamedPetting`,
+  `TamedCommand`). Mod: [Creature Kill and Tame Counts](../../src/Exploration/Stats.PerCreature) counts tames per
+  creature from the message.
+- **Console `tame`** (`Tameable.TameAllInArea`) ignores its point and radius: it calls `Tame()` on **every loaded**
+  tameable character. Only owned, untamed ones get tamed (wild ones nearby included), but each call bumps
+  `CreatureTamed`, even on creatures already tame.
+- **Tamed without `Tame()`** (no stat, no message): creatures with `m_startsTamed` (summons), `Procreation`
+  offspring (inherit the parent's state), `EggGrow` hatchlings, `Growup` adults.
 - **Commands:** `Tameable.Interact` on a tamed, `m_commandable` creature calls `Command(user)`, which sends the
   `"Command"` RPC (to the owner). `RPC_Command` toggles:
   - **stay**: `SetFollowTarget(null)` + `BaseAI.SetPatrolPoint()`. This stores the current **world** position in

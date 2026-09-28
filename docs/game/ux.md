@@ -278,8 +278,8 @@ The ZDO owner of the ItemDrop. Pickup is a client ownership grab followed by a l
 - History: `AddLog` *(private)* keeps the last `m_maxLogMessages = 50` messages, readable through `GetLog()`. They appear in the inventory **Texts** dialog (`TextsDialog.AddLog`, `$inventory_logs`). Note `Player.Message(type, msg, amount, icon, log = false)`: messages sent through the player (pickups, most gameplay toasts) are **not logged** by default, while direct `MessageHud.ShowMessage` calls default to `log = true`.
 - Network paths:
   - `MessageHud.MessageAll(type, text)` broadcasts routed RPC `"ShowMessage"(int, string)` to everybody (boss spawn/death, world-save warnings).
-  - `Player.Message` on a non-owned player sends the ZNetView RPC `"Message"(int, string, int)` to the owner.
-- `Update` calls `HideAll()` while the HUD is user-hidden, unless `showDespiteHiddenHUD`.
+  - `Player.Message` on a non-owned player sends the ZNetView RPC `"Message"(int, string, int)` to the owner, where `Player.RPC_Message` passes it to `MessageHud.ShowMessage`. The text travels as the raw `$` token string and is localized on arrival.
+- `Update` calls `HideAll()` while the HUD is user-hidden, unless `showDespiteHiddenHUD`. `ShowMessage` itself **returns at once** while the HUD is user-hidden (Ctrl+F3) and `showDespiteHiddenHUD` is false: such messages are dropped, not queued. To react to a gameplay message reliably (hidden HUD, or another mod muting `ShowMessage`), hook `Player.Message` / `Player.RPC_Message` instead (Creature Kill and Tame Counts does, for the tame message).
 
 ### Multiplayer authority
 Local rendering. Only the text arrives over RPC.
@@ -516,10 +516,11 @@ One gap remains: `Chat.Update` runs console `bind` keys (`Terminal.m_binds`) whe
   - signature: `ConsoleCommand(command, description, ConsoleEvent | ConsoleEventFailable action, isCheat, isNetwork, onlyServer, isSecret, allowInDevBuild, hideBehindDevCommands, optionsFetcher, alwaysRefreshTabOptions, remoteCommand, onlyAdmin)`
   - vanilla registers in `Terminal.InitTerminal()` *(private static, runs once)*
 - `ConsoleCommand.RunAction`:
-  - **Cheat commands require `confirmcheats` first.** They permanently mark the profile `m_usedCheats` and increment `PlayerStatType.Cheats`, which in 1.0 affects achievements.
+  - **Cheat commands require `confirmcheats` first**, but only while `Achievements.IsCheatedAtAll()` is false (profile `m_usedCheats`, a cheated world, a cheated item carried, or `Game.isModded` make it true). Every cheat command that runs (including `confirmcheats` itself) permanently marks the profile `m_usedCheats` and increments `PlayerStatType.Cheats`, which in 1.0 affects achievements.
   - Commands returning `false` or a string print an error.
   - Chat refuses cheat commands (`Chat.isAllowedCommand`).
   - `remoteCommand` forwards to the server via `ZNet.RemoteCommand` when not valid locally.
+- Cheat commands run only where `Terminal.IsCheatsEnabled()` is true (`devcommands` on **and** `ZNet.IsServer()`): in multiplayer only on the host's own game, never on a client of a dedicated server, even an admin (only `remoteCommand` commands are forwarded to the server). Details: [core-engine.md](core-engine.md), console section.
 - UX-relevant vanilla commands:
   - `filtercraft <terms>` (`Player.s_FilterCraft`)
   - `sortcraft <Original|Name|Type|Weight>` (unique key `"sortcraft"`)

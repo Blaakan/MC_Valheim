@@ -16,7 +16,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | Idea | Category | Feasibility | Existing mods | Status |
 |---|---|---|---|---|
 | [One click repair all](#one-click-repair-all) | Crafting | trivial | full | [One Click Repair All 0.1.0](../src/Crafting/Repair.OneClickAll) (in development) |
-| [Per creature kill count](#per-creature-kill-count) | Exploration | trivial | partial | idea |
+| [Per creature kill count](#per-creature-kill-count) | Exploration | trivial | partial | [Creature Kill and Tame Counts 0.1.0](../src/Exploration/Stats.PerCreature) (in development) |
 | [Crossbow revamp](#crossbow-revamp) | Combat | easy | full | [Crossbow Stays Loaded 0.1.0](../src/Combat/Crossbow.StaysLoaded) (in development) |
 | [Shift + E to feed 5 items to furnaces and kilns](#shift--e-to-feed-5-items-to-furnaces-and-kilns) | Crafting | easy | full | idea |
 | [Harpoon to work on tamed animals](#harpoon-to-work-on-tamed-animals) | Farming | easy | full | idea |
@@ -44,7 +44,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | Combat | New summons | New | medium | Both | yes | partial | idea |
 | Combat | New magical items based on valheim magic (ward, heal) | New | medium | Both | yes | partial | idea |
 | Combat | Ritual | New | hard | Both | yes | none | idea |
-| Exploration | Per creature kill count | QoL | trivial | Client | no | partial | idea |
+| Exploration | Per creature kill count | QoL | trivial | Client | no | partial | [Creature Kill and Tame Counts 0.1.0](../src/Exploration/Stats.PerCreature) (in development) |
 | Exploration | Sleep through the day | QoL | easy | Both | no | partial | idea |
 | Exploration | Cartography table revamp | QoL | medium | Client | no | partial | idea |
 | Exploration | Hip lantern as utility item | New | easy | Both | no | full | idea |
@@ -403,7 +403,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 
 ### Per creature kill count
 
-- **Scope:** QoL · **Feasibility:** trivial · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
+- **Scope:** QoL · **Feasibility:** trivial · **Who needs it:** Client · **Custom assets:** no · **Status:** [Creature Kill and Tame Counts 0.1.0](../src/Exploration/Stats.PerCreature) (in development)
 - **Approach:** Read m_playerStats[0].m_enemyStats[0][Character.m_name] (and modifier buckets) and show it on the enemy nameplate, in the trophy panel (map trophy prefab -> Character.m_name by scanning ZNetScene prefabs with CharacterDrop) and in the stats/compendium page. Data already exists and is retroactive.
 - **Hooks:** `PlayerProfile.m_playerStats`, `PlayerProfile.IncrementStatEnemy`, `Game.RPC_RegisterKill`, `EnemyHud.UpdateHuds`, `EnemyHud.ShowHud`, `InventoryGui.UpdateTrophyList`, `TextsDialog.AddStats`
 - **Risks:** Counts are per character across worlds; key is the localization token shared by variants; PvP victims mixed in (filter non-'$' keys); read index 0 not achievement buckets; minor conflicts with nameplate UI mods.
