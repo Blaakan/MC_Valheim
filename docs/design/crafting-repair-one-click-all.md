@@ -135,10 +135,18 @@ Crossbow Stays Loaded's re-stamp).
 - **Prefix** (priority First, so it runs before other mods' prefixes): snapshot the worn items and their durability
   in our own list (never `m_tempWornItems`, which vanilla clears on every call). Fewer than 2 worn items: do nothing.
 - **Postfix**: if the click repaired nothing (durability of the snapshot unchanged: no station, unusable station, a
-  cost mod refused), stop — the next press would be refused too. Otherwise, for at most `snapshot count − 1` more
-  presses and while `HaveRepairableItems()`: call `RepairOneItem()` then `UpdateRepair()`; if no snapshot item's
+  cost mod refused), stop — the next press would be refused too. Otherwise, for at most 10 presses per worn item
+  (vanilla needs one per item; the headroom is for mods that repair only part of an item per press) and while
+  `HaveRepairableItems()`: call `RepairOneItem()` then `UpdateRepair()`; if no snapshot item's
   durability rose during that press (compared per item, not as a float sum, so even a tiny repair counts), the press
   was blocked: stop. The cap guarantees termination even with odd mods.
+- **Why the stop never cuts vanilla short:** `HaveRepairableItems` and `RepairOneItem` run the same guards and the
+  same `CanRepair` walk in the same order, in the same frame. So when the first says "yes", the second repairs that
+  exact item to max, and an item is only "worn" below max: every press makes progress. The "no progress" stop can
+  only fire when another mod refuses a repair; nothing changed then, so a manual click would be refused the same
+  way. Remaining gaps (another click continues, the button keeps glowing): a mod whose refused press changes its own
+  state so the next one would succeed, an exception from another mod's patch, a mod repairing items outside the
+  player's inventory.
 - After extra repairs: `UpdateCraftingPanel()` once more (the upgrade list's durability bars were built after the
   first repair only), then one summary message.
 - An exception from inside a press (another mod's broken patch) stops the loop, is reported once (`PatchGuard`), and
@@ -200,6 +208,7 @@ repaired by the mod are ordinary items for everyone (hand-off test M02).
 | nocost at a station | Any repairable item, even from another station | All of them in 1 click (vanilla rule) |
 | Item from a lower world level | Repairable at any station of high enough level | Same |
 | Repair-cost mod, player can pay for 2 of 5 | 2 clicks succeed, 3rd refused | 2 repaired and paid in 1 click, stop, reason TopLeft |
+| Mod that repairs only part of an item per press | Several clicks per item | Continues while each press makes progress, up to 10 presses per worn item |
 | Mod that skips `RepairOneItem` (RhythmicRepairs) | That mod's behaviour | Same: our first extra press makes no progress → stop |
 | Mod that replaces the press (FastRepairButton) | That mod's behaviour | Same: nothing left, no extra press |
 | Loaded crossbow (Crossbow Stays Loaded) | Stays loaded | Stays loaded (its `RepairOneItem` patches run per item) |

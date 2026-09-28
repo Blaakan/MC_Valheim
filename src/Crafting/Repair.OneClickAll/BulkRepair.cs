@@ -15,6 +15,9 @@ internal static class BulkRepair
     // Summary list this many item names, rest become "+N".
     private const int NamesInSummary = 3;
 
+    // Vanilla need one press per worn item. Mods that repair only a bit per press need more: me allow plenty.
+    private const int PressesPerItem = 10;
+
     // Vanilla say this (not localized) when a press find nothing. Never a real reason for a block.
     internal const string VanillaNothingLeft = "No more item to repair";
 
@@ -91,9 +94,10 @@ internal static class BulkRepair
             }
             Muting = true;
 
-            // Each good press fix at least one item, so never more presses than worn items: no endless loop.
+            // Real stop rule: press fix nothing = stop (below), so no freeze. Cap only stop endless tiny repairs.
             var before = new float[snapshot.Items.Count];
-            for (var i = 1; i < snapshot.Items.Count && gui.HaveRepairableItems(); i++)
+            var maxPresses = snapshot.Items.Count * PressesPerItem;
+            for (var i = 1; i < maxPresses && gui.HaveRepairableItems(); i++)
             {
                 for (var k = 0; k < before.Length; k++)
                 {
