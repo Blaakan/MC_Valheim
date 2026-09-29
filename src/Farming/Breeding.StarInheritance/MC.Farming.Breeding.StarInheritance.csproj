@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Breeding Star Inheritance</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>Revamp</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Breeding revamp</ModIdea>
+    <!-- Both: birth run on game that simulate animal; game without me = vanilla 50/50. So server refuse player without
+         me (unless AllowPlayersWithoutMod) and send own rule numbers to every player. No BepInProcess: me load on
+         valheim_server.exe too. -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. A birth is decided by the game of the player that is simulating the animal, and a game without the mod would use the normal game rule, so the server refuses players who do not have the mod (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on. The breeding settings of the server (or host) apply to everyone. Other players' Farming counts when they stand near the animal. On a server without the mod it turns itself off. Babies and eggs are normal for everyone.</ModMultiplayerNotes>
+    <!-- Me bump when RPC names/payloads or ZDO keys/format change. v1: rpc Settings + SettingsRequest (payload
+         protocol 1), ZDO keys PartnerLevel, ConceivedAt (animal), FarmingLevel (player). -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Tamed animals pass on the weaker parent's stars, with a chance of one extra star (up to 2) that grows with your Farming skill. Replaces the coin flip between the parents' levels. Install it on the server and on every player's game.</ModDescription>
+  </PropertyGroup>
+</Project>
