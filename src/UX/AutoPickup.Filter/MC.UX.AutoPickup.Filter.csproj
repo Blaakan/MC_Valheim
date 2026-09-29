@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Loot Pickup Filter</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Loot filter</ModIdea>
+    <ModSide>Client</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Only you need it; it works on vanilla servers and with friends who do not have it. Items your filter skips stay on the ground as normal items that anyone can pick up.</ModMultiplayerNotes>
+    <ModRequires></ModRequires>
+    <ModDescription>Choose what auto pickup collects: everything, everything except your ignored items, or only your selected items. Middle-click items in your inventory or a chest to mark them. Picking up or harvesting by hand is never filtered.</ModDescription>
+  </PropertyGroup>
+</Project>
