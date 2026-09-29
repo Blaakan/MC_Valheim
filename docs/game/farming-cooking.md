@@ -371,7 +371,8 @@ The owner spawns drops and the picked state. The picker decides the bonus and ra
 - **Commands:** `Tameable.Interact` on a tamed, `m_commandable` creature calls `Command(user)`, which sends the
   `"Command"` RPC (to the owner). `RPC_Command` toggles:
   - **stay**: `SetFollowTarget(null)` + `BaseAI.SetPatrolPoint()`. This stores the current **world** position in
-    `s_patrolPoint` / `s_patrol`.
+    `s_patrolPoint` / `s_patrol`. A staying tame that is moved away (pushed, dragged with the harpoon) walks back:
+    `BaseAI.RandomMovement` heads for the patrol point when it is more than `2 × m_randomMoveRange` away.
   - **follow**: `ResetPatrolPoint` + `SetFollowTarget(player)` + `s_follow = player name`, and enforces
     `s_maxInstances` via `UnsummonMaxInstances`.
 - **Follow restore:** `Tameable.UpdateSavedFollowTarget` (every frame, owner) re-issues follow for the player
@@ -379,8 +380,22 @@ The owner spawns drops and the picked state. The picker decides the bonus and ra
   unsummon otherwise; `UpdateSummon` unsummons past `m_unsummonDistance`.
 - **Movement:** `BaseAI.Follow` stops within 3 m and runs beyond 10 m (`MoveTo` → `Pathfinding`).
   `BaseAI.IdleMovement` for tamed creatures random-walks around their *current position* or the patrol point.
+- **Targets:** `BaseAI.IsEnemy` makes a tame the enemy of every wild non-player creature (passive ones such as deer
+  included), except creatures of the same `m_group` (checked first; prefab data) and Dvergr that are not aggravated. `BaseAI.FindEnemy` (every 2 s near a player) picks the closest one the tame
+  can sense, whether it can reach it or not (a creature seen through a fence counts). `MonsterAI.UpdateTarget` drops
+  the target when it dies, when a staying tame's target is farther than `m_alertRange` from the patrol point (a
+  following tame: from the followed player), after 30 s without sensing it, or after 60 s without attacking; then the
+  next search runs 5 s later and picks it again if it is still sensed. `BaseAI.HaveTarget()` reads the ZDO bool
+  `haveTarget` that the owner's AI writes every update, so every machine can tell whether a tame is busy. A pen
+  animal that sees a wild creature outside the fence therefore has a target most of the time. Mod:
+  [Harpoon Hooks Tames](../../src/Farming/Harpoon.HooksTames) hooks every tame whatever its target, for that reason
+  (skipping tames with a target made the hook fail most of the time near wild creatures).
+- **Console `killall` and `killtame`** kill every loaded non-player creature within 1000 m, tames included;
+  `killenemies` spares tames (`Terminal`, `ShouldKillAll`).
 - **Naming** (`s_tamedName`, `s_tamedNameAuthor`, privilege checked) and **saddle** (`s_haveSaddleHash`,
-  `RPC_AddSaddle`, `SetSaddle`, `DropSaddle`).
+  `RPC_AddSaddle`, `SetSaddle`, `DropSaddle`). `Tameable.HaveRider()` = a saddle with a valid user (`Sadle`); the
+  rider owns the mount's ZDO while riding, and cannot attack (`Player.SetControls` turns an attack into
+  `StopDoodadControl`).
 
 ### Data & persistence
 - `Character` ZDO: `s_tamed`, `s_level`.
@@ -520,19 +535,22 @@ Other clients only see transforms and effects.
 ## 9. Harpoon (`SE_Harpooned`) and its target filter
 
 ### Key classes
-- `SE_Harpooned` (status effect).
-- Chitin harpoon: `SpearChitin`, projectile `projectile_chitinharpoon`, `vfx_Harpooned`.
+- `SE_Harpooned` (status effect, asset `Harpooned`).
+- Chitin harpoon: `SpearChitin` (Abyssal Harpoon), projectile `projectile_chitinharpoon`, `vfx_Harpooned` (names
+  checked in the 1.0.16 SoftRef manifest).
 - Filtering happens before the status effect exists: `Projectile.IsValidTarget` and `Character.RPC_Damage`.
+- Implemented by [Harpoon Hooks Tames](../../src/Farming/Harpoon.HooksTames) (design:
+  [farming-harpoon-hooks-tames.md](../design/farming-harpoon-hooks-tames.md), full code trace in its section 1).
 
 ### Flow
 1. `Projectile.OnHit` (projectile owner = attacker) → `IsValidTarget(IDestructible)`. For a character hit by a
    projectile from a player without `m_hitFriendly`, the target is valid only if `BaseAI.IsEnemy(owner, target)`,
    or the target is aggravatable, or the player has **PvP enabled**. Tamed creatures are not enemies, so the
    harpoon ignores them for non-PvP players.
-2. `HitData.m_statusEffectHash` = the projectile's `m_statusEffect`. `Character.Damage` sends `RPC_Damage` to the
-   target's owner. `Character.RPC_Damage` adds or refreshes the SE and calls `SetAttacker(attacker)` **before**
-   damage is applied. `ApplyDamage` returns early when total damage ≤ 0.1, so `OnDamaged` / AI alert never fire
-   for zero-damage hits.
+2. `HitData.m_statusEffectHash` = the projectile's `m_statusEffectHash` (set from the weapon in `Projectile.Setup`,
+   see below). `Character.Damage` sends `RPC_Damage` to the target's owner. `Character.RPC_Damage` adds or refreshes
+   the SE and calls `SetAttacker(attacker)` **before** damage is applied. `ApplyDamage` returns early when total
+   damage ≤ 0.1, so `OnDamaged` / AI alert never fire for zero-damage hits.
 3. `SE_Harpooned.SetAttacker`:
    - Bosses: breaks immediately.
    - Beyond `m_maxDistance` (30): breaks.
@@ -544,11 +562,38 @@ Other clients only see transforms and effects.
    - Breaks when `distance − base > m_breakDistance`, or when the attacker has no stamina.
    - `IsDone` also ends it after 2 s if the attacker blocks or attacks.
 
+### More facts (checked in `.ref`, 1.0.16)
+- The throw's status effect comes from the weapon: `Attack.FireProjectileBurst` puts
+  `m_weapon.m_shared.m_attackStatusEffect` in the `HitData`, and `Projectile.Setup` overwrites the projectile's own
+  `m_statusEffectHash` with it. Identify the harpoon by the effect's type (`ObjectDB.GetStatusEffect(hash) is
+  SE_Harpooned`), not by item or prefab name.
+- `Projectile.FixedUpdate` casts along the flight step (with `m_rayRadius` 0 a plain ray reaches 1.5 × the step, so
+  the same collider can be tested on 2-3 physics steps), sorts the hits and calls `OnHit` for each until one sets
+  `m_didHit`: the projectile stops at the **first accepted target**, so an accepted target shields whatever is behind
+  it. `OnHit` gives Spears XP (`m_raiseSkillAmount`) and adrenaline (`m_adrenaline`) from the projectile's own fields
+  right after `Damage`, for any hit, even zero damage.
+- A successful block (`Humanoid.BlockAttack`) sets `hit.m_statusEffectHash = 0`: a blocked harpoon does not hook.
+- Any player hit, even for zero damage, makes the owner's `Character.RPC_Damage` write the attacker key
+  (`ZDOVars.s_attackers` as decimal text + player name, a ZDO bool), bump the `s_attackers` count and set the kill
+  modifier (`s_modifiers`; Spears → Melee). Vanilla never clears the key; `Character.OnDeath` credits every connected
+  player whose key is set (see [exploration-player.md §5](exploration-player.md), "Kill flow"). The same RPC also adds
+  1 to the local player's `EnemyHits` stat when that player is the attacker and owns the creature.
+- `SE_Harpooned` messages: `<name> $msg_harpoon_harpooned`, `$msg_harpoon_targettoofar`, `$msg_harpoon_linebroke`,
+  `<name> $msg_harpoon_released` (stamina out, or block/attack after 2 s). Bosses break the line at once. Code
+  defaults: 30 m max distance, 4 m break distance (the asset may override them).
+- Only players take fall damage (`Character.UpdateGroundContact`), so a hard pull never hurts a creature by itself.
+  A saddled mount that swims with no saddle stamina drowns slowly (`Sadle.UpdateDrown`, `ceil(maxHealth / 20)` per
+  second).
+- Tames: a staying tame walks back to its patrol point after being dragged; ridden mounts and what "has a target"
+  means for a tame (`BaseAI.HaveTarget()`) are in §6 (Flow: stay, Targets, saddle).
+
 ### Multiplayer authority, patch points
 - The attacker decides validity and damage; the target owner simulates the pull.
 - Patch points:
   - `Projectile.IsValidTarget` postfix (private; `m_owner` and `m_statusEffectHash` are private fields).
   - `Character.Damage` prefix (attacker side) to strip damage and pushback.
+  - `Character.RPC_Damage` prefix/postfix (target owner) to undo the attacker mark a zero-damage hit leaves (only
+    where the owner runs the mod).
   - `SE_Harpooned.SetAttacker` / `UpdateStatusEffect` for pull tuning.
 - Melee `Attack` has its own tame filter (`Attack.DoMeleeAttack` / `DoAreaAttack`) using
   `SharedData.m_tamedOnly`, the flag behind `KnifeButcher`, "designed specifically for slaughtering tamed
@@ -1055,6 +1100,14 @@ the lower parent's level, with a chance of +1.*
 
 ### Farming — Harpoon works on tamed animals (QoL)
 *Use the chitin harpoon to drag your own tames without hurting them.*
+
+- **Status:** implemented as [Harpoon Hooks Tames](../../src/Farming/Harpoon.HooksTames) (0.1.0). The design that
+  shipped differs from the sketch below: the harpoon is recognised by its status-effect type; the zeroed hit is also
+  unblockable (a block would cancel the hook), gives no Spears XP or adrenaline, and nested on-hit procs on the same
+  tame are skipped; an owner-side `Character.RPC_Damage` prefix/postfix removes the vanilla attacker mark a hook
+  leaves (no kill credit later when the tame's owner runs the mod); ridden tames are not added as targets, every other
+  tame is, whatever its AI is doing (so a tame in the line of fire catches the harpoon). No pull tuning. See
+  [docs/design/farming-harpoon-hooks-tames.md](../design/farming-harpoon-hooks-tames.md).
 
 - **Feasibility:** easy.
 - **Who needs the mod:** client-only (the harpooner). The attacker decides the valid target and builds the

@@ -101,6 +101,8 @@ game ignores.
   adds text to the Player Statistics entry (not tested in game yet). If a mod removes that entry, the section is not
   shown.
 - **One Click Repair All** (MC): works together; the two mods change different things.
+- **Harpoon Hooks Tames** (MC): hooking a tame does not make its later death your kill when the game running the
+  tame runs that mod (always in single player); otherwise the game may credit you with that kill.
 - Mods that tame creatures through their own code, without the game's normal taming, are not counted.
 
 ## For mod authors
