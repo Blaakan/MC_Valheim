@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Crafting Search and Sort</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Search crafting station</ModIdea>
+    <ModSide>Client</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Only you need it; it works on vanilla servers and with friends who do not have it. It only changes how your own crafting list is shown. The sort you pick for each station is saved with your character.</ModMultiplayerNotes>
+    <ModRequires></ModRequires>
+    <ModDescription>Adds a search field and a sort button above the recipe list of every crafting station. Search matches item and ingredient names as you type; sort puts the category you pick (weapons, swords, armor, food...) at the top.</ModDescription>
+  </PropertyGroup>
+</Project>

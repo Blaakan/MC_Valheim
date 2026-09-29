@@ -114,6 +114,11 @@ Each mod has a `TESTING.md` checklist (single-player and multiplayer). The frame
   `RuntimeHelpers.PrepareMethod` is an empty stub in Unity's Mono) so runtime-only binding failures (stale DLL after a
   game update, APIs present in .NET Framework but missing in Unity's Mono, missing assemblies) show up in the smoke
   test instead of mid-game. The framework test proves it works with a deliberately missing DLL.
+- `ItemKinds` (`src/Shared/ItemKinds.cs`, not framework but shared by every mod): `ItemKinds.Classify(SharedData)`
+  returns an `ItemKind` (Weapon, Ammo, Shield, each armor slot, Utility, Trinket, Tool, SkillTool, Torch, Food, Potion,
+  Material, Fish, Trophy, Misc, Other) from the item type, skill, animation and food values. Any mod that sorts or
+  groups items "by type" builds its own groups and labels on top of it, so the same item lands in the same group in
+  every MC mod (Crafting Search and Sort, Sort Chest). Pure enum compares, no state, no allocation.
 - Mod namespace is not the GUID: `MC.<Category>.<Feature without dots>Mod` (e.g. `MC.Combat.CrossbowStaysLoadedMod`),
   because a namespace segment like `Inventory` would hide the game class of the same name.
 - The panel blocks clicks to the game's buttons behind it with an invisible top-most canvas while it is open.

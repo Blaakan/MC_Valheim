@@ -217,6 +217,7 @@ Related 1.0 system: **`ShieldGenerator`** (fuelled dome; `IsInsideShield`, `IsIn
 
 ### Key classes
 * **`CraftingStation`** (`Hoverable`, `Interactable`, `IMonoUpdater`) – workbench, forge, stonecutter, artisan table, black forge, galdr table, cauldron, **Forge of Potential** (`m_upgrader`), etc.
+  * Prefab names (1.0.16 game data manifest, checked for Crafting Search and Sort): `piece_workbench`, `forge`, `blackforge`, `piece_magetable` (Galdr Table), `piece_artisanstation`, `piece_cauldron`, `piece_MeadCauldron` (Mead Ketill), `piece_preptable` (Food Preparation Table), `piece_stonecutter`, `UpgradeStation` (Forge of Potential piece). The matching localization keys (`$piece_workbench`, `$piece_forge`, `$piece_blackforge`, `$piece_magetable`, `$piece_artisanstation`, `$piece_cauldron`, `$piece_meadcauldron`, `$piece_preptable`, `$piece_stonecutter`, `$piece_upgradestation`) exist; that they are the stations' `m_name` is assumed *(prefab)*. All of them open the same `InventoryGui` crafting panel (see [ux.md §3](ux.md)).
 * **`StationExtension`** – chopping block, anvils, tanning rack, etc.; raises station level.
 
 ### Fields
@@ -271,7 +272,7 @@ All crafting logic is in **`InventoryGui`** (client UI singleton).
 
 ### Flow
 1. `UpdateCraftingPanel` → tabs: no station ⇒ craft only; station with `!m_hasCraftTab` ⇒ upgrade only (Forge of Potential); `Player.GetAvailableRecipes` → `UpdateRecipeList`.
-2. `UpdateRecipeList`: craft tab lists recipes (`!m_noCraftOnlyUpgrade`); upgrade tab lists, for each recipe with `m_maxQuality > 1`, **every matching inventory item** (normal stations skip max-quality items; the upgrader lists all items whose recipe has an upgrader resource). Sort via player unique key `"sortcraft"` (`SortMethod`).
+2. `UpdateRecipeList`: craft tab lists recipes (`!m_noCraftOnlyUpgrade`); upgrade tab lists, for each recipe with `m_maxQuality > 1`, **every matching inventory item** (normal stations skip max-quality items; the upgrader lists all items whose recipe has an upgrader resource). Sort via player unique key `"sortcraft"` (`SortMethod`), applied **after** the rows are built and followed by a repositioning of every row, so list reorders belong in a postfix. Search and sort UI: [Crafting Search and Sort](../../src/UX/Crafting.SearchSort) ([design](../design/ux-crafting-search-sort.md)); details in [ux.md §3](ux.md).
 3. `UpdateRecipe(player, dt)` (every frame): description via `ItemDrop.ItemData.GetTooltip(item, q, crafting: true, worldLevel, stack)`, variant button (only craft tab, `m_variants > 1`), `SetupRequirementList`, station level indicator, **`m_craftButton.interactable`** decision and tooltip; runs the craft timer and calls `DoCrafting` when done.
 4. `OnCraftPressed`: snapshots `m_craftRecipe`, `m_craftUpgradeItem`, `m_craftVariant`, `m_multiCrafting`; inventory space checks (upgrader requires `recoverable resources + 1` empty slots); starts the timer.
 5. **`DoCrafting(player)`** – the core rule:
@@ -310,8 +311,8 @@ Oddity: in the bonus loop `DoCrafting` adds the *cumulative* bonus each time (`n
 1.0 adds a refinement station that pushes items **beyond** their normal `m_maxQuality`, with success / downgrade / break outcomes.
 
 ### Identification
-* Station: a `CraftingStation` with **`m_upgrader = true`**, name `$piece_upgradestation` = "Forge of Potential" (localisation). It is a world location (SoftRef names `AncientUpgradeStation`, `UpgradeStation`, `RuneStone_UpgradeStation`; lore stone `lore_upgradestation_*`). Probably `m_hasCraftTab = false` *(prefab)*.
-* Catalyst: **Idol** items (`$item_upgrader_name` "Idol"), two families — `$item_upgrader_weapon` "Battle" and `$item_upgrader_armor` "Protection" — in 8 tiers `$item_upgrader_tier0..7` (Wooden, Bronze, Iron, Silver, Black Metal, Black Marble, Flametal, Bloodgold). Models `UpgradeStatuetteWeapon`/`UpgradeStatuetteArmor`. Exact prefab names: dump at runtime.
+* Station: a `CraftingStation` with **`m_upgrader = true`**, name `$piece_upgradestation` = "Forge of Potential" (localisation). It is a world location (game data: the Mountains location `AncientUpgradeStation` in `SoftRef/manifest`, the piece prefab `UpgradeStation` and the prop `RuneStone_UpgradeStation` in `manifest_extended`; lore stone `lore_upgradestation_*`). Probably `m_hasCraftTab = false` *(prefab)*.
+* Catalyst: **Idol** items (`$item_upgrader_name` "Idol"), two families — `$item_upgrader_weapon` "Battle" and `$item_upgrader_armor` "Protection" — in 8 tiers `$item_upgrader_tier0..7` (Wooden, Bronze, Iron, Silver, Black Metal, Black Marble, Flametal, Bloodgold). Models `UpgradeStatuetteWeapon`/`UpgradeStatuetteArmor`. Item prefabs (game data manifest, `Items/Upgrades/`): `Upgrader0Weapon` … `Upgrader7Weapon` and `Upgrader0Armor` … `Upgrader7Armor`.
 * Each weapon/armor `Recipe` that can be refined carries an extra `Piece.Requirement` with `m_upgraderResource = true` pointing at the matching idol tier *(prefab)*.
 
 ### Per-idol tuning (`ItemDrop.ItemData.SharedData`, header "Upgrader (Refinement Forge)")

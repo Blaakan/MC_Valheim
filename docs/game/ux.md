@@ -147,15 +147,19 @@ Local. Container edits are legal only because the panel is shown only while the 
 `InventoryGui` (crafting part), `Player.GetAvailableRecipes`, `Player.GetCurrentCraftingStation`, `CraftingStation`, `Recipe`, and the private struct `InventoryGui.RecipeDataPair` (`Recipe`, `ItemData`, `InterfaceElement`, `CanCraft`).
 
 ### Flow
-- `CraftingStation.Interact` → `InventoryGui.instance.Show(null, 3)`, which opens with the crafting group active.
+- `CraftingStation.Interact` → `InventoryGui.instance.Show(null, 3)`, which opens with the crafting group active. The plain inventory (Tab) calls `Show(null)`. The crafting panel `m_crafting` is always active while the inventory is visible; without a station it lists the hand-crafting recipes. Every crafting station (workbench, forge, cauldron, mead ketill, food preparation table, stonecutter, Forge of Potential...) and hand crafting share this one recipe list.
 - `UpdateCraftingPanel(bool focusView = false)` *(private)* picks the tabs (`m_tabCraft` / `m_tabUpgrade`, `InCraftTab()` / `InUpradeTab()` [sic]), calls `Player.GetAvailableRecipes(ref list)`, `UpdateRecipeList(list)` *(private)* and `SetRecipe(index, center)`.
-- It is **not called every frame**. It runs on `Show`, tab switches, after crafting and repair, and after dropping an item. This makes it the right refresh call for filters.
+- It is **not called every frame**. It runs on `Show`, tab switches, after crafting and repair, after dropping an item outside and after moving items (`OnSelectedItem`). Picking items up does not rebuild it. This makes it the right refresh call for filters.
+- **Selection after a rebuild**: `GetSelectedRecipeIndex(acceptOneLevelHigher: true)` finds the previous selection again by `Recipe` + `ItemData`; not found → index 0; empty list → `SetRecipe(-1)` (empty details, craft button off). `SetRecipe` logs `Setting selected recipe <n>` (`ZLog.Log`) on every call and, with `center`, scrolls through `m_recipeEnsureVisible.CenterOnItem` (`ScrollRectEnsureVisible` on the list's `ScrollRect`; it uses its `maskTransform` and the `ScrollRect` height). A craft in progress uses the snapshot taken by `OnCraftPressed` (`m_craftRecipe`, `m_craftUpgradeItem`), not the current selection.
 - **`Player.GetAvailableRecipes`** starts from `ObjectDB.instance.m_recipes` and keeps recipes that are enabled or in the current season. It then applies **`Player.s_FilterCraft`**, a public static `List<string>` set by the non-cheat console command `filtercraft`. A recipe survives if any term matches the prefab name, the `$token` or the localized name; an empty term never matches.
   - A list containing only `""` therefore hides everything. Call `Clear()` instead.
   - Remaining conditions: DLC owned; known recipe (`m_knownRecipes`) or `m_noPlacementCost` or global key `AllRecipesUnlocked`; and `RequiredCraftingStation(recipe, 1, false)`.
 - **`UpdateRecipeList`** destroys and re-instantiates one `m_recipeElementPrefab` per entry, spaced `m_recipeListSpace = 30`. Children are `icon`, `name`, `Durability`, `QualityLevel` and `selected`.
   - The craft tab skips `m_noCraftOnlyUpgrade` recipes. The upgrade tab lists player items with `m_maxQuality > 1`; upgrader stations need an `m_upgraderResource` requirement.
   - Sort order comes from the player unique key `"sortcraft"` (console `sortcraft`), parsed into `InventoryGui.SortMethod { Original, Name, Type, Weight, Count }`. Every mode sorts craftable first, then `Recipe.m_listSortWeight`, then name/type/weight, then quality level. `Count` has no switch case, so it does not sort.
+  - Order inside the method: build the rows, size the content (`max(m_recipeListBaseSize, count * m_recipeListSpace)`; `m_recipeListBaseSize` *(private)* is read once in `Awake` from the list root's height), **then** sort `m_availableRecipes` (`List.Sort`, not stable), **then** reposition every row. A reorder of the `recipes` argument in a prefix is therefore overwritten (only ties survive): reorder in a postfix, then redo `anchoredPosition` and the content height.
+- **Which ingredients a row shows** (`SetupRequirementList`, called from `UpdateRecipe` with quality 1 in the Craft tab and item quality + 1 in the Upgrade tab): a requirement is listed only when `station.m_upgrader == req.m_upgraderResource` (without a station: `!req.m_upgraderResource`, so idols show only at the Forge of Potential), `req.GetAmount(quality) > 0` (upgrade-only ingredients are hidden in the Craft tab and craft-only ones in the Upgrade tab), and, for `m_requireOnlyOneIngredient` recipes, `Player.IsKnownMaterial(name)`.
+- Recipe assets are named `Recipe_<result prefab>` (e.g. `Recipe_SwordSilver`, game data manifest `Assets/GameElements/Recipes/...`). A search on `recipe.name` must strip that prefix, or `recipe` matches every row.
 - **`UpdateRecipe(player, dt)`** runs every frame.
   - It builds the description with `ItemDrop.ItemData.GetTooltip(item, quality, crafting: true, worldLevel, stack)` (static overload).
   - The requirement list has `m_recipeRequirementList` slots and pages every second when there are more than 4.
@@ -172,8 +176,8 @@ The sort choice lives in player unique keys, which are saved in the character. `
 Local player. Crafting runs entirely client-side against the player inventory.
 
 ### Patch points
-- `Player.GetAvailableRecipes` (postfix): the cleanest place to filter or search. It feeds both tabs.
-- `InventoryGui.UpdateRecipeList` (postfix): re-sort or decorate rows after vanilla sorting. Row positions are `anchoredPosition = (0, -i*m_recipeListSpace)`.
+- `Player.GetAvailableRecipes` (postfix): feeds both tabs, but other mods call it for their own UIs (recipe browsers), so a filter there must be scoped to the crafting panel.
+- `InventoryGui.UpdateRecipeList` (postfix): filter, re-sort or decorate rows after vanilla sorting. Row positions are `anchoredPosition = (0, -i*m_recipeListSpace)`. A postfix that removes rows must also destroy their GameObjects and set the content height again. Mod: [Crafting Search and Sort](../../src/UX/Crafting.SearchSort) filters and sorts here (postfix at `Priority.Low`) and refreshes with `UpdateCraftingPanel(false)` ([design](../design/ux-crafting-search-sort.md)).
 - `InventoryGui.UpdateCraftingPanel` (call it to refresh), `InventoryGui.SetRecipe`, `InventoryGui.DoCrafting`, `InventoryGui.RepairOneItem` (for one-click repair all).
 
 ---
@@ -417,6 +421,12 @@ Local, except player-position pins (`ZNet.GetOtherPublicPlayers`) and pings/shou
 - `ZInput.ResetKBMButtons` (add buttons)
 - `Chat.HasFocus` (postfix-OR a custom text field's focus: see §14)
 
+Inventory screen timing (learned for Crafting Search and Sort):
+- `InventoryGui.Update` calls `ZInput.ResetButtonStatus("Inventory")` (and `"JoyButtonY"`) right before `Show`, so a later `GetButtonDown("Inventory")` in the same frame misses the press that opened the inventory. It closes only when `m_shownFrames > 1`, on `Inventory`, `JoyButtonB`, `JoyButtonY`, Escape or `Use`, and resets those buttons first. `GP` (guardian power) is F by default, but `Player.Update` reads it only when `Player.TakeInput` is true, never while the inventory is visible. `Use` and `Inventory` are rebindable, so a player may bind one of them to F (the build-search key).
+- `InventoryGui.IsVisible()` stays true on the frame of `Hide`; the Animator bool `"visible"` (`m_animator`, private) is cleared at once by `Hide`, so use it for a same-frame check.
+- With keyboard and mouse the player can walk while the inventory is open: `PlayerController.TakeInput` blocks movement for the inventory only when a gamepad is active. `Player.TakeInput` is false while the inventory is visible (no hotbar, Use, auto-pickup toggle).
+- The build search's focus (`Hud.instance.m_buildUi.SearchFieldFocused`) is checked by `Player.TakeInput`, `PlayerController.TakeInput` and `Minimap.Update`, not by `InventoryGui.Update`.
+
 ---
 
 ## 10. UI toolkit (TextMeshPro, gui_framework, navigation, radial)
@@ -440,7 +450,13 @@ Local, except player-position pins (`ZNet.GetOtherPublicPlayers`) and pings/shou
   - New panels should carry their own `UIGroupHandler` with a priority above the inventory's, or be added to `InventoryGui.m_uiGroups`.
   - `ScrollRectEnsureVisible.CenterOnItem` keeps the selection in view.
 - **Radial menu (1.0, gamepad-first)**: `Hud.instance.m_radialMenu` (`Valheim.UI.RadialBase`: `Open(IRadialConfig, back)`, `QueuedOpen`, `Refresh`, `Back`, `QueuedClose`). Configs implement `IRadialConfig { LocalizedName; Sprite; InitRadialConfig(RadialBase) }`. `OpenRadialConfig` picks Main or Emote groups, or a context radial from the hover object. This is a natural host for a ping wheel or a sort-mode wheel.
-- **Localize component**: `Localize.Start` localizes every Text/TMP under it and re-localizes on language or input-layout change. Put `$tokens` in cloned labels **before** they start, so they stay translatable.
+- **Localize component**: `Localize.Start` localizes every Text/TMP under it and re-localizes on language or input-layout change. Put `$tokens` in cloned labels **before** they start, so they stay translatable. Remove it from a clone whose text you set yourself.
+- **`GuiInputField` focus and navigation**: `ActivateInputField` turns `EventSystem.sendNavigationEvents` off while a keyboard user types (it does nothing for a gamepad user) and opens the Steam keyboard in Big Picture. Navigation comes back **only on submit or deselect** (listeners added in `GuiInputField.Start`) or when the field is disabled or destroyed, so when a field loses focus any other way (Esc, a click elsewhere, a mod releasing it), also call `EventSystem.current.SetSelectedGameObject(null)`, as `Chat.Update` does.
+- **Cloning checklist** (learned for Crafting Search and Sort):
+  - a cloned `Button` keeps its persistent `onClick` calls: assign a new `Button.ButtonClickedEvent`. For a cloned `GuiInputField`, mute the persistent listeners (`SetPersistentListenerState(i, UnityEventCallState.Off)`) instead of replacing the events, which would drop the listeners `GuiInputField.Start` adds;
+  - a cloned `Selectable` keeps its source's `navigation`, explicit targets included: set `Navigation.Mode.None` to keep the D-pad off a control that must not trap a gamepad user (Unity's automatic navigation skips `None`);
+  - destroy cloned `UIGamePad` (button hotkey), `UIInputHint`, `UITooltip` and `Localize` components before the clone's `Start`; destroy their hint GameObjects only when they are inside the clone (`Instantiate` keeps references to objects outside the cloned hierarchy, which belong to the vanilla source);
+  - instantiate under an inactive parent (or deactivate first) so nothing runs before you strip it.
 
 ---
 
@@ -462,7 +478,8 @@ Local, except player-position pins (`ZNet.GetOtherPublicPlayers`) and pings/shou
   - `Localize(string)` replaces each `$word` (terminated by one of `" (){}[]+-!?/\&%,.:-=<>\n"`) through `Translate`. Missing keys render as `"[word]"`. `$KEY_<button>` resolves to bound key names.
   - `Localize(text, params string[] words)` substitutes `$1..$n` afterwards.
   - Results are memoised in an **LRU cache of 100** (`m_cache`).
-- Sources: CSV `TextAsset`s from `LocalizationSettings.Localizations`, with columns per language and English as fallback. `SetLanguage` clears the table, calls `SetupLanguage` and raises `Localization.OnLanguageChange`.
+- Sources: CSV `TextAsset`s from `LocalizationSettings.Localizations`, with columns per language and English as fallback. `SetLanguage` clears the table, calls `SetupLanguage` and raises `Localization.OnLanguageChange` (a plain static `Action`: subscribe with `Delegate.Combine`). By then the new words are in place, so a handler can re-localize its labels at once.
+- Ready-made labels: skill names are `"$skill_" + SkillType.ToString().ToLower()` (`SkillsDialog`), e.g. `$skill_swords` "Swords", `$skill_elementalmagic` "Elemental Magic"; note `$skill_unarmed` is "Fists" in English. Station names: `$piece_workbench`, `$piece_forge`, `$piece_blackforge`, `$piece_magetable` (Galdr Table), `$piece_artisanstation`, `$piece_cauldron`, `$piece_meadcauldron` (Mead Ketill), `$piece_preptable` (Food Preparation Table), `$piece_stonecutter`, `$piece_upgradestation` (Forge of Potential) exist in the 1.0.16 English table.
 - **There is no public API to add words.** `AddWord(key, text)` and `m_translations` are private. To add tokens:
   1. postfix `Localization.SetupLanguage(language)` (it runs at construction and on every language change)
   2. call `AddWord` by reflection for our tokens (English fallback plus any translations)
@@ -505,7 +522,12 @@ Use these to decide whether a hotkey may fire or whether the player is "in a men
 
 `Chat.HasFocus()` is checked by `InventoryGui.Update` (hotkeys, including close-on-`Use`/Tab), `Player.TakeInput`, `PlayerController.TakeInput`, `GameCamera`, `Minimap.Update`, `StoreGui` and `TextInput`. **A postfix `__result |= OurTextFieldFocused` on `Chat.HasFocus` is the smallest patch that stops the game reacting to keys typed into a custom text field.**
 
-One gap remains: `Chat.Update` runs console `bind` keys (`Terminal.m_binds`) whenever the chat's own input is unfocused. Also suppress those if needed, for example with a prefix that skips binds while our field is focused.
+One gap remains: `Chat.Update` runs console `bind` keys (`Terminal.m_binds`) whenever the chat's own input is unfocused. Also suppress those if needed, for example with a prefix that skips binds while our field is focused. The bind loop is the only caller of `Terminal.TryRunCommand(text, silentFail: true, skipAllowedCheck: true)`, so a prefix that skips calls with `skipAllowedCheck` leaves typed commands alone. `UIGamePad.ButtonPressed` can also fire a panel button from a keyboard `m_keyCode` (prefab data).
+
+Cautions (learned for Crafting Search and Sort):
+- The `Chat.HasFocus` postfix blocks the **whole** hotkey block of `InventoryGui.Update` (gamepad B and Y included) and all keyboard walking. Raise it only while a field really has the keyboard, never for a mouse-only popup. For a popup that should close on Esc/B, return true only on the frame Esc or `JoyButtonB` goes down, so that key closes the popup and not the inventory.
+- Raise the flag until "this frame + 1": the Esc that makes the field lose focus in frame N must still be blocked for `InventoryGui.Update` in frame N, whatever the script order.
+- While the inventory is visible, the chat cannot be opened (`Chat.Update`) and neither can the pause menu (`Menu.Update`): only the console (F5) can have the keyboard next to a field in the inventory screen. An IMGUI field (ConfigurationManager) shows as `GUIUtility.keyboardControl != 0`.
 
 ---
 
@@ -630,6 +652,7 @@ One gap remains: `Chat.Update` runs console `bind` keys (`Terminal.m_binds`) whe
 
 ### Search crafting station (QoL, new)
 
+- **Status**: implemented as [Crafting Search and Sort](../../src/UX/Crafting.SearchSort) (0.1.0). The design that shipped differs from the sketch below: it never touches `Player.s_FilterCraft`, the `"sortcraft"` key or `GetAvailableRecipes` (the console commands keep working and combine with it). One `InventoryGui.UpdateRecipeList` postfix removes the rows that do not match (item name, internal prefab/recipe name, and only the ingredients the row shows) and reorders the rest (a category first as a stable partition, or by name), and a search or sort change calls the vanilla `UpdateCraftingPanel(false)` again. The sort is a button with a menu of categories built on the shared `src/Shared/ItemKinds.cs` classifier, remembered per station type in `Player.m_customData`. See [docs/design/ux-crafting-search-sort.md](../design/ux-crafting-search-sort.md).
 - **Feasibility**: easy to medium. Vanilla already has the filter backend (`Player.s_FilterCraft`) and the sort backend (`"sortcraft"`).
 - **Who needs the mod**: client-only.
 - **Hooks**:
@@ -722,6 +745,7 @@ One gap remains: `Chat.Update` runs console `bind` keys (`Terminal.m_binds`) whe
   - localization token registration (`SetupLanguage` postfix + `AddWord`)
   - a `Inventory.Changed` reverse patch
   - the stack-merge/sort routine used by all sort features
+- **Grouping items "by type"** (sort chest, sort bags, filters): build the groups on `MC.Shared.ItemKinds.Classify(SharedData)` (`src/Shared/ItemKinds.cs`, added with Crafting Search and Sort), so the same item lands in the same group in every MC mod. It keeps tools, pickaxes, the scythe and torches out of the weapons (vanilla `IsWeapon()` counts torches as weapons) and puts tankards (`Feaster` animation) with Misc.
 - **Everything here is client-only except pings**, which are opt-in per client. Container edits are safe as long as they happen while `InventoryGui` shows the container (ownership guaranteed).
 - **Compatibility checklist**:
   - EpicLoot (`ItemData.m_customData`, tooltips, inventory overlays): never merge stacks with differing custom data; append rather than replace tooltip text.
