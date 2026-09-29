@@ -18,7 +18,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | [One click repair all](#one-click-repair-all) | Crafting | trivial | full | [One Click Repair All 0.1.0](../src/Crafting/Repair.OneClickAll) (in development) |
 | [Per creature kill count](#per-creature-kill-count) | Exploration | trivial | partial | [Creature Kill and Tame Counts 0.1.0](../src/Exploration/Stats.PerCreature) (in development) |
 | [Crossbow revamp](#crossbow-revamp) | Combat | easy | full | [Crossbow Stays Loaded 0.1.0](../src/Combat/Crossbow.StaysLoaded) (in development) |
-| [Shift + E to feed 5 items to furnaces and kilns](#shift--e-to-feed-5-items-to-furnaces-and-kilns) | Crafting | easy | full | idea |
+| [Shift + E to feed 5 items to furnaces and kilns](#shift--e-to-feed-5-items-to-furnaces-and-kilns) | Crafting | easy | full | [Batch Station Feeding 0.1.0](../src/Crafting/Stations.BatchFeed) (in development) |
 | [Harpoon to work on tamed animals](#harpoon-to-work-on-tamed-animals) | Farming | easy | full | idea |
 | [Search crafting station](#search-crafting-station) | UX | easy | full | idea |
 | [Loot filter](#loot-filter) | UX | easy | full | idea |
@@ -79,7 +79,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | Building | Ward revamp | New | hard | Both | no | partial | idea |
 | Building | Magic applied to non combat (craft, farming, cooking, sailing, etc,) | New | very-hard | Depends | yes | partial | idea |
 | Crafting | One click repair all | QoL | trivial | Client | no | full | [One Click Repair All 0.1.0](../src/Crafting/Repair.OneClickAll) (in development) |
-| Crafting | Shift + E to feed 5 items to furnaces and kilns | QoL | easy | Client | no | full | idea |
+| Crafting | Shift + E to feed 5 items to furnaces and kilns | QoL | easy | Client | no | full | [Batch Station Feeding 0.1.0](../src/Crafting/Stations.BatchFeed) (in development) |
 | Crafting | Forge of potential revamp | QoL | medium | Client | no | partial | idea |
 | Crafting | Gemstone revamp | New | easy | Depends | no | partial | idea |
 | Crafting | Trophy on mobs without trophy | New | medium | Both | yes | none | idea |
@@ -1081,7 +1081,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 
 ### Shift + E to feed 5 items to furnaces and kilns
 
-- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
+- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** [Batch Station Feeding 0.1.0](../src/Crafting/Stations.BatchFeed) (in development)
 - **Approach:** A prefix on Switch.Interact detects alt (AltPlace = Shift) on a Smelter's add-ore or add-fuel switch. Compute n = min(5, m_maxOre - GetQueueSize(), inventory count of the FindCookableItem type) (fuel: m_maxFuel - ceil(GetFuel())), then n times remove 1 item and InvokeRPC RPC_AddOre / RPC_AddFuel. Show one summary message and add a hover hint.
 - **Hooks:** `Switch.Interact`, `Smelter.OnAddOre`, `Smelter.OnAddFuel`, `Smelter.OnHoverAddOre`, `Smelter.OnHoverAddFuel`, `CookingStation.OnAddFuelSwitch`
 - **Risks:** Non-owners read a stale queue/fuel count and the owner handlers don't cap, so simultaneous feeding can overfill (a vanilla race too); track recently sent counts. Low conflict with auto-fuel and V+ since limits are read live.

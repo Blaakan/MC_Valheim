@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Batch Station Feeding</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Shift + E to feed 5 items to furnaces and kilns</ModIdea>
+    <ModSide>Client</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Only you need it; it works on vanilla servers and with friends who do not have it. Each item is added through the game's normal add action, exactly as if you pressed E several times, so stations filled this way are normal for everyone.</ModMultiplayerNotes>
+    <ModRequires></ModRequires>
+    <ModDescription>Hold Left Shift and press E on a smelter, kiln, furnace, fire, cooking station, windmill, spinning wheel and more to add 5 items at once instead of 1. The amount and the key are configurable. Works on vanilla servers.</ModDescription>
+  </PropertyGroup>
+</Project>

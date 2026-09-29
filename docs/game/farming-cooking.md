@@ -743,6 +743,14 @@ fuel switches on the oven), `EffectArea` (fire detection).
     the crafter).
 - **Oven fuel:** `OnAddFuelSwitch` → `RPC_AddFuel`. Destroying the station drops fuel and every slot
   (`DropAllItems` on the owner via `WearNTear.m_onDestroyed`).
+- The **Frost Foundry** (`piece_FrostFoundry`) is a `CookingStation` too: one slot for a cast, Liquid Frost as fuel,
+  no fire needed.
+- Prefab data (1.0.16, read from the game's asset bundle): Cooking Station 2 slots and Iron Cooking Station 5 slots,
+  both without switches (food goes on the station itself, a fire below is needed); Stone Oven 4 slots with a food
+  switch and a fuel switch (Wood, `m_maxFuel` 10, `m_secPerFuel` 2000, `m_requireFire` false); Frost Foundry 1 slot
+  and Liquid Frost fuel (`m_maxFuel` 20). The station switches seem to repeat every 0.2 s while E is held (read by
+  record layout, unverified); the station body (`CookingStation.Interact`) ignores holds. More feeding facts (owner caps, item loss, hover vs press on done items):
+  [building-crafting.md, section 11](building-crafting.md#feeding-stations-with-use-e-facts-shared-by-every-feeder-class).
 
 ### Data & persistence
 - String keys per slot: `"slot{i}"` holds **both** a string (item prefab name) and a float (cooked seconds),
