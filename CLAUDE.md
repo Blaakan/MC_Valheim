@@ -7,7 +7,8 @@ Sheet columns: CATEGORY, NAME, DESCRIPTION, SCOPE, EXISTS ALREADY, Status (dropd
 `Idea` | `Implemented` | `Cancelled`; a mod in `src/` = `Implemented`). **The user maintains the sheet: never edit it.**
 `./tools/Update-Backlog.ps1` (online) lists the sheet rows that changed since the research (`idea-research.json`
 keeps a verbatim copy of each row; the online run copies Status changes into it; changed rows need a research pass)
-and the sheet cells the repo contradicts (Status vs the mods in `src/`, EXISTS ALREADY vs the research coverage).
+and the sheet cells the repo contradicts (Status vs the mods in `src/`, EXISTS ALREADY vs the research coverage; when
+the user keeps a flagged EXISTS ALREADY value, record it as `existsConfirmed` in that idea's research entry).
 Whenever a task changes what the sheet should say (a mod implements or drops an idea, research contradicts a cell, an
 idea overlaps or merges with another), end it with the list of sheet cells for the user to change.
 

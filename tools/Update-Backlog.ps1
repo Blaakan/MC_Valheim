@@ -8,8 +8,9 @@
     implements yet; a mod in src/ overrides it with a link to the mod (Status 'Implemented' in the sheet). The script
     also lists what is out of date: sheet rows that differ from the research snapshot (new, changed or removed
     ideas: run a research pass and update idea-research.json), sheet Status cells that do not match the repo, and
-    EXISTS ALREADY cells the research clearly contradicts (coverage full or none). The user maintains the sheet: these
-    lists are what to give them. A changed Status needs no research: the online run copies it into the snapshot
+    EXISTS ALREADY cells the research clearly contradicts (coverage full or none), unless the user kept that value
+    after seeing the flag (research field existsConfirmed). The user maintains the sheet: these lists are what to give
+    them. A changed Status needs no research: the online run copies it into the snapshot
     (Windows PowerShell 5.1 only, the writer that made the file), so -Offline shows it too.
 .PARAMETER Offline
     Use the ideas stored in idea-research.json instead of downloading the sheet.
@@ -136,6 +137,8 @@ $existsCheck = @()
 foreach ($r in $rows) {
     $res = $byName[(Norm $r.n)]
     if (-not $res -or $r.st -ne 'Idea' -or $modsByIdea.ContainsKey((Norm $r.n))) { continue }
+    # User saw flag and kept cell: research entry have existsConfirmed = that value. Me stay quiet while cell same.
+    if ("$($res.existsConfirmed)" -and $r.e -ceq "$($res.existsConfirmed)") { continue }
     $cov = "$($res.coverage)".Trim()
     if ($r.e -ne 'Yes' -and $cov -eq 'full') { $existsCheck += "$($r.n): '$($r.e)', but the research found mods that already do all of it (coverage full): 'Yes'?" }
     if ($r.e -ne 'No' -and $cov -eq 'none') { $existsCheck += "$($r.n): '$($r.e)', but the research found no mod doing it (coverage none): 'No'?" }
@@ -275,4 +278,7 @@ if ($existsCheck) {
 }
 if ($statusFix -or $existsCheck) {
     Write-Host '      The user maintains the sheet: give them these cells to change (never edit the sheet yourself).'
+}
+if ($existsCheck) {
+    Write-Host '      A cell the user keeps as it is: set "existsConfirmed" to that value in the idea''s research entry.'
 }
