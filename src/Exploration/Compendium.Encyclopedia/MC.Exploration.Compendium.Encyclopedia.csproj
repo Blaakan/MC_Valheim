@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Encyclopedia</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>New</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Compendium</ModIdea>
+    <ModSide>Client</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes></ModMultiplayerNotes>
+    <ModRequires></ModRequires>
+    <ModDescription>Adds an Encyclopedia tab to the game's Valheim Compendium: every item, building piece and creature in the game, with recipes, stations, drops, habitats and kill counts. Anything you have not discovered yet stays hidden as ???.</ModDescription>
+  </PropertyGroup>
+</Project>

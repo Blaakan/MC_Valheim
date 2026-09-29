@@ -18,8 +18,8 @@ the test is done. Cleanup: `killenemies` kills untamed creatures within 1000 m a
 the loaded creature spawners). **Do not use `killall` or `killtame`** while you still need your tames: both kill every
 loaded non-player creature within 1000 m, tames included, with a hit that has no attacker. `heal` refills stamina.
 **Keep your PvP off unless a test says otherwise** (checkbox in the inventory screen, available after 10 s out of
-combat). The hover text of a tamed creature reads `( Tame, ... )`, a wild one `( Wild, ... )`. Creatures within about
-10 m of you show a health bar. Kill counts: Tab → Compendium → **Player Statistics**, line `Enemy Kills` in the first
+combat). The hover text of a tamed creature reads `( Tame, ... )`, a wild one `( Wild, ... )`. A creature shows a
+health bar for 60 s after you aimed at it, while it is within about 30 m. Kill counts: Tab → Valheim Compendium → **Player Statistics**, line `Enemy Kills` in the first
 "Difficulty Category" block (with Creature Kill and Tame Counts installed, also its Creatures section at the top).
 
 Names checked in the 1.0.16 game data (prefab list and English localization): `SpearChitin` (Abyssal Harpoon),
@@ -145,7 +145,7 @@ The vanilla log line `Setting attacker ...` is normal.
 - [ ] **C01 With Crossbow Stays Loaded (MC)** (patches `Attack.OnAttackTrigger`, which the harpoon throw also runs):
   reload a crossbow, switch to the harpoon, hook a tame, switch back. Expected: the tame was hooked without damage and
   the crossbow is still loaded; no errors.
-- [ ] **C02 With Creature Kill and Tame Counts (MC):** both installed, single player. Note the Boar line in Compendium
+- [ ] **C02 With Creature Kill and Tame Counts (MC):** both installed, single player. Note the Boar line in Valheim Compendium
   → Player Statistics → Creatures. Harpoon a fresh tamed Boar you never hit, release it, then `spawn Wolf` next to it
   and let the wild wolf kill it. Expected: the Boar kill count does not change, and hooking never changes the Boar
   tamed count (only taming does). Harpoon another tamed Boar, then kill it with the Butcher Knife. Expected: Boar +1

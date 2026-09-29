@@ -10,6 +10,6 @@
     <ModMultiplayer>Compatible</ModMultiplayer>
     <ModMultiplayerNotes>Only you need it; it works on vanilla servers and with friends who do not have it. Kills follow the game's own rule: everyone who hit a creature gets the kill. A tame goes to the player the game tells it has been tamed (the closest one within 30 m). If nobody was that close, it goes to the player whose game ran the taming, unless that player's game sees another player closer to the creature, in which case nobody gets it (players far outside that game's loaded area are not seen).</ModMultiplayerNotes>
     <ModRequires></ModRequires>
-    <ModDescription>Shows how many of each creature you have killed, and how, plus how many you have tamed, at the top of Player Statistics in the Compendium. Kills come from the game's own saved stats, so past kills show too. Tames count from install.</ModDescription>
+    <ModDescription>Shows how many of each creature you have killed, and how, plus how many you have tamed, at the top of Player Statistics in the Valheim Compendium. Kills come from the game's own saved stats, so past kills show too. Tames count from install.</ModDescription>
   </PropertyGroup>
 </Project>

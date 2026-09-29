@@ -1,10 +1,12 @@
 # Creature Kill and Tame Counts
 
-Shows how many of each creature you have killed, and how, plus how many you have tamed, at the top of Player Statistics in the Compendium. Kills come from the game's own saved stats, so past kills show too. Tames count from install.
+Shows how many of each creature you have killed, and how, plus how many you have tamed, at the top of Player Statistics in the Valheim Compendium. Kills come from the game's own saved stats, so past kills show too. Tames count from install.
 
 ## Features
 
-- **A "Creatures" section at the top of Compendium > Player Statistics** (inventory → Compendium → last entry). One
+- **A "Creatures" section at the top of Valheim Compendium > Player Statistics** (inventory → the game's Valheim
+  Compendium button → last entry, on its Texts tab when the MC Encyclopedia mod is installed; not in the Encyclopedia,
+  which has no Player Statistics). One
   line per creature, for example `Greydwarf: 243 killed (melee 180, ranged 50, other 13)` or
   `Boar: 12 killed (melee 11, other 1), 3 tamed`. Creature names are shown in your game language. The vanilla
   statistics follow below, unchanged.
@@ -43,7 +45,7 @@ Shows how many of each creature you have killed, and how, plus how many you have
 The config file `BepInEx/config/MC.Exploration.Stats.PerCreature.cfg` is created the first time you launch the game
 with the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. The display settings can
 be changed in-game with ConfigurationManager, or by editing the file (the game picks up the change while it runs).
-Display settings apply the next time you open the Compendium.
+Display settings apply the next time you open the Valheim Compendium.
 
 | Section | Setting | Default | Description |
 |---|---|---|---|
@@ -71,7 +73,7 @@ creatures: a creature tamed with the mod is an ordinary tame for everyone, inclu
 
 ## Good to know
 
-- The section is built when you open the Compendium. A kill or tame made while the Compendium is open shows the next
+- The section is built when you open the Valheim Compendium. A kill or tame made while it is open shows the next
   time you open it.
 - Tame counts are saved with your character (in the character file, like the game's own stats), so they survive
   death, logout and cloud saves. If you remove the mod, the game keeps them in the character file and ignores them;
@@ -97,7 +99,7 @@ game ignores.
   game yet).
 - **Almanac, TrophyHuntMod** show kill counts in their own panels. They may keep counts of their own, so their numbers
   can differ from this list. This mod only reads the game's data, so they do not get in each other's way.
-- **Other mods that edit the Compendium** (EquipmentAndQuickSlots, SecondaryAttacks): compatible, since this mod only
+- **Other mods that edit the Valheim Compendium** (EquipmentAndQuickSlots, SecondaryAttacks): compatible, since this mod only
   adds text to the Player Statistics entry (not tested in game yet). If a mod removes that entry, the section is not
   shown.
 - **One Click Repair All** (MC): works together; the two mods change different things.

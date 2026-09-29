@@ -305,7 +305,16 @@ same table, `docs/design/ux-autopickup-filter.md` 3.4):
 |---|---|---|---|---|---|
 | 0 container grid | Sort Chest: sort | Sort Chest: change criterion | none of ours | none of ours | none of ours |
 | 1 player grid | none of ours | none of ours | Loot Pickup Filter: mark / unmark | Loot Pickup Filter: change mode | Loot Pickup Filter: lists panel |
-| 2 side panels, 3 crafting | none of ours | none of ours | none of ours | none of ours | none of ours |
+| 2 side panel | Encyclopedia: open the window (only with its optional side button; default: none of ours) | none of ours | none of ours | none of ours | none of ours |
+| 3 crafting | none of ours | none of ours | none of ours | none of ours | none of ours |
+| Valheim Compendium (vanilla dialog, priority 2, above every inventory group while open) | none of ours | none of ours | none of ours | none of ours | none of ours |
+| Encyclopedia window (its own group, above every inventory group while open) | none of ours (every inventory group is off, so no MC pad fires) | none of ours | none of ours | none of ours | none of ours |
+
+The Encyclopedia's optional View/Select pad (`docs/design/exploration-compendium-encyclopedia.md` 3.6) belongs to the side panel
+group, and its `UIGamePad.ButtonPressed` gate rejects the press in any other group before the shared lock is taken, so
+View/Select on the chest grid always reaches Sort Chest. In the Valheim Compendium and the Encyclopedia window, LT / RT
+alone pick the Encyclopedia's Texts / Encyclopedia tabs (read by its own code, not a pad; the inventory groups are off
+there). A new MC binding must not use View/Select in the side panel, nor LT / RT alone in those two dialogs.
 
 Sort Chest's `UIGamePad`s (View/Select, L3; no modifier check, so LT/RT + those keys act the same) fire only while the
 container group is active, Loot Pickup Filter's R3 gestures only while the player group is active: one press never

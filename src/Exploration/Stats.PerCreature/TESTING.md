@@ -8,9 +8,11 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 MC Mods panel. Smoke test passed 2026-09-29 (loads, patches, JitCheck clean: 191 methods, 0 failures). No in-game
 test yet.
 
-**Setup:** open the Compendium: inventory (Tab) → Compendium button → last entry **Player Statistics**; the new
-"Creatures" section is at the top of the text. The page is built when the Compendium opens and is not refreshed while
-it stays open: "reopen" below means close the inventory and open the Compendium again. T01 uses your normal character
+**Setup:** open the Valheim Compendium: inventory (Tab) → the game's **Valheim Compendium** button (raven icon; with the
+MC Encyclopedia mod installed, on its **Texts** tab, not the Encyclopedia tab, which has no Player Statistics) → last
+entry **Player Statistics**; the new
+"Creatures" section is at the top of the text. The page is built when the Valheim Compendium opens and is not refreshed while
+it stays open: "reopen" below means close the inventory and open the Valheim Compendium again. T01 uses your normal character
 (no cheats needed). For the other tests use a **test character**: F5 console → `devcommands`; if the console then asks
 you to confirm cheats, run `confirmcheats` (it only asks when the character, world and session are not already
 cheated). Any cheat command marks the character as cheated for achievements for good; kill stats still count. In
@@ -78,7 +80,7 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. With `Debug` in the BepInEx disk log le
 - [ ] **T14 Butcher knife (checks an unverified prefab value):** tame a Boar, kill it with `KnifeButcher`. Expected:
   Boar +1 killed with "melee" +1 (vanilla counts it; melee if the knife uses the Knives skill), tame count
   unchanged.
-- [ ] **T15 Gamepad:** with a controller, open the Compendium, go down to Player Statistics. Expected: the section is
+- [ ] **T15 Gamepad:** with a controller, open the Valheim Compendium, go down to Player Statistics. Expected: the section is
   at the top of the text, the right stick scrolls as in vanilla.
 - [ ] **T16 Live toggle:** Esc → MC Mods → untick Creature Kill and Tame Counts → reopen Player Statistics.
   Expected: vanilla page, no "Creatures" section. `spawn Boar` + `tame` while off, and kill a `Greyling`. Tick it
@@ -88,7 +90,7 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. With `Debug` in the BepInEx disk log le
   restart. Expected: vanilla page. Set it back to `true`.
 - [ ] **T18 Clean log:** after a session, no errors or exceptions mentioning `Creature Kill and Tame Counts` or
   `MC.Exploration` in `BepInEx/LogOutput.log`.
-- [ ] **T19 API and storage format (for the future Compendium):** create a new test character with the Debug log on
+- [ ] **T19 API and storage format (for the MC Encyclopedia mod):** create a new test character with the Debug log on
   and open Player Statistics before doing anything. Expected: the section shows "Nothing killed or tamed yet." Then do
   T08 once. Expected: the `Tame counted` log line shows
   `Stored MC.Exploration.Stats.PerCreature.Tames = 1\n1\t$enemy_boar` exactly (version line `1`, count, tab, token;
@@ -129,8 +131,8 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. With `Debug` in the BepInEx disk log le
 
 - [ ] **C01 With One Click Repair All:** both mods on. Repair several items in one click (still one summary message),
   then tame a boar with `tame` next to you. Expected: repair unchanged; Boar +1 tamed.
-- [ ] **C02 With a mod that edits the Compendium (EquipmentAndQuickSlots or SecondaryAttacks):** open the
-  Compendium. Expected: that mod's entries or changes are there as usual, and Player Statistics still starts with the
+- [ ] **C02 With a mod that edits the Valheim Compendium (EquipmentAndQuickSlots or SecondaryAttacks):** open the
+  Valheim Compendium. Expected: that mod's entries or changes are there as usual, and Player Statistics still starts with the
   "Creatures" section; no errors.
 - [ ] **C03 With DudeWhatAreMyStats:** open its stats window and Player Statistics. Expected: the kill counts of the
   creatures it lists match the "Creatures" section; no errors.

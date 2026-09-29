@@ -5,7 +5,7 @@ using MC.Shared;
 namespace MC.Exploration.StatsPerCreatureMod;
 
 /// <summary>
-/// Me = public read door for kill and tame numbers of the local character. Future MC Compendium read here.
+/// Me = public read door for kill and tame numbers of the local character. MC Encyclopedia read same tames through documented key.
 /// Creature key everywhere = <c>Character.m_name</c> (token like <c>"$enemy_greyling"</c>; variants and star levels
 /// share it). Kills = vanilla numbers, lifetime slot of the profile (every world, since Call to Arms update), me only
 /// read them. Tames = me count them, from <see cref="CountingSince"/>, only while mod on.

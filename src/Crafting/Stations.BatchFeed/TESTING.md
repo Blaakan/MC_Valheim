@@ -196,7 +196,7 @@ Debug line of each batch then says `owner=other`.
   after a batch.
 - [ ] **C02 Creature Kill and Tame Counts (MC):** both installed, test character, no other tameable creature loaded
   nearby (`tame` tames all of them; see that mod's Setup). Shift+E on a smelter, then right away `spawn Boar`, stand
-  next to it and run `tame`. Expected: "Boar has been tamed" shows and the Boar tame count in Compendium > Player
+  next to it and run `tame`. Expected: "Boar has been tamed" shows and the Boar tame count in Valheim Compendium > Player
   Statistics goes up by 1.
 - [ ] **C03 Other batch mod** (only if BulkSmelt, ComfyAddAllFuel or Add All Fuel And Ore is available; else `[-]`):
   both installed, Shift+E on a Smelter you own and, in multiplayer, on one the friend owns. Expected: one press fills
