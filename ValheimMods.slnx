@@ -1,8 +1,12 @@
 <Solution>
+  <Folder Name="/Building/">
+    <Project Path="src/Building/Lights.Switchable/MC.Building.Lights.Switchable.csproj" />
+  </Folder>
   <Folder Name="/Combat/">
     <Project Path="src/Combat/Crossbow.StaysLoaded/MC.Combat.Crossbow.StaysLoaded.csproj" />
   </Folder>
   <Folder Name="/Crafting/">
+    <Project Path="src/Crafting/Forge.IdolUpgrades/MC.Crafting.Forge.IdolUpgrades.csproj" />
     <Project Path="src/Crafting/Repair.OneClickAll/MC.Crafting.Repair.OneClickAll.csproj" />
     <Project Path="src/Crafting/Stations.BatchFeed/MC.Crafting.Stations.BatchFeed.csproj" />
   </Folder>

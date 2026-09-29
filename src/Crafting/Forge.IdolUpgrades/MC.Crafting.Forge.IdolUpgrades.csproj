@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Forge Idol Upgrades</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). Also cover part of "Boss summon
+         revamp" (boss trophies get a use); backlog link only the first idea. -->
+    <ModIdea>Forge of potential revamp</ModIdea>
+    <!-- Both: user rule (2026-09-29): mod that change the game is required by the server and every player. Server
+         refuse players without me and send its rules (odds, failure, costs, trophy lists) to everyone. -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game: the server refuses players without it, and its settings (odds, what a failure does, upgrade costs, trophy lists) apply to everyone. On a server without the mod it turns itself off. Upgraded idols are normal idols with a higher quality: a game without the mod shows them without stars and its Forge cannot spend a starred idol on its own.</ModMultiplayerNotes>
+    <!-- RPC <guid>.Settings / <guid>.SettingsRequest (ForgeRules layout 1). Bump when names or layout change. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Upgrade Forge of Potential idols up to 3 stars with metal and trophies from their biome. More stars give better refinement odds (35 to 95 percent), and by default a failed refinement costs one level instead of destroying the item.</ModDescription>
+  </PropertyGroup>
+</Project>
