@@ -25,7 +25,7 @@ Directory.Build.props     shared build rules, game refs, mod identity from proje
 Directory.Build.targets   metadata checks, ModInfo.g.cs generation, deploy to game
 Local.props               machine-only (ValheimDir); written by tools/Setup.ps1; git-ignored
 ValheimMods.slnx          solution (solution folders = categories)
-src/Shared/               compiled into every mod as internal code: Log, JitCheck, ItemDataExtensions
+src/Shared/               compiled into every mod as internal code: Log, JitCheck, ItemDataExtensions, ItemKinds
 src/Shared/Framework/     mod framework: ModPlugin life cycle, FeatureRegistry, NetworkGate, FeaturePanel (see docs/modding/framework.md)
 src/Shared/TESTING.md     in-game tests for the framework
 src/<Category>/<System>.<Feature>/   one mod = one project = one DLL = one Thunderstore package (+ TESTING.md)
