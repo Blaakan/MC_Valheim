@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Harpoon Hooks Tames</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Harpoon to work on tamed animals</ModIdea>
+    <ModSide>Client</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Only the player who throws the harpoon needs it. It works on vanilla servers and with friends who do not have it: the pull itself is done by the normal game on whichever computer runs the animal. Friends without the mod cannot hook tames while their PvP is off; with PvP on the normal game already lets them, and their hit can hurt the animal. If the computer running the animal does not run the mod (not installed, or turned off), the game may later credit you with the animal's kill.</ModMultiplayerNotes>
+    <ModRequires></ModRequires>
+    <ModDescription>The Abyssal Harpoon hooks your tamed animals like wild creatures, but the hit never hurts them: no damage, no knockback. Pull a stray animal back to its pen. Only the thrower needs the mod.</ModDescription>
+  </PropertyGroup>
+</Project>

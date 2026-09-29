@@ -32,6 +32,7 @@ clearly who needs to install it and how it behaves in multiplayer. Details: [doc
 | [Creature Kill and Tame Counts](src/Exploration/Stats.PerCreature) | Exploration | QoL | only you (client-side) | works | in development |
 | [One Click Repair All](src/Crafting/Repair.OneClickAll) | Crafting | QoL | only you (client-side) | works | in development |
 | [Batch Station Feeding](src/Crafting/Stations.BatchFeed) | Crafting | QoL | only you (client-side) | works | in development |
+| [Harpoon Hooks Tames](src/Farming/Harpoon.HooksTames) | Farming | QoL | only you (client-side) | works | in development |
 
 The full list of planned ideas, with feasibility and existing mods, is in [docs/backlog.md](docs/backlog.md).
 

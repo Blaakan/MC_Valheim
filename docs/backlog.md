@@ -19,7 +19,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | [Per creature kill count](#per-creature-kill-count) | Exploration | trivial | partial | [Creature Kill and Tame Counts 0.1.0](../src/Exploration/Stats.PerCreature) (in development) |
 | [Crossbow revamp](#crossbow-revamp) | Combat | easy | full | [Crossbow Stays Loaded 0.1.0](../src/Combat/Crossbow.StaysLoaded) (in development) |
 | [Shift + E to feed 5 items to furnaces and kilns](#shift--e-to-feed-5-items-to-furnaces-and-kilns) | Crafting | easy | full | [Batch Station Feeding 0.1.0](../src/Crafting/Stations.BatchFeed) (in development) |
-| [Harpoon to work on tamed animals](#harpoon-to-work-on-tamed-animals) | Farming | easy | full | idea |
+| [Harpoon to work on tamed animals](#harpoon-to-work-on-tamed-animals) | Farming | easy | full | [Harpoon Hooks Tames 0.1.0](../src/Farming/Harpoon.HooksTames) (in development) |
 | [Search crafting station](#search-crafting-station) | UX | easy | full | idea |
 | [Loot filter](#loot-filter) | UX | easy | full | idea |
 | [Sort chest](#sort-chest) | UX | easy | full | idea |
@@ -62,7 +62,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | Exploration | Late Game quest | New | hard | Depends | no | partial | idea |
 | Exploration | Big unique dungeon | New | very-hard | Both | yes | partial | idea |
 | Exploration | Underwater biome | New | very-hard | Both | yes | partial | idea |
-| Farming | Harpoon to work on tamed animals | QoL | easy | Client | no | full | idea |
+| Farming | Harpoon to work on tamed animals | QoL | easy | Client | no | full | [Harpoon Hooks Tames 0.1.0](../src/Farming/Harpoon.HooksTames) (in development) |
 | Farming | Easy plant | QoL | medium | Client | no | full | idea |
 | Farming | Plant "everything" | QoL | medium | Both | no | full | idea |
 | Farming | Breeding revamp | Revamp | easy | Both | no | partial | idea |
@@ -761,7 +761,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 
 ### Harpoon to work on tamed animals
 
-- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
+- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** [Harpoon Hooks Tames 0.1.0](../src/Farming/Harpoon.HooksTames) (in development)
 - **Approach:** A Projectile.IsValidTarget postfix returns true for a tamed target when the owner is the local player and the projectile's status effect resolves to SE_Harpooned. A Character.Damage prefix on the attacker side zeroes damage, push force and stagger for that hit. ApplyDamage then exits early (no damage, no alert), while RPC_Damage still applies the SE on the tame's owner.
 - **Hooks:** `Projectile.IsValidTarget`, `Character.Damage`, `SE_Harpooned.SetAttacker`, `SE_Harpooned.UpdateStatusEffect`, `ObjectDB.GetStatusEffect`
 - **Risks:** PvP players can already harpoon tames but also damage them; apply the zero-damage rule anyway. Heavy tames drain a lot of stamina (scaled by mass). There is no pull while the tame is on a ship and no upward force. Keep the patch additive to coexist with EpicLoot projectile patches.

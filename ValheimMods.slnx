@@ -9,6 +9,9 @@
   <Folder Name="/Exploration/">
     <Project Path="src/Exploration/Stats.PerCreature/MC.Exploration.Stats.PerCreature.csproj" />
   </Folder>
+  <Folder Name="/Farming/">
+    <Project Path="src/Farming/Harpoon.HooksTames/MC.Farming.Harpoon.HooksTames.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="CLAUDE.md" />

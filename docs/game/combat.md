@@ -79,6 +79,9 @@ Consequences:
    - `None` → `DoNonAttack`: applies `m_consumeStatusEffect` to self (buff staves, etc.).
    - Afterwards: `m_toggleFlying`, recoil, self damage, `m_consumeItem` (throwables), and **`if (m_requiresReload) ResetLoadedWeapon()`**.
 6. Projectiles: `FireProjectileBurst` computes accuracy / velocity (bow: `Lerp(min,max, sqrt(draw%))`, damage × draw%, `m_drawVelocityCurve`; non-bow `m_skillAccuracy` lerps by skill), adds ammo damage/force/status effect, calls `IProjectile.Setup(owner, vel, hitNoise, hitData, weapon, ammo)`.
+   - The weapon's `m_attackStatusEffect` goes into the `HitData` (subject to `m_attackStatusEffectChance`), and `Projectile.Setup` overwrites the projectile's own `m_statusEffectHash` with it (this is how the harpoon carries `SE_Harpooned`).
+   - Only the projectile's owner simulates it (`Projectile.FixedUpdate`): it casts along the flight step, sorts the hits by distance and calls `OnHit` for each until one sets `m_didHit` (or bounces). `OnHit` asks the private `Projectile.IsValidTarget` (friend/foe: `BaseAI.IsEnemy`, aggravatable, owner's PvP; `m_hitFriendly`; dodge i-frames); a refused target is flown through, so **the first accepted target shields everything behind it**. `DoAOE` uses the same filter.
+   - After `Damage`, `OnHit` gives the owner `RaiseSkill(m_skill, m_raiseSkillAmount)` and `AddAdrenaline(m_adrenaline)` from the **projectile's own fields**, for any character hit, even a zero-damage one. Harpoon details: [farming-cooking.md §9](farming-cooking.md).
 
 ### Data model (tuning fields on `Attack`)
 | Group | Fields |
@@ -128,7 +131,7 @@ Important `HitData` fields: `m_damage`, `m_dodgeable`, `m_blockable`, `m_ranged`
 2. Return if dead/teleporting/cutscene or `m_dodgeable && IsDodgeInvincible()`.
 3. `m_eitrAdd`; PvP gate (player vs player needs `IsPVPEnabled` unless `m_ignorePVP`).
 4. Non-player attacker: `Game.GetDifficultyDamageScalePlayer` (nearby player count scaling, `m_difficultyScaleRange` 100 m, max 5 players) and `Game.m_enemyDamageRate`.
-5. Attacker bookkeeping in ZDO (`Attackers` count + per-player flags → kill credit in `OnDeath`), `KillModifiers` (melee/ranged/magic/unarmed for achievements).
+5. Attacker bookkeeping in ZDO (`Attackers` count + per-player flags → kill credit in `OnDeath`), `KillModifiers` (melee/ranged/magic/unarmed for achievements). Any player hit writes them, **even a zero-damage one**, and vanilla never clears the per-player flag: a player who once hit a creature is credited with its kill if it dies later while they are connected. (Before the owner check, `RPC_Damage` also adds `EnemyHits`/`PlayerHits` for a local attacker.)
 6. `SEMan.OnDamaged` (e.g. `SE_Shield` absorbs by zeroing the hit, `SE_React` reflects).
 7. Aggravate Dvergr-style mobs (`BaseAI.AggravateAllInArea` 20 m).
 8. **Backstab**: `!m_baseAI.IsAlerted() && m_backstabBonus > 1 && Time.time − m_backstabTime > 300` (and with PassiveMobs, only if it cannot see the attacker) → damage × `m_backstabBonus`, backstab effect. Cooldown is per victim, local to the victim owner.
@@ -143,7 +146,7 @@ Important `HitData` fields: `m_damage`, `m_dodgeable`, `m_blockable`, `m_ranged`
 Armor formula (`HitData.DamageTypes.ApplyArmor`): if `ac < dmg/2` → `dmg − ac`, else `dmg × clamp01(dmg / (4·ac))`. Block power uses the same formula.
 
 ### Data & persistence
-`HitData` is transient (serialized only inside the RPC; `m_hitCollider` is converted to `m_weakSpot` index in `Character.Damage`). Health lives in ZDO `health` (the key is removed in `Character.Awake` when at max) and `max_health`; kill credit in ZDO `Attackers` (count) plus one bool key per attacking player name; kill style in `Modifiers`; cheat flag `cheated`. Stagger accumulation and backstab cooldown are plain fields on the owner (lost on ownership change).
+`HitData` is transient (serialized only inside the RPC; `m_hitCollider` is converted to `m_weakSpot` index in `Character.Damage`). Console kill commands send attacker-less hits: `killall` and `killtame` (despite its name) kill every loaded non-player creature within 1000 m, tames included; `killenemies` spares tames (`Terminal`, `ShouldKillAll`). Health lives in ZDO `health` (the key is removed in `Character.Awake` when at max) and `max_health`; kill credit in ZDO `Attackers` (count) plus one bool key per attacking player name; kill style in `Modifiers`; cheat flag `cheated`. Stagger accumulation and backstab cooldown are plain fields on the owner (lost on ownership change).
 
 ### Multiplayer authority
 `Character.Damage` → `ZNetView.InvokeRPC("RPC_Damage", hit)` (no target = ZDO owner). Everything after that runs on the victim owner. Heals use `RPC_Heal`, stagger `RPC_Stagger`, remote adrenaline `RPC_AddAdrenaline`, hit-stop `RPC_FreezeFrame` (to everybody).
@@ -167,7 +170,7 @@ Armor formula (`HitData.DamageTypes.ApplyArmor`): if `ac < dmg/2` → `dmg − a
   - **Parry** = `m_timedBlockBonus > 1 && m_blockTimer < 0.25` (`m_perfectBlockInterval`). Block power = `GetBlockPower(skill) = base(quality) × (1 + 0.5·blockingSkill)`, × `m_timedBlockBonus` on parry (`SEMan.ModifyTimedBlockBonus`).
   - Shield `m_damageModifiers` applied to the hit first; blocked amount = blockable damage minus armor-formula result with block power as AC.
   - Stamina: normal `m_blockStaminaDrain` (25) × `clamp01(blocked/blockPower)`; parry uses `m_perfectBlockStaminaDrain`; both × (1 + equip block-stamina mod) → `SEMan.ModifyBlockStaminaUsage` (negative ⇒ stamina gain). Parry with `m_perfectBlockStaminaRegen > 0` refunds stamina instead.
-  - Residual stagger damage goes to `AddStaggerDamage`; the block only "holds" if the player still has stamina and was not staggered (`flag3`); then status effect is cancelled and `hit.BlockDamage(blocked)`.
+  - Residual stagger damage goes to `AddStaggerDamage`; the block only "holds" if the player still has stamina and was not staggered (`flag3`); then status effect is cancelled (`hit.m_statusEffectHash = 0`, so a blocked harpoon does not hook) and `hit.BlockDamage(blocked)`.
   - Durability, `RaiseSkill(Blocking, parry ? 2 : 1)`, block-charge mechanic (`m_buildBlockCharges`, `m_maxBlockCharges`, fires the shield's own `m_attack` via `StartWithoutAnimation`).
   - Adrenaline: `m_blockAdrenaline` (2) on normal block, `m_perfectBlockAdrenaline` (5) on successful parry; parry staggers the attacker if `attacker.m_staggerWhenBlocked`, applies `m_perfectBlockStatusEffect`.
   - Holding block: `hit.m_pushForce *= fraction`; melee attackers get a deflection push (`GetDeflectionForce`).
@@ -326,7 +329,7 @@ Sources (all call `AddAdrenaline` on the local owner except stagger):
 | Melee hit on character | `m_attackAdrenaline (1) × target.m_enemyAdrenalineMultiplier` per character | `Attack.DoMeleeAttack` |
 | Melee swing hitting no character | `Player.m_attackMissAdrenaline` (−5) | `Attack.DoMeleeAttack` |
 | Area attack | `m_attackAdrenaline × max multiplier` | `Attack.DoAreaAttack` |
-| Projectile damaging a character | `Projectile.m_adrenaline` (2) | `Projectile.OnHit` |
+| Projectile hitting a character (even for 0 damage) | `Projectile.m_adrenaline` (2) | `Projectile.OnHit` |
 | Attack trigger | `Attack.m_attackUseAdrenaline` | `Attack.OnAttackTrigger`, per burst |
 | Block / parry | `m_blockAdrenaline` (2) / `m_perfectBlockAdrenaline` (5) | `Humanoid.BlockAttack` |
 | Taking unblocked damage | `m_nonBlockDamageAdrenaline` (−5) | `Character.RPC_Damage` |
@@ -392,6 +395,8 @@ Patch points / extension: create SEs with `ScriptableObject.CreateInstance<T>()`
 Movement: `BaseAI.MoveTo` → `FindPath` (cached ≥1 s; up to 5 s if target moved <1 m) → steer to next corner (`MoveTowards`/`MoveTowardsSwoop`). **If no path is found, `MoveTo` stops and returns true ("arrived")** – the classic "monster stands still" behaviour. Only flying AI (`MoveAndAvoid`) has stuck detection (1.5 s window, <0.2 m → 4 s "get out of corner"). Protected helper `BaseAI.StandStillDuration(threshold)` exists but is not used by ground movement.
 
 Flee (`BaseAI.Flee`): every `m_fleeInterval` (2 s) pick a point `m_fleeRange` (25 m) away within ±`m_fleeAngle` (45°) that has a path and is not water/lava; runs if alerted.
+
+Targets: `MonsterAI.UpdateTarget` searches every 2 s within 50 m of a player (6 s otherwise) and drops a target when it dies, after 30 s without sensing it or 60 s without attacking (then the next search waits 5 s); a tame also drops a target too far from its patrol point or followed player. `BaseAI.HaveTarget()` reads the ZDO `haveTarget` written by the owner, so any machine can read it. Tames target every wild creature they sense (details: [farming-cooking.md §6](farming-cooking.md), Targets).
 
 Factions (`Character.Faction`): Players, AnimalsVeg, ForestMonsters, Undead, Demon, MountainMonsters, SeaMonsters, PlainsMonsters, Boss, MistlandsMonsters, Dverger, PlayerSpawned, TrainingDummy, DeepNorth. `BaseAI.IsEnemy(a, b)`: same group → friends; tamed rules (tamed ≠ enemy of Players / other tamed / non-aggravated Dvergr); aggravated Dvergr vs Players; same faction → friends; then a per-faction table (e.g. `TrainingDummy` is only an enemy of Players; AnimalsVeg/PlayerSpawned are enemies of everyone; Boss is enemy of Players/PlayerSpawned). Hot path – called for every character in every search.
 
