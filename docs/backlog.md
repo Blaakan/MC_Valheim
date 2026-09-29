@@ -38,15 +38,16 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 | Combat | Better tower shields | Revamp | medium | Client | no | partial | idea |
 | Combat | Blood magic XP | Revamp | medium | Both | no | partial | idea |
 | Combat | Boss power revamp | Revamp | medium | Depends | no | full | idea |
-| Combat | Training dummies can attack ennemies | Revamp | medium | Both | no | none | idea |
 | Combat | Trinket revamp | Revamp | medium | Client | no | partial | idea |
 | Combat | Mob AI revamp | Revamp | hard | Both | no | partial | idea |
 | Combat | Weapon revamp | Revamp | very-hard | Both | yes | partial | idea |
+| Combat | Training dummies revamp | Revamp | not researched yet | ? | ? | ? | idea |
 | Combat | More training dummies | New | easy | Both | no | partial | idea |
 | Combat | New magical items based on valheim magic (ward, heal) | New | medium | Both | yes | partial | idea |
 | Combat | New summons | New | medium | Both | yes | partial | idea |
 | Combat | Combat pet | New | hard | Both | no | partial | idea |
 | Combat | Ritual | New | hard | Both | yes | none | idea |
+| Combat | Blood trinket | New | not researched yet | ? | ? | ? | idea |
 | Exploration | Per creature kill count | QoL | trivial | Client | no | partial | [Creature Kill and Tame Counts 0.1.0](../src/Exploration/Stats.PerCreature) (in development) |
 | Exploration | Sleep through the day | QoL | easy | Both | no | partial | [Sleep Through the Day 0.1.0](../src/Exploration/Sleep.ThroughDay) (in development) |
 | Exploration | Cartography table revamp | QoL | medium | Client | no | partial | idea |
@@ -67,7 +68,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 | Exploration | Underwater biome | New | very-hard | Both | yes | partial | idea |
 | Farming | Harpoon to work on tamed animals | QoL | easy | Client | no | full | [Harpoon Hooks Tames 0.1.0](../src/Farming/Harpoon.HooksTames) (in development) |
 | Farming | Easy plant | QoL | medium | Client | no | full | idea |
-| Farming | Plant "everything" | QoL | medium | Both | no | full | idea |
+| Farming | Plant "everything" | QoL | medium | Both | no | full | cancelled |
 | Farming | Breeding revamp | Revamp | easy | Both | no | partial | [Breeding Star Inheritance 0.1.0](../src/Farming/Breeding.StarInheritance) (in development) |
 | Farming | Ashlands trees | Revamp | medium | Both | no | none | idea |
 | Farming | Cultivator revamp | Revamp | medium | Both | yes | partial | idea |
@@ -78,13 +79,13 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 | Farming | Bring tamed / pets on ship | New | hard | Both | no | partial | idea |
 | Cooking | Unlock biome feast in the biome not after | QoL | easy | Depends | no | none | idea |
 | Cooking | Cooking equipment | New | hard | Both | yes | partial | idea |
-| Building | Torches ON/OFF only, no fuel | QoL | easy | Both | no | full | idea |
+| Building | Torches ON/OFF only, no fuel | QoL | easy | Both | no | full | [Switchable Lights 0.1.0](../src/Building/Lights.Switchable) (in development) |
 | Building | Place sign on chest | QoL | medium | Both | no | partial | idea |
 | Building | Ward revamp | New | hard | Both | no | partial | idea |
 | Building | Magic applied to non combat (craft, farming, cooking, sailing, etc,) | New | very-hard | Depends | yes | partial | idea |
 | Crafting | One click repair all | QoL | trivial | Client | no | full | [One Click Repair All 0.1.0](../src/Crafting/Repair.OneClickAll) (in development) |
 | Crafting | Shift + E to feed 5 items to furnaces and kilns | QoL | easy | Client | no | full | [Batch Station Feeding 0.1.0](../src/Crafting/Stations.BatchFeed) (in development) |
-| Crafting | Forge of potential revamp | QoL | medium | Client | no | partial | idea |
+| Crafting | Forge of potential revamp | QoL | medium | Client | no | partial | [Forge Idol Upgrades 0.1.0](../src/Crafting/Forge.IdolUpgrades) (in development) |
 | Crafting | Gemstone revamp | New | easy | Depends | no | partial | idea |
 | Crafting | Barber shop to customize armor | New | medium | Depends | yes | partial | idea |
 | Crafting | Player trophy | New | medium | Both | yes | partial | idea |
@@ -169,7 +170,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Sneak revamp
 
-> gain xp on sneak attack, make ennemies spot you less easily early
+> Gain XP on sneak attack Make sneak much more efficient when not moving at all
 
 - **Scope:** Revamp · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
 - **Approach:** Prefix Character.Damage, which runs on the attacker's machine. If the attacker is the local player, the target's BaseAI is not alerted (synced from ZDO alert) and backstabBonus > 1, raise Sneak and remember the victim for 300 s. Postfix Player.UpdateStealth to multiply the stealth target by a bonus that fades with Sneak skill or boss progression, and scale noise in RPC_AddNoise. Both values sync through ZDO, so the change stays client-only.
@@ -190,7 +191,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Adrenaline revamp
 
-> It sucks, change it
+> Right now it is too long to build up adrenaline, specifically with a bow. It needs to be rebalanced properly across all combat systems. One easy first step would be to have a passiv income of adrenaline while in fight. Weapons adrenaline generation must also be reworked to reflect their active time (sword hits faster than bows). The goal should be to hit consistent trinket proc from combat to combat. Fighting one ennemy might not trigger it, but a large group should, Chaining combat from isolated mobs to isolated mobs should also trigger
 
 - **Scope:** Revamp · **Feasibility:** medium · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
 - **Approach:** Route all gains through a prefix on Player.AddAdrenaline, with a source-context flag set by prefixes on the source methods. Apply a mod-defined gain table, drop the miss and unblocked-hit penalties, and disable the automatic pop. Add explicit spenders, such as empowered context attacks or guardian-power activation, and optional tier SEs via m_adrenalineEffects.
@@ -210,7 +211,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Balista revamp
 
-> Better AI, target assignement
+> Balista are slow to turn and shoot, which makes them almost useless against most enemies that move above the speed of a snail. The goal is to make them smarter at acquire target (better aim, turns faster), and make them able to have multiple targets assignement
 
 - **Scope:** Revamp · **Feasibility:** medium · **Who needs it:** Both · **Custom assets:** no · **Status:** idea
 - **Approach:** Replace the closest-creature pick with a score: threat (targeting a player or a structure), low HP, distance, and a claim cap derived from other turrets' networked targets (RPC_SetTarget reaches everybody). Keep the current target unless a much better one appears. Sphere-cast the line of fire to skip shots that would hit players, tames or walls. Add gravity compensation using Projectile.m_gravity. Make HitType.Turret bolts ignore players and tames in Projectile.IsValidTarget.
@@ -231,7 +232,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Better tower shields
 
-> Make them usable. I see them as a immovable wall that can't parry: The player should be slowed A LOT but should be able to block virtually anything > idea, make them TWO HANDED, very slow, with a small shield bash attack, and a lot of block armor
+> Make them usable. I see them as a immovable wall that can't parry: The player should be slowed A LOT but should be able to block virtually anything idea, make them TWO HANDED, very slow, with a small shield bash attack that has heavy stagger numbers but low damage number, and a lot of block armor
 
 - **Scope:** Revamp · **Feasibility:** medium · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
 - **Approach:** Pick tower shields from a configurable prefab list: ShieldWoodTower, ShieldBoneTower, ShieldIronTower, ShieldSerpentscale (the wiki lists the Serpent Scale Shield with the tower shields), ShieldBlackmetalTower, ShieldFlametalTower and ShieldGoldTower. FW_ShieldBlackmetalTower and SP_ShieldBlackmetalTower are separate prefabs (their prefixes match the FallenWarrior and ShadowPerson creature prefabs, unverified) and stay untouched. An ObjectDB.Awake/CopyOtherDB postfix edits their SharedData. (1) Set m_itemType to TwoHandedWeaponLeft and m_attachOverride to Shield. Vanilla Humanoid.EquipItem then empties both hands when the shield is equipped, and a one-handed weapon or torch replaces it. Humanoid.Pickup stops auto-equipping weapons. The back model and the armor stand slot follow m_attachOverride, so they stay those of a shield. The tooltip says two-handed and shows damage. (2) Keep m_timedBlockBonus at 1 or lower so it cannot parry (the wiki already lists no parry bonus for tower shields, so this guards against other mods), and set m_perfectBlockAdrenaline to 0, because the tooltip shows a parry-adrenaline line whenever it is above 0. (3) Multiply m_blockPower and m_blockPowerPerLevel (the block armor). In the vanilla block formula, block armor far above the hit's damage cuts the damage taken, the stamina per block, the stagger and the knockback. (4) Make m_movementModifier more negative, but keep it above -0.67. (5) Set m_attack to a clone of the player's unarmed combo (Humanoid.m_unarmedWeapon), which already plays in the shield stance. No player exists yet when ObjectDB loads, so take it from the player prefab (Game.m_playerPrefab) or clone it on first use, as CaptainValheim does at attack time. Give the shield blunt m_damages from block armor, a high m_attackForce and attack stagger multiplier, m_skillType Blocking, and m_blockable/m_dodgeable true. Humanoid.GetCurrentWeapon then returns the shield, so the normal attack button bashes through vanilla StartAttack, and GetCurrentBlocker still blocks with it. While blocking, an UpdateBlock postfix adds a local SE_Stats brace slow, which also slows walking, crouching and turning. An RPC_Damage prefix makes frontal hits blockable, filtered by HitType (fall hits use the ground normal as direction and pass the facing test). A Character.AddStaggerDamage prefix, scoped to BlockAttack, skips or scales the stagger while stamina remains, because a stagger ends IsBlocking and the next hits land unblocked. Rear hits and stamina stay the counterplay. Everything runs on the bearer's own client: equipping, attacks and movement run there, the bash's HitData is built by the attacker, and incoming hits are resolved by the victim's owner. So it is client-only.
@@ -282,7 +283,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Boss power revamp
 
-> Same as trinkets
+> Boss powers are strong with a large cooldown, This does not necessarily need a revamp but I'm tempted to boost them SLIGHTLY
 
 - **Scope:** Revamp · **Feasibility:** medium · **Who needs it:** Depends · **Custom assets:** no · **Status:** idea
 - **Approach:** While a power is selected, keep a passive, scaled clone of its GP SE on the player, refreshed in an UpdateGuardianPower postfix. A StartGuardianPower prefix makes activation consume adrenaline instead of waiting for m_guardianPowerCooldown, with stronger effects at full adrenaline. Custom shared SEs are registered in ObjectDB.
@@ -301,27 +302,9 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 - **Inspiration:** The passive-plus-burst concept is fully covered and very popular. FPO shows the balance and config explosion this creates. Our only differentiator: a thin layer on our adrenaline system (a small passive per defeated boss plus an adrenaline-fuelled surge, no separate cooldown economy). Otherwise skip it and recommend the existing mods.
 
-### Training dummies can attack ennemies
-
-- **Scope:** Revamp · **Feasibility:** medium · **Who needs it:** Both · **Custom assets:** no · **Status:** idea
-- **Approach:** Postfix BaseAI.IsEnemy so the TrainingDummy faction is hostile to configured monster factions and optionally friendly to Players, using a per-piece guard-mode toggle stored in the piece ZDO. Tune the TrainingDummy_attack* items (range, damage) so the stationary dummy can hit monsters that come into range. Optionally set m_aiSkipTarget so monsters ignore dummies.
-- **Hooks:** `BaseAI.IsEnemy`, `MonsterAI.UpdateTarget`, `Humanoid.EquipBestWeapon`, `Character.m_aiSkipTarget`, `ObjectDB.Awake`, `ZNetScene.Awake`
-- **Risks:** IsEnemy is a hot path, so the branch must stay cheap. Wrong faction lists could hit tames or Dvergr. The dummy's movement and prefab layout (piece_TrainingDummy vs the character prefab) must be verified at runtime. Dummy deaths refund piece resources through Character.ApplyDamage.
-- **Related:** More training dummies; Mob AI revamp
-- **Game systems:** [docs/game/combat.md](game/combat.md)
-- **Existing mods:** none
-
-  | Mod | Status | Notes |
-  |---|---|---|
-  | [TouchGrass (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/TouchGrass/) | v1.0.7, 2026-09-10 (1.0: likely) | The opposite direction: dummies can hunt players at night. Also a DPS and XP meter and anti-macro fatigue. |
-  | [DPS (JereKuusela)](https://thunderstore.io/c/valheim/p/JereKuusela/DPS/) | v1.7.0, 2026-09-10 (1.0: likely) | Dummy spawn, reset and kill commands with configurable resistances. A test tool. |
-  | [OdinTrainingPlace (OdinPlus)](https://thunderstore.io/c/valheim/p/OdinPlus/OdinTrainingPlace/) | v1.6.6, 2026-09-19 (1.0: yes) | Its dummies are passive and never attack. |
-
-- **Inspiration:** Vanilla 1.0 has the T.W.I.G. dummy with faction Character.Faction.TrainingDummy, and BaseAI.IsEnemy makes that faction hostile only to Players. One faction rule plus a target-selection hook turns dummies into decoys or sparring partners that hit monsters. There is no prior art. Watch base-defence balance and XP farming exploits.
-
 ### Trinket revamp
 
-> Change how the trinket effect works (probably passiv + adrenaline boost)
+> Trinkets needing the adrenaline proc kinda sucks because the adrenaline system kinda suck. Tie this item to the Adrenaline revamp.  Considering making trinket passiv bonuses (slightly nerfed from current state) with an interaction with the adrenaline system,
 
 - **Scope:** Revamp · **Feasibility:** medium · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
 - **Approach:** On ObjectDB init, give every ItemType.Trinket a passive m_equipStatusEffect (a scaled clone of its full-adrenaline SE, or a hand-authored SE_Stats). Keep or boost m_fullAdrenalineSE as the burst. Optionally use a custom SE_Stats subclass whose Modify* overrides scale with Player.GetAdrenaline()/GetMaxAdrenaline().
@@ -341,7 +324,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Mob AI revamp
 
-> (run away when scared, avoid player when strong, stop being stuck when rooted / frozen etc)
+> Being fully geared from Ashlands and still being attacked by neck and boars does not make sense. Weak enemies should not try to attack the player (except if frighten). Groups of enemies should enter a "flee" mode if their leader is taken down (for example, Greydwarfs would run away if a troll, shaman, or greydwarf brute is killed)
 
 - **Scope:** Revamp · **Feasibility:** hard · **Who needs it:** Both · **Custom assets:** no · **Status:** idea
 - **Approach:** Attach a brain component in a MonsterAI.Awake postfix. It computes fear from HP%, recent damage, allies and fire, plus player strength from ZDO-synced data: max_health, VisEquipment item hashes mapped to ObjectDB stats, and boss keys vs biome. When fearful, a MonsterAI.UpdateAI prefix calls the reverse-patched BaseAI.UpdateAI and Flee, then returns false. A BaseAI.MoveTo postfix detects not-rooted-but-not-moving (StandStillDuration) and forces a repath, side-step or jump. While rooted, it suppresses the can't-reach timers and prefers ranged weapons.
@@ -362,7 +345,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Weapon revamp
 
-> Revamp of base moveset, new moveset on ROLL JUMP PARRY, unique move per weapon type
+> Objective is a SLIGHT rework of the vanilla weapon gameplay MAYBE rework the existing animations/moveset to be a bit more dynamic Add a roll attack (roll then attack) Add a parry attack (parry then attack) Add a jump attack (jump then attack)
 
 - **Scope:** Revamp · **Feasibility:** very-hard · **Who needs it:** Both · **Custom assets:** yes · **Status:** idea
 - **Approach:** Define a move table keyed by weapon skill or animation state, with context moves: riposte after a successful parry, roll-strike within N s of a dodge, plunge while airborne. A Humanoid.StartAttack prefix checks context timers set in BlockAttack/UpdateDodge/OnJump postfixes and swaps in a cloned Attack template, using a vanilla trigger from another weapon family or a custom Animator trigger. Per-move damage, stagger and adrenaline are set through Attack fields.
@@ -380,6 +363,13 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
   | [AttackCancleCounter (IDRdhnTM)](https://thunderstore.io/c/valheim/p/IDRdhnTM/AttackCancleCounter/) | v1.2.0, 2025-11-16 (1.0: unknown) | Cancel an attack mid-animation into a parry or dodge; counter while chaining. Related: Valheim Legends 1.0 port (Duelist Riposte) and GrindstoneSkills (buffed attack after a parry). |
 
 - **Inspiration:** Borrow GCO's input detection (running attack = attack above a speed threshold, jump attack = attack before landing) and its YAML per-weapon profiles, plus SpecialAttack's skill-gated unlocks. What existing mods get wrong: they overload the secondary attack or add keys, spawn un-Valheim projectile VFX, and bundle stamina, PvP and AI changes. Ours: moves that depend on context using vanilla inputs (roll-attack, plunge from a jump, riposte in the window after a perfect block), exactly one signature move per weapon type, built on vanilla SharedData attack data and existing animator states, and fed by the adrenaline revamp (Humanoid.BlockAttack already grants perfect-block adrenaline).
+
+### Training dummies revamp
+
+> Merge with "More training dummies" Make that dummies can target any hostile creature in range Make the dummies toggleable ON and OFF (OFF state makes the dummy completely inactive and it attacks nothing) Create new dummies for each type of weapons (currently only sword and shield with throwable rock as a range attack)
+
+- **Scope:** Revamp · **Feasibility:** not researched yet · **Who needs it:** ? · **Custom assets:** ? · **Status:** idea
+- Not researched yet: run a research pass for this idea.
 
 ### More training dummies
 
@@ -488,6 +478,13 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 - **Inspiration:** No mod requires several participants. Vanilla building blocks: OfferingBowl (consume items, spawn), Incinerator (consume, produce), ShieldGenerator and PrivateArea (area effects). Ours: a ritual circle with N runestones that players must interact with at the same time, synchronized through the ZDO. It consumes offerings and triggers summons, weather, area buffs, crop growth or a raid. A strong co-op hook and a cross-category magic theme.
 
+### Blood trinket
+
+> Trinket that, when it procs, sets you to 15% HP for 10 seconds then heals you quickly,
+
+- **Scope:** New · **Feasibility:** not researched yet · **Who needs it:** ? · **Custom assets:** ? · **Status:** idea
+- Not researched yet: run a research pass for this idea.
+
 ## Exploration
 
 ### Per creature kill count
@@ -529,7 +526,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Cartography table revamp
 
-> More pins when near table
+> When next to the cartography table, enable additional pins icons in the map The map when not near the cartography table does not change The map when near the cartography table has additional pins for various types of POI: Dungeon, cave, tower, stone, plant, creature (paw), etc. Removing a pin generated from another player by interacting with the table should prevent it from being placed again when interacting with the table again (click on the table, get pin A, remove pin A from my map, click on table again, pin A should not be added again)
 
 - **Scope:** QoL · **Feasibility:** medium · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
 - **Approach:** Reserve custom PinType ints (100+), extend m_visibleIconTypes/m_icons/m_selectedIcons in a Minimap.Start postfix (before first LoadMapData) and clone the Icon4 button for an extra palette row reusing vanilla location/item sprites. Show that row only when the player is within N m of a registered MapTable (registry via MapTable.Start postfix) or the map was opened from the table.
@@ -894,7 +891,9 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Plant "everything"
 
-- **Scope:** QoL · **Feasibility:** medium · **Who needs it:** Both · **Custom assets:** no · **Status:** idea
+> cf cultivator
+
+- **Scope:** QoL · **Feasibility:** medium · **Who needs it:** Both · **Custom assets:** no · **Status:** cancelled
 - **Approach:** Clone a vanilla sapling for each target (RaspberryBush, BlueberryBush, CloudberryBush, Pickable_Mushroom*, Pickable_Thistle, Pickable_Dandelion, tree saplings). Set the target as its only m_grownPrefabs entry, give it a Piece with the seed item as resource and a biome mask, register it in ZNetScene, and add it to the cultivator piece table (or use Jotunn PieceManager).
 - **Hooks:** `ZNetScene.Awake`, `ObjectDB.Awake`, `PieceTable.m_pieces (_CultivatorPieceTable)`, `Piece`, `Plant`, `Pickable`
 - **Risks:** Already exists (Advize's PlantEverything). Uninstalling leaves ZDOs with unknown prefab hashes. Balance. Saplings must be covered by the Ashlands revamp.
@@ -933,7 +932,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Ashlands trees
 
-> safe  if in shield, Crop burns out outside, tree changes to scorched tree outside
+> Being able to plant any tree that has no biome restriction in ashlands. If crop is not placed in a shield, burns away and is destroyed. If crop is placed in a shield, then grows following the crop's rules. If tree is fully grown outside of a shield, turns into a scorched tree after a cooldown If tree is fully grown inside of a shield, stays unhurt,
 
 - **Scope:** Revamp · **Feasibility:** medium · **Who needs it:** Both · **Custom assets:** no · **Status:** idea
 - **Approach:** An AshExposure component is added at ZNetScene.Awake to every crop Pickable and TreeBase reachable from sapling m_grownPrefabs. On the owner it ticks every 10-20 s and accumulates exposure in a custom ZDO float while the object is in the Ashlands and outside every shield, after a grace period of at least 20 s from load. Past a threshold, a crop burns and is destroyed (optional Coal drop) and a tree is replaced by a configured scorched prefab (AshlandsTree1-6 or a stump). A Plant.UpdateHealth postfix destroys saplings that stay TooHot too long.
@@ -1110,7 +1109,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Torches ON/OFF only, no fuel
 
-- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Both · **Custom assets:** no · **Status:** idea
+- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Both · **Custom assets:** no · **Status:** [Switchable Lights 0.1.0](../src/Building/Lights.Switchable) (in development)
 - **Approach:** For whitelisted Fireplace prefabs (torches, sconces, braziers), set m_infiniteFuel=true, m_canTurnOff=true and m_canRefill=false at ZNetScene.Awake. A prefix on Interact allows toggling at 0 fuel, and a postfix on GetHoverText adds on/off text. Toggling uses the vanilla s_state; also top up s_fuel so pieces stay lit for a while after uninstall.
 - **Hooks:** `ZNetScene.Awake`, `Fireplace.Interact`, `Fireplace.GetHoverText`, `Fireplace.UpdateState`, `Fireplace.UpdateFireplace`, `Fireplace.SetFuel`
 - **Risks:** A vanilla ZDO owner still burns fuel and vanilla viewers see torches go out. Pieces with wet Low/High visuals auto-turn off in rain once m_canTurnOff is true. Overlaps with V+ and other infinite-torch mods. Some 1.0 pieces already use these flags (runtime dump needed).
@@ -1222,7 +1221,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 > Only consumes the idol on failure, does not destroy the item. Need higher tier idol when high level enough. Might require skill level to be able to craft, Upgrade idols with trophies to inrease odds (low trophy brings it up to 50%, elite to 70, zone boss 95)
 
-- **Scope:** QoL · **Feasibility:** medium · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
+- **Scope:** QoL · **Feasibility:** medium · **Who needs it:** Client · **Custom assets:** no · **Status:** [Forge Idol Upgrades 0.1.0](../src/Crafting/Forge.IdolUpgrades) (in development)
 - **Approach:** A prefix on InventoryGui.DoCrafting takes over the Forge branch (station.m_upgrader). It rolls our own chance for the idol actually spent: a configurable base for a plain idol, or 50%, 70% or 95% for an idol infused with a common, elite or zone-boss trophy (the trophy sets the chance, it does not add to it). On success it raises m_quality in place, which keeps the crafter, world level and m_customData. Durability must be set on purpose: a higher quality has a higher max durability, and vanilla re-creates the item at full durability. Keep vanilla's unequip so hand, back and shoulder visuals refresh. On failure it removes only that idol (Inventory.RemoveItem by name and quality) and leaves the item untouched. The infusion is stored as the idol's own m_quality (1 plain, 2 common, 3 elite, 4 boss). This vanilla field is saved everywhere, and Inventory.FindFreeStackItem already stacks only equal qualities. Raising the idols' SharedData.m_maxQuality to 4 in ObjectDB.Awake/CopyOtherDB also keeps levels apart on drag and drop (ItemData.IsSameType, InventoryGrid.DropItem) and shows the level on the slot. Infusing happens in the Upgrade tab of a normal station: one recipe per idol prefab with m_noCraftOnlyUpgrade and m_requireOnlyOneIngredient, whose trophy requirements are banded per step by a Piece.Requirement.GetAmount postfix. Our own DoCrafting branch runs these recipes, because the vanilla upgrade path removes the whole idol stack and gives back one item. Trophy classes are built at ZNetScene.Awake: boss = trophies in the CharacterDrop of prefabs with Character.m_boss; elite = a config list; common = every other trophy. The Deep North boss (Kall Fimbulbringer) has no trophy, so the Bloodgold boss step needs a configured item such as Sacrificial Blood (FrozenKingDrop). A biome-tier gate stops a cheap trophy from lifting a high-tier idol. Keep the higher-tier idol bands at high levels and the Crafting skill gate in UpdateRecipe and DoCrafting.
 - **Hooks:** `InventoryGui.DoCrafting`, `InventoryGui.OnCraftPressed`, `InventoryGui.UpdateRecipe`, `InventoryGui.UpdateRecipeList`, `Piece.Requirement.GetAmount`, `Player.HaveRequirementItems`, `Player.GetFirstRequiredItem`, `ObjectDB.Awake`, `ObjectDB.CopyOtherDB`, `ZNetScene.Awake`, `Character.IsBoss`, `ItemDrop.ItemData.GetTooltip`
 - **Risks:** The sheet's ladder only makes sense if a plain idol rolls below 50%, which is lower than vanilla's 65%. That is fair only because a failure no longer costs the item, so make it configurable and flag it. What a vanilla failure does is disputed (the wiki and Forge No Destroy: the item is always destroyed; OdinBet and Forge of Certainty: usually a level is lost), so dump the idol prefabs. Without a biome gate, a Boar trophy or a re-summoned Eikthyr would lift a Bloodgold idol. 'Elite' has no vanilla flag, so it needs a config list. The vanilla only-one-ingredient helpers mishandle a 0-amount requirement: Player.HaveRequirementItems returns true, and Player.GetFirstRequiredItem returns a null item that Recipe.GetAmount dereferences in both OnCraftPressed and DoCrafting. Recipe.GetRequiredStationLevel (max(1, m_minStationLevel) + q - 1) needs a level-4 station for the boss step. Raising the idols' m_maxQuality also puts other mods' idol recipes (ReforgedPotential, OdinBet, JGFoP, DowngradeableIdols) in their station's Upgrade tab, where the vanilla upgrade path eats the whole stack. Where idols keep m_maxQuality 1 (vanilla players, or after an uninstall), the vanilla Forge counts only quality-1 idols, so infused idols are refused until they are dragged onto a plain stack, and plain idols dragged onto an infused stack become infused. ReforgedPotential reports greyed-out icons with dynamic requirements. Many Forge mods patch DoCrafting or the idol data (EpicLoot, ReforgedPotential, OdinBet, JGFoP, Wire's, the IL patch in ForgeOfPotentialSafe, Potential Forge NoFail, Potential Draught, Forge No Destroy, G3A3), so keep the prefix narrow and declare them incompatible. Our framework has no config sync yet. Fix the vanilla $msg_upgrader_failed key.

@@ -388,6 +388,9 @@ The Hildir quest loop, fully data-driven: Hildir dungeons (themes `ForestCryptHi
 ## Feature ideas
 
 ### Boss summon revamp (New, exists: partially)
+- **Status:** partly covered by [Forge Idol Upgrades](../../src/Crafting/Forge.IdolUpgrades) (0.1.0): boss trophies
+  (for Kall, the Crown Jewel) upgrade idols to 3 stars, which gives re-summoning bosses a lasting reward. The boss
+  tiers, affixes and rewards below are not done.
 - **Feasibility:** medium (tier system with vanilla assets); hard if each tier gets bespoke boss mechanics.
 - **Who needs the mod:** everyone. The altar owner spawns (`OfferingBowl.RPC_SpawnBoss`/`DelayedSpawnBoss` run on a client), the boss owner computes AI/damage/drops, boss events/HUD are per client.
 - **Assets:** optional (reuse vanilla VFX; a "boss essence" reward item can be a Jotunn clone with a tinted icon).

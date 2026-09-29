@@ -120,12 +120,25 @@ Owner computes wear/support and applies damage. A non-modded owner will apply va
 * `Fireplace.GetHoverText` returns **empty string when `m_infiniteFuel`**.
 * `Fireplace.CanBeRemoved` exists but nothing calls it (dead code in 1.0.16).
 * Radial menu: `Fireplace.TryGetItems` / `CanUseItems` return false for infinite-fuel fires.
-* Prefab data (1.0.16, fire records read from the game's main asset bundle; the Batch Station Feeding coverage dump
-  lists every prefab in game): the **only fire with `m_canTurnOff`** is the Resin Candle (3 fuel), and it has
-  `m_canRefill` false: in vanilla no fire both takes fuel with E and toggles. The Wood fires hold 10 or 20 fuel, three
-  fires on other fuels 5, the torches, Sconce, Jack-o-turnip and Snow Lantern 6, and the two Standing Wood Torch
-  records 4 and 1 (which prefab each belongs to is unverified). Every fire record uses `m_holdRepeatInterval` 0.2 (the
-  code default). The Hot Tub is **not** a `Fireplace` (section 11).
+* Prefab data (1.0.16, runtime dump of every `Fireplace` prefab, 2026-09-29; full table in
+  [docs/design/building-lights-switchable.md](../design/building-lights-switchable.md) §1.2): 20 prefabs. The **only
+  fire with `m_canTurnOff`** is the Resin Candle (`Candle_resin`, 3 fuel, 5000 s per fuel), and it has `m_canRefill`
+  false: in vanilla no fire both takes fuel with E and toggles. Torches (`piece_groundtorch_wood` 4 fuel / 10000 s,
+  `piece_groundtorch`, `_green`, `_blue` 6 / 20000 s), the Sconce (`piece_walltorch`), Jack-o-turnip and Snow Lantern
+  (6 / 20000 s) have no wet low/high flame; the three braziers (`piece_brazierfloor01`, `piece_brazierfloor02`,
+  `piece_brazierceiling01`, Coal or GreydwarfEye, 5 / 20000 s) do, and carry Heat, Fire and Burning areas like the
+  campfire family (`fire_pit`, `fire_pit_iron`, `hearth` 20, `bonfire`, all Wood, 5000 s, snow melter). The 1-fuel
+  "Standing Wood Torch" is `CastleKit_groundtorch_unlit` (world prop, no `Piece`, start 0). The location fire pits
+  (`BogWitch_Fire_Pit`, `fire_pit_haldor`, `fire_pit_hildir`, `Morkhalla_firepit`) have infinite fuel. Every fire
+  uses `m_holdRepeatInterval` 0.2 (the code default). The Hot Tub is **not** a `Fireplace` (section 11).
+* `RPC_SetFuelAmount` writes the value raw (no clamp to `m_maxFuel`) and always plays the fuel-added effect on the
+  owner, also when setting 0. `TryGetItems` / `CanUseItems` (radial menu) check only `m_infiniteFuel`, not
+  `m_canRefill`. `Fire.Dot` (spreading fire: Ashlands, Fire world modifier) drains nearby fires with `AddFuel(-0.1)`.
+* A **dedicated server never runs fires**: it keeps its reference position far away (server build 1.0.15,
+  `Game.FixedUpdate`), so it instantiates no world objects; fires are always simulated by a player's game.
+* A `s_state` of 2 on a fire without `m_canTurnOff` is stuck off in vanilla (nothing toggles it back).
+* Implemented as a mod: [Switchable Lights](../../src/Building/Lights.Switchable)
+  ([design](../design/building-lights-switchable.md)).
 
 ### Data & persistence
 ZDO: `s_fuel` (float), `s_state` (int: 1 = on, 2 = off; default 1), `s_lastTime` (ticks). RPCs: `RPC_AddFuel`, `RPC_AddFuelAmount(float)`, `RPC_SetFuelAmount(float)`, `RPC_ToggleOn`. Public helpers: `AddFuel(float)`, `SetFuel(float)`.
@@ -316,7 +329,13 @@ Oddity: in the bonus loop `DoCrafting` adds the *cumulative* bonus each time (`n
 * Each weapon/armor `Recipe` that can be refined carries an extra `Piece.Requirement` with `m_upgraderResource = true` pointing at the matching idol tier *(prefab)*.
 
 ### Per-idol tuning (`ItemDrop.ItemData.SharedData`, header "Upgrader (Refinement Forge)")
-`m_upgradeChance` 0.65, `m_breakChance` 0.1, `m_successUpgradeSteps` 1 (**declared but never read in 1.0.16**), `m_breakReturnIngreientsAmount` 0.5. Per-tier values are prefab data.
+Code defaults: `m_upgradeChance` 0.65, `m_breakChance` 0.1, `m_successUpgradeSteps` 1 (**declared but never read in 1.0.16**), `m_breakReturnIngreientsAmount` 0.5.
+**Prefab values (runtime dump, 1.0.16): every one of the 16 idols has `m_upgradeChance` 0.65, `m_breakChance` 1.0,
+return 0.35**, so a vanilla failure (35%) **always destroys the item** and returns 35% of the materials; the
+downgrade branch is unreachable. Idols: `ItemType.Material`, stack 20, weight 0.5, value 0, `m_maxQuality` 1, one
+icon (packed in the 4096² BC7 icon atlas, not CPU-readable). Every refinable recipe has one idol requirement with
+amount 1 and 0 per level: **one idol per attempt**. The idol tier does not always match the item's craft tier (e.g.
+`SwordWood` uses `Upgrader1Weapon`). Idols come only from location and dungeon chests (no recipe, no creature drop).
 
 ### Rule (paraphrase of `InventoryGui.DoCrafting`, upgrader branch)
 ```
@@ -331,6 +350,26 @@ resources (idols only, because of the upgrader filter) are consumed in all three
 * The original item is removed **before** the roll; success/fail re-create it through `Inventory.AddItem` (loses `m_customData`, resets durability/crafter/world level). UI warning `$inventory_upgraderwarning` "Maximum safe quality. Refinement may break your item."
 * Items of any quality with an upgrader-flagged recipe are listed; a failure on a quality-1 item would produce quality 0 — guard against it.
 * **Vanilla bug**: the failure message key is `$msg_upgrader_failed` but the localisation file only contains `msg_upgrader_fail`, so failures show a raw key.
+
+### Crafting panel facts (runtime dump and code, 1.0.16)
+* The Forge prefab is `UpgradeStation` (`m_upgrader` true, `m_hasCraftTab` false, `m_canRepair` true, no roof or fire
+  needed). `UpdateCraftingPanel` re-selects the Upgrade tab at it on **every** call (Craft hidden). The tab buttons sit
+  under `TabsButtons` (Craft at x −418, UPGRADE at −311, 100×32; `TabBorder` sibling); their `onClick` listeners are
+  persistent (a clone keeps calling `OnTabCraftPressed` unless `onClick` is replaced), the label has a `Localize`
+  component. 4 requirement slots (`res_icon`, `res_name`, `res_amount` + `UITooltip`); recipe rows `icon`, `name`,
+  `Durability`, `QualityLevel`; grid slots `icon`, `amount`, `quality`, `binding`, `durability`, … .
+* `AddRecipeToList` and `SetupRequirement` draw the prefab's icon; `UpdateRecipe` reads `m_shared.m_icons[...]`
+  directly for the big icon; `SetupUpgradeItem` has no caller (dead code, like `m_qualityPanel`).
+* `ItemData.GetIcon` is 19 bytes of IL, under Mono's 20-byte inline limit: patch it at plugin load (a Harmony patch
+  marks it NoInlining for the session), or callers compiled earlier keep the inlined copy.
+* **Shared item data is copied per item object in a build**: `Object.Instantiate` of an item prefab (inventory load,
+  `Inventory.AddItem(name, …)`, crafting, chests, world drops) deep-copies `m_shared`; only `ItemData.Clone()`
+  shares it (`ItemDrop.Awake` relinks to the prefab only in the editor). Editing a prefab's shared data reaches items
+  made later, not those already loaded; identify items by `m_dropPrefab` or `m_shared.m_name`, not by shared-data
+  reference.
+* HarmonyX runs every prefix even after one returned false: two mods taking over `DoCrafting` both run.
+* Implemented as a mod: [Forge Idol Upgrades](../../src/Crafting/Forge.IdolUpgrades)
+  ([design](../design/crafting-forge-idol-upgrades.md)).
 
 ### Multiplayer authority
 Local (crafting client). Idols are vanilla items.
@@ -480,6 +519,15 @@ Legend: feasibility = trivial / easy / medium / hard / very hard. "Who needs the
 ### 1. Crafting — Forge of Potential revamp (QoL)
 *User: only consume the idol on failure, don't destroy the item; require a higher-tier idol at high levels; maybe a skill requirement; upgrade idols with trophies to raise the odds (common trophy 50 %, elite 70 %, zone boss 95 %).*
 
+* **Status:** implemented as [Forge Idol Upgrades](../../src/Crafting/Forge.IdolUpgrades) (0.1.0). The design that
+  shipped differs from the sketch below: the user asked for idol upgrades **at the Forge of Potential, in their own
+  tab** (an IDOLS tab cloned from the hidden Craft tab, not a recipe at a normal station), with metal and trophies of
+  the idol's biome in three steps (5 metal + 5 common, 10 + 3 elite, 15 + 1 boss), and odds 35 / 55 / 75 / 95 % by idol
+  level; a failure uses up the idol and costs the item one level by default (setting: any number of levels, or
+  destroy it as in vanilla), a success raises the item in place. No higher-tier idol bands and no skill gate. Required
+  on the server and every player; the server's rules apply to everyone. Idol level = item quality as sketched, but shared data is copied per item object, so levels are raised on
+  each idol as it is seen. See [docs/design/crafting-forge-idol-upgrades.md](../design/crafting-forge-idol-upgrades.md).
+
 * **Feasibility:** medium, at the upper end. It needs two custom branches of `InventoryGui.DoCrafting` (the Forge roll and idol infusion) plus two data tables (trophy classes and biome tiers). No assets and no network code.
 * **Who needs the mod:** client-only. Refinement and crafting run on the crafting client (`InventoryGui.DoCrafting`, `Player.ConsumeResources`), and recipes live in the local `ObjectDB`. The infusion is stored in a vanilla field (the idol's `m_quality`), so no new prefab has to exist on other peers; new "infused idol" prefabs were rejected because they would need everyone and icons. Our odds apply only to players with the mod. The framework has no config sync, so add one (or accept per-player config) if a server wants the same odds for everyone.
 * **Hooks:** `InventoryGui.DoCrafting` (prefix: the Forge roll when `Player.GetCurrentCraftingStation().m_upgrader`, plus our idol infusion recipes), `InventoryGui.OnCraftPressed` (the Forge free-slot check reserves room for the break refund and the re-created item, and neither happens any more; it also calls `Recipe.GetAmount`, see the 0-amount guard below), `InventoryGui.UpdateRecipe` (postfix: chance on the button, which idol level will be spent, skill-gate text, replace `$inventory_upgraderwarning`), `InventoryGui.UpdateRecipeList` (prefix: drop our idol recipes at the Forge, and other mods' idol recipes from every Upgrade tab), `Piece.Requirement.GetAmount` (postfix: quality bands for idol tiers and trophy steps), `Player.HaveRequirementItems` / `Player.GetFirstRequiredItem` (guard 0-amount requirements in our only-one-ingredient recipes), `ObjectDB.Awake` / `ObjectDB.CopyOtherDB` (idol `m_maxQuality`, infusion recipes, higher-tier idol requirements), `ZNetScene.Awake` (classify trophies), `ItemDrop.ItemData.GetTooltip` (infusion and chance lines).
@@ -491,7 +539,7 @@ Legend: feasibility = trivial / easy / medium / hard / very hard. "Who needs the
   * **Earlier parts, unchanged.** Add extra `m_upgraderResource` requirements (next idol tiers) banded by `GetAmount` for high levels. The rolling idol is the first upgrader requirement with amount > 0 (vanilla takes the first one regardless of amount). Check the skill gate `Player.GetSkills().GetSkillLevel(skill) ≥ threshold(q)` in both `UpdateRecipe` and `DoCrafting`.
 * **Risks:**
   * The sheet's ladder only makes sense if a plain idol rolls below 50 % (for example 35 %), which is lower than vanilla's 65 %. That is fair only because a failure no longer costs the item, so make it configurable and flag it at the pause.
-  * What a vanilla failure does is disputed. The wiki and Forge No Destroy say every failure destroys the item (35 %, with 35 % of the materials back), which needs idol prefabs with `m_breakChance` ≥ 0.35 and a 0.35 refund. OdinBet's readme says a normal failure loses a level, and Forge of Certainty quotes 65/25/10, which is what the code defaults (0.65 / 0.1) give. Confirm with the Appendix A dump. The wiki also says one idol per attempt, so the idol requirements in the recipes have `m_amountPerLevel` 0 (unverified).
+  * Settled by the runtime dump (2026-09-29): every idol prefab has `m_breakChance` 1.0 and a 0.35 refund, so every vanilla failure destroys the item (the wiki and Forge No Destroy were right; OdinBet's and Forge of Certainty's figures are the code defaults). Idol requirements have amount 1 and `m_amountPerLevel` 0: one idol per attempt.
   * Without the biome gate, a Boar or re-summoned Eikthyr trophy would lift a Bloodgold idol to 50–95 %.
   * The vanilla only-one-ingredient helpers mishandle a 0-amount requirement. `Player.HaveRequirementItems` returns true as soon as it meets one. `Player.GetFirstRequiredItem` returns a null item there (`CountItems(name, 0) >= 0` is true and `Inventory.GetItem(name, 0)` finds nothing), even when a later trophy is held, and both `OnCraftPressed` and `DoCrafting` pass it to `Recipe.GetAmount`, which dereferences it. Guard both for our recipes.
   * Once idols have several qualities, `Player.HaveRequirementItems` counts only the largest single-quality stack, so a mixed hand can read as missing when a recipe needs more than one idol. Count all qualities in our Forge check.
@@ -513,6 +561,14 @@ Legend: feasibility = trivial / easy / medium / hard / very hard. "Who needs the
 * **Risks:** Minimal. It has to coexist with "repair requires materials" mods (the loop honours their `CanRepair`/`RepairOneItem` patches). It still repairs only items this station can repair (vanilla rule). Message spam if the per-item message isn't suppressed.
 
 ### 3. Building — Torches on/off only, no fuel (QoL, partially exists)
+* **Status:** implemented as [Switchable Lights](../../src/Building/Lights.Switchable) (0.1.0). The design that shipped
+  differs from the sketch below: no `m_infiniteFuel` / `m_canTurnOff` flags on prefabs (vanilla viewers would still
+  see lights die). **Braziers and every fire that can be used for cooking stay normal fires** (any `EffectArea` of type
+  `Burning`), even if listed. Instead **off = fuel 0, on = fuel full**, vanilla keys only
+  (the candle keeps its vanilla on/off state); a prefix on `UpdateFireplace` stops the burn on modded owners and tops
+  up lit lights; switching takes ownership first. Players without the mod see the same lights and can refuel an off
+  one; nothing is stuck after uninstall. Required on the server and every player; the server's list applies to
+  everyone. See [docs/design/building-lights-switchable.md](../design/building-lights-switchable.md).
 * **Feasibility:** easy.
 * **Who needs the mod:** everyone. Fuel burn runs on the torch's ZDO owner, and `IsBurning()` is evaluated per client from its own prefab flags.
 * **Hooks:** `ZNetScene.Awake` (postfix: for whitelisted `Fireplace` prefabs set `m_infiniteFuel = true`, `m_canTurnOff = true`, `m_canRefill = false`), `Fireplace.Interact` (prefix: allow `RPC_ToggleOn` when fuel is 0 for infinite pieces), `Fireplace.GetHoverText` (postfix: vanilla returns "" for infinite fuel; show state plus a `[E] Turn on/off` hint), `Fireplace.UpdateState` (keep rain auto-off optional), `Fireplace.TryGetItems`/`CanUseItems` (already false).

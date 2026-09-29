@@ -3,9 +3,11 @@
   "bepinex": "https://www.nexusmods.com/valheim/mods/3605",
   "pack": "",
   "mods": {
+    "MC.Building.Lights.Switchable": "",
     "MC.Combat.Crossbow.StaysLoaded": "",
     "MC.Crafting.Repair.OneClickAll": "",
     "MC.Crafting.Stations.BatchFeed": "",
+    "MC.Crafting.Forge.IdolUpgrades": "",
     "MC.Exploration.Stats.PerCreature": "",
     "MC.Exploration.Sleep.ThroughDay": "",
     "MC.Exploration.Compendium.Encyclopedia": "",
