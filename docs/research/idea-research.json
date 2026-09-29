@@ -9,6 +9,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "very-hard",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -69,6 +70,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -124,6 +126,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -172,6 +175,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -226,6 +230,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "depends",
                       "needsAssets":  false,
@@ -281,6 +286,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -337,6 +343,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "hard",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -397,6 +404,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -451,6 +459,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -495,6 +504,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -543,6 +553,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -592,27 +603,34 @@
                   {
                       "category":  "Combat",
                       "name":  "Better tower shields",
-                      "description":  "Make them usable. I see them as a immovable wall that can\u0027t parry: The player should be slowed A LOT but should be able to block virtually anything",
+                      "description":  "Make them usable. I see them as a immovable wall that can\u0027t parry: The player should be slowed A LOT but should be able to block virtually anything \u003e idea, make them TWO HANDED, very slow, with a small shield bash attack, and a lot of block armor",
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
                       "hooks":  [
+                                    "ObjectDB.Awake",
+                                    "ObjectDB.CopyOtherDB",
                                     "Character.RPC_Damage",
                                     "Humanoid.BlockAttack",
+                                    "Character.AddStaggerDamage",
                                     "Humanoid.UpdateBlock",
-                                    "Player.GetJogSpeedFactor",
-                                    "Humanoid.CheckRun",
                                     "Character.ApplyPushback",
-                                    "ObjectDB.Awake",
-                                    "ItemDrop.ItemData.GetBlockPower"
+                                    "Aoe.OnHit",
+                                    "ItemDrop.ItemData.GetTooltip",
+                                    "Player.GetJogSpeedFactor",
+                                    "Humanoid.EquipItem",
+                                    "Humanoid.GetCurrentWeapon",
+                                    "Humanoid.StartAttack"
                                 ],
-                      "sketch":  "Identify tower shields from a configurable list (ShieldWoodTower, ShieldBoneTower, ShieldIronTower, ShieldBlackmetalTower, ShieldFlametalTower, ShieldGoldTower) and force m_timedBlockBonus \u003c= 1 so they cannot parry. While blocking with one: apply a local SE_Stats with m_speedModifier around -0.6 (also slows turning) from an UpdateBlock postfix. In an RPC_Damage prefix, make frontal non-environmental hits blockable. After BlockAttack, scale down residual damage, stagger and pushback. Rear hits and stamina remain the counterplay.",
-                      "risks":  "Some damage bypasses blocking (Aoe launch via ForceJump, DoTs, lava, falling), so the set of \u0027blockable anything\u0027 hit types needs deciding. EpicLoot and shield mods patch GetBlockPower/BlockAttack. RPC_Damage is hot and long, so use prefix only, no transpiler. PvP balance.",
+                      "sketch":  "Pick tower shields from a configurable prefab list: ShieldWoodTower, ShieldBoneTower, ShieldIronTower, ShieldSerpentscale (the wiki lists the Serpent Scale Shield with the tower shields), ShieldBlackmetalTower, ShieldFlametalTower and ShieldGoldTower. FW_ShieldBlackmetalTower and SP_ShieldBlackmetalTower are separate prefabs (their prefixes match the FallenWarrior and ShadowPerson creature prefabs, unverified) and stay untouched. An ObjectDB.Awake/CopyOtherDB postfix edits their SharedData. (1) Set m_itemType to TwoHandedWeaponLeft and m_attachOverride to Shield. Vanilla Humanoid.EquipItem then empties both hands when the shield is equipped, and a one-handed weapon or torch replaces it. Humanoid.Pickup stops auto-equipping weapons. The back model and the armor stand slot follow m_attachOverride, so they stay those of a shield. The tooltip says two-handed and shows damage. (2) Keep m_timedBlockBonus at 1 or lower so it cannot parry (the wiki already lists no parry bonus for tower shields, so this guards against other mods), and set m_perfectBlockAdrenaline to 0, because the tooltip shows a parry-adrenaline line whenever it is above 0. (3) Multiply m_blockPower and m_blockPowerPerLevel (the block armor). In the vanilla block formula, block armor far above the hit\u0027s damage cuts the damage taken, the stamina per block, the stagger and the knockback. (4) Make m_movementModifier more negative, but keep it above -0.67. (5) Set m_attack to a clone of the player\u0027s unarmed combo (Humanoid.m_unarmedWeapon), which already plays in the shield stance. No player exists yet when ObjectDB loads, so take it from the player prefab (Game.m_playerPrefab) or clone it on first use, as CaptainValheim does at attack time. Give the shield blunt m_damages from block armor, a high m_attackForce and attack stagger multiplier, m_skillType Blocking, and m_blockable/m_dodgeable true. Humanoid.GetCurrentWeapon then returns the shield, so the normal attack button bashes through vanilla StartAttack, and GetCurrentBlocker still blocks with it. While blocking, an UpdateBlock postfix adds a local SE_Stats brace slow, which also slows walking, crouching and turning. An RPC_Damage prefix makes frontal hits blockable, filtered by HitType (fall hits use the ground normal as direction and pass the facing test). A Character.AddStaggerDamage prefix, scoped to BlockAttack, skips or scales the stagger while stamina remains, because a stagger ends IsBlocking and the next hits land unblocked. Rear hits and stamina stay the counterplay. Everything runs on the bearer\u0027s own client: equipping, attacks and movement run there, the bash\u0027s HitData is built by the attacker, and incoming hits are resolved by the victim\u0027s owner. So it is client-only.",
+                      "risks":  "Changing m_itemType is global and breaks code that looks for ItemType.Shield. CaptainValheim\u0027s shield techniques check it (seen in its source). EpicLoot\u0027s shield enchant rules and auto-equip-shield features such as ZenCombat\u0027s probably do too (unverified). MC\u0027s own shared ItemKinds classifier (Sort Chest, Crafting Search and Sort) would file tower shields under weapons unless it also reads m_attachOverride. ItemStand.CanAttach matches its supported types against m_itemType, not m_attachOverride, so an item stand that lists Shield but not TwoHandedWeaponLeft would refuse tower shields (stand lists unverified). Fallback: keep ItemType.Shield, enforce two hands with Humanoid.EquipItem postfixes, and swap in the bash through a GetCurrentWeapon/StartAttack override, as CaptainValheim does. EquipItem enforces hands only at equip time, so turning the feature on while a sword and a tower shield are held must unequip the sword. Vanilla block charges fire the shield\u0027s own m_attack through Attack.StartWithoutAnimation. A mod that turns m_buildBlockCharges on (ZenCombat, CaptainValheim) would fire our bash as that counter. The equipment movement modifier only scales jog and run speed, run, jump and dodge stamina, and knockback. Walk and crouch speed ignore it, so with the code defaults (jog 10, walk 5) a modifier below -0.5 makes walking faster than jogging. The run factor reaches 0 at -0.67 and the jog factor at -1. Below that, Character.UpdateWalking gets a negative speed that nothing clamps unless an SE_Stats is active. The rest of the slow therefore needs an SE. An SE speed of -1 or lower roots the player and turns jumps into weak tired jumps. Some damage breaks the block or never reaches BlockAttack. Hits with m_staggerMultiplier of 100 or more stagger before the block check. Aoe.m_blockable is false in code by default, and fire (CinderFire) hits are unblockable. AoE launches (ForceJump) and Aoe.m_knockBackForce pushes are applied in Aoe.OnHit, which a networked AoE runs on its owner\u0027s machine, so the bearer\u0027s client may not be the one applying them. DoTs, lava and falls skip blocking. Stagger is counted twice: BlockAttack adds it from the damage left after block armor, and ApplyDamage adds it again from what lands, times m_staggerMultiplier. Shield base values, block-charge settings and the vanilla slow are prefab data (unverified): the wiki says -10% for tower shields, Make Tower Shields Great Again\u0027s page says -20%. CaptainValheim (BlockAttack transpiler, GetCurrentWeapon, StartAttack, Pickup, RPC_Damage), ReliableBlock (BlockAttack transpiler), GCO and ZenCombat (closed source) and EpicLoot (GetBlockPower, unverified) touch the same code. The MC mods Crossbow Stays Loaded (BlockAttack postfix, UnequipItem prefix, GetTooltip postfix) and Harpoon Hooks Tames (RPC_Damage prefix and postfix) need cross tests. Huge block armor plus a bash is a PvP balance issue, so ship a server-synced config. RPC_Damage is hot and long, so patch it with a prefix only.",
                       "relatedIdeas":  [
-                                           "Weapon revamp"
+                                           "Weapon revamp",
+                                           "Adrenaline revamp"
                                        ],
                       "chapter":  "combat",
                       "coverage":  "partial",
@@ -620,29 +638,59 @@
                                            {
                                                "name":  "Goo\u0027s Combat Overhaul (gnls)",
                                                "url":  "https://thunderstore.io/c/valheim/p/gnls/GoosCombatOverhaul/",
-                                               "status":  "v2.1.2, 1.0: yes",
-                                               "notes":  "Closest to the vision: blocks until stamina is empty, no stagger or knockback, wider angle, reduced leftover damage, no parry, no running while blocking. Only available inside a huge overhaul."
+                                               "status":  "v2.1.2, updated 2026-09-26, targets Valheim 1.0.16 (1.0: yes)",
+                                               "notes":  "Closest to the wall stance. Tower shields hold until a blocked hit empties your stamina. Successful blocks prevent stagger and knockback, cover a wider angle and reduce the remaining physical damage. Tower shields cannot parry or run while blocking and have a heavier equipment penalty. The page mentions no two-handed rule and no shield bash. Only available inside a huge overhaul. No source link on the page. Listed under AI Generated. About 8.5K downloads."
+                                           },
+                                           {
+                                               "name":  "CaptainValheim (sighsorry)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/sighsorry/CaptainValheim/",
+                                               "status":  "v1.0.11, updated 2026-09-27, rebuilt for Valheim 1.0.7, tagged Deep North (1.0: yes)",
+                                               "notes":  "Turns shields into weapons. With an empty right hand, the primary attack is a shield strike built from a clone of the vanilla unarmed attack. Its damage comes from block power (x0.4 by default) and its push from deflection force (x0.4 by default), and it scales with the Blocking skill. Also adds a shield throw, a charge (block + secondary attack), projectile reflection and the vanilla block-charge counter. Applies to every shield through a global fallback, keeps tower shields one-handed, and its techniques check ItemType.Shield. Patches Humanoid.GetCurrentWeapon, StartAttack, Pickup, BlockAttack (transpiler) and Character.RPC_Damage, among others. Source: github.com/sighsorry1029/CaptainValheim (GPL-3.0 and MIT license files). Tagged AI Generated. About 2.4K downloads."
+                                           },
+                                           {
+                                               "name":  "ShieldBash (Mexanik)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Mexanik/ShieldBash/",
+                                               "status":  "v1.5.5, 2026-07-04 (1.0: unknown)",
+                                               "notes":  "Shield bash on a separate key (F by default) with its own animation and hit and miss sounds. Blunt damage scales with block power and the Blocking skill, plus enemy knockback and a dynamic stamina cost. The page does not say which shields it works with. Needs Jotunn (2.29.1). About 6.4K downloads."
                                            },
                                            {
                                                "name":  "ZenCombat (ZenDragon)",
                                                "url":  "https://thunderstore.io/c/valheim/p/ZenDragon/ZenCombat/",
-                                               "status":  "v1.0.2, updated 2026-09-25 (1.0: likely)",
-                                               "notes":  "Tower shield block charges: every N blocks triggers a counter-attack. Reliable block while staggered. Closed source (GitHub repo is only a wiki and issue tracker). About 97K downloads."
+                                               "status":  "v1.0.2, updated 2026-09-25, tagged Deep North (1.0: yes)",
+                                               "notes":  "Tower shield block charges: turns on the vanilla block-charge counter, which its page says is disabled by default, so every 5 blocks (default) trigger a counter-attack. Reliable block: block defence still applies while a hit staggers you, as long as you have stamina. Also scales knockback (block deflection 0%, melee 40%, area and ranged 50% by default) and auto-equips your last shield when you draw a one-handed weapon. Closed source (the GitHub repo only holds the wiki, the issue tracker and modpack files). About 97K downloads."
                                            },
                                            {
                                                "name":  "Make Tower Shields Great Again (FactoriaTeam)",
                                                "url":  "https://thunderstore.io/c/valheim/p/FactoriaTeam/Make_Tower_Shields_Great_Again/",
                                                "status":  "v0.0.4, 2024-10-25 (1.0: unknown)",
-                                               "notes":  "Stat buffs, resistances, knockback damage on block."
+                                               "notes":  "+20% tower shield block armor (more with quality), pierce resistance (four resistances on the Serpent scale shield), knockback damage on block scaled by the Blocking skill, and a heavier slow (-25%, against -20% in vanilla per its page) with +10% run and walk stamina. A data pack built on WackysDatabase 2.4.31 and ReliableBlock 1.0.0, both from before 1.0. About 3.5K downloads. Also on Nexus (mod 2900)."
+                                           },
+                                           {
+                                               "name":  "ReliableBlock (Korppis)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Korppis/ReliableBlock/",
+                                               "status":  "v1.0.0, 2022-06-14 (1.0: unknown)",
+                                               "notes":  "A block or parry always counts while you have stamina, even when the leftover damage fills the stagger bar (vanilla drops the block in that case). Heavy hits still stagger you and deal a lot of damage. Done with a Humanoid.BlockAttack transpiler. Required by Make Tower Shields Great Again. Source: github.com/karkkant/valheim-reliable_block. About 140K downloads."
+                                           },
+                                           {
+                                               "name":  "GrindstoneSkills (MilkyTeam)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/",
+                                               "status":  "v0.10.0, updated 2026-09-29 (1.0: likely)",
+                                               "notes":  "Blocking-skill perks: up to a 15% chance that a normal block staggers the attacker, up to 25% more poise, and a Shield Wall perk from level 50 (players within 4 m behind a blocking player take 10% less damage). Must be installed on the server and every client. Source: github.com/geraldjglasgow/ValheimMods. About 530 downloads."
+                                           },
+                                           {
+                                               "name":  "Combat Adjustments (NickSpinosa)",
+                                               "url":  "https://github.com/NickSpinosa/Valheim_Mushroom_Mods",
+                                               "status":  "v0.1.0 per its design doc, source only, last commit 2026-09-28, checked against Valheim 1.0.7 (1.0: yes)",
+                                               "notes":  "Hold-block rework. Shields add a flat amount to the stagger bar while equipped (Flametal tower +70 at max quality; round shields and bucklers less). Tower shields also get +5% block armor, and towers and round shields +20% durability. The goal is that hold-blocking stays viable while big hits still break the block. No slow, parry or two-handed change. Server-authoritative and needs the author\u0027s MushroomSync plugin. No Thunderstore page found."
                                            },
                                            {
                                                "name":  "Valheim Combat Overhaul (Kyresel)",
                                                "url":  "https://thunderstore.io/c/valheim/p/Kyresel/CombatOverhaul/",
-                                               "status":  "2021, deprecated (dead)",
-                                               "notes":  "No parry; overflow damage drains stamina instead of HP; lower block cost; stickiness."
+                                               "status":  "v1.7.8, 2021-04-22, deprecated (dead)",
+                                               "notes":  "Tower shields trade their parry for blocking damage beyond their block power at extra stamina cost. Surplus damage drains stamina instead of health, and no hit staggers you while stamina remains after the block. 40% less block stamina than other shields, halved knockback on a successful block, and \u0027stickiness\u0027 to the opponent. Nexus mod 591."
                                            }
                                        ],
-                      "inspiration":  "Vanilla Humanoid.BlockAttack: a perfect block needs m_timedBlockBonus \u003e 1, which tower shields lack; the stamina drain comes from excess damage. Borrow GCO\u0027s \u0027hold until stamina is empty, no stagger\u0027 and Kyresel\u0027s \u0027overflow drains stamina\u0027. Ours: a standalone, configurable shield-wall stance with a heavy slow, frontal immunity to stagger, knockback, AoE and projectiles, no parry, and optionally bash or brace. Detect GCO and ZenCombat and warn."
+                      "inspiration":  "Vanilla already provides most of the parts: the TwoHandedWeaponLeft equip rules, the unarmed combo (it already plays while a shield is held), a block formula where very high block armor absorbs almost everything (less damage, stamina, stagger and push per hit), and a block-charge counter that is switched off. Borrow four things. From GCO: \u0027hold until stamina is empty, no stagger or knockback\u0027. From ReliableBlock and ZenCombat: the block still counts when a hit staggers you (ours goes further and prevents that stagger while stamina lasts). From CaptainValheim: the empty-hand strike built from the cloned unarmed attack, with damage from block power, push from deflection force and Blocking skill scaling. From Make Tower Shields Great Again: knockback on block. What they get wrong: GCO locks the stance inside a huge overhaul. CaptainValheim gives every shield a strike and ShieldBash adds a bash on an extra key, but neither makes tower shields two-handed, so you still carry a sword. Make Tower Shields Great Again only changes numbers and depends on mods from before 1.0. Combat Adjustments only enlarges the stagger bar. Ours gives tower shields their own identity. They are two-handed under the vanilla rules and very slow when carried, slower still while bracing. They get much more block armor, no parry, and a frontal block that also stops AoE and projectiles. The bash is small and cheap and uses the normal attack button. Detect GCO, ZenCombat, CaptainValheim and ShieldBash and warn."
                   },
                   {
                       "category":  "Combat",
@@ -651,6 +699,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Implemented",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -705,6 +754,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -759,10 +809,11 @@
                   {
                       "category":  "Crafting",
                       "name":  "Forge of potential revamp",
-                      "description":  "Only consumes the idol on failure, does not destroy the item. Need higher tier idol when high level enough. Might require skill level to be able to craft",
+                      "description":  "Only consumes the idol on failure, does not destroy the item. Need higher tier idol when high level enough. Might require skill level to be able to craft, Upgrade idols with trophies to inrease odds (low trophy brings it up to 50%, elite to 70, zone boss 95)",
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -770,16 +821,24 @@
                                     "InventoryGui.DoCrafting",
                                     "InventoryGui.OnCraftPressed",
                                     "InventoryGui.UpdateRecipe",
+                                    "InventoryGui.UpdateRecipeList",
                                     "Piece.Requirement.GetAmount",
+                                    "Player.HaveRequirementItems",
+                                    "Player.GetFirstRequiredItem",
                                     "ObjectDB.Awake",
                                     "ObjectDB.CopyOtherDB",
+                                    "ZNetScene.Awake",
+                                    "Character.IsBoss",
                                     "ItemDrop.ItemData.GetTooltip"
                                 ],
-                      "sketch":  "A prefix on DoCrafting takes over the upgrader branch when station.m_upgrader is set. On success, raise m_quality in place (preserving customData, durability and crafter) and consume the idols; on failure, consume only the idols and leave the item untouched. Add higher-tier idol requirements per recipe and make GetAmount return 0 outside each quality band, rolling on the first requirement with amount \u003e 0. Gate by skill level in UpdateRecipe and DoCrafting.",
-                      "risks":  "Power creep once break and downgrade are removed (keep scaling costs or diminishing chance). EpicLoot and other mods patch DoCrafting, so keep the prefix narrow. Use a server-synced config for fairness. Fix the vanilla $msg_upgrader_failed localization key.",
+                      "sketch":  "A prefix on InventoryGui.DoCrafting takes over the Forge branch (station.m_upgrader). It rolls our own chance for the idol actually spent: a configurable base for a plain idol, or 50%, 70% or 95% for an idol infused with a common, elite or zone-boss trophy (the trophy sets the chance, it does not add to it). On success it raises m_quality in place, which keeps the crafter, world level and m_customData. Durability must be set on purpose: a higher quality has a higher max durability, and vanilla re-creates the item at full durability. Keep vanilla\u0027s unequip so hand, back and shoulder visuals refresh. On failure it removes only that idol (Inventory.RemoveItem by name and quality) and leaves the item untouched. The infusion is stored as the idol\u0027s own m_quality (1 plain, 2 common, 3 elite, 4 boss). This vanilla field is saved everywhere, and Inventory.FindFreeStackItem already stacks only equal qualities. Raising the idols\u0027 SharedData.m_maxQuality to 4 in ObjectDB.Awake/CopyOtherDB also keeps levels apart on drag and drop (ItemData.IsSameType, InventoryGrid.DropItem) and shows the level on the slot. Infusing happens in the Upgrade tab of a normal station: one recipe per idol prefab with m_noCraftOnlyUpgrade and m_requireOnlyOneIngredient, whose trophy requirements are banded per step by a Piece.Requirement.GetAmount postfix. Our own DoCrafting branch runs these recipes, because the vanilla upgrade path removes the whole idol stack and gives back one item. Trophy classes are built at ZNetScene.Awake: boss = trophies in the CharacterDrop of prefabs with Character.m_boss; elite = a config list; common = every other trophy. The Deep North boss (Kall Fimbulbringer) has no trophy, so the Bloodgold boss step needs a configured item such as Sacrificial Blood (FrozenKingDrop). A biome-tier gate stops a cheap trophy from lifting a high-tier idol. Keep the higher-tier idol bands at high levels and the Crafting skill gate in UpdateRecipe and DoCrafting.",
+                      "risks":  "The sheet\u0027s ladder only makes sense if a plain idol rolls below 50%, which is lower than vanilla\u0027s 65%. That is fair only because a failure no longer costs the item, so make it configurable and flag it. What a vanilla failure does is disputed (the wiki and Forge No Destroy: the item is always destroyed; OdinBet and Forge of Certainty: usually a level is lost), so dump the idol prefabs. Without a biome gate, a Boar trophy or a re-summoned Eikthyr would lift a Bloodgold idol. \u0027Elite\u0027 has no vanilla flag, so it needs a config list. The vanilla only-one-ingredient helpers mishandle a 0-amount requirement: Player.HaveRequirementItems returns true, and Player.GetFirstRequiredItem returns a null item that Recipe.GetAmount dereferences in both OnCraftPressed and DoCrafting. Recipe.GetRequiredStationLevel (max(1, m_minStationLevel) + q - 1) needs a level-4 station for the boss step. Raising the idols\u0027 m_maxQuality also puts other mods\u0027 idol recipes (ReforgedPotential, OdinBet, JGFoP, DowngradeableIdols) in their station\u0027s Upgrade tab, where the vanilla upgrade path eats the whole stack. Where idols keep m_maxQuality 1 (vanilla players, or after an uninstall), the vanilla Forge counts only quality-1 idols, so infused idols are refused until they are dragged onto a plain stack, and plain idols dragged onto an infused stack become infused. ReforgedPotential reports greyed-out icons with dynamic requirements. Many Forge mods patch DoCrafting or the idol data (EpicLoot, ReforgedPotential, OdinBet, JGFoP, Wire\u0027s, the IL patch in ForgeOfPotentialSafe, Potential Forge NoFail, Potential Draught, Forge No Destroy, G3A3), so keep the prefix narrow and declare them incompatible. Our framework has no config sync yet. Fix the vanilla $msg_upgrader_failed key.",
                       "relatedIdeas":  [
                                            "Gemstone revamp",
-                                           "Enchanting"
+                                           "Enchanting",
+                                           "One trinket per trophy",
+                                           "Trophy on mobs without trophy",
+                                           "Boss summon revamp"
                                        ],
                       "chapter":  "building-crafting",
                       "coverage":  "partial",
@@ -787,17 +846,77 @@
                                            {
                                                "name":  "ReforgedPotential (Akuichi)",
                                                "url":  "https://thunderstore.io/c/valheim/p/Akuichi/ReforgedPotential/",
-                                               "status":  "2.0.6, 2026-09-27, 1.0 tagged",
-                                               "notes":  "100% success by default. Break-or-degrade on failure. Craftable idols. Cost scales with level. Boss progression, and an idol progression where the required idol changes at level thresholds (matches half our idea). No skill gate."
+                                               "status":  "v2.0.6, updated 2026-09-27, Jotunn 2.26.1, tagged Deep North Update (1.0: yes)",
+                                               "notes":  "100% success by default (configurable). Break Chance decides whether a failed item breaks or loses one level. Craftable idols with configurable recipes (Artisan table by default), configurable idol cost scaling and upgrade duration. Boss progression, and an idol progression that changes the required idol at level thresholds (our \u0027higher tier idol\u0027 part). No trophy odds and no skill gate. Known bug: dynamic requirements grey out icons in the upgrade list. EpicLoot compatible."
                                            },
                                            {
                                                "name":  "OdinBet ForgeOfPotential (Igao)",
                                                "url":  "https://thunderstore.io/c/valheim/p/Igao/OdinBet_ForgeOfPotential/",
-                                               "status":  "1.4.2, 2026-09-28, updated post-1.0",
-                                               "notes":  "Every number configurable. Three failure modes: lose levels, destroyed with partial refund, or reset to level 1. Idols craftable with boss trophies. Settings panel, Hall of Fame, elemental infusions. Feature-heavy."
+                                               "status":  "v1.4.2, updated 2026-09-28, BepInEx only, requires Valheim 1.0 (1.0: yes)",
+                                               "notes":  "Gambling framing, 100% success by default. A failure can lose levels, destroy the item with a partial refund, or reset it to level 1. With LevelsLostOnFailure = 0 the item keeps its level and only the ingredients are spent, which covers our \u0027item survives\u0027 part as a setting. All 16 idols are craftable, each tier with its biome boss trophy; the Bloodgold tier uses Sacrificial Blood (FrozenKingDrop, from Kall). Trophies make idols but do not change the odds. Its readme says a normal vanilla failure loses a level. Server-synced with a version lock. Also a settings panel, Hall of Fame and Thunder Night elemental infusions."
+                                           },
+                                           {
+                                               "name":  "JGFoP (JGSTUDIOS)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/JGSTUDIOS/JGFoP/",
+                                               "status":  "v0.1.0, updated 2026-09-22, Jotunn 2.30.2 (1.0: yes)",
+                                               "notes":  "Lightweight configurable replacement: success and failure weights, a break share of failures, levels lost on failure with a minimum level, optional level-1 return on a break, a level cap, idol cost scaling and duration. Idols are craftable at the standard Forge with one boss trophy per tier (Sacrificial Blood for Bloodgold). Server-synced; install on the server and every client."
+                                           },
+                                           {
+                                               "name":  "Forge of Progression (Nexus 3980, BaceBank)",
+                                               "url":  "https://www.nexusmods.com/valheim/mods/3980",
+                                               "status":  "v2, updated 2026-09-25, Nexus only (1.0: yes)",
+                                               "notes":  "The Forge itself is upgraded through eight biome tiers, paid with trophies, materials and idols, with nine custom models. Failure chance drops from 80% to 30%, idol cost drops by up to 25%, and the penalty goes from destroy to losing two levels, then one (the JSON config can set None). Failed attempts still use the idols. The host and every player need it. Closest to \u0027trophies raise the odds\u0027, but per station, not per idol."
+                                           },
+                                           {
+                                               "name":  "Potential Draught (LOSDC)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/LOSDC/PotentialDraught/",
+                                               "status":  "v1.3.10, updated 2026-09-26, Jotunn 2.30.2 (1.0: yes)",
+                                               "notes":  "A Cauldron potion gives 5 minutes of 75% success (10% break, 15% level loss) and half the upgrade time. The numbers are fixed. It swaps the idol chance only around the crafting call. It also caps normal Forge refinement at level 25 by default (server setting). Required on the server and every client."
+                                           },
+                                           {
+                                               "name":  "Forge No Destroy (Nexus 3781, whitebarbie)",
+                                               "url":  "https://www.nexusmods.com/valheim/mods/3781",
+                                               "status":  "v1.0.1, updated 2026-09-16, Valheim 1.0 (1.0: yes)",
+                                               "notes":  "Keeps vanilla odds, but a failure drops one level instead of destroying the item: it sets the idols\u0027 m_breakChance negative. Its page says vanilla failures destroy the item. Install on host and clients. Alternative to the same author\u0027s Potential Forge NoFail."
+                                           },
+                                           {
+                                               "name":  "Potential Forge NoFail (Nexus 3751, whitebarbie)",
+                                               "url":  "https://www.nexusmods.com/valheim/mods/3751",
+                                               "status":  "v1, updated 2026-09-14, Valheim 1.0 (1.0: yes)",
+                                               "notes":  "Every refinement succeeds; idols are still consumed. Harmony only; its page says it conflicts with mods that touch InventoryGui.DoCrafting. Install on host and clients."
+                                           },
+                                           {
+                                               "name":  "Wire\u0027s Forge of Potential Rework (Wire)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Wire/WiresForgeOfPotentialRework/",
+                                               "status":  "v1.0.0, updated 2026-09-28, also on Nexus (4079, by Kr0sshair) (1.0: yes)",
+                                               "notes":  "90% then 95% success, falling 5 points per level to a 65% floor. A failure loses no level up to +5 (35% of the attempted materials come back), one level at +6 and +7, and is split 50/50 between a one-level loss and a break from +8. A 20% jackpot chain grants up to +5. The idol is always consumed. Shows live odds in the Forge UI."
+                                           },
+                                           {
+                                               "name":  "Forge of Potential Safe (OutsiderTeam)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/OutsiderTeam/ForgeOfPotentialSafe/",
+                                               "status":  "v1.0.3, updated 2026-09-13, tested on 1.0.12 (1.0: yes)",
+                                               "notes":  "100% success and 0% break through an IL patch on InventoryGui.DoCrafting; SuccessChance and BreakChance are configurable. Odin\u0027s Blessing (valheim_gigachads, 0.0.1, 2026-09-13, https://thunderstore.io/c/valheim/p/valheim_gigachads/OdinsBlessingForgeOfPotential/) gives 100% success with no options."
+                                           },
+                                           {
+                                               "name":  "Forge of Certainty (Nexus 3860, Rrostayk)",
+                                               "url":  "https://www.nexusmods.com/valheim/mods/3860",
+                                               "status":  "v1, updated 2026-09-19, client-side (1.0: yes)",
+                                               "notes":  "100% success by default, with configurable SuccessChance and BreakChance; the idol and materials are still consumed. It gives vanilla odds as 65/25/10 (success, level lost, destroyed), which matches the code defaults but contradicts the wiki\u0027s 65% success / 35% destroyed. Verify with a data dump."
+                                           },
+                                           {
+                                               "name":  "DowngradeableIdols (valheim_gigachads)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/valheim_gigachads/DowngradeableIdols/",
+                                               "status":  "v1.0.0, updated 2026-09-28, no Jotunn (1.0: yes)",
+                                               "notes":  "Workbench recipes turn one idol into one idol of the tier below, for both families. It shows that idol recipes are a plain ObjectDB job. Source: github.com/lemigu/downgradeable_idols."
+                                           },
+                                           {
+                                               "name":  "G3A3 (G3A1)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/G3A1/G3A3/",
+                                               "status":  "v1.9.73, updated 2026-09-28, Jotunn 2.30.2 (1.0: yes)",
+                                               "notes":  "All-in-one pack. Its ForgeOfPotential section changes the upgrade odds, and its difficulty sections (BossIdols, Idols) hand out Forge of Potential idols as a reward. Server-synced; the server and every player need the same version. One more mod that touches the Forge odds."
                                            }
                                        ],
-                      "inspiration":  "Both mods mainly remove or retune the gamble. Neither does \u0027on failure consume only the idol, keep the item and the other materials\u0027. Vanilla InventoryGui.DoCrafting finds the Piece.Requirement with m_upgraderResource (the idol) and rolls SharedData.m_upgradeChance (defaults to 0.65) then m_breakChance (refund via m_breakReturnIngreientsAmount). Otherwise the item drops a level, and all resources are consumed in every case. Plan: a narrow patch on that branch that refunds everything except the idol on failure and never destroys the item. Require an idol tier by target level. Optional Crafting-skill gate or odds bonus, and odds shown in the tooltip. Detect or declare these two mods incompatible. Gems could act as catalysts."
+                      "inspiration":  "Vanilla already spends only the idol at the Forge: Player.ConsumeResources skips non-upgrader requirements there. What a failure really costs is the item, but sources disagree on how. The wiki and Forge No Destroy say every vanilla 1.0 failure destroys it (65% success, 35% destroyed with 35% of the materials back, which needs idol prefabs with m_breakChance of at least 0.35). OdinBet\u0027s readme says a normal failure loses a level, and Forge of Certainty quotes 65/25/10, which is what the code defaults give. A data dump settles it. Most mods remove the gamble (ForgeOfPotentialSafe, Odin\u0027s Blessing, Potential Forge NoFail, Forge of Certainty, and ReforgedPotential and OdinBet at their 100% defaults) or soften it (Forge No Destroy downgrades instead of destroying; Wire\u0027s loses no level up to +5; OdinBet with LevelsLostOnFailure 0 and Forge of Progression with the None penalty keep the item\u0027s level, which already covers our first part as a setting). Odds boosters exist, but not per idol: Forge of Progression spends trophies to upgrade the station, and Potential Draught is a timed potion. OdinBet and JGFoP use boss trophies (and Sacrificial Blood for Bloodgold) only as idol ingredients, and nobody infuses idols with trophies. Ours: a failure loses only the idol, a plain idol has a low base chance, and trophies set 50/70/95%. The infusion is stored as idol quality, so there are no new prefabs and the mod stays client-only; after an uninstall, infused idols must be merged onto a plain stack before the vanilla Forge accepts them. Trophies are biome-gated, higher-tier idols are required at high levels, the Crafting skill gate is optional and the chance is shown on the button. Borrow Wire\u0027s live odds display, ReforgedPotential\u0027s idol-threshold progression and Forge of Progression\u0027s biome-tier trophy costs."
                   },
                   {
                       "category":  "Farming",
@@ -806,6 +925,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "Yes",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -855,6 +975,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "Yes",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -903,6 +1024,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "depends",
                       "needsAssets":  false,
@@ -940,6 +1062,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "Yes",
                       "userLink":  "https://www.nexusmods.com/valheim/mods/116",
+                      "status":  "Implemented",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -996,6 +1119,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "Yes",
                       "userLink":  "",
+                      "status":  "Implemented",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -1052,6 +1176,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "Yes",
                       "userLink":  "",
+                      "status":  "Cancelled",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -1108,6 +1233,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -1161,6 +1287,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -1219,6 +1346,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Implemented",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -1274,6 +1402,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Implemented",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -1314,6 +1443,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "Yes",
                       "userLink":  "",
+                      "status":  "Implemented",
                       "feasibility":  "trivial",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -1364,6 +1494,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "Partially",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -1415,6 +1546,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -1471,6 +1603,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -1521,6 +1654,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Implemented",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -1572,6 +1706,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Implemented",
                       "feasibility":  "trivial",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -1626,6 +1761,7 @@
                       "scope":  "QoL",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "hard",
                       "side":  "depends",
                       "needsAssets":  false,
@@ -1686,6 +1822,7 @@
                       "scope":  "New",
                       "existsPerUser":  "Partially",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -1749,6 +1886,7 @@
                       "scope":  "New",
                       "existsPerUser":  "Partially",
                       "userLink":  "https://www.nexusmods.com/valheim/mods/922",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -1809,6 +1947,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "very-hard",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -1869,6 +2008,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "depends",
                       "needsAssets":  true,
@@ -1918,6 +2058,7 @@
                       "scope":  "New",
                       "existsPerUser":  "Partially",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "hard",
                       "side":  "client-only",
                       "needsAssets":  true,
@@ -1974,6 +2115,7 @@
                       "scope":  "New",
                       "existsPerUser":  "Yes",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -2015,6 +2157,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "depends",
                       "needsAssets":  false,
@@ -2062,6 +2205,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "hard",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2116,6 +2260,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "very-hard",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2173,6 +2318,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -2232,6 +2378,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -2291,6 +2438,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2338,6 +2486,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -2393,6 +2542,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2437,6 +2587,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  true,
@@ -2492,6 +2643,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2547,6 +2699,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "hard",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2603,6 +2756,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2660,6 +2814,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2718,6 +2873,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "very-hard",
                       "side":  "depends",
                       "needsAssets":  true,
@@ -2776,6 +2932,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "very-hard",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2828,6 +2985,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "hard",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -2886,6 +3044,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -2944,6 +3103,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "hard",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -2997,6 +3157,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -3054,6 +3215,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "hard",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -3100,27 +3262,52 @@
                   {
                       "category":  "Exploration",
                       "name":  "New ability depending on skill level",
-                      "description":  "",
+                      "description":  "at 25 - 50 - 75 - 100",
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "depends",
                       "needsAssets":  false,
                       "hooks":  [
                                     "Skills.GetSkillLevel",
+                                    "Skills.GetSkillList",
                                     "Skills.RaiseSkill",
                                     "Player.OnSkillLevelup",
-                                    "Skills.LowerAllSkills",
+                                    "Skills.CheatRaiseSkill",
                                     "Skills.OnDeath",
+                                    "Skills.LowerAllSkills",
+                                    "Skills.Clear",
+                                    "SEMan.ModifySkillLevel",
+                                    "Player.OnDeath",
+                                    "Player.OnSpawned",
+                                    "Player.Update",
+                                    "Player.Message",
                                     "SkillsDialog.Setup",
-                                    "Player.m_customData"
+                                    "UITooltip.Set",
+                                    "SEMan.AddStatusEffect",
+                                    "SEMan.RemoveStatusEffect",
+                                    "SE_Stats (m_fallDamageModifier, m_maxMaxFallSpeed, m_jumpModifier, m_swimSpeedModifier, m_stealthModifier, m_noiseModifier, stamina-use modifiers)",
+                                    "Player.m_customData",
+                                    "Player.SetControls",
+                                    "Character.Jump",
+                                    "Character.ForceJump",
+                                    "Character.UpdateGroundContact",
+                                    "Player.Dodge",
+                                    "Player.UpdateDodge",
+                                    "Player.CheckRun",
+                                    "Player.OnSwimming",
+                                    "Player.UpdateStealth",
+                                    "Sadle.UpdateRiding"
                                 ],
-                      "sketch":  "Shared SkillPerks library: perks declared as (SkillType, minLevel, id, description) evaluated from GetSkillLevel (so meads can unlock temporarily), queried by feature mods (e.g. Swim 25 dive, Sailing 30 instant stop); OnSkillLevelup postfix announces unlocks and SkillsDialog.Setup postfix lists perks in skill tooltips.",
-                      "risks":  "Death penalty can drop players below thresholds (choose current vs peak level stored in m_customData); balance with skill XP mods; perks affecting ships/creatures/others need everyone and owner-side evaluation.",
+                      "sketch":  "Each skill gets four named abilities, at 25, 50, 75 and 100. A registry declares them as (SkillType, tier, id, name, description, passive or active); injected custom skills such as Sailing register the same way. The local player\u0027s tiers are re-evaluated on Player.OnSpawned, in a Skills.RaiseSkill postfix and on a 1 s timer (Player.Update postfix, filtered to Player.m_localPlayer). The timer also catches meads and set bonuses (SEMan.ModifySkillLevel), the console command Skills.CheatRaiseSkill and deaths, none of which go through the level-up event. Each check takes the highest tier at or below Skills.GetSkillLevel (or, as an option, the peak level kept in Player.m_customData) and compares it with a per-character cache, so a respawn does not re-announce every tier. Gained and lost abilities are announced with Player.Message and the skill icon. Passive tiers are hidden SE_Stats created at runtime (m_hidden, m_ttl 0, a unique object name because StatusEffect.NameHash hashes it). SEMan.AddStatusEffect(StatusEffect) clones them without an ObjectDB entry, and the HUD skips them. Fall damage, the fall-speed cap, jump force, swim speed, stealth, noise and stamina costs then need no Harmony patch. Passive tiers are re-added after respawn, because Player.OnDeath calls SEMan.RemoveAllStatusEffects. Active tiers reuse vanilla animation triggers that already replicate through ZSyncAnimation.SetTrigger: \u0027jump\u0027 (Character.ForceJump) and \u0027dodge\u0027 (Player.UpdateDodge). Example Jump set: 25 soft landing; 50 landing roll (vanilla already queues a Dodge pressed in the air for 0.5 s and fires it after touchdown, so an UpdateGroundContact prefix only checks that queue and cuts the fall damage); 75 one jump in the air (a Player.SetControls prefix calls ForceJump); 100 slow fall while Jump is held (fall-speed cap plus a fall damage cut, because fall damage depends on the height fallen, not on speed). A SkillsDialog.Setup postfix adds each skill\u0027s four tiers to its tooltip. First pack: Run, Jump, Swim, Sneak, Dodge and Ride (24 abilities). Sailing gets its tiers from the Sailing revamp. Feasibility is medium: the framework is small and many tiers need no patch. The cost is content, and abilities that need new animation or physics (diving, ledge mantle) stay in their own ideas. Who needs it depends on the ability. Abilities on the local player are client-only: the owner simulates the player, and stealth and noise reach enemies through the player ZDO (s_stealth, s_noise). The rider owns the Sadle ZDO after Sadle.RPC_RequestControl and sends its Ride factor in the Controls RPC. Abilities on ships or on other characters need everyone.",
+                      "risks":  "Death: on the Normal preset a hard death costs 5 % of every skill. The presets cost 1 % (Casual, Very easy), 2.5 % (Easy), 5 % (Normal) and 7.5 % (Hard), and Hardcore sets the DeathSkillsReset global key, which clears all skills through Skills.Clear (wiki). Game.m_skillReductionRate defaults to 1, so the Player prefab must override the C# initialiser Skills.m_DeathLowerFactor = 0.25; log it at runtime. A Normal death drops a tier only when the base level is less than about 5 % above it (25 to 26.3, 50 to 52.6, 75 to 78.9), but always drops the level-100 ability (100 becomes 95). Choose between current-level gating (default, vanilla-consistent) and peak-level gating. Meads and set bonuses unlock and relock tiers: avoid message spam. Skills.GetSkillLevel creates a level-0 entry for a skill the player never used, and that entry then shows in the skills panel and is saved. Only read skills listed by Skills.GetSkillList. For an injected skill without a SkillDef, that entry has m_info = null and breaks the panel and the save. Content volume: covering all 24 vanilla skills means 96 abilities. Tiers stack on vanilla\u0027s linear scaling, which needs balancing. The air jump must not fire while a grappling hook is attached, because Character.Jump uses that case to pull the hook. Conflicts: ImpactfulSkills patches Character.Jump, Character.UpdateGroundContact, Character.UpdateSwimming, Character.UpdateWalking, Player.OnSwimming and Character.AddNoise. PIXPIX Movement adds its own double jump and landing roll. GrindstoneSkills and SkillPeak also change the skills panel. Skill overhauls, XP multipliers and death-penalty settings change how fast tiers are reached or lost. Mods that clear status effects remove passive tiers until the next check. Skills are client-authoritative (saved in the character file by Skills.Save), so a server cannot enforce tiers. Ship and other-character abilities need everyone and must be evaluated on the owner.",
                       "relatedIdeas":  [
                                            "Swim dive",
-                                           "Sailing revamp"
+                                           "Sailing revamp",
+                                           "Sneak revamp",
+                                           "Increase base HP/Stamina with stats"
                                        ],
                       "chapter":  "exploration-player",
                       "coverage":  "partial",
@@ -3128,29 +3315,53 @@
                                            {
                                                "name":  "ImpactfulSkills (MidnightMods)",
                                                "url":  "https://thunderstore.io/c/valheim/p/MidnightMods/ImpactfulSkills/",
-                                               "status":  "0.20.2, 2026-09-28, 1.0 tagged",
-                                               "notes":  "Level-gated unlocks: AOE mining at 50, AOE harvest at 25, sneak noise at 50. New Voyager, Hauling and Forging skills with milestones."
+                                               "status":  "v0.20.2, updated 2026-09-28, tagged Deep North Update, updated for 1.0 in 0.16.0 (1.0: yes)",
+                                               "notes":  "Each effect has a required level (configurable from 0 to 100), then scales linearly. Its movement modules only change numbers. Jump: height from level 10, fall damage reduction from 15 and a higher safe-fall height from 25 (patches Character.Jump and Character.UpdateGroundContact). Swim: speed from 25 and stamina from 50 (Character.UpdateSwimming, Player.OnSwimming). Sneak: backstab bonus from 25 and noise reduction from 50 (Character.AddNoise). Run: speed with no threshold (Character.UpdateWalking). Discrete unlocks elsewhere: Forging at 25/50/75/90, Voyager at 25/35/50/75, AOE harvest and multi-planting at 25, AOE mining at 50, vein breaking at 75. Unlock announcements are only on its roadmap. Needs Jotunn, server-synced config. GPL-3.0 source on GitHub. About 6.4K downloads."
                                            },
                                            {
                                                "name":  "GrindstoneSkills (MilkyTeam)",
                                                "url":  "https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/",
-                                               "status":  "0.9.1, 2026-09-27, updated post-1.0",
-                                               "notes":  "Milestones at 25/50/100 per skill (sailing lookout, legendary fish, starred crops, last stand)."
+                                               "status":  "v0.10.0, updated 2026-09-29 (first upload 2026-09-27), BepInExPack 5.4.2350, covers Deep North content (1.0: yes)",
+                                               "notes":  "Named milestones, listed with their level on a skill-book page it adds to the skills panel (click a skill). Only its new Defense skill uses exactly 25/50/75/100 (Riposte, Shield Wall, Hardened, Last Stand). Other skills: Pickaxes 25/50/100, Fishing 25/50/75 (angler\u0027s senses, Catch your breath at 75), Farming 20/25/50/75/100, Husbandry 20/25/50, Foraging 25, and its own Sailing skill only 50 (Lookout). Milestone levels are configurable (a level above 100 turns one off). No movement skills. Also has a setting for the skill loss on death. Must be installed on the server and every client (server-synced). GPL-3.0 source on GitHub."
                                            },
                                            {
                                                "name":  "Exploration (Smoothbrain)",
                                                "url":  "https://thunderstore.io/c/valheim/p/Smoothbrain/Exploration/",
-                                               "status":  "1.0.4, 2026-02-05, pre-1.0",
-                                               "notes":  "Explore radius and speed; level 20 table record, 40 map copy, 50 double chest loot."
+                                               "status":  "v1.0.4, updated 2026-02-05, tagged Ashlands Update (1.0: unknown)",
+                                               "notes":  "Adds an Exploration skill. Level 20: record your map on the cartography table. Level 40: copy the map. Level 50: chance to double chest loot. Explore radius, speed and Wishbone radius scale continuously. Configurable, can run on a server to enforce the config. Open source (blaxxun-boop/Exploration), about 39K downloads."
                                            },
                                            {
                                                "name":  "NorntasticSkillGrowth (Dafini)",
                                                "url":  "https://thunderstore.io/c/valheim/p/Dafini/NorntasticSkillGrowth/",
-                                               "status":  "0.14.2, 2026-09-17, AI-generated",
-                                               "notes":  "Skyrim-style perk trees for every skill, respec."
+                                               "status":  "v0.14.2, updated 2026-09-17, built against Valheim 1.0.12, needs Jotunn, tagged AI Generated (1.0: yes)",
+                                               "notes":  "Skyrim-style perk trees for every skill, including skills added by other mods: points earned from levels, level gates, prerequisites, prestige at 100 and respec. Perk effects run through one aggregate status effect. The page says only 69 of 384 nodes do something so far."
+                                           },
+                                           {
+                                               "name":  "Valheim Mastery (ValheimMastery)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/ValheimMastery/Valheim_Mastery/",
+                                               "status":  "v0.16.31 (public beta), updated 2026-09-27, built against Valheim 1.0.16, tagged AI Generated (1.0: yes)",
+                                               "notes":  "OSRS-style progression with 21 Mastery skills of its own (including Prayer; Agility covers movement and swimming, plus Sailing), each from 1 to 100 with milestones and a skill cape. It runs its own XP and imports matching vanilla levels once, instead of adding tiers to the vanilla skills. Every player needs the same release. Dedicated servers are experimental."
+                                           },
+                                           {
+                                               "name":  "Movement (PIXPIX)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/PIXPIX/Movement/",
+                                               "status":  "v0.7.3, updated 2026-03-02, BepInExPack 5.4.2202 (1.0: unknown)",
+                                               "notes":  "Nine active movement abilities: dash, slide, overdrive, double jump, wall kick, blink, landing roll (Shift + Space before touching the ground), slam and shield surf. They unlock by defeating bosses (configurable), not by skill level. Slide and Slam use custom animation work, plus sound effects and a 3D asset. Mostly client-driven, but also install it on a dedicated server if you use one. About 7K downloads."
+                                           },
+                                           {
+                                               "name":  "SkillPeak (gooop)",
+                                               "url":  "https://github.com/gooop/skill-peak",
+                                               "status":  "v1.0.0, GitHub only (not on Thunderstore), created and last pushed 2026-09-18, MIT (1.0: likely)",
+                                               "notes":  "Draws a tick mark on each skill bar at the highest level ever reached. It records peaks in a Skills.Skill.Raise postfix, stores them in Player.m_customData (Player.Save prefix, read back in a Player.OnSpawned postfix) and draws them in a SkillsDialog.Setup postfix. A ready pattern for a \u0027keep abilities at peak level\u0027 option."
+                                           },
+                                           {
+                                               "name":  "Valheim-PerkSystemMod (DeepWolf413)",
+                                               "url":  "https://github.com/DeepWolf413/Valheim-PerkSystemMod",
+                                               "status":  "GitHub only, README only (no code), created 2025-10-23, last pushed 2025-10-28, GPL-3.0 (1.0: no release)",
+                                               "notes":  "A planned perk system on top of the vanilla skills: it would read skill levels without changing them, define perks in YAML and add new skills. Nothing released; listed only because it is the closest concept."
                                            }
                                        ],
-                      "inspiration":  "Existing systems focus on gathering and combat. Vanilla skills (Skills.SkillType Run, Jump, Sneak, Swim, Ride, Dodge; no Sailing) mostly scale linearly through Skills.GetSkillFactor. Give the exploration skills discrete, visible unlocks announced with a message: Run second wind, Jump ledge-mantle and fall-damage roll, Swim dive and breath, Sneak hide in tall grass, Ride mount sprint, and our Sailing skill. Thresholds configurable and server-synced. Avoid hidden % creep and perk-tree UI bloat."
+                      "inspiration":  "What to borrow: GrindstoneSkills\u0027 named milestones listed with their level in the skills panel, and its configurable milestone levels (a level above 100 turns one off). ImpactfulSkills\u0027 per-effect required levels. SkillPeak\u0027s Player.m_customData record for an optional peak-level mode. NorntasticSkillGrowth\u0027s single aggregate status effect for perk effects, the same approach as our hidden SE_Stats. PIXPIX Movement\u0027s movement actions (landing roll, double jump, dash) as candidate tiers. What existing mods get wrong: ImpactfulSkills\u0027 movement effects are hidden number increases with no unlock feedback (announcements are only on its roadmap). GrindstoneSkills skips the movement skills and must be installed on the server and every client. PIXPIX gates movement abilities on bosses, not on the skill the ability uses. NorntasticSkillGrowth adds a point-buy perk tree whose nodes are mostly unimplemented. Valheim Mastery replaces vanilla progression with its own 21 skills. What ours does differently: exactly four named abilities per vanilla skill, at 25, 50, 75 and 100. Each unlock gets one clear message, the tiers are shown in the vanilla skills tooltip, and every ability can be switched off. The first pack is client-only and covers the exploration skills (Run, Jump, Swim, Sneak, Dodge, Ride). Most passive tiers are hidden status effects rather than patches. Active tiers reuse vanilla animation triggers, and the landing roll is vanilla\u0027s own queued dodge. The Sailing revamp adds the Sailing tiers."
                   },
                   {
                       "category":  "Crafting",
@@ -3159,6 +3370,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  true,
@@ -3200,6 +3412,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "medium",
                       "side":  "depends",
                       "needsAssets":  true,
@@ -3257,6 +3470,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -3312,6 +3526,7 @@
                       "scope":  "New",
                       "existsPerUser":  "Partially",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -3370,6 +3585,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "easy",
                       "side":  "depends",
                       "needsAssets":  false,
@@ -3424,31 +3640,52 @@
                       "name":  "Late Game quest",
                       "description":  "Pick up quest from NPC to get rare items (kill specific target, bring specific item, find specific location, etc)",
                       "scope":  "New",
-                      "existsPerUser":  "",
+                      "existsPerUser":  "Partially",
                       "userLink":  "",
+                      "status":  "Idea",
                       "feasibility":  "hard",
                       "side":  "depends",
                       "needsAssets":  false,
                       "hooks":  [
-                                    "Trader.Interact / StoreGui.Show",
+                                    "Trader.Interact",
+                                    "Trader.GetHoverText",
+                                    "Trader.UseItem",
+                                    "StoreGui.Show",
+                                    "Chat.SetNpcText",
                                     "Player.m_customData",
-                                    "Player.AddUniqueKey / HaveUniqueKey",
+                                    "ZNet.GetWorldUID",
+                                    "EnvMan.GetDay",
+                                    "ZoneSystem.GetGlobalKey",
                                     "Game.RPC_RegisterKill",
-                                    "Character.OnDeath",
-                                    "Game.DiscoverClosestLocation / Game.RPC_DiscoverLocationResponse",
+                                    "ZDOMan.m_onZDODestroyed",
+                                    "ZNetScene.GetPrefab",
+                                    "ZoneSystem.IsZoneLoaded",
+                                    "ZoneSystem.GetSolidHeight",
+                                    "Character.SetLevel",
+                                    "Character.GetHoverName (ZDOVars.s_overrideHoverName)",
+                                    "BaseAI.SetPatrolPoint",
+                                    "ZNetView.ClaimOwnership",
+                                    "Game.DiscoverClosestLocation",
+                                    "Game.RPC_DiscoverLocationResponse",
+                                    "ZoneSystem.FindClosestLocation",
                                     "ZoneSystem.FindLocations",
                                     "Location.GetLocation",
-                                    "Inventory.CountItems / RemoveItem",
+                                    "Inventory.CountItems",
+                                    "Inventory.RemoveItem",
                                     "Minimap.AddPin",
-                                    "TextViewer.ShowText",
-                                    "Trader.m_useItems + TradeItem.m_requiredGlobalKey (Hildir pattern)"
+                                    "Minimap.RemovePin",
+                                    "MessageHud.ShowMessage",
+                                    "Trader.TraderUseItem.m_setsGlobalKey + Trader.TradeItem.m_requiredGlobalKey (Hildir pattern)"
                                 ],
-                      "sketch":  "An NPC offers rotating contracts (kill a named elite, hunt N of a creature, fetch rare materials, reach a location type) stored in Player.m_customData. Client-only v1 uses vanilla RPC_RegisterKill for kill credit and RPC_DiscoverClosestLocation for location targets; full version spawns named elites tagged with the quester\u0027s ID in their ZDO and reports kills via routed RPC, rewarding rare items or progression keys.",
-                      "risks":  "Overlap with EpicLoot bounties/treasure maps; per-character persistence allows cross-world farming (store world UID); vanilla kill credit only for flagged attackers; named targets despawn with zone unload (respawn from quest state); reward inflation.",
+                      "sketch":  "Client-only v1 on vanilla traders. Vanilla Trader.Interact ignores its alt argument, so Shift+E on Haldor, Hildir or the Bog Witch opens a contract board once a late-boss global key is set. The board offers 3 contracts per in-game day, seeded by ZNet.GetWorldUID + EnvMan.GetDay so every player of a world sees the same list, and keeps accepted contracts in Player.m_customData under the world UID. There are four contract types. (1) Slay a named elite: when the quester nears the pinned spot and ZoneSystem.IsZoneLoaded is true, the quester\u0027s client instantiates the creature, sets stars with Character.SetLevel, writes a name to ZDOVars.s_overrideHoverName and a contract id to a custom ZDO key, and calls BaseAI.SetPatrolPoint. Character.GetHoverName, and therefore EnemyHud, shows that name on every client, including clients without the mod. The contract completes when Game.RPC_RegisterKill arrives for that m_name while the tracked ZDO has 0 health (ZDOVars.s_health) or is destroyed (ZDOMan.m_onZDODestroyed). (2) Hunt N: count matching Game.RPC_RegisterKill calls (postfix) while the player is in the contract\u0027s world. Do not use the PlayerProfile per-creature totals, which cover every world. (3) Deliver: Inventory.CountItems/RemoveItem at the trader, through a Trader.UseItem prefix or a button on the board. (4) Survey: Game.DiscoverClosestLocation with discoverAll false and a chosen point (for example a random point a few km away), so the server answers with the one instance closest to that point. A Game.RPC_DiscoverLocationResponse prefix recognises the request\u0027s unique pinName, swallows that reply and stores the position. Arrival is then a distance check or Location.GetLocation. Rewards are rare vanilla items, so only the quester needs the mod. A new NPC, custom reward items or shared party contracts would require everyone to install it (side: depends).",
+                      "risks":  "Vanilla kill credit is keyed by player name in the victim\u0027s ZDO (set in Character.RPC_Damage, which runs on the owner). Only the owner sends it: Character.OnDeath returns before the credit loop on other peers. OnDeath is reached from CheckDeath on the owner, or from the CharacterAnimEvent.Die animation event for creatures with a death animation. The RPC carries the creature name, boss order, modifiers, attacker count and a cheat flag, but no ZDO id. So a specific target needs a second signal, players with the same name share credit, and hooks on the owner\u0027s code path (as in Haldor Fetch Quests) miss kills of creatures that another peer owns. The PlayerProfile per-creature totals cover every world the character played and also grow on cheated kills, so a \u0027kills since accepted\u0027 delta could be filled in another world. Spawned targets never despawn: only SpawnSystem sets the despawn-in-day and event-creature flags. An expired contract must therefore remove its tagged creature (as owner or after ZNetView.ClaimOwnership), and any player can kill it. Two questers who take the same shared daily contract would spawn two elites unless the spawn first looks for an existing tagged creature. ZDOMan.m_onZDODestroyed fires only on peers that hold the ZDO. With discoverAll, the server sends one reply per instance. Each reply that is not intercepted adds a pin and turns the player\u0027s view (Character.SetLookDir, when the map is closed). A prefix must not swallow the reply to a vanilla vegvisir read made at the same time, so match the pin name. The RPC only knows registered locations, and the chosen one may already be looted. The late-boss defeat keys are not in the GlobalKeys enum (it names only the first five bosses): they come from Character.m_defeatSetGlobalKey on the boss prefabs (read the prefab at runtime, or check with listkeys). Inventory counts match world level by default. EpicLoot (its own window at Haldor), HaldorBounties (a board in Haldor\u0027s shop) and TradersExtended already change the trader UI, so check that no other trader mod uses alt interact. Other risks: reward inflation, and cross-world farming if contracts are not keyed by the world UID.",
                       "relatedIdeas":  [
                                            "Better shops",
+                                           "Mob variant",
                                            "Boss summon revamp",
-                                           "Big unique dungeon"
+                                           "Big unique dungeon",
+                                           "Deep North revamp",
+                                           "Per creature kill count"
                                        ],
                       "chapter":  "exploration-world",
                       "coverage":  "partial",
@@ -3456,29 +3693,546 @@
                                            {
                                                "name":  "Almanac (RustyMods)",
                                                "url":  "https://thunderstore.io/c/valheim/p/RustyMods/Almanac/",
-                                               "status":  "3.8.0, 2026-09-25, 1.0 tagged",
-                                               "notes":  "YAML quests (Collect, Farm, Harvest, Kill, LearnItems, Mine), NPC dialogue trees with requirements, bounties with map pins, treasure hunts, token store."
+                                               "status":  "v3.8.0, 2026-09-25, tagged Deep North (1.0: yes)",
+                                               "notes":  "YAML quests (Collect, Farm, Harvest, Kill, LearnItems, Mine) with StartQuest/CompleteQuest dialogue commands. NPCs whose YAML dialogue syncs from the server and reloads live. Bounties spawn a buffed creature in a biome with a map pin, and the cost is refunded if it despawns or escapes. The defaults are Boar, Neck, Troll, Serpent, Abomination, Wraith, Lox, Seeker Brute and Fallen Valkyrie. Treasure hunts place map pins that spawn loot containers. A token store. The content is YAML that the server admin edits, and there is no \u0027reach a location\u0027 quest type. About 227K downloads and 355 dependants. RustyMods\u0027 earlier TraderQuest (a trader panel with bounty, treasure hunt, alt shop and gambling; v1.0.7, 2025-03-12) is deprecated."
                                            },
                                            {
                                                "name":  "EpicLoot Adventure Mode (RandyKnapp)",
                                                "url":  "https://thunderstore.io/c/valheim/p/RandyKnapp/EpicLoot/",
-                                               "status":  "0.14.13, 2026-09-24, 1.0 tagged",
-                                               "notes":  "Haldor bounties spawn a mini-boss and minions at a random spot in a biome; treasure maps; tokens."
+                                               "status":  "v0.14.13, 2026-09-24, tagged Deep North (1.0: yes)",
+                                               "notes":  "A new window at Haldor. Bounties spawn a mini-boss, sometimes with minions, at a random spot in its biome. They pay coins plus Iron/Gold tokens, can be limited per player, and can be gated by boss kills (Gated Bounty Mode). Treasure maps send the player to a chest in a biome. Also gambling and a secret stash. 0.14.13 repairs bounties and treasure that never spawned because of the 1.0 save migration; 0.14.11 moved their pin filters into the vanilla map. Tied to the whole magic-loot system. About 2.2M downloads."
+                                           },
+                                           {
+                                               "name":  "HaldorBounties (ProfMags)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/ProfMags/HaldorBounties/",
+                                               "status":  "v0.0.5, 2026-03-09, tagged Ashlands and Bog Witch, AI-generated (1.0: unknown)",
+                                               "notes":  "A daily board in Haldor\u0027s shop: 4 bounties per day (2 kill, 1 named miniboss with a map marker that fights like a player, 1 raid warband at campfires). The daily selection is shared server-wide. The player picks 1 of 4 rewards (coins, ingots, resources, consumables), and a live timer shows the next reset. Tiers follow boss progression only up to Mistlands (after Yagluth), so there are no Ashlands or Deep North contracts. Requires HaldorOverhaul (1.0.18+ per its GitHub README). About 8K downloads."
+                                           },
+                                           {
+                                               "name":  "BeastMarketOutpost (Yggdrah)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Yggdrah/BeastMarketOutpost/",
+                                               "status":  "v1.0.1, 2026-09-21, tagged Deep North, AI-generated (1.0: likely)",
+                                               "notes":  "A new outpost NPC mod. Nugget, a small dragon, guards a Quest Board where players browse missions to hunt creatures, gather resources and complete objectives across the biomes for rewards; the page gives no details on objective types, rotation or rewards. Also has companions (pets and mounts unlocked per Forsaken boss). Must be installed on the server and all clients. About 1K downloads."
                                            },
                                            {
                                                "name":  "Marketplace And Server NPCs Revamped (KGvalheim)",
                                                "url":  "https://thunderstore.io/c/valheim/p/KGvalheim/Marketplace_And_Server_NPCs_Revamped/",
-                                               "status":  "9.8.1, 2026-04-25, deprecated",
-                                               "notes":  "The classic server NPC framework: quest NPC with custom quest types and rewards, trader, banker, teleporter. Dead."
+                                               "status":  "v9.8.1, 2026-04-25, deprecated (dead)",
+                                               "notes":  "The classic server NPC framework: a Quests NPC with admin-made quests (custom types, conditions, timeouts, random rewards, hand-in at another NPC), plus trader, banker, teleporter, gambler and buffer NPCs. About 387K downloads. Its add-on Marketplace Quests (JewelHeim, v1.0.1, 2023-06-25) is also deprecated."
                                            },
                                            {
-                                               "name":  "HaldorBounties (ProfMags)",
-                                               "url":  "https://old.thunderstore.io/c/valheim/p/ProfMags/HaldorBounties/",
-                                               "status":  "0.0.5, 2026-03-09, pre-1.0, AI-generated",
-                                               "notes":  "Daily bounty board: kill contracts, player-style minibosses, raid warbands, pick 1 of 4 rewards."
+                                               "name":  "Haldor Fetch Quests + Quest Framework (aedenthorn)",
+                                               "url":  "https://github.com/aedenthorn/ValheimMods/tree/master/HaldorFetchQuests",
+                                               "status":  "v0.4.0 source (references Quest Framework 0.3.0), written 2021-10, folder last changed 2025-03-04; published on Nexus as Haldor Quests (1.0: unknown)",
+                                               "notes":  "Random kill or fetch quests offered in Haldor\u0027s store (3 at a time by default). The list refreshes every 86,400 game seconds by default (the config calls it 24 hours). The gold reward is based on the item value or the creature\u0027s max health. Kill progress comes from a Character.RPC_Damage postfix that checks the attacker is the local player; that RPC runs only on the creature\u0027s owner, so kills of creatures owned by another peer do not count. Quest state is saved in a file named after the character and the world name. Its patch targets still exist by name in 1.0.16."
+                                           },
+                                           {
+                                               "name":  "HildirsQuest (Smoothbrain)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Smoothbrain/HildirsQuest/",
+                                               "status":  "v1.0.2, 2023-10-06, tagged Ashlands (1.0: unknown)",
+                                               "notes":  "Makes Hildir\u0027s vanilla chest quests per player instead of world-wide, and lets mini-bosses drop one chest per nearby player. It fills a vanilla gap: Trader.UseItem completes a Hildir quest by setting a world global key. About 86K downloads."
                                            }
                                        ],
-                      "inspiration":  "Vanilla Hildir quests (return her chests to unlock stock via keys) are already a quest pattern. Idea: a late-game contract board (after the Queen, Fader or Deep North boss) at a trader or a new NPC. Contracts: kill a named elite (our variants), deliver a rare item, scout a far location (Cartography/Spyglass), dive for a relic (Underwater). Rare rewards: unique trinkets and crafting materials. Borrow EpicLoot\u0027s world-spawned target with a map pin, Almanac\u0027s YAML quest schema and Hildir\u0027s key persistence. Ship curated content; avoid token economies that bypass progression."
+                      "inspiration":  "Borrow EpicLoot\u0027s world-spawned target with minions, a map pin and boss-kill gating. Borrow HaldorBounties\u0027 daily board (pick 1 of N rewards, visible reset timer), Almanac\u0027s typed objectives (Kill, Collect, ...) as the data schema, and Hildir\u0027s key-based unlocks. What existing mods get wrong: token currencies and gambling that sidestep progression (EpicLoot, Almanac); content the server admin must write in YAML or config (KG Marketplace, most of Almanac apart from its default bounties); no Ashlands or Deep North contracts (HaldorBounties stops at Mistlands, and it needs HaldorOverhaul); new NPCs that every player and the server must install (BeastMarketOutpost); owner-side kill detection that misses kills in multiplayer (Haldor Fetch Quests patches Character.RPC_Damage); and quest completion that is world-wide rather than per player (vanilla Hildir). Ours: a small, curated late-game contract board that unlocks after the Queen or a later boss. It lives on vanilla traders behind Shift+E, so StoreGui stays free for EpicLoot, TradersExtended and HaldorBounties. It has four contract types: named elite, hunt N, deliver a rare item, and survey a late-biome location. Rewards are rare vanilla items with no new currency. The client-only v1 is built only on vanilla RPCs and ZDO keys, so it works in mixed groups and on vanilla servers."
+                  },
+                  {
+                      "category":  "Crafting",
+                      "name":  "Smelt gold",
+                      "description":  "We have too much gold, Smelt it in bars and create things with it (weapons, armors, tools, probably on the fancy side not necessarily strong, or with an interesting set bonus)",
+                      "scope":  "New",
+                      "existsPerUser":  "No",
+                      "userLink":  "",
+                      "status":  "Idea",
+                      "feasibility":  "medium",
+                      "side":  "everyone",
+                      "needsAssets":  true,
+                      "hooks":  [
+                                    "ObjectDB.Awake",
+                                    "ObjectDB.CopyOtherDB",
+                                    "ZNetScene.Awake",
+                                    "PieceTable.m_pieces",
+                                    "Smelter.m_conversion",
+                                    "Smelter.OnAddOre",
+                                    "Smelter.RPC_AddOre",
+                                    "InventoryGui.DoCrafting",
+                                    "Player.UpdateKnownRecipesList",
+                                    "Inventory.GetValuableItems",
+                                    "StoreGui.GetSellableItem",
+                                    "StoreGui.SellItem",
+                                    "Humanoid.UpdateEquipmentStatusEffects",
+                                    "Humanoid.HaveSetEffect",
+                                    "Humanoid.GetSetCount",
+                                    "VisEquipment.SetChestEquipped",
+                                    "ItemDrop.ItemData.GetTooltip"
+                                ],
+                      "sketch":  "Treat Coins as the ore. Craft a Coin Sack (default 50 Coins) at the workbench and give it a max stack of 1, so InventoryGui.DoCrafting hands out no bonus sacks. Smelt the sack in the vanilla Smelter: append a Smelter.ItemConversion (Coin Sack to Gold Bar) to the smelter prefab\u0027s m_conversion at ZNetScene.Awake, so fuel, timing and Batch Station Feeding work unchanged. Register a Gold Bar and a small Gilded line in ObjectDB.Awake and ObjectDB.CopyOtherDB: crown, chest, legs, one weapon, a pickaxe, a trinket, and a stack or throne decor piece with comfort in the Hammer\u0027s PieceTable. Clone each one from a vanilla prefab, tint it gold, and give it a prefixed name, because vanilla 1.0 game data already uses \u0027Gold\u0027 for Bloodgold. Stats sit around the Bronze/Iron tier. The reason to wear the set is its bonus: a data-only SE_Stats set through m_setName, m_setSize and m_setStatusEffect. The trinket and the weapon can count toward the set (Humanoid.GetSetCount counts every slot), but the armour pieces must carry the effect, because the trinket never grants it. Optional coded perks could include better sell prices through StoreGui.SellItem (client-side). Keep m_value at 0 so nothing gold sells back to a trader, and make each upgrade level cost more bars, so the sink grows with the player\u0027s hoard. Register the prefabs once at load and keep them registered even while the feature is off. All numbers go in a server-synced config. The code is small and mostly data. Feasibility is medium rather than easy because this is the first MC mod that registers new prefabs, and every item needs a gold look and an icon.",
+                      "risks":  "Every peer needs the mod, including the dedicated server. A peer without it loses gold items: Inventory.AddItem skips unknown prefabs when an inventory loads, and the server destroys world ZDOs it cannot instantiate (ZNetScene.CreateObjectsSorted). It also sees gilded armour on other players as missing (VisEquipment.SetChestEquipped logs \u0027Missing chest item\u0027). As a smelter owner, it silently drops a Coin Sack that a modded client has already removed from its inventory, because Smelter.RPC_AddOre re-checks IsItemAllowed against the owner\u0027s own list. A sack that is already queued when a vanilla peer takes ownership is consumed with no output. The MC framework\u0027s Both handshake only checks the server, so a vanilla client can still join a modded server; blocking or warning those players is extra work (Jotunn\u0027s version check does it). Prefab registration must not follow the framework\u0027s live toggle: a character that loads while the prefabs are missing loses its gold items at the next save. Economy loops can duplicate coins: any m_value above 0, a melt-back recipe, or a stackable crafted intermediate (through the craft bonus). Watch for name clashes with vanilla Gold/GoldOre, Digitalroot\u0027s GoldIngot/CoinPile and Balrond\u0027s GoldBar_bal, and with display names such as vanilla\u0027s Coin Pile piece. Uninstalling the mod deletes the items. This is the first MC mod that registers prefabs, so it needs a shared helper or Jotunn. Art and balance will take most of the time.",
+                      "relatedIdeas":  [
+                                           "Gemstone revamp",
+                                           "Better shops",
+                                           "Barber shop to customize armor",
+                                           "One trinket per trophy",
+                                           "Forge of potential revamp"
+                                       ],
+                      "chapter":  "building-crafting",
+                      "coverage":  "partial",
+                      "existingMods":  [
+                                           {
+                                               "name":  "Digitalroots GoldBars (Digitalroot)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Digitalroot/Digitalroots_GoldBars/",
+                                               "status":  "1.2.34, 2026-09-10, 1.0 tagged",
+                                               "notes":  "The closest match. 200 Coins craft a Coin Pile, and a Coin Pile crafts back into 200 Coins (no station for either). The Smelter turns a Coin Pile into a Gold Ingot (GoldIngot). A level-2 forge turns an ingot plus 1 Copper back into 100 Coins. Hammer pieces: Coin Pile (200 Coins, 1 comfort) and Gold Stack (48 ingots, 2 comfort), with the comfort configurable. No weapons, armour or tools. Uses Jotunn. AGPL-3.0 source on GitHub."
+                                           },
+                                           {
+                                               "name":  "Ravenwood Currency (JamesJonesTV)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/JamesJonesTV/Ravenwood_Currency/",
+                                               "status":  "1.0.2, 2026-09-20, 1.0 tagged",
+                                               "notes":  "Six metal coins minted from bars at a Currency Station, used in Ravenwood mod recipes. Its \u0027Vanilla Coin Exchange\u0027 is an explicit coin sink: vanilla coins buy its coins at 2x their value (5x for Copper and Mithril). Uses Jotunn."
+                                           },
+                                           {
+                                               "name":  "RepairRequiresCoins (cjayride)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/cjayride/RepairRequiresCoins/",
+                                               "status":  "1.2.10, 2026-09-26, 1.0 tagged, tagged AI Generated (the author says AI only checked the 1.0 port)",
+                                               "notes":  "A fork of aedenthorn\u0027s RepairRequiresMats. Repairs cost Coins, priced from the item\u0027s recipe materials. A recurring coin sink with no new items."
+                                           },
+                                           {
+                                               "name":  "OttoPay + OttoAura (potto007)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/potto007/OttoPay/",
+                                               "status":  "1.6.4, 2026-09-26, updated post-1.0 (README: built against 1.0.16)",
+                                               "notes":  "A coin bank balance kept by the traders. The companion OttoAura (1.4.4, 2026-09-25) spends the balance on services: gear repairs inside a ward (1 coin per item per tick by default; the ward\u0027s healing is free), moving placed pieces (5 coins per move), and a fee for selling valuables through the bank. Coins buy services, not things."
+                                           },
+                                           {
+                                               "name":  "Weather Altar (EnyMan)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/EnyMan/Weather_Altar/",
+                                               "status":  "1.0.3, 2026-09-14, 1.0 tagged, AI-generated",
+                                               "notes":  "Pay 10 Coins and 10 HP to force a weather for 10 minutes. Needs the server and every client. Uses Jotunn. Another service-style coin sink."
+                                           },
+                                           {
+                                               "name":  "VanillaNPC (fedorovdgap)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/fedorovdgap/VanillaNPC/",
+                                               "status":  "1.1.0, 2026-09-16, updated post-1.0 (README: requires Valheim 1.0)",
+                                               "notes":  "NPCs paid in coins: a fisherman who charges a small fee per fish, guards at 300 coins per banner, and a tavern selling meads for 30 to 200 coins. Everyone needs it, including the dedicated server. Uses Jotunn. Another service-style coin sink."
+                                           },
+                                           {
+                                               "name":  "Terraheim (DasSauerkraut)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/DasSauerkraut/Terraheim/",
+                                               "status":  "2.3.9, 2023-09-12, deprecated",
+                                               "notes":  "Armour overhaul with a bonus for each set. Its Hyran (Nomad) bow set is money-themed: hits sometimes drop coins, damage grows with the coins carried, and each attack spends a coin. A good model for a coin-themed set bonus."
+                                           },
+                                           {
+                                               "name":  "balrond amazing nature (Balrond)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Balrond/balrond_amazing_nature/",
+                                               "status":  "1.4.0, 2026-08-21, pre-1.0",
+                                               "notes":  "Large overhaul where Gold is a mined progression material (gold_Rock_bal deposits, GoldOre_bal, GoldBar_bal, GoldScrap_bal, goldbar_stack_bal). It also lists a Peningar_bal item with its own treasure_pile_peningar_bal and treasure_stack_peningar_bal pieces; the README gives names only. Its prefab names must not clash with ours."
+                                           },
+                                           {
+                                               "name":  "Glitnir Blood \u0026 Gold Weapon (GlitnirBr)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/GlitnirBr/Glitnir_Blood_Gold_Weapon/",
+                                               "status":  "2.2.3, 2026-04-28, deprecated",
+                                               "notes":  "Weapons made for the Glitnir server: a gold-themed staff, sword, bow, shield and arrows. They are not made from coins."
+                                           }
+                                       ],
+                      "inspiration":  "Digitalroot\u0027s GoldBars proves the loop works (coins, then Coin Pile, then Smelter, then Gold Ingot), but it stops at decoration: the Coin Pile crafts back into its 200 Coins, an ingot melts back into 100 Coins at the forge, and nothing uses the bars for gear. The coin-sink mods spend coins on services or on another currency rather than on things to own: RepairRequiresCoins and OttoAura (repairs, moving pieces), Weather Altar, VanillaNPC (fisherman, guards, tavern) and Ravenwood\u0027s coin exchange. Terraheim\u0027s Hyran set shows how fun a coin-themed set bonus can be. Ours would keep the vanilla Smelter step so it feels like Valheim, with a Coin Sack as the \u0027ore\u0027. It would add a small hand-made Gilded line (armour, one weapon, a tool, a trinket, decor) whose value is looks plus a set bonus, not raw stats. To stay a real sink, bars and gear cannot be sold (m_value 0), the crafted intermediate gets no craft bonus, and there is no melt-back by default. Every prefab name gets a prefix (vanilla 1.0 already uses Gold for Bloodgold). Optionally, Digitalroot\u0027s GoldIngot could be accepted when that mod is installed."
+                  },
+                  {
+                      "category":  "Combat",
+                      "name":  "Blood magic XP",
+                      "description":  "Gain XP when sacrificing HP, and when any shield is HIT (not only on broken) It should also provide blood magic skill XP to the caster of the shield, not the wearer of the shield",
+                      "scope":  "Revamp",
+                      "existsPerUser":  "No",
+                      "userLink":  "",
+                      "status":  "Idea",
+                      "feasibility":  "medium",
+                      "side":  "everyone",
+                      "needsAssets":  false,
+                      "hooks":  [
+                                    "Character.UseHealth",
+                                    "Attack.Update",
+                                    "Attack.FireProjectileBurst",
+                                    "Attack.GetAttackHealth",
+                                    "Humanoid.m_currentAttack",
+                                    "Player.RaiseSkill",
+                                    "SE_Shield.OnDamaged",
+                                    "SE_Shield.IsDone",
+                                    "SE_Shield.SetLevel",
+                                    "StatusEffect.SetAttacker",
+                                    "Character.RPC_Damage",
+                                    "Player.Awake",
+                                    "ZNetView.InvokeRPC",
+                                    "Character.RaiseSkill"
+                                ],
+                      "sketch":  "Wrap Character.UseHealth with a prefix and postfix for the local player while Humanoid.m_currentAttack uses a Blood Magic weapon. Raise Blood Magic by the share of max HP actually lost times a config rate. Vanilla only calls UseHealth from Attack.Update and Attack.FireProjectileBurst, and paying HP gives no XP. Postfix StatusEffect.SetAttacker on SE_Shield instances to remember the caster: Character.RPC_Damage passes the caster after it adds or refreshes the bubble, and vanilla throws it away. Around SE_Shield.OnDamaged, measure what was really absorbed (the change in m_damage, capped at the remaining capacity) and keep only hits from an attacker other than the wearer. Turn that into XP in proportion to the share of the bubble\u0027s capacity used. On break (SE_Shield.IsDone prefix), give the vanilla m_levelUpSkillFactor to the caster instead of the wearer. A local caster gets the XP through Player.RaiseSkill. A remote caster gets it through a routed RPC on their Player ZNetView, sent only when their ZDO says they have the mod; otherwise vanilla rules apply and the wearer keeps the break XP. Optionally, route summon XP the same way.",
+                      "risks":  "Besides attacker hits, the bubble absorbs every attacker-less Character.Damage hit: fall (Character.UpdateGroundContact), drowning (Player.OnSwimming), Ashlands lava and hot ocean (Character.UpdateHeatDamage), the edge of the world, and SE_Wet and SE_Stats damage ticks. A character\u0027s own AoE (Aoe.m_hitOwner) hits it with itself as the attacker. HitData.GetTotalDamage also counts chop and pickaxe damage and, in NG+, the world-level enemy bonus. So only hits from other attackers may count, with a cap per hit, per bubble and per minute. Absorb scaling with skill is unverified: the wiki says 200 + 5 per level, but the skill only reaches SetLevel when the shield Aoe keeps m_useAttackSettings, and SkeletonCrew\u0027s README says vanilla never scales it. Only eitr stops a cast-heal-recast loop. Mods that turn eitr costs into HP costs remove that limit, and recast-refill mods (BubbleBar, ShieldOverflowFix, Better Staff Of Protection) let one bubble absorb without end. The caster reference exists only in the status effect on the wearer\u0027s current owner, so a logout or respawn loses the credit, and an ownership change drops the bubble itself. Both sides need the mod: an RPC to an unmodded caster is simply lost (a ZDO-targeted one only logs \u0027Failed to find rpc method\u0027), which is why the ZDO capability flag is needed to fall back to vanilla. ImpactfulSkills, SmartSkills, BloodMagicCompanion, EitrMagicExtended, SecondaryAttacks and BubbleBar patch the same methods, so detect them to avoid paying XP twice. Prefab values (the Staff_shield skill and XP factor, the shield Aoe settings, staff HP and eitr costs) must be dumped at runtime first.",
+                      "relatedIdeas":  [
+                                           "New magical items based on valheim magic (ward, heal)",
+                                           "New summons",
+                                           "Magic applied to non combat (craft, farming, cooking, sailing, etc,)"
+                                       ],
+                      "chapter":  "combat",
+                      "coverage":  "partial",
+                      "existingMods":  [
+                                           {
+                                               "name":  "BloodMagicCompanion (qwertyzxcv)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/qwertyzxcv/BloodMagicCompanion/",
+                                               "status":  "v1.0.0, 2026-09-25, compiled for Valheim 1.0.16 but not playtested in game, no tags (1.0: likely)",
+                                               "notes":  "Gives the Staff of Protection break XP to the caster through a custom network message, but only when the caster and the computer processing the break both run it; otherwise vanilla rules apply. Its other feature (on by default) replaces eitr costs with extra current-HP costs, capped to leave 1 HP, so casting at 1 HP is free. No XP per hit and no XP for paying HP. The Thunderstore page has no source link; the repo its README names (lhy-loveworld/valheim-blood-magic-companion) only contains the README so far. Made with AI assistance, per its README. 33 downloads."
+                                           },
+                                           {
+                                               "name":  "SmartSkills (Smoothbrain)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Smoothbrain/SmartSkills/",
+                                               "status":  "v1.0.2, 2024-06-21, tagged Ashlands Update; the source has an unreleased \u0027fixes for 1.0\u0027 commit (2026-09-12, version 1.0.3) (1.0: unknown)",
+                                               "notes":  "When a shielded player gains XP in an attack skill, the recorded caster gets that XP times the shield\u0027s m_levelUpSkillFactor times 33% (config) as Blood Magic, through a routed RPC. From reading the source (not tested): it records Player.m_localPlayer as the caster in an SEMan.AddStatusEffect prefix. That code runs on the shielded character\u0027s owner, so a shield on another player records the wearer. Its \u0027Remove shield expired XP\u0027 option (on by default) clears m_levelUpSkillOnBreak on every IsDone call. In 1.0.16 vanilla gives no XP on expiry, so this removes the break XP entirely. Open source (blaxxun-boop/SmartSkills). About 120K downloads."
+                                           },
+                                           {
+                                               "name":  "ImpactfulSkills (MidnightMods)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/MidnightMods/ImpactfulSkills/",
+                                               "status":  "v0.20.2, updated 2026-09-28, tagged Deep North (1.0: likely)",
+                                               "notes":  "Blood Magic XP for damage a shield absorbs (default ratio 50, about 1 XP per 50 damage, server-synced), on top of the vanilla break XP. An SE_Shield.OnDamaged prefix calls Player.m_localPlayer.RaiseSkill, with one damage counter shared by all shields, for wearers in the player factions or tamed. So the XP goes to the player on the computer that simulates the shielded character (the wearer, or whoever owns the shielded tame), not to the caster. It also counts fall and drowning damage, chop and pickaxe damage, and damage past the remaining capacity. Large skill overhaul; GPL-3.0 source (MidnightsFX/Valheim_Impactful_Skills). About 218K downloads."
+                                           },
+                                           {
+                                               "name":  "SecondaryAttacks (sighsorry)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/sighsorry/SecondaryAttacks/",
+                                               "status":  "v1.2.13, updated 2026-09-27, tagged Deep North (1.0: likely)",
+                                               "notes":  "Blood Magic XP for health actually paid, on by default (0.01 XP per HP; 0 turns it off): a Character.UseHealth prefix and postfix, only while the current attack\u0027s weapon skill is Blood Magic. Also on by default: percentage HP costs are based on max HP instead of current HP (Attack.GetAttackHealth postfix). Covers the \u0027sacrificing HP\u0027 part, but only inside a large secondary-attack mod. Tagged AI Generated. GPL-3.0 source (sighsorry1029/SecondaryAttacks). About 12.5K downloads."
+                                           },
+                                           {
+                                               "name":  "Better Staff Of Protection (Belphegor)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Belphegor/Better_Staff_Of_Protection/",
+                                               "status":  "v1.0.0, 2024-06-13, tagged Ashlands Update (1.0: unknown)",
+                                               "notes":  "All options that the README says need to be enabled: flat XP (OnHitExperienceFactor) for each attack the barrier blocks; refill on recast (RecastFullRefresh), with partial XP on recast for the share of the barrier used, rounded to 10% (RecastExperience); immunity to chop and pickaxe damage (IgnoreChopAndPickaxe). The README does not say who receives the XP. No source link. About 1.7K downloads."
+                                           },
+                                           {
+                                               "name":  "EitrMagicExtended (shudnal)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/shudnal/EitrMagicExtended/",
+                                               "status":  "v1.0.4, updated 2026-09-11, tagged Deep North (1.0: likely)",
+                                               "notes":  "No XP change, but a compatibility trap. It patches SE_Shield.OnDamaged: a prefix can skip the original for zero-damage hits, and a postfix zeroes whatever damage is left for chosen hit types. An SE_Shield.IsDone postfix clears a cache. An optional Staff of Protection secondary attack removes your own shield without XP; it copies the primary attack at half the eitr and half the HP-percentage cost, so an HP-sacrifice XP rule would pay for it. Open source (Unlicense, shudnal/EitrMagicExtended). About 21.6K downloads."
+                                           },
+                                           {
+                                               "name":  "BubbleBar (pandincus)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/pandincus/BubbleBar/",
+                                               "status":  "v0.1.0, 2026-09-15, tagged AI Generated (1.0: likely)",
+                                               "notes":  "No XP change, but a compatibility trap. Shows the barrier\u0027s remaining capacity and, by default (RestoreOnRefresh), refills the barrier on recast through an SE_Shield.SetLevel postfix that sets m_damage to 0, on the client that receives the barrier. With XP per share of capacity used, refills let one bubble pay without end. Open source (pandincus/valheim-mods). 128 downloads."
+                                           },
+                                           {
+                                               "name":  "ShieldOverflowFix (NxDimi)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/NxDimi/ShieldOverflowFix/",
+                                               "status":  "v1.0.0, 2026-03-15, tagged AI Generated (1.0: unknown)",
+                                               "notes":  "No XP change. Lets damage beyond the barrier\u0027s remaining capacity through instead of blocking the whole hit, and can refill the barrier on recast (option). Changes the numbers an absorbed-damage XP rule measures. No source link. 235 downloads."
+                                           }
+                                       ],
+                      "inspiration":  "Vanilla (1.0.16): paying HP for a staff gives no XP. SE_Shield.IsDone gives m_levelUpSkillFactor XP only when damage breaks the bubble, never on expiry. That XP goes to the wearer through Skills.RaiseSkill, so a shielded tame gives nothing (Character.GetSkills returns null for non-players). The caster passed to StatusEffect.SetAttacker is thrown away. Borrow SecondaryAttacks\u0027 before/after wrapper on UseHealth: it pays for HP actually lost and respects the 1 HP floor. Borrow ImpactfulSkills\u0027 XP for absorbed damage, and BloodMagicCompanion\u0027s capability flag with a fallback to vanilla. What existing mods get wrong: ImpactfulSkills pays whoever simulates the wearer and counts fall, drowning, chop and pickaxe damage. SmartSkills records the wrong caster for shields on other players, and its expiry option (on by default) removes the break XP. BloodMagicCompanion only moves the break reward. SecondaryAttacks pays per raw HP, so more food HP levels you faster. Ours is one small mod with three rules. HP sacrifice XP scales with the share of max HP paid. Shield XP scales with the share of the bubble\u0027s capacity that other attackers\u0027 hits used up, with a cap per bubble so recast-refill mods (BubbleBar, ShieldOverflowFix) cannot farm it. All shield XP (hits and break) goes to the caster through a routed RPC, falling back to vanilla when either side lacks the mod. Optionally, it also fixes summon XP that is lost when another client simulates the summon."
+                  },
+                  {
+                      "category":  "Combat",
+                      "name":  "Blood stone revamp",
+                      "description":  "It\u0027s hard to interact with the bloodstone mechanic (+,2% damage per missing HP): provide cheap bloodmagic spell to sacrifice life / gain life on hit / lifesteal etc, to have better health management",
+                      "scope":  "Revamp",
+                      "existsPerUser":  "No",
+                      "userLink":  "",
+                      "status":  "Idea",
+                      "feasibility":  "easy",
+                      "side":  "client-only",
+                      "needsAssets":  false,
+                      "hooks":  [
+                                    "Attack.ModifyDamage",
+                                    "Attack.GetAttackHealth",
+                                    "ItemDrop.ItemData.GetTooltip",
+                                    "Hud.UpdateHealth",
+                                    "Character.UseHealth",
+                                    "Character.Heal",
+                                    "Player.Update",
+                                    "Player.RaiseSkill",
+                                    "SEMan.AddStatusEffect",
+                                    "SE_Stats",
+                                    "Character.Damage",
+                                    "BaseAI.IsEnemy",
+                                    "Character.ApplyDamage",
+                                    "ObjectDB.Awake",
+                                    "ObjectDB.CopyOtherDB"
+                                ],
+                      "sketch":  "Detect bloodstone weapons from data, not names: any weapon whose m_attack or m_secondaryAttack has m_damageMultiplierPerMissingHP or m_damageMultiplierByTotalHealthMissing above 0. That covers the seven Ashlands Bleeding weapons, probably the Deep North *Gold_BloodLightning set (prefab data, verify), and modded items. Blood rite: a hotkey, read in a Player.Update postfix for the local player, pays a share of current HP with the vanilla blood-magic rule. The rule is mirrored from Attack.GetAttackHealth (up to 33% cheaper with skill; the rite uses the Blood Magic skill factor) and from Attack.Update, which pays UseHealth(min(HP - 1, cost)) so the cost never kills. Character.UseHealth itself only clamps at 0, so the mod applies the HP - 1 cap. The rite costs no eitr, has a short cooldown, raises Blood Magic, and adds a local SE_Stats (or subclass) by reference through SEMan.AddStatusEffect. While the rite is active, a Character.Damage postfix on the attacker\u0027s client heals the local player for a share of each enemy hit. The share grows with missing HP and is capped per swing. A Hud.UpdateHealth postfix and the item tooltip show the live \u0027+X% damage\u0027 bonus. Optional extras: the first lethal hit during the rite leaves 1 HP (prefix on Character.ApplyDamage for the local player), and a config multiplier for the per-HP bonus, applied in ObjectDB.Awake/CopyOtherDB. No new prefab, item, RPC or asset is needed. A craftable spell item instead of the hotkey would make it medium and require everyone to have the mod.",
+                      "risks":  "Lifesteal is estimated from the outgoing hit on the attacker\u0027s client, which is also EpicLoot\u0027s approach. That happens before the victim owner applies resistances, NG+ enemy armor, difficulty scaling, the backstab bonus and the x2 on staggered targets. The outgoing total also still counts fire, poison and spirit damage that lands later as damage over time. An exact value would need an RPC back from the victim owner, and then everyone would need the mod. Multi-target swings and AoEs call Character.Damage once per target, so cap the heal per attack. Heal only on enemies. BaseAI.IsEnemy is false for tames and for every other player, so PvP needs its own IsPVPEnabled check. It is true for training dummies, and structures are not Characters. Do not reuse vanilla Projectile.m_healthReturn: Projectile.OnHit heals the owner after damaging any destructible, trees and rocks included. EpicLoot LifeSteal/Blood Drinker, JardsAdditions vampirism and WeaponArts Bloodthirst stack with ours and multiply the healing. Food regen every 10 s and health meads keep pushing HP back up. Balance and PvP fairness need a server-synced config. The per-HP values of the Deep North variants are prefab data and must be checked at runtime. It overlaps with the Blood magic XP idea (XP for sacrificing HP), so design the rite\u0027s XP together with it.",
+                      "relatedIdeas":  [
+                                           "Blood magic XP",
+                                           "Gemstone revamp",
+                                           "New magical items based on valheim magic (ward, heal)",
+                                           "Adrenaline revamp",
+                                           "Increase base HP/Stamina with stats"
+                                       ],
+                      "chapter":  "combat",
+                      "coverage":  "partial",
+                      "existingMods":  [
+                                           {
+                                               "name":  "JardsAdditions (jard_hu)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/jard_hu/JardsAdditions/",
+                                               "status":  "v2.1.0, updated 2025-12-15, tagged Ashlands and Bog Witch updates (1.0: unknown)",
+                                               "notes":  "The closest match on bloodstone itself. The BloodstoneEffect config picks Damage (default), Vampirism or DamageAndVampirism, so vampirism is off by default. BloodstoneDamagePercent defaults to 0.004, double the vanilla 0.2%. Vampirism returns health after each hit: missing HP x 0.0225 x a weapon factor (higher base damage, so slower weapons heal more) x the world\u0027s enemy-damage difficulty factor. Server-enforced config, needs Jötunn, bundled with unrelated vanilla tweaks and PvP protections. It offers no way to lose HP on purpose. About 2.2K downloads, no source link."
+                                           },
+                                           {
+                                               "name":  "EpicLoot (RandyKnapp)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/RandyKnapp/EpicLoot/",
+                                               "status":  "v0.14.13, updated 2026-09-24, tagged Deep North Update (1.0: yes)",
+                                               "notes":  "Random magic-item effects. LifeSteal heals a share of the outgoing hit, computed on the attacker\u0027s side in a shared Character.Damage postfix. Bloodlust turns a weapon\u0027s attack stamina cost into a health cost. \u0027LowHealth\u0027 effect variants apply at 30% HP or less by default. Its blood shardstones add Blood Drinker (lifesteal for less max HP), Bloodrage (hits taken stack an outgoing damage bonus) and Blood Base Block (more block power, costs 5% of max HP when a block starts). Driven by loot and sockets, not tied to bloodstone weapons. Needs Jötunn. Source: github.com/RandyKnapp/ValheimMods. About 2.26M downloads."
+                                           },
+                                           {
+                                               "name":  "WeaponArts (j1gA)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/j1gA/WeaponArts/",
+                                               "status":  "v0.14.1, updated 2026-09-26, tested with Valheim 1.0.16 (1.0: yes)",
+                                               "notes":  "One key (default C) fires an active \u0027art\u0027 chosen by the held weapon type, with cooldowns and a HUD. The one-handed sword\u0027s Bloodthirst gives lifesteal from damage dealt, and the battleaxe\u0027s Berserk cuts damage taken and regenerates HP. It is the closest match to a hotkey blood rite, but it is tied to weapon type, not to bloodstone, and has no health cost. Install on every player who wants the arts, host recommended. Source: github.com/tbsj1ga/WeaponArtsValheim. AI Generated tag, about 280 downloads."
+                                           },
+                                           {
+                                               "name":  "BloodMagicCompanion (qwertyzxcv)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/qwertyzxcv/BloodMagicCompanion/",
+                                               "status":  "v1.0.0, updated 2026-09-25, compiled against 1.0.16, not playtested (1.0: yes)",
+                                               "notes":  "Health-only blood magic: each point of base eitr cost becomes 0.5% of current HP, discounted by up to 33% with Blood Magic skill and capped to leave 1 HP. Also gives the caster the Staff of Protection shield-break XP. This makes vanilla blood staffs cheap, but there is no lifesteal and no link to bloodstone. The linked GitHub repo (lhy-loveworld/valheim-blood-magic-companion) holds only the README so far; the README says MIT and AI-assisted. About 33 downloads."
+                                           },
+                                           {
+                                               "name":  "ValheimLegends (momos3939)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/momos3939/ValheimLegends/",
+                                               "status":  "v0.7.10, updated 2026-09-11, \u0027Compatibility port for Valheim 1.0 (Unity 6)\u0027, tagged Deep North Update (1.0: yes)",
+                                               "notes":  "Class mod. The Berserker sacrifices health for attack speed, movement speed and physical damage. In the original source (github.com/TorannD/ValheimLegends, last pushed 2023), the 18 s Berserk state deals 5% of max health (1 to 15, spirit damage) to the player every 3 s. It also removes the stamina-regen delay and carries a lifesteal share of 20% + 0.2% per level. AI Generated tag, about 4K downloads."
+                                           },
+                                           {
+                                               "name":  "RacesOfValheim (Nandor)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Nandor/RacesOfValheim/",
+                                               "status":  "v1.5.0, updated 2026-09-28, tagged Deep North Update (1.0: yes)",
+                                               "notes":  "Playable races. The Aswid (vampire) race gets lifesteal on all damage dealt. It grows from 5% to 35% with boss progression, and the race also has a toggleable life-draining aura. Its blood magic costs health only, with no eitr. A full race overhaul that needs Jötunn. AI Generated tag, about 19.1K downloads."
+                                           },
+                                           {
+                                               "name":  "SecondaryAttacks (sighsorry)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/sighsorry/SecondaryAttacks/",
+                                               "status":  "v1.2.13, updated 2026-09-27, tagged Deep North Update (1.0: yes)",
+                                               "notes":  "Blood magic staff secondaries. \u0027Shield Convert\u0027 turns the remaining Staff of Protection shield on you and nearby allies into healing, and \u0027Summon Empower\u0027 buffs summons. Its Blood Magic config also tweaks health costs (max-health based costs) and grants Blood Magic XP from health-cost abilities. Nothing for bloodstone weapons. About 12.5K downloads."
+                                           },
+                                           {
+                                               "name":  "MagicOverhaul (KGvalheim)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/KGvalheim/MagicOverhaul/",
+                                               "status":  "v1.5.594, 2022-05-29, deprecated (dead)",
+                                               "notes":  "14 classes. DeathKnight converts 3% of damage into HP, Spartan gets passive vampirism at level 100, and Warlock has a rage mode that consumes HP. About 101K downloads."
+                                           }
+                                       ],
+                      "inspiration":  "Vanilla already has every piece. Attack.m_damageMultiplierPerMissingHP gives 0.2% per missing HP point on the Bleeding weapons (wiki; the value is prefab data). Blood-magic health costs are a % of current HP, reduced by skill, and capped to leave 1 HP. m_attackHealthReturnHit heals a flat amount per character hit. Players already pair the Staff of Protection (60 eitr plus 40% of current HP, and a shield) with bloodstone weapons, and Steam threads ask for heal on hit or life leech on bloodstone weapons. What to borrow: JardsAdditions\u0027 vampirism that scales with missing HP and compensates slow weapons, EpicLoot\u0027s attacker-side lifesteal and low-health thresholds, WeaponArts\u0027 one-key active art with a cooldown and HUD, and Blood Magic Companion\u0027s \u0027leave 1 HP\u0027 cost rule. What they get wrong: JardsAdditions adds vampirism (off by default) but predates 1.0 and still offers no way to go low on purpose. EpicLoot, WeaponArts and the class and race mods tie the effect to random loot, a weapon type or a class. Vanilla blood staffs need eitr (Blood Magic Companion removes that) and a weapon swap. Ours is one loop on the bloodstone weapons themselves. A cheap Blood rite pays HP for a short blood buff with no eitr and earns Blood Magic XP. Lifesteal grows as HP falls, so a low-HP fight can be sustained. A visible \u0027+X% damage\u0027 readout shows the bonus. Client-only, built from vanilla visuals and rules."
+                  },
+                  {
+                      "category":  "Farming",
+                      "name":  "Cultivator revamp",
+                      "description":  "Base cultivator (bronze) works the same as vanilla + replant Dandelion, Rasberry bushes, Blueberry bushes, mushrooms, yellow mushrooms, Thistle need to equip the cultivator and aim at a plant bush/plant with the Replant action, it gives a new item to be planted elsewhere.\nNew cultivator (blackmetal) does the bronze actions + replant Cloudberries, crafted with Bronze cultivator and blackmetal ingot x5 and linnen x10\nNew cultivator (eitr) does the blackmetal actions + replant Yggdrasil trees, but can only grow near roots and it drains energy to grow , crafted with blackmetal cultivator and refined eitr x15\nNew cultivator (flametal) does the eitr actions + replant Fiddlehead and Smokepuff (can only grow in Ashlands), crafted with previous cultivator and flametal ingot x5\nNew cultivator (bloodgold) does the flametal actions + replant lingonberries (can only grow in Deepnorth), crafted with previous cultivator and bloodgold ingot x5",
+                      "scope":  "Revamp",
+                      "existsPerUser":  "No",
+                      "userLink":  "",
+                      "status":  "Idea",
+                      "feasibility":  "medium",
+                      "side":  "everyone",
+                      "needsAssets":  true,
+                      "hooks":  [
+                                    "Player.UpdatePlacement",
+                                    "Player.UpdateHover",
+                                    "Player.UpdateBuildGuiInput",
+                                    "Player.RemovePiece",
+                                    "ZInput.ResetButtonStatus",
+                                    "Hud.UpdateCrosshair",
+                                    "Pickable.Interact",
+                                    "Pickable.SetPicked",
+                                    "Pickable.Awake",
+                                    "TreeBase",
+                                    "Location.IsInsideNoBuildLocation",
+                                    "PrivateArea.CheckAccess",
+                                    "ZNetView.ClaimOwnership",
+                                    "ZNetScene.Destroy",
+                                    "Inventory.AddItem",
+                                    "ObjectDB.Awake",
+                                    "ObjectDB.CopyOtherDB",
+                                    "ZNetScene.Awake",
+                                    "PieceTable.m_pieces (_CultivatorPieceTable)",
+                                    "Recipe.m_resources (Cultivator recipe)",
+                                    "Piece.Requirement.GetAmount",
+                                    "Player.RequiredCraftingStation",
+                                    "InventoryGui.DoCrafting",
+                                    "ItemDrop.ItemData.GetTooltip (static overload)",
+                                    "Plant.Grow",
+                                    "Plant.GetHoverText",
+                                    "Piece.m_mustConnectTo",
+                                    "ResourceRoot.CanDrain",
+                                    "ResourceRoot.Drain"
+                                ],
+                      "sketch":  "Keep one tool and put the four new tiers on top of the vanilla levels. In 1.0 the Cultivator already has quality 1-3 (Bronze and Corewood at the Forge) and the Forge of Potential refines it past 3 with a Wooden Battle Idol (wiki), so the tiers are quality 4-7 (raise m_maxQuality to 7): black metal 4, eitr 5, flametal 6, bloodgold 7. Add the tier materials to the Cultivator recipe with m_amount 0, so they never block recipe discovery or the first craft, and let a Piece.Requirement.GetAmount postfix (on those requirement objects only) return each level\u0027s list: BlackMetal 5 + LinenThread 10, Eitr 15, FlametalNew 5, Gold (\u0027Bloodgold\u0027) 5, and 0 for the vanilla Bronze and Corewood above level 3. A 0 amount hides the row and is skipped by the checks. Remove the idol (m_upgraderResource) requirement so the Forge of Potential skips the Cultivator and cannot push it into a tier, and record the tier in m_customData in an InventoryGui.DoCrafting postfix (the upgrade creates a new item with empty custom data), so a cultivator refined past 3 before install does not count. The vanilla upgrade unequips and replaces the old cultivator and keeps m_name $item_cultivator, so PlantEasily and PlantEverything still recognise it. Replant action (local player, cultivator equipped): the Use key, read in a Player.UpdatePlacement postfix; it is free because Player.UpdateHover clears m_hovering in place mode. On gamepad, JoyUse in the Alternative layouts; in the Default layout JoyUse toggles the piece menu, so use the Remove button there, caught in a Player.UpdatePlacement prefix that calls ZInput.ResetButtonStatus, so neither vanilla removal nor PlantEverything\u0027s removal also fires. Raycast from the camera with m_interactMask (the mask Player.FindHoverObject uses) within m_maxInteractDistance, and look for a Pickable or TreeBase whose prefab name is in the tier table and whose tier is at most the cultivator\u0027s. Check Location.IsInsideNoBuildLocation, PrivateArea.CheckAccess, stamina and durability as the vanilla remove path does, claim the ZDO, harvest any fruit with Pickable.Interact, destroy the plant with ZNetScene.Destroy (unless the pick already destroyed it), and give one transplant item (dropped if the inventory is full). A Hud.UpdateCrosshair postfix shows \u0027[E] Replant \u003cplant\u003e\u0027 or the tier needed. Each transplant item plants a cloned sapling on _CultivatorPieceTable whose only m_grownPrefabs entry is the vanilla plant, so grown plants are vanilla prefabs; clear Piece.m_cultivatedGroundOnly and Plant.m_needCultivatedGround. Fiddlehead and smoke puff saplings get Plant.m_biome and Piece.m_onlyInBiome = AshLands plus m_tolerateHeat. Lingonberry gets DeepNorth plus m_tolerateCold and Piece.m_allowedInDeepSnow. The Yggdrasil sapling (from YggaShoot_small1 or YggaShoot1-3) grows into YggaShoot1-3. It uses Piece.m_mustConnectTo = YggdrasilRoot with a configurable m_connectRadius, and a Plant.Grow prefix lets a Healthy sapling grow only when ResourceRoot.Drain(cost) on a cached nearby root succeeds (a Plant.GetHoverText postfix explains the wait). A Plant.Grow postfix sets a grown bush to picked, so replanting never creates fruit. Replanted one-shot forage gets a respawn cycle from a Pickable.Awake prefix keyed on a custom ZDO flag; the first grown instance is set up in the Plant.Grow postfix, which must also start UpdateRespawn because its Awake already ran.",
+                      "risks":  "The vanilla Cultivator already has three bronze levels and Forge of Potential refinement (wiki; recipe values not checked in game data), so the tier plan changes vanilla: the Cultivator can no longer be refined, a player must reach bronze level 3 before black metal, and quality 7 needs a level-7 station by Recipe.GetRequiredStationLevel unless Player.RequiredCraftingStation is patched per tier. The literal alternative (separate cultivator items, as the sheet words it) needs its own m_name per item, because Inventory.RemoveItem, CountItems and ObjectDB.GetRecipe match by name; a cultivator consumed as an ingredient is not unequipped (Inventory.RemoveItem does not unequip); and PlantEasily\u0027s grid and PlantEverything\u0027s cultivator removal only work when m_name is $item_cultivator. Quality tiers keep one icon and model; a per-tier icon means patching the one-line ItemDrop.ItemData.GetIcon (inlining risk). Mushrooms, thistle, dandelion, fiddlehead and smoke puff look one-shot in vanilla. PlantEverything writes respawn times into these prefabs but adds m_hideWhenPicked only to Pickable_Stone, which suggests the vanilla forage already hides a child when picked (a picked wild mushroom would then stay as a hidden, picked ZDO instead of being destroyed). Either way a replanted copy gives one harvest without our respawn fix; dump the prefabs to confirm. Transplant items and saplings are unknown prefabs for players without the mod and after an uninstall: the items are dropped from inventories and unfinished saplings stay invisible in the save until the mod is back; grown plants are vanilla prefabs and survive. Wild vegetation is placed once per zone (ZoneSystem.SpawnZone), so uprooting is a permanent move; it needs the ward check. Two players uprooting the same plant in the same instant could both get an item (same race as the hammer). Yggdrasil: Plant.HaveGrowSpace fails on any non-plant collider within m_growRadius and Plant.HaveRoof on anything overhead, so m_connectRadius must be larger than m_growRadius and an overhanging root may block growth. CanDrain is level \u003e cost, so the cost must stay below m_maxLevel (C# default 100). Roots regenerate (C# default 1 per second), so a one-off drain is cheap. CanDrain reads a possibly stale ZDO copy on non-owners. Plant.SUpdate calls Grow on every pass once the grow time is over, so the prefix must be cheap and drain only a Healthy sapling. PlantEverything adds a Piece to the vanilla pickable prefabs and replaces Player.RemovePiece while the cultivator is held: the Remove button deletes any flora it manages, wild bushes and forage included (fruit harvested first, no refund by default). So \u0027has a Piece\u0027 cannot tell wild from planted, the Remove button is taken, and its produce-paid bushes undercut the transplant items. Unverified (prefab): the cultivator table\u0027s m_canRemovePieces, the idol requirement on the Cultivator recipe, whether the YggaShoot prefabs carry TreeBase (the wiki calls the Yggdrasil shoot a choppable tree), and which layers the forage colliders use.",
+                      "relatedIdeas":  [
+                                           "Plant \"everything\"",
+                                           "Easy plant",
+                                           "Ashlands trees",
+                                           "Sap collector on other trees",
+                                           "Deep North revamp",
+                                           "Magic applied to non combat (craft, farming, cooking, sailing, etc,)"
+                                       ],
+                      "chapter":  "farming-cooking",
+                      "coverage":  "partial",
+                      "existingMods":  [
+                                           {
+                                               "name":  "PlantEverything (Advize), partial",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Advize/PlantEverything/",
+                                               "status":  "1.21.3, 2026-09-25, 1.0 tagged",
+                                               "notes":  "The cultivator plants every target of this idea (raspberry, blueberry, cloudberry and lingonberry bushes, mushrooms, yellow mushrooms, thistle, dandelion, fiddlehead, smoke puff) directly as pieces, paid with their own produce (default 5 per bush, 5 mushrooms, 5 thistle), with configurable respawn times (240-300 minutes by default). It also adds a \u0027Ygga Sapling\u0027 paid with 1 Sap that grows into YggaShoot1-3. EnforceBiomes is off by default and PlantsRequireShielding is on. It adds a Piece to the vanilla pickable prefabs and takes over Player.RemovePiece while the cultivator is held, so the Remove button already deletes the wild bushes and forage it manages (fruit harvested first; resources only with RecoverResources, off by default). CanRemoveFlora extends removal to decorative flora placed by a player. No tool tiers, no transplant item, no root rule. GPL-3.0 (github.com/AdvizeGH/Advize_ValheimMods), so ideas only."
+                                           },
+                                           {
+                                               "name":  "RestlessPlant (Restless), partial",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Restless/RestlessPlant/",
+                                               "status":  "0.2.0, 2026-09-29, 1.0 tagged",
+                                               "notes":  "Bushes and forage on the cultivator, each costing one of the item it grows (raspberries, blueberries, cloudberries, lingonberries, several mushrooms including smoke puff, thistle, dandelion, fiddlehead), a planting grid, bulk harvest of neighbouring plants and auto-replant of one-shot crops such as carrots. Wild plants stay wild: no transplanting and no tiers. Needs RestlessCore, BepInEx and Jotunn; everyone on a server should run the same minor version."
+                                           },
+                                           {
+                                               "name":  "Groundwork (sighsorry), related",
+                                               "url":  "https://thunderstore.io/c/valheim/p/sighsorry/Groundwork/",
+                                               "status":  "1.1.15, 2026-09-29, 1.0 tagged, AI-generated",
+                                               "notes":  "YAML-configured pickable planting recipes (cultivation.yml). Its \u0027Natural Pickable Removal\u0027 lets the cultivator permanently remove allowlisted natural pickables (Pickable_Branch, Pickable_Flint, Pickable_Dandelion, Pickable_Mushroom, Pickable_Thistle) with the usual distance, build, ward and ownership checks, but gives nothing back. The closest thing to our uproot action."
+                                           },
+                                           {
+                                               "name":  "Amazing Nature (Balrond), related",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Balrond/balrond_amazing_nature/",
+                                               "status":  "1.4.0, 2026-08-21, pre-1.0",
+                                               "notes":  "Total overhaul (server and every client, same version) with 33 cultivator plants, new tree saplings and higher-tier tools including BlackMetalCultivator_bal and BlackMetalHoe_bal. The page does not say what the higher-tier cultivator changes. No transplanting."
+                                           },
+                                           {
+                                               "name":  "ZethProj (Zethin), related",
+                                               "url":  "https://www.nexusmods.com/valheim/mods/1242",
+                                               "status":  "1.7.1, 2023-01-03, pre-1.0 (Nexus; details from search results because the page blocks automated fetches)",
+                                               "notes":  "Foods plus a Black Metal Cultivator (craftable at the Artisan Table) and a \u0027Frometal\u0027 Cultivator. Nothing in its description suggests new cultivator actions. Its Thunderstore predecessor ZethPack is deprecated (2021)."
+                                           },
+                                           {
+                                               "name":  "PlantEasily (Advize), compatibility",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Advize/PlantEasily/",
+                                               "status":  "2.2.2, 2026-09-24, 1.0 tagged, client-side",
+                                               "notes":  "Grid planting only activates when the right-hand item\u0027s m_shared.m_name is \"$item_cultivator\" (its ModUtils.HoldingCultivator); PlantEverything uses the same check for its cultivator removal. Separate tier items with their own names would lose both; tiers stored as quality levels of the vanilla Cultivator keep them."
+                                           }
+                                       ],
+                      "inspiration":  "Planting wild flora is solved: PlantEverything (and now RestlessPlant) lets the cultivator plant every plant on this list, PlantEverything even a Sap-paid Yggdrasil sapling. But they create new plants from produce, so a wild bush is never worth moving, and nothing is gated by progression. PlantEverything\u0027s and Groundwork\u0027s cultivators can already delete wild pickables but return no plant. Balrond\u0027s and ZethProj\u0027s higher-tier cultivators are only better tools. Borrow PlantEverything\u0027s per-biome m_tolerateHeat / m_tolerateCold flags and its respawn times for one-shot forage (ideas only, it is GPL), and Groundwork\u0027s prefab allowlist with vanilla distance, ward and ownership checks. Ours would differ in four ways. Transplanting moves a finite wild plant, because vegetation never regrows once removed, so scouting the map for good bushes matters. Each biome\u0027s flora is gated by the matching cultivator tier. The Yggdrasil sapling ties farming to the Mistlands Ancient Roots (the sap collector\u0027s reservoir) instead of a flat cost. Grown plants are vanilla prefabs, so a world survives an uninstall. Keep the tiers on the vanilla Cultivator (quality levels 4-7, above the three bronze levels) so PlantEasily and PlantEverything keep recognising it, and make every transplant sapling an ordinary cultivator piece with a Plant component."
+                  },
+                  {
+                      "category":  "Combat",
+                      "name":  "Combat pet",
+                      "description":  "Animal handling skill that allows you to train tamed animals and bring them in combat with you, Training and fighting with them makes them gain XP, increasing their stats (up to 5 stars). Every star they gain, they gain a new skill to use in combat, Naturally spawned starred animals already have the abilities",
+                      "scope":  "New",
+                      "existsPerUser":  "No",
+                      "userLink":  "",
+                      "status":  "Idea",
+                      "feasibility":  "hard",
+                      "side":  "everyone",
+                      "needsAssets":  false,
+                      "hooks":  [
+                                    "Character.SetLevel",
+                                    "Character.SetupMaxHealth",
+                                    "Attack.GetLevelDamageFactor",
+                                    "Character.RaiseSkill",
+                                    "Character.OnDeath",
+                                    "Character.GetRandomSkillFactor",
+                                    "Tameable.Awake",
+                                    "Tameable.GetHoverText",
+                                    "Tameable.Interact",
+                                    "Tameable.RPC_Command",
+                                    "Humanoid.GiveDefaultItems",
+                                    "Humanoid.EquipBestWeapon",
+                                    "BaseAI.CanUseAttack",
+                                    "BaseAI.IsEnemy",
+                                    "BaseAI.FindEnemy",
+                                    "SEMan.AddStatusEffect",
+                                    "Skills.IsSkillValid",
+                                    "Skills.GetSkillDef",
+                                    "EnemyHud.ShowHud",
+                                    "EnemyHud.UpdateHuds",
+                                    "LevelEffects.SetupLevelVisualization",
+                                    "Procreation.Procreate",
+                                    "ZNetScene.Awake",
+                                    "ObjectDB.Awake"
+                                ],
+                      "sketch":  "Stars are the vanilla creature level (ZDO level, 1 = no star, 6 = 5 stars). Character.SetLevel has no owner check, so the mod calls it on the pet\u0027s ZDO owner; it rescales max HP (Character.SetupMaxHealth = base x level), and damage follows the level through Attack.GetLevelDamageFactor (1 + 0.5 per extra level). Wild animals keep their spawn level when tamed, so abilities keyed on GetLevel() give natural 1-2 star animals their abilities for free. Pet XP is a custom ZDO float written only by the pet\u0027s owner. It comes from three sources: a Character.RaiseSkill postfix (a tame\u0027s own hits call it); a kill bonus from a Character.OnDeath postfix, sent to the pet\u0027s owner through an RPC registered in Tameable.Awake; and reduced, capped XP for sparring with training dummies (BaseAI.IsEnemy already makes dummies enemies of tames). A new Animal Handling skill (Jotunn SkillManager, or patches on Skills.IsSkillValid and Skills.GetSkillDef) rises on the handler\u0027s own client through an RPC. It gates the star cap and adds damage through the vanilla ZDO float RandomSkillFactor, which Character.GetRandomSkillFactor multiplies into the melee, area and projectile hits (Attack) of a non-player character. Active abilities are cloned attack items added in a Humanoid.GiveDefaultItems postfix, and added directly on level-up. Humanoid.EquipBestWeapon, called about once a second while the pet has a target, picks them by range, interval and AiTarget, and they reuse each animal\u0027s own attacks (wolf, boar, lox, asksvin, moose). Passive abilities are status effects that the owner re-applies. Patches on EnemyHud.ShowHud/UpdateHuds and LevelEffects.SetupLevelVisualization show stars 3-5. The mod sets m_commandable in ZNetScene.Awake on every combat species whose prefab lacks it, and a Procreation.Procreate patch clamps offspring (newborns and eggs) to the natural maximum level.",
+                      "risks":  "Non-owner clients read Character.m_level from the ZDO only in Character.Awake. A mid-session star-up must therefore be broadcast (RPC or ZDO poll), and vanilla clients keep the old level until the pet reloads. That includes its damage if a vanilla client takes ownership. The pet\u0027s AI owner is not necessarily its handler, and kills resolve on the victim\u0027s owner, so every XP path needs an RPC (BetterTames silently skips that case). Custom skills are dropped on load when the mod is removed (Skills.IsSkillValid). Vanilla scaling at 5 stars is 6x HP and 3.5x damage, and flattening it only works where the pet\u0027s owner has the mod. The RandomSkillFactor bonus does not reach AoE payloads (a non-player Aoe ignores it). Support (FriendHurt) abilities are only picked while the pet has an enemy target. Death stays permanent (Tameable.OnDeath only drops the saddle). About 25 abilities (5 stars x wolf, boar, lox, asksvin, moose) need balancing and must use animation triggers each Animator already has. The hen has no attack-like asset, so it probably cannot fight. Which vanilla tames are commandable is prefab data, and sources disagree about lox. Conflicts: StarLevelSystem/CLLC/ReefLevels (level scaling and star UI), BetterTames and Monster Level Up (their own kill level-ups), BetterTames, GrindstoneSkills, ReefLevels and our Breeding revamp (offspring stars), and BeastMaster/AllTameable/LetMeTameYou (Tameable patches).",
+                      "relatedIdeas":  [
+                                           "Breeding revamp",
+                                           "Training dummies can attack ennemies",
+                                           "More training dummies",
+                                           "New summons",
+                                           "New ability depending on skill level",
+                                           "Bring tamed / pets through stone portal",
+                                           "Bring tamed / pets on ship",
+                                           "Ping system revamp"
+                                       ],
+                      "chapter":  "combat",
+                      "coverage":  "partial",
+                      "existingMods":  [
+                                           {
+                                               "name":  "BeastMaster (SmokedGaming)",
+                                               "url":  "https://www.nexusmods.com/valheim/mods/3691",
+                                               "status":  "v0.5.7, updated 2026-09-26, alpha (1.0: likely; created 2026-09-13, lists Asksvin)",
+                                               "notes":  "Taming Mastery, the mod\u0027s own 0-100 progression: up to 95% shorter taming, and at 100 about +20% max health, +15% damage and +30% training speed for owned pets. Claimed pets gain up to 10 training levels (health, damage) while fed, active and near the owner. These levels are separate from stars, so other players cannot see them. Also ownership claims, Follow/Stay/Defend/Return Home, and deer taming. No abilities. Read through the Nexus API (the page returns 403 to automated fetches)."
+                                           },
+                                           {
+                                               "name":  "BetterTames (xtavim)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/xtavim/BetterTames/",
+                                               "status":  "v0.9.0, updated 2026-09-22 (1.0: yes, Deep North Update tag)",
+                                               "notes":  "Tames can gain a star on each kill: 10% base chance plus 5% for each star the victim has above the tame, up to 2 stars (the source hardcodes MaxLevel = 3 in Leveling.cs), with a full heal on star-up. The level-up runs in a Character.OnDeath postfix and requires IsOwner() on the killer, so it only fires when the same peer owns both the victim and the tame. Newborns have a 25% chance to be one star above the parent (up to 2 stars). Also pet protection (the tame lies down for 60 s instead of dying), follow/stay for any tame, portals and dungeons, and tames that fight wild creatures of their own kind. Open source (github.com/xtavim/BetterTames), ServerSync."
+                                           },
+                                           {
+                                               "name":  "Monster Level Up (MaxFoxGaming)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/MaxFoxGaming/Monster_Level_Up/",
+                                               "status":  "v1.2.3, updated 2026-09-17 (1.0: yes, Bog Witch and Deep North tags)",
+                                               "notes":  "Monsters and tames can level up when they kill. Configurable max level, base chance, bonus or penalty by level difference, optional heal on level-up, separate settings for tames, and guaranteed level-ups for listed tough victims. Bosses and players never level. No XP bar, no abilities, no source link. About 34K downloads."
+                                           },
+                                           {
+                                               "name":  "TrollCompanion (Satisfaction)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Satisfaction/TrollCompanion/",
+                                               "status":  "v0.2.10, updated 2026-09-27, development release (1.0: yes, Deep North Update tag), AI Generated tag",
+                                               "notes":  "Summoned troll companions (Trollstaff) that keep their names and progress and gain stars from kills: 1 star at 25 kills, 2 at 75 (maximum configurable), with kills shared within 25 m. Orders: attack-move, focus a targeted enemy, hold and follow; an F6 panel shows stars, kills and the next threshold. Blood Magic sets how many can be active. Trolls, not tamed animals, and no abilities. Server and every client (Jotunn)."
+                                           },
+                                           {
+                                               "name":  "ValBall (ValBall)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/ValBall/ValBall/",
+                                               "status":  "v1.6.0, updated 2026-09-20 (1.0: likely, no version tag)",
+                                               "notes":  "Capture orbs. Released companions earn growth points per kill (1 in the Meadows, +0.5 per harder biome, +50% per victim star, x5 for a boss). The points raise Vitality (up to +200% HP) and Strength (up to +100% damage), as hidden multipliers rather than stars. The Val Master skill only improves capture chance. Follow/stay orders; a CommandFarmAnimals option (off by default) lets boars, lox and other animals from a ball take them too. Needs Jotunn, on the server and every client. No abilities."
+                                           },
+                                           {
+                                               "name":  "GrindstoneSkills (MilkyTeam)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/",
+                                               "status":  "v0.10.0, updated 2026-09-29 (1.0: likely, created 2026-09-27)",
+                                               "notes":  "Husbandry skill, raised by taming, feeding, births, petting, butchering and honey. Perks: faster taming and breeding, twins, up to a 25% chance that a newborn or egg is one star above its parent (up to 2 stars), and \u0027Calm\u0027 at level 50. Following wolves deal up to 50% more damage and take up to a third less. The only mod found where a player skill makes pets better fighters. Server and all clients. Source on GitHub (geraldjglasgow/ValheimMods)."
+                                           },
+                                           {
+                                               "name":  "ReefLevels (ReefTeam)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/ReefTeam/ReefLevels/",
+                                               "status":  "v0.3.0, updated 2026-09-17 (1.0: likely, part of The Reef\u0027s Valheim 1.0 modpack)",
+                                               "notes":  "Creature stars from 0 to 5 depending on bosses defeated, drawn in the nameplate (5 per row), with vanilla per-star scaling kept. Tames are touched only at birth: newborns draw stars around the parents\u0027 average (up to 4). No pet progression, but prior art for showing 3-5 stars, and a conflict on offspring level. Replaces the creature part of CLLC. Server and every client."
+                                           },
+                                           {
+                                               "name":  "WolfPack (Neobotics)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Neobotics/WolfPack/",
+                                               "status":  "v1.2.0, updated 2026-09-11 (1.0: yes, changelog \u0027Updated for Valheim 1.0\u0027)",
+                                               "notes":  "Hotkeys make all nearby tames of a selected kind follow or stay. Also commands tames to attack the hovered target, spreads followers around the player and caps the number of followers. Server-authoritative config. No progression. Also on Nexus (mods/1549)."
+                                           },
+                                           {
+                                               "name":  "Cartur\u0027s Follow Command (Cartur)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Cartur/Carturs_Follow_Command/",
+                                               "status":  "v1.0.2, updated 2026-09-21 (1.0: likely), AI-generated",
+                                               "notes":  "Turns on Tameable.m_commandable for every tame, so boars, hens and asksvin follow like wolves and lox (the vanilla followers, per its page; the Valheim wiki\u0027s Taming page names only wolves). Uses the vanilla follow system, so the follow state survives relogs. Source on GitHub (jekkle/cartur-follow-command)."
+                                           },
+                                           {
+                                               "name":  "Wolf Commands (Fai)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Fai/Wolf_Commands/",
+                                               "status":  "v1.0.0, updated 2026-09-22 (1.0: yes), AI-generated",
+                                               "notes":  "G sends following tames forward for 3 s to engage. H recalls them and clears their alert state. Saves nothing in world data."
+                                           },
+                                           {
+                                               "name":  "FeedLikeGrandma (sighsorry)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/sighsorry/FeedLikeGrandma/",
+                                               "status":  "v1.1.3, updated 2026-09-09, targets Valheim 1.0.7 (1.0: yes, Deep North Update tag), AI Generated tag",
+                                               "notes":  "Adult tames level up by being hand-fed (level progress per food), capped at level 3 by default (configurable). Also mounted stamina settings (attack and jump costs), feed barrels and taming orbs. No combat progression. Source on GitHub (sighsorry1029/FeedLikeGrandma)."
+                                           },
+                                           {
+                                               "name":  "ValheimCompanion (PranaySPatil)",
+                                               "url":  "https://github.com/PranaySPatil/ValheimCompanion",
+                                               "status":  "no release, last push 2026-05-13 (1.0: unknown), GitHub only",
+                                               "notes":  "Prototype of an owner-bound wolf companion with Follow / Stay / Aggressive / Defensive orders, a fixed configurable star level, and death modes (permadeath, downed and revivable, recoverable). Single-player only, no XP and no abilities; phase 1 of a planned 6-phase roadmap. BepInEx + Jotunn."
+                                           }
+                                       ],
+                      "inspiration":  "Every piece exists somewhere, but never all together, and nobody ties combat abilities to stars. BetterTames and Monster Level Up roll a star on kills. BetterTames caps it at 2 stars and loses the level-up when the victim and the tame have different ZDO owners. TrollCompanion gives summoned trolls stars at kill thresholds (25 and 75 kills), shares kill credit within 25 m and shows progress in a panel. ValBall and BeastMaster grow hidden stat multipliers instead of stars (BeastMaster\u0027s 10 training levels are explicitly not stars), so other players cannot see the progress. GrindstoneSkills and BeastMaster\u0027s Taming Mastery show that a player skill can carry pet bonuses. ReefLevels already draws up to five stars in the nameplate. Borrow: ValBall\u0027s XP weighting by biome, victim stars and bosses; TrollCompanion\u0027s visible thresholds and shared kill credit; BeastMaster\u0027s \u0027training while fed and near the owner\u0027; WolfPack\u0027s attack-the-hovered-target command; Cartur\u0027s m_commandable switch. Ours differs in these ways. The stars are the vanilla creature level, which is visible, synced, already scales HP and damage, and means natural 1-2 star animals arrive with their abilities. Each species (including the Deep North moose) gets one ability per star, built from its own attacks. XP is routed to the pet\u0027s ZDO owner by RPC. A handler skill gates the star cap and adds damage through the vanilla RandomSkillFactor. Star UI goes up to 5 stars. Offspring are clamped, so breeding cannot copy trained stars. When StarLevelSystem or ReefLevels is installed, leave star display to it rather than drawing a second set."
                   }
               ],
     "infrastructure":  [
