@@ -118,8 +118,10 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
 3. **Implement** per "Mod code conventions". Prefer calling the vanilla method in a loop or wrapper over copying its
    logic: other mods' patches on it keep working. `dotnet build ValheimMods.slnx`, then
    `./tools/Test-Smoke.ps1 -Mod <Feature>` (one word of `<System>.<Feature>`, e.g. `Repair`: `-Mod` matches the
-   project name in Test-Smoke and the `TESTING.md` path in Get-TestTodo). The game must be closed (if it is running,
-   ask the user); the smoke test takes up to ~5 min, so give the command a long timeout.
+   project name in Test-Smoke and the `TESTING.md` path in Get-TestTodo as a substring, so when the word is in another
+   mod's name too, pass `<System>.<Feature>`: `Sort` also matches `Crafting.SearchSort`, use `Container.Sort`). The
+   game must be closed (if it is running, ask the user); the smoke test takes up to ~5 min, so give the command a long
+   timeout.
 4. **Review** the change: correctness against `.ref`, other mods patching the same methods, and whether every claim
    in the docs and tests is true. Names and values that are not in `.ref` (spawn/prefab/piece names, station levels,
    capacities) must be checked (wiki, game data, runtime log) or marked "(unverified)" in `TESTING.md` and listed at

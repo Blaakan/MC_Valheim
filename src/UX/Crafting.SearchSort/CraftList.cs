@@ -258,7 +258,7 @@ internal static class CraftList
     private static string DumpKey(InventoryGui gui) => CraftSearch.StationKey + (gui.InCraftTab() ? "/craft" : "/upgrade");
 
     // Debug aid: first build per station and tab, one line per row with the classifier inputs and result, to
-    // check unverified prefab values (tools, torches, tankards, food) in game. Same ItemKind format as Sort Chest.
+    // check unverified prefab values (tools, torches, tankards, food) in game. Sort Chest log same kinds, own format.
     private static void DumpRows(InventoryGui gui, List<InventoryGui.RecipeDataPair> rows)
     {
         var key = DumpKey(gui);
