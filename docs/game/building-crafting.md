@@ -113,12 +113,19 @@ Owner computes wear/support and applies damage. A non-modded owner will apply va
 * `Fireplace.Awake`: owner initialises `s_fuel = m_startFuel` if absent; registers RPCs; `InvokeRepeating(UpdateFireplace, 0, 2)`, `CheckEnv` every 4 s.
 * `Fireplace.UpdateFireplace`: **owner only** subtracts `elapsed / m_secPerFuel` from `s_fuel` when `IsBurning() && !m_infiniteFuel && state == 1`. Time comes from `s_lastTime` (offline catch-up).
 * `Fireplace.IsBurning()`: false if blocked (`CheckUnderTerrain`: terrain/solid above or smoke blocked), `s_state != 1`, or under water; otherwise true if fuel > 0 **or `m_infiniteFuel`**.
-* `Fireplace.Interact(user, hold, alt)`: claims ownership if unowned; **if `m_canTurnOff && !hold && !alt && fuel > 0` → `RPC_ToggleOn`** (so a turn-off-able piece with 0 fuel cannot be toggled); else if `m_canRefill` (and not infinite) removes 1 `m_fuelItem` and sends `RPC_AddFuel`.
+* `Fireplace.Interact(user, hold, alt)`: claims ownership if unowned; **if `m_canTurnOff && !hold && !alt && fuel > 0` → `RPC_ToggleOn`** (so a turn-off-able piece with 0 fuel cannot be toggled); else if `m_canRefill` (and not infinite) removes 1 `m_fuelItem` and sends `RPC_AddFuel`. Its hold gate compares against `m_lastUseTime`, **which vanilla never assigns**: hold repeats are only limited by `Player.Interact`'s own 0.2 s gate.
+* Owner `RPC_AddFuel` **does nothing when `CeilToInt(fuel) >= m_maxFuel`**: the item the sender already removed is lost (a non-owner reading a stale fuel value can waste wood this way).
 * `Fireplace.UseItem`: fuel item or firework items.
 * `Fireplace.UpdateState`: visuals; **if `m_canTurnOff` and it is wet (rain/wind without cover, only computed for prefabs having both Low/High objects) the owner auto-toggles it off**.
 * `Fireplace.GetHoverText` returns **empty string when `m_infiniteFuel`**.
 * `Fireplace.CanBeRemoved` exists but nothing calls it (dead code in 1.0.16).
 * Radial menu: `Fireplace.TryGetItems` / `CanUseItems` return false for infinite-fuel fires.
+* Prefab data (1.0.16, fire records read from the game's main asset bundle; the Batch Station Feeding coverage dump
+  lists every prefab in game): the **only fire with `m_canTurnOff`** is the Resin Candle (3 fuel), and it has
+  `m_canRefill` false: in vanilla no fire both takes fuel with E and toggles. The Wood fires hold 10 or 20 fuel, three
+  fires on other fuels 5, the torches, Sconce, Jack-o-turnip and Snow Lantern 6, and the two Standing Wood Torch
+  records 4 and 1 (which prefab each belongs to is unverified). Every fire record uses `m_holdRepeatInterval` 0.2 (the
+  code default). The Hot Tub is **not** a `Fireplace` (section 11).
 
 ### Data & persistence
 ZDO: `s_fuel` (float), `s_state` (int: 1 = on, 2 = off; default 1), `s_lastTime` (ticks). RPCs: `RPC_AddFuel`, `RPC_AddFuelAmount(float)`, `RPC_SetFuelAmount(float)`, `RPC_ToggleOn`. Public helpers: `AddFuel(float)`, `SetFuel(float)`.
@@ -361,6 +368,31 @@ Client removes inventory items and sends RPCs; owner mutates queue and simulates
 `Switch.Interact` (prefix: detect Shift/alt on a smelter switch), `Smelter.OnAddOre` / `OnAddFuel` (private; reverse-patch or reimplement), `Smelter.OnHoverAddOre` / `OnHoverAddFuel` (hints), `Smelter.UpdateSmelter` (speed/efficiency — owner side), `Smelter.Spawn` (output modification).
 Related feeders with the same pattern: `CookingStation` (`OnAddFuelSwitch`, `OnAddFoodSwitch`, `RPC_AddItem`), `Fermenter` (`AddItem`, `RPC_AddItem`), `ShieldGenerator` (`RPC_AddFuel`), `Fireplace`.
 
+### Feeding stations with Use (E): facts shared by every feeder class
+Learned while building [Batch Station Feeding](../../src/Crafting/Stations.BatchFeed) ([design](../design/crafting-stations-batch-feed.md), section 1).
+* **One entry point.** `Player.Update` computes `alt` once per frame (gamepad on an Alternative 1/2 layout, `ZInput.IsNonClassicFunctionality()` → `JoyAltKeys`; otherwise `AltPlace` (Left Shift only) or `JoyAltPlace`) and calls the private `Player.Interact(go, hold, alt)`, the only caller of `Interactable.Interact` for the local Use key (press and hold). `Switch`, `CookingStation` and `Turret` ignore `alt`; `Fireplace` uses it as "add fuel instead of toggling".
+* **Build tools block E**: `Player.UpdateHover` sets `m_hovering = null` while `InPlaceMode()` (hammer, hoe, cultivator equipped), so no hover text and no Interact on stations.
+* **Every vanilla add path removes exactly one item per press** (`Smelter.OnAddOre`/`OnAddFuel`, `Fireplace.Interact`, `CookingStation.CookItem`/`OnAddFuelSwitch`, `ShieldGenerator.OnAddFuel`, `Turret.UseItem`). `CookItem` returns true for an item in `m_incompatibleItems` without removing anything.
+* **Owner-side caps** (the non-owner's check reads its stale local ZDO copy):
+
+  | Owner handler | Caps? | Stale non-owner sends too many → |
+  |---|---|---|
+  | `Smelter.RPC_AddOre` / `RPC_AddFuel` | no | overfill |
+  | `CookingStation.RPC_AddFuel`, `ShieldGenerator.RPC_AddFuel` | no | overfill |
+  | `Turret.RPC_AddAmmo` | no, and **no ammo-type check**: sets `s_ammoType` to the last name received | overfill; mixed missile kinds are all relabelled as the last kind (dupe or loss when the ballista drops its ammo) |
+  | `Fireplace.RPC_AddFuel` | yes | items lost |
+  | `CookingStation.RPC_AddItem` | yes (free slot) | items lost |
+* **Unowned ZDO**: `ZNetView.InvokeRPC` routes to owner 0, which `ZRoutedRpc.InvokeRoutedRPC` handles locally **and** broadcasts; handlers that check `IsOwner()` then do nothing anywhere (the add is lost). `CookingStation.RPC_AddItem` has **no** `IsOwner()` check; it is safe only because `CookItem` claims ownership first. `Fireplace.Interact` also claims; smelter, fuel switches, shield and ballista do not.
+* **Owner just left**: `ZNet.Disconnect` → `ZDOMan.RemovePeer` only removes orphaned non-persistent ZDOs; a station keeps the gone owner's uid until the server's next `ZDOMan.ReleaseZDOS` pass (every 2 s) hands it on (longer while a crashed peer has not timed out). Adds sent in that window are dropped by the server (`ZRoutedRpc.RouteRPC` finds no peer). The server sends a new player list right on disconnect (`ZNet.Disconnect` → `SendPlayerList`), so a client can tell whether an owner uid still belongs to a connected game (`PlayerInfo.m_characterID.UserID`).
+* **Frost Foundry, Frigid Kiln and Hot Tub** (1.0.16, read from the game data; the Batch Station Feeding coverage dump confirms them in game): `piece_FrostKiln` "Frigid Kiln" is a **`Smelter`** with a fuel switch only (`m_addOreSwitch` null, `m_maxOre` 0, `m_maxFuel` 25, `m_fuelPerProduct` 5, `m_secPerProduct` 30) and a no-source conversion to Liquid Frost (`FrozenFuel`): Ice goes in as fuel (an "Add Ice" text is in the data;
+the fuel item reference itself is unverified). `piece_FrostFoundry` "Frost Foundry" is a **`CookingStation`** with **one** slot, a food switch ("Place Cast") and a fuel switch (Liquid Frost, `m_maxFuel` 20, `m_secPerFuel` 10, `m_useFuel`, no fire needed, `m_skill` None), `m_recordCrafter` and `m_spawnFullDurability` on, 30 cast conversions of 50 s. `piece_bathtub` "Hot Tub" is a **`Smelter`**, not a `Fireplace`: fuel switch only (Wood, `m_maxFuel` 10, `m_fuelPerProduct` 1, `m_secPerProduct` 5000, so one Wood burns per 5000 s while it has fuel), `m_maxOre` 0, no conversion.
+* **Vanilla capacities** (1.0.16 game data): Smelter and Blast Furnace 10 ore / 20 Coal, Eitr Refinery 20 / 20, Charcoal Kiln 25, Windmill 50, Spinning Wheel 40 (no fuel). Only the Windmill has an Empty switch (`m_emptyOreSwitch`); the others drop their output. The station add switches seem to use `m_holdRepeatInterval` 0.2 (holding E keeps adding; read by record layout,
+unverified: `Switch` defaults to −1, which means no repeat). Cooking stations: section 14 of [farming-cooking.md](farming-cooking.md).
+* **No-source conversions**: `ItemConversion.m_from` can be null (`Smelter.Awake` sets `m_noSourceConversion`); `FindCookableItem` skips them, but `Smelter.TryGetItems` (radial menu) dereferences `m_from`: null-check it in any code that reads `m_conversion`.
+* **Cooking station hover vs press**: the hover switches to "take" only when every slot is done (`IsEverythingCooked`), but E takes a finished item as soon as any slot is done (`HaveDoneItem`).
+* **Key hints**: vanilla's combined-key hint (`ItemStand.GetHoverText`) shows `$KEY_AltPlace + $KEY_Use`, or `$KEY_AltKeys` when `IsNonClassicFunctionality() && IsGamepadActive()`. `Localization.Localize` serves whole strings from an LRU cache that a key rebind does not evict (only language and input-layout changes do): read live bindings with `Localization.GetBoundKeyString`.
+* **First skill level-up is a Center message**: `Skills.RaiseSkill` uses `MessageType.Center` when the level before the raise was 0 (`TopLeft` afterwards), via `Player.Message` (not logged). Code that mutes Center messages during a loop (cooking raises Cooking 0.4 per item) must keep it.
+
 ---
 
 ## 12. Incinerator (Obliterator)
@@ -476,6 +508,7 @@ Legend: feasibility = trivial / easy / medium / hard / very hard. "Who needs the
 * **Risks:** Transpilers on `UpdatePlacementGhost` conflict with build mods (Gizmo, PlanBuild, Valheim Build Camera, etc.). On uninstall, signs on chests lose support and break (resources drop). Moving or removing the chest drops the sign (intended). The UGC/privilege flow in `Sign.Interact` stays untouched.
 
 ### 5. Crafting — Shift+E feeds 5 items to furnaces and kilns (QoL)
+* **Status:** implemented as [Batch Station Feeding](../../src/Crafting/Stations.BatchFeed) (0.1.0). The design that shipped differs from the sketch below: it hooks `Player.Interact` (one place for every feeder class: smelters, fires, cooking stations, shield generator, ballista) and repeats the station's own vanilla `Interact` up to N times instead of calling the RPCs itself, so vanilla checks, messages, skills and other mods' patches run per item; a non-owner tracks the adds it sent for 3 s (the owner-side handlers do not cap, or lose the item); spots that hold one item (the Frost Foundry's cast slot) stay vanilla. See [docs/design/crafting-stations-batch-feed.md](../design/crafting-stations-batch-feed.md).
 * **Feasibility:** easy.
 * **Who needs the mod:** client-only. The client removes items from its own inventory and sends the vanilla `RPC_AddOre`/`RPC_AddFuel`, which any vanilla owner accepts.
 * **Hooks:** `Switch.Interact` (prefix: `alt == true` and the switch is `m_addOreSwitch`/`m_addWoodSwitch` of a parent `Smelter`; `alt` comes from `Player.Update` = `AltPlace`, Left Shift by default, or `JoyAltKeys`/`JoyAltPlace` on gamepad), `Smelter.OnAddOre`/`OnAddFuel` (reuse their checks through a reverse patch, or reimplement), `Smelter.OnHoverAddOre`/`OnHoverAddFuel` (append a `[Shift+E] ×5` hint). Optionally the same for `CookingStation.OnAddFuelSwitch`, `Fireplace.Interact` (alt currently means "add fuel instead of toggle") and `ShieldGenerator`.
