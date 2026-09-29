@@ -7,9 +7,12 @@
     <Project Path="src/Crafting/Stations.BatchFeed/MC.Crafting.Stations.BatchFeed.csproj" />
   </Folder>
   <Folder Name="/Exploration/">
+    <Project Path="src/Exploration/Compendium.Encyclopedia/MC.Exploration.Compendium.Encyclopedia.csproj" />
+    <Project Path="src/Exploration/Sleep.ThroughDay/MC.Exploration.Sleep.ThroughDay.csproj" />
     <Project Path="src/Exploration/Stats.PerCreature/MC.Exploration.Stats.PerCreature.csproj" />
   </Folder>
   <Folder Name="/Farming/">
+    <Project Path="src/Farming/Breeding.StarInheritance/MC.Farming.Breeding.StarInheritance.csproj" />
     <Project Path="src/Farming/Harpoon.HooksTames/MC.Farming.Harpoon.HooksTames.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">

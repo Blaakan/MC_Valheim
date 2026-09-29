@@ -262,9 +262,9 @@ All client-local; knowledge is in the character save, so it follows the characte
 * `Skills` component on the player: `m_skills` (`List<SkillDef>`: skill, icon, description, `m_increseStep`), runtime `m_skillData` (`Dictionary<SkillType, Skill>`), `m_DeathLowerFactor` (0.25), optional `m_useSkillCap`/`m_totalSkillCap`.
 * `Skills.SkillType`: `Swords 1, Knives 2, Clubs 3, Polearms 4, Spears 5, Blocking 6, Axes 7, Bows 8, ElementalMagic 9, BloodMagic 10, Unarmed 11, Pickaxes 12, WoodCutting 13, Crossbows 14, Jump 100, Sneak 101, Run 102, Swim 103, Fishing 104, Cooking 105, Farming 106, Crafting 107, Dodge 108, Ride 110, All 999`.
 * `Skills.Skill.Raise`: xp `m_increseStep * factor * Game.m_skillGainRate`; next level needs `floor(level+1)^1.5 * 0.5 + 0.5`; max 100.
-* `Skills.GetSkillLevel` = base level + `SEMan.ModifySkillLevel` (e.g. `SE_Stats.m_skillLevel/m_skillLevelModifier` from meads/set bonuses), floored. `GetSkillFactor` = level/100. `GetRandomSkillFactor` = random in `lerp(0.4,1,f) ± 0.15`.
+* `Skills.GetSkillLevel` = base level + `SEMan.ModifySkillLevel` (e.g. `SE_Stats.m_skillLevel/m_skillLevelModifier` from meads/set bonuses), floored. `GetSkillFactor` = level/100. `GetRandomSkillFactor` = random in `lerp(0.4,1,f) ± 0.15`. **Reading a level creates the skill:** the private `Skills.GetSkill` adds a level-0 entry to `m_skillData` when the player has none, which then shows in the Skills dialog and is saved in the character. To read without side effects, check `m_skillData.TryGetValue` first (a missing skill = 0 plus the `SEMan.ModifySkillLevel` boost), as Breeding Star Inheritance does.
 * `Player.RaiseSkill` applies `SEMan.ModifyRaiseSkill` then `Skills.RaiseSkill` → on level up `Player.OnSkillLevelup` (effect only) + message "$msg_skillup $skill_<enum name lowercase>".
-* Death: `Skills.OnDeath` → `LowerAllSkills(m_DeathLowerFactor * Game.m_skillReductionRate)` (also resets accumulators).
+* Death: `Skills.OnDeath` → `LowerAllSkills(m_DeathLowerFactor * Game.m_skillReductionRate)` (also resets accumulators). The 0.25 above is the C# initialiser; the wiki gives a 5 % loss per hard death on the Normal preset (1 % to 7.5 % depending on the preset, full reset on Hardcore), so the Player prefab probably sets a lower value: log it at runtime.
 * Persistence: `Skills.Save/Load` (version 2: type int, level, accumulator). **`Skills.Load` drops any type failing `Skills.IsSkillValid` (`Enum.IsDefined`)**, and `Skills.GetSkill` builds a `Skill` with `m_info = null` for unknown types (so `RaiseSkill` would NRE). Custom skills require patching `IsSkillValid`, `GetSkillDef` (or adding to `m_skills`), localization, and `CheatRaiseSkill` - which is what Jotunn's `SkillManager` does.
 
 ### Vanilla effects (where the factor is read)
@@ -361,6 +361,7 @@ Interpretation: when the large map is used at / near a cartography table, the pl
 * **Risks**: Array resize must happen before the first `LoadMapData` or saved custom pins are downgraded to `Icon3` on load; other pin mods (Pinnacle, AutoMapPins-style mods, Jotunn `MinimapManager` overlays) may also touch `m_icons`/`m_visibleIconTypes`: coordinate the id range and append instead of replacing. Removing the mod keeps pins but as `Icon3`.
 
 ### Sleep through the day (QoL)
+* **Status**: implemented as [Sleep Through the Day](../../src/Exploration/Sleep.ThroughDay) (0.1.0), the first MC mod that the server and every player need (`ModSide` Both). The shipped design keeps `Bed.Interact` untouched: a `EnvMan.CalculateCanSleep` postfix allows lying down in the morning (06:00 to noon; the afternoon stays vanilla unless `IncludeAfternoon` is on), a server `Game.UpdateSleeping` postfix starts the sleep with vanilla's own steps and moves the end of the `SkipToMorning` skip to 18:00 of the same day, and a `Player.SetSleeping` patch replaces "Good morning" with "Good evening". Verified in a single-player world (2026-09-29): a morning sleep wakes at 18:00 of the same day with Rested. Vanilla facts: `Game.UpdateSleeping` only skips while `EnvMan.IsAfternoon() || EnvMan.IsNight()`, so a vanilla server never skips in the morning; there is no "Good evening" token (`$msg_goodnight` exists but is unused). See [docs/design/exploration-sleep-through-day.md](../design/exploration-sleep-through-day.md).
 * **Feasibility**: easy.
 * **Who needs the mod**: everyone (server makes the skip; bed-entry gating is client-side and all players must be in bed; unmodded clients simply cannot lie down in the morning, which blocks the skip safely).
 * **Hooks**: `EnvMan.CalculateCanSleep` (postfix, allow `IsDay()` mornings, keep the `m_sleepCooldownSeconds` check), `Bed.Interact` (prefix: e.g. alt-interact = "sleep until evening", write intent to the player ZDO), `Game.UpdateSleeping` (server: new branch for daytime), `EnvMan` private `m_skipTime`/`m_skipToTime`/`m_timeSkipSpeed`, `Game.EverybodyIsTryingToSleep`, `Player.SetSleeping` (wake message).
@@ -408,6 +409,9 @@ Skill gains make it easier to catch the wind, turn, stop and accelerate, and wid
 ### Compendium (New)
 Vanilla already has a basic "Compendium" (`TextsDialog`: log, active effects, collected lore texts, raw stats dump). The idea is a real encyclopedia: bestiary, lore, re-readable tutorials, biomes, discovered items.
 
+* **Status**: implemented as [Encyclopedia](../../src/Exploration/Compendium.Encyclopedia) (0.1.0), client-side. The shipped design nests it under the raven: the vanilla Valheim Compendium dialog (`$inventory_texts`, `TextsDialog`) gets two top-level tabs on its title line, Texts (its own content, unchanged) and Encyclopedia, which shows a clone of the dialog in its place with 8 category tabs (weapons, armor, tools, food, materials, trophies, building, creatures). Entries come from `ObjectDB`/`ZNetScene` at runtime (1.0.16: 910 listed items, 424 pieces, 109 creatures) and are discovered from vanilla per-character data (known materials, recipes, stations, trophies, biomes, profile kills and placements) plus two small records of its own (creatures met, biomes visited). Undiscovered entries and details show as "???". Kill counts are read from profile stats slot 0. An optional side-panel button (setting SideButton, off by default) opens it too. See [docs/design/exploration-compendium-encyclopedia.md](../design/exploration-compendium-encyclopedia.md).
+* **Vanilla facts learned (creature name plates, `EnemyHud`)**: `EnemyHud.LateUpdate` sets `m_refPoint` to the local player's position (not the camera) and calls the private `ShowHud`, which creates a plate (`HudData`, its `m_gui` set active) for every character within `m_maxShowDistance` of that point (code default 10 m, the prefab uses **30 m**, measured 2026-09-29), or a boss within `m_maxShowDistanceBoss` (100 m) that is alerted (`TestShow`, a distance test only; a boss that is not alerted gets no plate, even close). `UpdateHuds`, at the end of the same `LateUpdate`, then switches each plate on or off: players, bosses and the mount stay on; any other creature's plate is **shown** only while its `m_hoverTimer` is under `m_hoverShowDuration` (60 s), a timer reset only while the creature is `Player.GetHoverCreature()`. That comes from `Player.FindHoverObject`: the camera-forward ray (50 m, `m_interactMask`) looks at the **first** collider it hits (the player's own body skipped) and counts it only if it is a `Character` that is not asleep and not hidden by mist, so a wall, a built piece, terrain, a tree or a rock in between blocks it. So "plate created" does not mean "seen". The Encyclopedia records a creature as met from an `UpdateHuds` postfix only when `m_gui.activeSelf`. Building an item's vanilla tooltip (`ItemDrop.ItemData.GetTooltip`) calls `GetSkillLevel` for the item's skill and so adds a missing level-0 skill entry (see section 7).
+
 * **Feasibility**: medium (mostly UI work, data is available).
 * **Who needs the mod**: client-only.
 * **Kill and tame counts**: read them from [Creature Kill and Tame Counts](../../src/Exploration/Stats.PerCreature) (`CreatureCounts` API, or its documented `Player.m_customData` keys without a reference: see that mod's README, "For mod authors"). Per-creature tames exist only through that mod.
@@ -416,8 +420,61 @@ Vanilla already has a basic "Compendium" (`TextsDialog`: log, active effects, co
 * **Risks**: Must not spoil content (gate everything on player knowledge). Localization of new texts (Jotunn `LocalizationManager` or `Localization.instance.AddWord`). UI mods restyling the inventory (e.g. Auga-style UI overhauls) may break cloned UI paths (`Utils.FindChild` names). Large text rebuilds each open: cache.
 
 ### New ability depending on skill level (New)
-* **Feasibility**: medium for the framework; each perk varies (easy to hard).
-* **Who needs the mod**: depends on the perk: movement/self perks are client-only (owner-authoritative player), perks affecting ships/creatures/other players need everyone, world-state perks need the server.
-* **Hooks**: `Skills.GetSkillLevel` (effective level, includes `SE_Stats` boosts), `Player.OnSkillLevelup` (unlock notification), `Skills.RaiseSkill`, `Skills.LowerAllSkills`/`Skills.OnDeath` (losing a threshold on death), `SkillsDialog.Setup` (list perks in the tooltip), `Player.m_customData` (persist "highest level reached" or chosen perks); perk-specific hooks (e.g. `Character.UpdateSwimming` for a Swim perk, `Character.Jump` for Jump, `Player.CheckRun` for Run, `Ship.*` for Sailing).
-* **Sketch**: A small shared "SkillPerks" library: perks declared as `(SkillType, minLevel, id, description, IsActive(player))`, evaluated from `GetSkillLevel` so meads can temporarily unlock them; other mods (Swim dive at Swim 25, faster dive at 50; Sailing instant-stop at 30; Run slide; Jump ledge-grab) query `Perks.Has(player, id)`. `Player.OnSkillLevelup` postfix shows an unlock message; `SkillsDialog.Setup` postfix appends locked/unlocked perks per skill.
-* **Risks**: Death penalty (-25 % levels by default, world modifier `Game.m_skillReductionRate`) can remove perks unexpectedly: decide between "current level" and "peak level" gating. Balance with skill-changing mods (e.g. skill XP multipliers, Jotunn-based skill mods). Keep perk logic owner-side to avoid desync; never trust a remote player's skill for authoritative effects without syncing it via ZDO.
+Interpretation (sheet: "at 25 - 50 - 75 - 100"): each skill gets four named, separate abilities, one per tier. They come on top of vanilla's continuous scaling (section 7), because vanilla has no discrete unlocks (section 10). They are announced when reached and listed in the skills panel. The idea is filed under Exploration, so the first pack covers the movement skills: Run, Jump, Swim, Sneak, Dodge and Ride. Sailing gets its tiers from the Sailing revamp, and other skills can follow through the same registry.
+
+* **Feasibility**: medium. The tier framework is small, and many passive tiers need no Harmony patch (hidden `SE_Stats`, see Sketch). The cost is content: 6 movement skills x 4 tiers = 24 abilities, and all 24 vanilla skills would mean 96. Abilities that need new animations or new physics (ledge mantle, glide pose, diving) are hard and stay in their own ideas (Swim dive). Prefer abilities built on existing animation triggers.
+* **Who needs the mod**: depends on the ability.
+  * Abilities on the local player are client-only. The owner simulates its own character. Stealth and noise reach enemies through the player ZDO (`Player.UpdateStealth` writes `ZDOVars.s_stealth`, `Character` writes `ZDOVars.s_noise`). The `jump` and `dodge` triggers replicate through `ZSyncAnimation.SetTrigger` (an RPC to everybody). A rider becomes the mount's ZDO owner (`Sadle.RPC_RequestControl` → `SetOwner`), and `Sadle.ApplyControlls` sends the rider's Ride factor in the `Controls` RPC.
+  * Ship abilities (Sailing) and abilities that act on other players or creatures need everyone.
+  * Skills are client-authoritative (saved in the character by `Skills.Save`), so a server cannot enforce tiers anyway. Server-synced settings would need config sync, which the MC framework does not have yet ([Infra] Server-authoritative config sync).
+* **Hooks**:
+  * Level: `Skills.GetSkillLevel` returns `floor(base level + SEMan.ModifySkillLevel boosts)`, so meads and set bonuses count. It is not clamped at 100 (`GetSkillFactor` is). It creates a level-0 entry for a skill the player never used (through private `Skills.GetSkill`), so read only skills listed by `Skills.GetSkillList`.
+  * Level-up: `Skills.RaiseSkill` postfix. Every natural raise goes through it (`Player.RaiseSkill`, and `Player.Dodge` directly). `Skills.Skill.Raise` adds at most one level per call (max 100). Then `Player.OnSkillLevelup` plays the effect and the `$msg_skillup` message shows. `Skills.CheatRaiseSkill` (console) changes levels without that path.
+  * Death: `Player.OnDeath` calls `Skills.Clear` when the `DeathSkillsReset` global key is set. Otherwise it calls `Skills.OnDeath` → `Skills.LowerAllSkills`, on hard deaths only (private `Player.HardDeath`). Then it calls `SEMan.RemoveAllStatusEffects`.
+  * Life cycle and UI: `Player.OnSpawned` (re-apply), `Player.Update` (private; 1 s re-evaluation timer, only for `Player.m_localPlayer`), and a `SkillsDialog.Setup` postfix. Vanilla sets each row's tooltip with `UITooltip.Set` from `SkillDef.m_description`.
+  * Storage: `SEMan.AddStatusEffect(StatusEffect)` / `SEMan.RemoveStatusEffect`, and `Player.m_customData` for optional peak levels.
+  * Ability hooks:
+    * `Player.SetControls` (jump and dodge input flags).
+    * `Character.Jump` works only on the ground, or at swim depth within 0.25 s of touching the world. In the air it only pulls an attached grappling hook.
+    * `Character.ForceJump` sets the `jump` trigger, and `Player.OnJump` takes the stamina.
+    * `Player.Dodge` (private) queues a dodge for 0.5 s in `m_queuedDodgeTimer`. `Player.UpdateDodge` fires it once `IsOnGround`. `Player.GetDodgeStaminaUse` is private.
+    * `Player.CheckRun`, `Player.OnSwimming` and `Player.UpdateStealth`.
+    * `Sadle.UpdateRiding`: mount run and swim stamina = drain x `lerp(1, 0.5, rider skill)`.
+  * Fall damage: `Character.UpdateGroundContact` (private). Players take fall damage above 4 m: `clamp01((height - 4) / 16) * 100`, passed through `SEMan.ModifyFallDamage`. It depends only on the height fallen (`m_maxAirAltitude`), not on fall speed. This method is also where `IsOnGround` turns true, so it runs before a queued dodge fires.
+* **Sketch**:
+  * Registry: abilities are declared as `(SkillType, tier 25|50|75|100, id, name, description, passive|active)`. Injected custom skills (Sailing) register with their own `SkillType` value.
+  * Evaluation: on `Player.OnSpawned`, in a `Skills.RaiseSkill` postfix and about every second, compute each skill's tier from `GetSkillLevel` and compare it with the cached set. Do not rely on the level-up event alone, because deaths, meads, set bonuses and the console change levels without it. Keep the cache per character, not per `Player` object, or every respawn re-announces all tiers.
+  * Feedback: a new tier shows "New ability: <name>" through `Player.Message`, with the skill icon (`SkillDef.m_icon`). A lost tier shows a quieter top-left line.
+  * Passive tiers: one hidden `SE_Stats` per ability, created at runtime.
+    * Set `m_hidden = true`: the HUD lists only effects that have an icon and are not hidden.
+    * Set `m_ttl = 0`, so it never expires.
+    * Give it a unique object name, because `StatusEffect.NameHash` hashes that name.
+    * `SEMan.AddStatusEffect(StatusEffect)` clones it without an `ObjectDB` entry.
+    * Its fields already cover fall damage (`m_fallDamageModifier`), the fall-speed cap (`m_maxMaxFallSpeed`, applied through `SEMan.ModifyWalkVelocity` in `Character.UpdateWalking`), jump force (`m_jumpModifier`), swim speed (`m_swimSpeedModifier`), stealth (`m_stealthModifier`), noise (`m_noiseModifier`) and the run, jump, dodge, swim and sneak stamina costs. These tiers need no patch.
+    * Re-add them on spawn, because death removes all status effects.
+  * Active tiers reuse vanilla triggers that other players already see. Example abilities:
+    * Jump 25 soft landing (passive fall damage reduction).
+    * Jump 50 landing roll: vanilla already accepts a Dodge press in the air and keeps it queued for 0.5 s. An `UpdateGroundContact` prefix only has to see that the queue is set and cut the fall damage. The normal roll then plays by itself.
+    * Jump 75 one extra jump in the air: a `Player.SetControls` prefix calls `Character.ForceJump`, with normal stamina. Check in game that the `jump` animation plays in the air.
+    * Jump 100 slow fall while Jump is held: the fall-speed cap plus a fall damage cut, since the damage ignores speed.
+    * Swim 25 dive (Swim dive idea).
+    * Sneak 50 silent steps (`m_noiseModifier`).
+    * Ride 50 cheaper mount sprint.
+    * Run 25 second wind (`Player.CheckRun`).
+  * Skills panel: a `SkillsDialog.Setup` postfix appends the four tiers to each skill's tooltip (unlocked, or greyed with the level needed).
+  * Config: each ability has its own toggle.
+* **Risks**:
+  * Death penalty: on the Normal preset a hard death costs 5 % of every skill. The presets cost 1 % (Casual, Very easy), 2.5 % (Easy), 5 % (Normal) and 7.5 % (Hard), and Hardcore sets `DeathSkillsReset` (wiki). `Game.m_skillReductionRate` defaults to 1, so the 5 % means the Player prefab overrides the C# initialiser `Skills.m_DeathLowerFactor = 0.25` quoted in section 7. Log it at runtime.
+    * With 25-point tiers, a Normal death drops a tier only when the base level is less than about 5 % above it (25 to 26.3, 50 to 52.6, 75 to 78.9). It always drops the level-100 ability (100 becomes 95).
+    * Decide between the current level (vanilla-consistent, default) and "highest level reached" (a SkillPeak-style `Player.m_customData` record).
+  * Meads and set bonuses unlock and relock tiers temporarily. Avoid message spam, and decide whether boosts count at all.
+  * An injected skill without a `SkillDef` gets a `Skill` with `m_info = null` from `GetSkillLevel`, which breaks `SkillsDialog.Setup` and `Skills.Save`. Register the def first (section 7).
+  * Balance: tiers stack on vanilla's linear scaling.
+  * The air jump must not fire while a grappling hook is attached (`GrapplingPoint.m_localGrappler`).
+  * Compatibility:
+    * ImpactfulSkills patches `Character.Jump`, `Character.UpdateGroundContact`, `Character.UpdateSwimming`, `Character.UpdateWalking`, `Player.OnSwimming` and `Character.AddNoise`.
+    * PIXPIX Movement adds its own double jump and landing roll.
+    * GrindstoneSkills (skill-book page) and SkillPeak also patch the skills panel.
+    * Skill overhauls, XP multipliers and death-penalty settings change how fast players reach or lose tiers.
+    * Mods that clear status effects remove passive tiers until the next check.
+  * Keep abilities on the owner's side. Never trust a remote player's skill for authoritative effects unless it is synced through a ZDO.

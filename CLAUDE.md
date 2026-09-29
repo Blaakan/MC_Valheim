@@ -3,6 +3,13 @@
 Mono-repo of Valheim 1.0 mods (BepInEx 5 + HarmonyX) published by **MC**. Goal: QoL, revamps and new
 features that build on the vanilla experience. The idea backlog is `docs/backlog.md` (source: the user's
 Google Sheet, CSV export: https://docs.google.com/spreadsheets/d/1nd_oWjYyphCcjt5F0SrstpkMK_UzDdKwj0U1UC3FHG0/export?format=csv).
+Sheet columns: CATEGORY, NAME, DESCRIPTION, SCOPE, EXISTS ALREADY, Status (dropdown from the sheet's `data` tab:
+`Idea` | `Implemented` | `Cancelled`; a mod in `src/` = `Implemented`). Keep the Status cells true:
+`./tools/Update-Backlog.ps1` (online) lists the cells the repo contradicts and the sheet rows that changed since the
+research (`idea-research.json` keeps a verbatim copy of each row; the online run copies Status changes into it).
+The edit link is not in this public repo: ask the user for it (or use your local memory). In the built-in browser,
+typing and paste do not reach the Status chips: click the chip's arrow, then the value; check the result in the CSV
+export. Never enter Google credentials yourself.
 
 ## House rules (whole folder)
 
@@ -14,7 +21,7 @@ Google Sheet, CSV export: https://docs.google.com/spreadsheets/d/1nd_oWjYyphCcjt
 - **Never credit Claude in commits** (no `Co-Authored-By`, no "Generated with" lines).
 - Commit locally at each milestone. Remote `origin` = https://github.com/Blaakan/MC_Valheim (GitHub): push only when the user asks.
   Exception: the backlog mod workflow (below) commits nothing before its pause; the user's OK there covers the
-  commit, the push and the test issue.
+  commit, the push, the test issue and the idea's sheet Status.
 - **Never commit game code.** Decompiled source lives in `.ref/` (git-ignored). In docs, cite `Class.Method`
   instead of pasting game code (at most ~5 lines when truly essential).
 
@@ -30,7 +37,7 @@ src/Shared/Framework/     mod framework: ModPlugin life cycle, FeatureRegistry, 
 src/Shared/TESTING.md     in-game tests for the framework
 src/<Category>/<System>.<Feature>/   one mod = one project = one DLL = one Thunderstore package (+ TESTING.md)
 templates/Mod/            template used by tools/New-Mod.ps1
-tests/Probes/             throwaway probe mods for tools/Test-Framework.ps1 (never shipped)
+tests/Probes/             throwaway probe mods for tools/Test-Framework.ps1 and tools/Test-InWorld.ps1 (never shipped)
 tools/                    PowerShell workflow scripts (see Commands)
 docs/backlog.md           GENERATED idea backlog (tools/Update-Backlog.ps1): feasibility, who needs it, existing mods
 docs/game/                game-systems knowledge base per category + core-engine.md (read before designing)
@@ -69,6 +76,7 @@ dist/                     packaged zips (git-ignored)
 | Build all (Debug deploys to `<Valheim>/BepInEx/plugins/MC_Valheim/<Category>/<GUID>/`) | `dotnet build ValheimMods.slnx` |
 | Smoke test (launch game, check mods load + patch cleanly, close) | `./tools/Test-Smoke.ps1 [-Mod Crossbow] [-KeepRunning]` |
 | Framework test (probe mods: live toggle, config watch, dependency gating) | `./tools/Test-Framework.ps1` |
+| In-world self-tests (throwaway world "MCProbe", your saves untouched, mod configs put back after; runs every deployed mod's `SelfTest`, screenshots in `%TEMP%\MC_Valheim_InWorld`) | `./tools/Test-InWorld.ps1 [-Mod Sleep.ThroughDay] [-Only sleep.] [-KeepRunning] [-NoBuild]` |
 | **In-game test to-do list** | `./tools/Get-TestTodo.ps1 [-Mod X] [-All]` |
 | Tooling regression tests (after changing tools/) | `./tools/Test-Tools.ps1` |
 | Regenerate the idea backlog from the sheet | `./tools/Update-Backlog.ps1` |
@@ -86,7 +94,14 @@ characters at runtime (`[char]0x2014`).
 ## Testing workflow
 
 There are no unit tests: code runs inside Unity. Verification = build + `Test-Smoke.ps1` (+ `Test-Framework.ps1`
-when `src/Shared` changes) + in-game tests.
+when `src/Shared` changes) (+ `Test-InWorld.ps1` when a mod has self-tests) + in-game tests.
+
+- In-world self-tests (Debug builds): a mod registers coroutines with `SelfTest.Register` (`src/Shared/SelfTest.cs`);
+  `./tools/Test-InWorld.ps1` runs them in a throwaway world with isolated saves (how to write one:
+  `docs/modding/framework.md`, "In-world self-tests"). Like the smoke test it launches the game (close it first)
+  and takes ~1-2 min plus the tests. Every deployed mod's tests run unless `-Only` filters them; the run fails when
+  no mod test ran, or when `-Mod` / `-Only` picked tests that did not run (it says why). It puts
+  `BepInEx/config/MC.*.cfg` back as before the run, also after Ctrl+C or a timeout.
 
 - Every mod has `TESTING.md` next to its code (framework: `src/Shared/TESTING.md`): numbered checkboxes
   `[ ]` to test, `[x]` passed, `[!]` failed + note, `[-]` skipped, split single-player / multiplayer, and a
@@ -102,7 +117,7 @@ when `src/Shared` changes) + in-game tests.
 
 Use it when the user assigns a backlog idea, usually "implement <idea> from the backlog" plus a list of expected
 behaviours. One pause: **nothing is committed, pushed or posted until the user says OK**, and that one OK covers the
-commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no feature branch, no pull request).
+commit, the push, the test issue and the idea's sheet Status (steps 7-8). Work on `main` (solo repo: no feature branch, no pull request).
 
 1. **Understand.** First run `git status` and `git log --oneline origin/main..HEAD`: if the tree is dirty or commits
    are waiting to be pushed, tell the user and ask whether they belong to this run. Read the idea's section in
@@ -137,19 +152,21 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
    - root `README.md` mods table; `packaging/nexus/pages.json` (empty URL); `packaging/nexus/PACK_CHANGELOG.md`
      (list the mod in the top entry if that pack version has no `nexus/pack/v*` tag yet, else in a new entry);
    - `docs/game/<chapter>.md`: vanilla facts learned, and a status link on the idea's feature note;
-   - `./tools/Update-Backlog.ps1 -Offline`, then check the idea's rows in `docs/backlog.md` link the mod (a `ModIdea`
-     typo fails silently);
+   - `./tools/Update-Backlog.ps1`, then check the idea's rows in `docs/backlog.md` link the mod (the script warns
+     about a `ModIdea` that matches no sheet idea); `-Offline` when the sheet cannot be downloaded;
    - `CLAUDE.md` or other docs when a rule or fact turned out wrong.
 6. **Pause.** Do not commit. Give the user: what was built and how; the GUID and display name (permanent after
    release); decisions, assumptions and extras to confirm; the files changed (`git status`); what was verified (build,
    smoke test) and what was not (in-game, "(unverified)" names); the test list (`./tools/Get-TestTodo.ps1 -Mod
    <Feature>`); the proposed commit message(s); what the push will publish (this run's commit(s) plus any commit
    already in `git log --oneline origin/main..HEAD`). Then say exactly what the OK does: "commit on main, push to
-   origin (public repo) and open the public issue 'In-game tests: <ModName> <Version>'". Wait for an explicit OK. On
+   origin (public repo), open the public issue 'In-game tests: <ModName> <Version>' and set the idea's Status to
+   Implemented in the sheet". Wait for an explicit OK. On
    change requests: apply, re-verify, pause again.
 7. **Commit and push** after the OK: stage this run's files by path (never `git add -A`), caveman commit message(s),
    no Claude credit (in commits and in the issue), `git push origin main`. Then rebuild (`dotnet build
-   ValheimMods.slnx`) so the deployed DLL's build id is the pushed commit, not `<hash>+dirty`.
+   ValheimMods.slnx`) so the deployed DLL's build id is the pushed commit, not `<hash>+dirty`. Then set the idea's
+   sheet Status to `Implemented` (see the sheet note at the top), and re-run `./tools/Update-Backlog.ps1`.
 8. **Test list as a GitHub issue**, after the push so the commit and file paths resolve on GitHub:
    `gh issue create --repo Blaakan/MC_Valheim --title "In-game tests: <ModName> <Version>" --body-file <scratch file>`.
    Body in normal English: build under test (commit hash), `TESTING.md` as the source of truth, the design doc path,
@@ -180,8 +197,8 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   `BepInPlugin` / `BepInProcess` (Client mods) / soft `BepInDependency` attributes from the csproj. Never
   hardcode GUID/name/version.
 - csproj metadata (single source of truth, validated by the build): `ModName`, `Version`, `ModScope`, `ModIdea`
-  (sheet idea name; NOT checked by the build, a typo just leaves the backlog row as "idea": check `docs/backlog.md`
-  after `./tools/Update-Backlog.ps1 -Offline`), `ModSide` (`Client` | `Server` | `Both`), `ModMultiplayer` (`Compatible` | `Limited` |
+  (sheet idea name; NOT checked by the build: `./tools/Update-Backlog.ps1` warns when it matches no sheet idea, and the
+  backlog row then shows the sheet Status instead of the mod), `ModSide` (`Client` | `Server` | `Both`), `ModMultiplayer` (`Compatible` | `Limited` |
   `SinglePlayer`), `ModMultiplayerNotes` (player-facing; required unless Client + Compatible), `ModRequires`
   (GUIDs of MC mods needed at runtime, `;`-separated, no cycles), `ModDependencies` (external Thunderstore strings),
   `ModNetworkVersion` (Both mods: bump when RPC names/payloads or ZDO keys/formats change), `ModDescription`.
@@ -214,5 +231,7 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   `./tools/Package-Mod.ps1 -Release` (refuses a dirty tree, an already-released version, failed tests; tags
   `nexus/<GUID>/v<ver>` and `nexus/pack/v<ver>` locally); then follow each `dist/nexus/.../nexus-page.md`
   (step-by-step guide: `docs/publishing/nexus.md`). After a first upload, save the page URL in `packaging/nexus/pages.json`.
+  After tagging, run `./tools/Update-Backlog.ps1` and commit `docs/backlog.md` (the backlog shows "released" from the
+  tag; the sheet Status stays `Implemented`).
   **Nexus AI tags for every page: "AI Assisted" + "AI Media"** (AI Assisted needs visible evidence of human-led development on the page), and untested AI mods count as spam: tag every
   release and never publish without the in-game tests.

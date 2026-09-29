@@ -451,6 +451,24 @@ already travel as items; the "bring pets" ideas below are about living tamed cre
 Both partners run the loop independently and **both can become pregnant**. For a mixed-level pair, which level
 passes on is decided by which parent reaches the love-point threshold, which is effectively a coin flip.
 
+**Prefab values** (the numbers above are code defaults; read at runtime in 1.0.16 by the Breeding Star Inheritance
+self-test, 2026-09-29):
+
+| Species | Offspring | Partner range | Population range / max | Pregnancy | Tick | Skip chance | Love points | Min offspring level | Partner |
+|---|---|---|---|---|---|---|---|---|---|
+| `Boar` | `Boar_piggy` | 3 m | 10 m / 5 | 60 s | 30 s | 0.33 | 3 | 0 | own species |
+| `Hen` | `ChickenEgg` (item, max quality 1, hatches into a tamed `Chicken`) | 4 m | 10 m / 10 | 60 s | 30 s | 0.33 | 3 | 0 | own species |
+
+Both are fed for 600 s. `ItemDrop.SetQuality` is not clamped to `m_maxQuality`, so a vanilla egg from a 2-star hen
+already carries quality 3 even though the item's max quality is 1.
+
+**First tick of a freshly loaded animal:** `Procreation.Awake` starts the loop with
+`InvokeRepeating(Procreate, Random.Range(m_updateInterval, 1.5 × m_updateInterval), m_updateInterval)`, so a game
+that just loaded an animal (for example a player who just joined) runs its first breeding step at least one tick
+(10 s code default, 30 s for boars and hens; other species unverified) later. Breeding Star Inheritance relies on
+this to refuse a player without the mod (1 s check + 4 s disconnect delay) before their game can decide a birth; its
+`breeding.network` self-test checks every prefab with `Procreation` and lists each species' tick in a `NOTE` line.
+
 ### `Growup.GrowUpdate` (every 10 s, owner)
 When `BaseAI.GetTimeSinceSpawned()` (from `s_spawnTime`) exceeds `m_growTime` (default 60 s), it instantiates
 `m_grownPrefab` (or a weighted `m_altGrownPrefabs` entry), copies the tamed flag (`m_inheritTame`) and level, and
@@ -952,6 +970,7 @@ Summary of the verdicts below. "Needs mod" means who must install it for correct
 |---|---|---|---|---|
 | Breeding revamp | Revamp | easy | everyone | no |
 | Ashlands trees | Revamp | medium | everyone | no (optional) |
+| Cultivator revamp | Revamp | medium | everyone | yes (icons for the transplant items) |
 | Easy plant | QoL (exists) | medium | client-only | no |
 | Plant "everything" | QoL (exists) | medium | everyone | no (icons reuse) |
 | Unlock biome feast in the biome | QoL | easy | depends (data: synced config) | no |
@@ -966,6 +985,15 @@ Summary of the verdicts below. "Needs mod" means who must install it for correct
 ### Farming — Breeding revamp (Revamp)
 *Now: the offspring takes the pregnant parent's level (a coin flip between parents). Target: the offspring takes
 the lower parent's level, with a chance of +1.*
+
+- **Status:** implemented as [Breeding Star Inheritance](../../src/Farming/Breeding.StarInheritance) (0.1.0). The
+  shipped design is needed on the server and every player (the game simulating the parent decides the birth, so the
+  server refuses players without the mod, unless its `AllowPlayersWithoutMod` is on, and sends its breeding settings
+  to everyone; a server-only design cannot reach the birth call, see decision 22 of the design doc), records
+  the partner's level at conception on the pregnant parent's ZDO, swaps the result into the parent's `m_level` for
+  the `Procreate` call instead of patching `SetLevel`/`SetQuality`, and scales the +1 chance with the best nearby
+  modded player's Farming skill (15% at 0, 50% at 100, 10% when no farmer is known). See
+  [docs/design/farming-breeding-star-inheritance.md](../design/farming-breeding-star-inheritance.md).
 
 - **Feasibility:** easy.
 - **Who needs the mod:** everyone. `Procreation.Procreate` runs on whichever client owns the parent's ZDO. A
@@ -1020,6 +1048,164 @@ the lower parent's level, with a chance of +1.*
     postfix) and a config.
   - Vanilla cinder fire already burns trees outside shields.
   - Interacts with PlantEverything-style saplings: include their prefabs via the same `m_grownPrefabs` scan.
+
+### Farming — Cultivator revamp (Revamp)
+*Now: the cultivator plants crops and tree saplings; wild bushes, mushrooms and forage can only be picked.
+Target: the cultivator digs up a wild plant into a transplant item that you plant elsewhere, and four upgrade tiers
+(black metal, eitr, flametal, bloodgold) unlock the plants of later biomes.*
+
+- **Feasibility:** medium. Every part reuses a vanilla mechanism: a sapling `Plant` that grows into the vanilla plant
+  prefab, `Piece` placement flags, the recipe upgrade flow and `ResourceRoot.Drain`. The only new interaction is one
+  raycast and one key while the cultivator is equipped. The effort is in the breadth (about 11 transplant items and
+  saplings, four tiers, icons, three special growth rules) and in fitting the tiers around the vanilla cultivator's
+  own upgrade levels.
+- **Who needs the mod:** everyone. The transplant items and saplings are new prefabs that every client's `ObjectDB`
+  and `ZNetScene` must know, and the sapling owner (usually a nearby client) runs the growth rules. The uproot
+  itself runs on the digger's client: it claims the plant's ZDO and destroys it, like `Player.RemovePiece`.
+- **Hooks:**
+  - `Player.UpdatePlacement` (private; postfix on the local player: the Use key while `InPlaceMode()` and the
+    right-hand item is the cultivator; prefix: the gamepad Remove button, cleared with `ZInput.ResetButtonStatus`).
+  - `Hud.UpdateCrosshair` (private; postfix: write the Replant hint into `m_hoverName`, which stays empty in place
+    mode).
+  - `Pickable.CanBePicked` / `Pickable.Interact` / `Pickable.SetPicked`, `TreeBase` (targets), `Utils.GetPrefabName`
+    (tier table lookup).
+  - `Location.IsInsideNoBuildLocation`, `PrivateArea.CheckAccess`, `Player.HaveStamina` / `UseStamina`,
+    `Player.GetPlaceDurability` (private), `ZNetView.ClaimOwnership`, `ZNetScene.Destroy`, `Inventory.AddItem` /
+    `ItemDrop.DropItem`.
+  - `ObjectDB.Awake` / `ObjectDB.CopyOtherDB` (transplant items; Cultivator recipe and `m_maxQuality`),
+    `ZNetScene.Awake` (saplings), `_CultivatorPieceTable` `PieceTable.m_pieces`.
+  - `Piece.Requirement.GetAmount` (postfix: one material list per tier level), `InventoryGui.DoCrafting` (postfix:
+    record the tier on the new item), `Player.RequiredCraftingStation` (optional per-tier station), the static
+    `ItemDrop.ItemData.GetTooltip` overload (tier and unlocked plants).
+  - `Plant.Grow` (prefix: Yggdrasil root drain; postfix: a grown bush starts picked, replanted forage gets its
+    respawn cycle), `Plant.GetHoverText` (postfix: "waiting for root energy").
+  - `Piece.m_mustConnectTo` / `m_connectRadius` (placement next to a `YggdrasilRoot`), `ResourceRoot.CanDrain` /
+    `Drain`.
+  - `Pickable.Awake` (prefix: a respawn cycle for replanted one-shot forage).
+- **Sketch:**
+  - Tiers stay on one tool. The 1.0 Cultivator already has quality 1-3 (5 Bronze + 5 Corewood at the Forge, then
+    1 + 1 and 2 + 2, +200 durability per level), and the Forge of Potential refines it past 3 with a Wooden Battle
+    Idol (wiki). So the new tiers are quality 4-7 (raise `m_maxQuality` to 7). Tier table (prefab names checked in
+    `manifest_extended`, English names in `resources.assets`):
+    - Bronze (vanilla, quality 1-3): `Pickable_Dandelion`, `RaspberryBush`, `BlueberryBush`, `Pickable_Mushroom`,
+      `Pickable_Mushroom_yellow`, `Pickable_Thistle`.
+    - Black metal (quality 4): adds `CloudberryBush`. Upgrade: `BlackMetal` ×5, `LinenThread` ×10.
+    - Eitr (quality 5): adds `YggaShoot_small1` / `YggaShoot1-3` (Yggdrasil shoot). Upgrade: `Eitr` ("Refined Eitr")
+      ×15.
+    - Flametal (quality 6): adds `Pickable_Fiddlehead`, `Pickable_SmokePuff` (Ashlands only). Upgrade: `FlametalNew`
+      ×5 (the 1.0 ingot; the old `Flametal` prefab is "Ancient Metal").
+    - Bloodgold (quality 7): adds `LingonberryBush` (Deep North only). Upgrade: `Gold` ×5 (`$item_gold` is
+      "Bloodgold" in English).
+  - Add the tier materials to the Cultivator recipe with `m_amount` 0, so they never block recipe discovery or the
+    first craft. A `Piece.Requirement.GetAmount` postfix, limited to those requirement objects and the vanilla ones,
+    returns each level's materials and 0 for the rest (the vanilla Bronze and Corewood above level 3).
+  - Remove the idol requirement (`m_upgraderResource`) from the recipe: the Forge of Potential then skips the
+    Cultivator, so refinement cannot push it into a tier. Record the tier in `m_customData` in an
+    `InventoryGui.DoCrafting` postfix (the upgrade creates a new item with empty custom data), so a cultivator refined
+    past 3 before install does not count as a tier.
+  - Station: `Recipe.GetRequiredStationLevel(q)` = `max(1, m_minStationLevel) + (q − 1)`, so quality 7 needs a
+    level-7 station. A per-tier station or level belongs in `Player.RequiredCraftingStation`
+    (`GetRequiredStationLevel` is a one-liner: inlining risk).
+  - Replant action (local player, cultivator equipped):
+    - Keyboard: the Use key. Gamepad: `JoyUse` in the Alternative layouts; in the Default layout `JoyUse` opens the
+      piece menu, so use the Remove button, caught in a prefix and cleared with `ZInput.ResetButtonStatus` so
+      neither vanilla removal nor PlantEverything's removal also fires.
+    - Raycast from the camera with `m_interactMask` within `m_maxInteractDistance` (as `Player.FindHoverObject`
+      does), then look for a `Pickable` or `TreeBase` in the parents whose `Utils.GetPrefabName` is in the table and
+      whose tier is at most the cultivator's.
+    - Check `Location.IsInsideNoBuildLocation`, `PrivateArea.CheckAccess`, stamina and durability, like the remove
+      path of `Player.UpdatePlacement`. Then `ClaimOwnership`, harvest any fruit with `Pickable.Interact`,
+      `ZNetScene.Destroy` the plant if the pick has not already destroyed it, and add one transplant item (drop it if
+      the inventory is full). Play the tool animation and raise Farming.
+    - The crosshair hint reads "[E] Replant Raspberry bush" or "Needs a black metal cultivator".
+  - Each transplant item is the resource of a cloned sapling piece on `_CultivatorPieceTable`. The piece becomes
+    known with the item (`Player.UpdateKnownRecipesList` → `HaveRequirements(piece, IsKnown)`). Its only
+    `m_grownPrefabs` entry is the vanilla plant, so grown plants are vanilla prefabs.
+    - Clear `Piece.m_cultivatedGroundOnly` and `Plant.m_needCultivatedGround` (they are wild plants; a cloned crop
+      sapling would carry both *(prefab)*). The Ashlands heat and Mountain/Deep North cold rules apply to every
+      `Plant` through `m_tolerateHeat` / `m_tolerateCold`, whatever its `m_biome`.
+    - Fiddlehead and smoke puff: `Plant.m_biome` and `Piece.m_onlyInBiome` = `AshLands`, plus `m_tolerateHeat` (or
+      require a shield, to match the Ashlands trees idea).
+    - Lingonberry: `DeepNorth`, `m_tolerateCold`, `Piece.m_allowedInDeepSnow`.
+    - Yggdrasil: `Piece.m_mustConnectTo` = the `YggdrasilRoot` `ZNetView` with a configurable `m_connectRadius`. A
+      `Plant.Grow` prefix drains a cached nearby `ResourceRoot` only when the sapling is `Healthy` (otherwise `Grow`
+      would not grow and the drain would be lost) and grows only if `Drain(cost)` succeeds; otherwise the sapling
+      waits and its hover text says why. A continuous variant drains while growing and shifts `s_plantTime` forward
+      when the root runs dry.
+  - A `Plant.Grow` postfix calls `SetPicked(true)` on a grown bush, so replanting never creates fruit.
+  - A `Pickable.Awake` prefix gives a replanted one-shot forage instance a respawn time (and `m_hideWhenPicked` if
+    the prefab has none). It is keyed on a custom ZDO flag set by the sapling's owner. The first grown instance is
+    set up in the `Plant.Grow` postfix, which must also start `UpdateRespawn`, because its `Awake` ran during
+    `Instantiate`, before the flag existed.
+  - Vanilla facts this relies on (checked in `.ref`, 1.0.16):
+    - `Player.UpdateHover` sets `m_hovering = null` while `InPlaceMode()` (any right-hand item with
+      `m_buildPieces`, set on equip by `Humanoid.SetPlaceMode`), so the Use key does nothing with a cultivator in
+      hand. On gamepad, `Player.UpdateBuildGuiInput` toggles the piece menu with `JoyUse` only in the Default layout;
+      the Alternative layouts use `JoyBuildMenu`.
+    - `Player.UpdatePlacement` records a Remove press and calls `Player.RemovePiece` in the same call, when the
+      tool's `PieceTable.m_canRemovePieces` (C# default true; the cultivator's value is *(prefab)*) or
+      `m_canRemoveFeasts` allows it. Anything that must stop that removal has to run first (a prefix).
+    - `Player.RemovePiece` only acts on a `Piece`: it raycasts with `m_removeRayMask`, a terrain hit falls back to
+      `TerrainModifier.FindClosestModifierPieceInRange` (2.5 m), and it checks `m_canBeRemoved`,
+      `Location.IsInsideNoBuildLocation`, `PrivateArea.CheckAccess` and the build station. For a piece without
+      `WearNTear` or `Character` it calls `ZNetView.ClaimOwnership`, `Piece.DropResources`, then
+      `ZNetScene.Destroy`.
+    - After the claim, `ZNetView.InvokeRPC` to the owner runs synchronously on the local machine
+      (`ZRoutedRpc.InvokeRoutedRPC` handles its own peer id locally), so "harvest, then destroy" works in one frame.
+      `ZNetScene.Destroy` clears the view's ZDO first, so a second call on the same object does nothing.
+    - `Pickable.SetPicked(true)` (owner) destroys a pickable that has no `m_respawnTimeMinutes` and no
+      `m_hideWhenPicked`; otherwise it stores `s_picked`. `Pickable.Awake` also destroys such a pickable when its ZDO
+      says picked, and starts `UpdateRespawn` only when `m_respawnTimeMinutes > 0`. Both fields are per instance.
+    - Wild vegetation is placed once per zone (`ZoneSystem.SpawnZone` → `PlaceVegetation`, then
+      `SetZoneGenerated`), so an uprooted wild plant never comes back.
+    - `Piece.m_mustConnectTo` is checked only at placement, in `Player.UpdatePlacementGhost`: an `OverlapSphere` of
+      `m_connectRadius` accepts any parent `ZNetView` whose GameObject name contains the target prefab's name.
+      Nothing re-checks during growth.
+    - `Plant.HaveGrowSpace` fails on any non-`Plant` collider within `m_growRadius`, and `Plant.HaveRoof` on
+      anything hit by a 100 m upward raycast.
+    - `ResourceRoot.CanDrain(x)` is `level > x`. `Drain` sends `RPC_Drain` to the root's owner. `UpdateTick` (every
+      10 s, owner) regenerates `m_regenPerSec` (C# default 1/s) up to `m_maxLevel` (C# default 100).
+    - `Plant.Grow` on an unhealthy plant does nothing, or destroys it with `m_destroyIfCantGrow`. Time since
+      planting keeps running meanwhile, and `Plant.SUpdate` calls `Grow` on every pass once the grow time is over
+      (§1), so a real pause must block `Grow` or move `s_plantTime`.
+    - A `Piece.Requirement.GetAmount` of 0 hides the requirement row (`InventoryGui.SetupRequirement`) and is skipped
+      by `Player.HaveRequirementItems` and `ConsumeResources`. Recipe discovery ignores requirements with
+      `m_amount <= 0`. `Player.ConsumeResources` → `Inventory.RemoveItem(name, …)` matches `m_shared.m_name` and
+      does not unequip; only the upgrade path of `InventoryGui.DoCrafting` unequips the old item, and it creates the
+      new one with empty `m_customData`.
+    - The Forge of Potential (`CraftingStation.m_upgrader`) lists an item only when its recipe has a requirement
+      with `m_upgraderResource` (`InventoryGui.UpdateRecipeList`), and `DoCrafting` lets it go past `m_maxQuality`.
+- **Risks:**
+  - The tiers change vanilla: the Cultivator can no longer be refined at the Forge of Potential, a player must reach
+    bronze level 3 before black metal, and quality 7 needs a level-7 station unless `Player.RequiredCraftingStation`
+    is patched. The Cultivator's recipe values come from the wiki, not from the game data.
+  - The literal alternative (separate cultivator items, as the sheet words it): each item needs its own `m_name`
+    (`Inventory.RemoveItem`, `CountItems` and `ObjectDB.GetRecipe` match by name), the ingredient cultivator must be
+    unequipped in an `InventoryGui.DoCrafting` prefix, and PlantEasily's grid and PlantEverything's cultivator
+    removal only work when `m_name` is `$item_cultivator`. It does give each tier its own icon and model; with
+    quality tiers a per-tier icon means patching the one-line `ItemDrop.ItemData.GetIcon` (inlining risk).
+  - Mushrooms, thistle, dandelion, fiddlehead and smoke puff look one-shot in vanilla. PlantEverything writes respawn
+    times into these prefabs but adds `m_hideWhenPicked` only to `Pickable_Stone`, which suggests the vanilla forage
+    already hides a child when picked (a picked wild mushroom would then stay as a hidden, picked ZDO instead of
+    being destroyed). Either way a replanted copy gives one harvest without the `Pickable.Awake` fix. Dump the
+    prefabs before relying on either.
+  - Transplant items and saplings are unknown prefabs for players without the mod and after an uninstall: the items
+    are dropped from inventories and unfinished saplings stay invisible in the save until the mod is back. Grown
+    plants are vanilla prefabs and survive.
+  - Uprooting is a permanent move of world vegetation. It needs the ward check. Two players digging the same plant
+    at once could both get an item (the same race as the hammer).
+  - Yggdrasil: `m_connectRadius` must be larger than `m_growRadius`, and an overhanging root may count as a roof.
+    The cost must stay below the root's `m_maxLevel`. The drain is cheap if it is a one-off, because roots
+    regenerate. `CanDrain` reads a possibly stale ZDO copy on non-owners. `Grow` runs on every `SUpdate` pass once
+    due, so the prefix must be cheap (cache the root). The drain competes with sap collectors on the same root
+    (intended, but tune it).
+  - PlantEverything adds a `Piece` component to the vanilla pickable prefabs and replaces `Player.RemovePiece` while
+    the cultivator is held: the Remove button deletes any flora it manages, wild bushes and forage included (fruit
+    harvested first, no refund by default). So "has a `Piece`" cannot tell wild from planted, the Remove button is
+    taken, and its produce-paid bushes undercut the transplant items.
+  - Unverified *(prefab)*: the cultivator table's `m_canRemovePieces`, the idol requirement on the Cultivator
+    recipe, whether the `YggaShoot*` prefabs carry `TreeBase` (the wiki calls the Yggdrasil shoot a choppable tree),
+    and which layers the forage colliders use.
 
 ### Farming — Easy plant (QoL, already exists)
 *Plant many crops at once, snapped to correct spacing.*
