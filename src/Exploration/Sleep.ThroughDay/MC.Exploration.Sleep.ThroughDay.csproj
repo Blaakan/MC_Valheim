@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Sleep Through the Day</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Sleep through the day</ModIdea>
+    <!-- Both: server start and aim time skip (Game.UpdateSleeping run only there), each game allow bed in morning. -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game: the server moves the time, and each game must allow lying down in the morning. As with vanilla sleep, time only skips when every player online is in bed. A player without the mod cannot lie down in the morning, so they block morning sleep like a player who stays up at night. The wake-up hour and the afternoon setting of the server (or host) apply to everyone. On a server without the mod it turns itself off.</ModMultiplayerNotes>
+    <!-- No RPC, no ZDO key of me own: only framework handshake. Bump when that change. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Sleep in the morning too: lie down in your bed and wake up at nightfall, with the usual sleep screen, time skip and Rested bonus. Night sleeps, and by default afternoon sleeps, still skip to the next morning.</ModDescription>
+  </PropertyGroup>
+</Project>
