@@ -5,13 +5,11 @@ When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
 **Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
-Mods panel). The previous uncommitted build (the client-only version) passed the build, the smoke test and the four
-in-world self-tests on 2026-09-29. This build (needed on the server and every player: join check, server settings for
-everyone, new self-test `breeding.network`) builds in Debug and Release without warnings; smoke test and in-world
-self-tests (`./tools/Test-InWorld.ps1`) to run again. Review changes since (join check after 1 s with a 4 s disconnect
-delay, the client listens for the server's settings again at the end of the handshake, `breeding.network` checks the
-breeding tick of every species, log and config wording): build only, smoke test and self-tests not run yet. No in-game
-test yet.
+Mods panel). Committed build `1254c75` (2026-09-29), the version needed on the server and every player (join check,
+server settings for everyone): Debug and Release build without warnings; smoke test (`./tools/Test-Smoke.ps1`, all MC
+mods) passed; automated in-world self-tests (`./tools/Test-InWorld.ps1`) passed on the same code: `breeding.rule`,
+`breeding.farmer`, `breeding.birth`, `breeding.egg` and `breeding.network` (17/17 tests of the run). No hands-on
+in-game test yet; the multiplayer items need two players.
 
 **Setup:** use a test character and a test world. Debug logging on (`./tools/Setup.ps1 -DevBepInExConfig`), F5 →
 `devcommands` (then `confirmcheats` if asked). Keep `./tools/Watch-Log.ps1 -Mine` open: every birth writes one Debug

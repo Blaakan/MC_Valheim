@@ -5,10 +5,10 @@ When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
 **Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the
-MC Mods panel). Smoke test: passed (2026-09-29, build `00103ab+dirty`, after the nesting under the Valheim Compendium,
-the rename and the review fixes). In-world self tests: all 6 `compendium.*` tests passed on earlier builds (2026-09-29)
-and again on this one (2026-09-29, 2560x1440, runs `20260929-154511`, after the rename `20260929-154751`, after the
-review fixes `20260929-162319`; T00 stays open until run on the committed build). No hands-on in-game test yet.
+MC Mods panel). Committed build `1254c75` (2026-09-29), nested under the Valheim Compendium and named Encyclopedia:
+Debug and Release build without warnings; smoke test (`./tools/Test-Smoke.ps1`, all MC mods) passed; automated
+in-world self-tests (T00, `./tools/Test-InWorld.ps1`) passed on the same code at 2560x1440: all 6 `compendium.*` tests
+(17/17 tests of the run). No hands-on in-game test yet.
 
 **Setup:** a **new character in a new world** for T05-T08, T13, T21, T25 and T32-T34 (everything starts as "???"), and a
 **mid-game character** for T09. Open the Encyclopedia: inventory (Tab) → the game's **Valheim Compendium** button

@@ -5,12 +5,10 @@ When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
 **Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
-Mods panel). Build OK (Debug and Release, 0 warnings). Smoke test (`./tools/Test-Smoke.ps1 -Mod ThroughDay`) passed on
-the build before the review fixes (loads, patches apply, JIT check clean); to re-run (the wake-up message now patches
-`Player.Message`). In-world self-tests (T17) last run 2026-09-29 on that earlier build: `sleep.morning` and
-`sleep.afternoon.included` passed; `sleep.night` and `sleep.afternoon.default` failed on the wake-up message check (the
-test expected "Good morning" to be the last message, but vanilla's Rested message comes after it). The wake-up message
-code and the tests changed since: to re-run. No in-game test yet.
+Mods panel). Committed build `1254c75` (2026-09-29): Debug and Release build without warnings; smoke test
+(`./tools/Test-Smoke.ps1`, all MC mods) passed (loads, patches apply, JIT check clean); automated in-world self-tests
+(T17, `./tools/Test-InWorld.ps1`) passed on the same code: `sleep.morning`, `sleep.night`, `sleep.afternoon.default`
+and `sleep.afternoon.included` (17/17 tests of the run). No hands-on in-game test yet.
 
 **Setup:** build a **Bed** (`bed`) under a roof with a **Campfire** (`fire_pit`) lit next to it, claim it and make it
 your spawn point (E until "Spawn point set"; the hover text then shows "[E] Sleep"). F5 for the console:
