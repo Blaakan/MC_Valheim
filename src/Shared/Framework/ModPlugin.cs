@@ -16,6 +16,7 @@ internal abstract class ModPlugin : BaseUnityPlugin
 {
     private ConfigEntry<string> _statusEntry;
     private bool _patched;
+    private bool _destroyed;       // OnDestroy ran (game quitting): never activate again
     private bool _failed;          // activation blew up; user toggle clear it (try again)
     private string _failedText;
     private string _initError;     // Awake blew up; never cleared, feature stay off whole session
@@ -131,6 +132,9 @@ internal abstract class ModPlugin : BaseUnityPlugin
 
     protected void OnDestroy()
     {
+        // Game quit destroy plugins before ZNet.OnDestroy; NetworkGate then call RefreshAll. Dead plugin must never
+        // start again (patch + OnActivated on destroyed object = error at every quit).
+        _destroyed = true;
         _watcher?.Dispose();
         if (_patched)
         {
@@ -150,6 +154,10 @@ internal abstract class ModPlugin : BaseUnityPlugin
     // Registry call me. Return true when patched-ness changed (so dependents re-check).
     internal bool Refresh()
     {
+        if (_destroyed)
+        {
+            return false;
+        }
         var (state, text) = ComputeState();
         var wasPatched = _patched;
         var wantPatched = state == ModState.Active;

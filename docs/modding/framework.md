@@ -96,6 +96,115 @@ Each mod has a `TESTING.md` checklist (single-player and multiplayer). The frame
 
 - `./tools/Test-Smoke.ps1`: every mod loads, patches cleanly, and compiles against the current game (JIT check).
 - `./tools/Test-Framework.ps1`: probe mods check live toggling, config-file watching, dependency gating and recovery.
+- `./tools/Test-InWorld.ps1`: loads a throwaway single-player world and runs every in-world self test the mods
+  register (Debug builds). See below.
+
+### In-world self-tests
+
+`./tools/Test-InWorld.ps1 [-Mod <names>] [-Only <tests>] [-KeepRunning] [-TimeoutSec 900] [-TestTimeoutSec 120] [-NoBuild]`
+builds and deploys the mods (all, or those matching `-Mod`) and the world probe (`tests/Probes/Core.Probe.World`),
+launches the game through `Start-Game.ps1` and waits. Mods already deployed in the game folder load too, so their
+tests run as well: every deployed mod's tests run unless `-Only` picks tests by name. Inside the game the probe:
+
+1. **Keeps your saves out of reach.** At plugin load, before the main menu reads anything, it points all save data
+   at `%TEMP%\MC_Valheim_InWorld\<yyyyMMdd-HHmmss>\saves` (`Utils.SetSaveDataPath`) and turns Steam Cloud saves off
+   for that game session (the same state as a player who disabled Steam Cloud). At the main menu it proves it in the
+   log (every save path, every save file the game knows) and refuses to start a world otherwise. The main-menu
+   preferences its button presses write (last character, last world, crossplay) are put back at once.
+2. **Starts the world like a player.** It creates (or reuses) the local character **MCProbe** and the local world
+   **MCProbe** (fixed seed `MCProbe01`) and starts it through the methods the main-menu buttons call, as a private,
+   closed server (no PlayFab login needed). The first-spawn intro is skipped: the player appears at the spawn stones.
+3. **Prepares the player.** When the player has spawned and the area around it has loaded (plus 8 s), it turns
+   **god mode** on (`Player.SetGodMode`, not a console command) and sets the world modifier **StaminaRate 0** (no
+   stamina use at all).
+4. **Runs the tests.** `probe.baseline` (player exists, position, biome, time of day, screenshots of the world and of
+   the inventory), `probe.runner` (checks the test runner itself), then every registered test in registration order,
+   each with a timeout. It logs `[selftest] BEGIN <name> (<mod GUID>)` / `[selftest] END <name>: passed|FAILED`
+   (tests that `-Only` skips are listed in `NOTE probe: filtered out: ...`), then
+   `[selftest] DONE pass=<tests passed> fail=<tests failed> tests=<tests run>`, and quits the game.
+
+The script prints every test's `PASS` / `FAIL` / `NOTE` / `SHOT` lines grouped by test, how many tests each mod ran,
+plus the errors that come from our mods (like the smoke test). It passes only when `DONE` was logged with `fail=0`, no
+error came from our mods, and at least one mod test ran: a run where only `probe.baseline` and `probe.runner` ran
+fails. With `-Only`, every piece must match a test; with `-Mod`, a test of the selected mods must have run, and each
+selected mod that has self tests must have run one (unless `-Only` filtered them out). When a mod ran no test,
+the script says why: it has no self tests, `-Only` filtered them out, it did not load, a Release build is deployed, or
+it is turned off in its `.cfg` (`Enabled = false`).
+
+It always removes the probe from the game folder and deletes the run's saves; the screenshots (`shots\`) and a copy
+of the log stay in the run folder (the 10 newest run folders are kept). Tests should not write settings (force them in
+memory, see below), but a test or a tester can still change `BepInEx/config/MC.*.cfg` during a run, so before launch the script copies those files to the run folder's
+`config-backup\`, and once the game has exited it puts them back byte for byte (a config file created during the run
+is deleted). It does this on every path, also when the run is cut short by Ctrl+C, the timeout or an error, and it
+names each file it had to put back. If the script itself is killed (for example its console window is closed),
+nothing is put back: the copies wait in `config-backup\`, and `config-backup\pending.txt` (deleted only when every
+file went back) makes the next run stop and say so, instead of backing up the changed files as the new "before".
+A new world is generated on every run: about 7 s to the main menu, 25-30 s from
+world start to spawn, about 1 minute from launch to quit plus the tests; a clean start is worth it. With
+`-KeepRunning` the game stays in the world after the tests and the clean-up (probe, saves, config files) happens when
+you close it; `cleanup.log` in the run folder then lists the config files that were put back. A probe left in the
+plugins folder by accident does nothing: it is idle unless the script launched the game (environment variable
+`MC_INWORLD_DIR`).
+
+**Writing a test** (Debug builds only; API in `src/Shared/SelfTest.cs`). Put the code in a file wrapped in
+`#if DEBUG`, register in `OnActivated`, unregister in `OnDeactivated`:
+
+```csharp
+#if DEBUG
+internal static class CrossbowSelfTests
+{
+    private const string Name = "crossbow.keeps-bolt";
+
+    internal static void Register() => SelfTest.Register(Name, Run);
+    internal static void Unregister() => SelfTest.Unregister(Name);
+
+    private static IEnumerator Run()
+    {
+        var player = Player.m_localPlayer;
+        GameObject spawned = null;
+        try
+        {
+            spawned = Object.Instantiate(ZNetScene.instance.GetPrefab("CrossbowArbalest"), player.transform.position, Quaternion.identity);
+            yield return new WaitForSeconds(1f);
+            // ... act, then check:
+            SelfTest.Pass(Name, "bolt kept after putting the crossbow away");
+            SelfTest.Screenshot(Name, "after");
+            yield return null;
+            yield return null;
+        }
+        finally
+        {
+            if (spawned != null)
+            {
+                ZNetScene.instance.Destroy(spawned);
+            }
+        }
+    }
+}
+#endif
+```
+
+- Name tests `<modshortname>.<what>`. A test must report at least one `SelfTest.Pass` or `SelfTest.Fail`, or it
+  fails. `SelfTest.Note` adds context. `SelfTest.Screenshot(name, label)` saves `<name>__<label>.png`; yield two
+  frames before changing the screen, and take at most one screenshot per frame.
+- Yield `null`, a nested `IEnumerator`, `WaitForSeconds`, `WaitForSecondsRealtime`, `WaitUntil` / `WaitWhile`, an
+  `AsyncOperation`, `WaitForEndOfFrame` or `WaitForFixedUpdate`. Do not yield a started `Coroutine`: the timeout
+  cannot stop it.
+- Each test has a timeout (120 s by default). When a test times out or throws, the runner closes it, so its
+  `try / finally` blocks still run: put the clean-up there. A test must leave the world as it found it (destroy what
+  it spawns, close windows, put back the time and global keys it changed). **Never set a `ConfigEntry.Value` in a
+  test**: BepInEx saves it to the player's real `.cfg` at once, and the script puts config files back only after the
+  whole run. Give the mod a Debug-only in-memory override read through one accessor (Sleep Through the Day:
+  `Plugin.ReadDaySettings`; Encyclopedia: its display settings) and clear it in `finally`. Between tests the probe
+  closes an inventory left open and turns god mode back on, and says so in a `NOTE`.
+- The player is in god mode: its health never drops below 1, and creatures it hurts are marked as cheated (vanilla
+  `Character.Damage`), which matters for kill statistics. A test that needs a normal player turns god mode off with
+  `Player.SetGodMode(false)` and back on in its `finally`. Likewise a test that measures stamina use removes the
+  modifier with `ZoneSystem.instance.RemoveGlobalKey(GlobalKeys.StaminaRate)` and sets it back with
+  `ZoneSystem.instance.SetGlobalKey(GlobalKeys.StaminaRate, 0f)`.
+- Tests must not depend on each other or on their order; other mods' tests run in the same world. The player starts
+  at the spawn stones in the Meadows, shortly before dawn of day 1 (it is dark): a test that needs daylight or a
+  given hour sets the time itself and puts it back.
 
 ## Internals (for mod authors)
 

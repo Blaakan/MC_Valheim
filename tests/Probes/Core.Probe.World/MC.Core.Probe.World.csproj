@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Me = world probe for tools/Test-InWorld.ps1 (Debug build). Never shipped: lives outside src/, script deploy me
+    before run and remove me after. Idle unless env var MC_INWORLD_DIR set. Client + Compatible like other probes:
+    me start own single-player world, no network gate needed.
+  -->
+  <PropertyGroup>
+    <ModName>Probe World</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <ModSide>Client</ModSide>
+    <ModDescription>In-world self-test runner for MC mods. Does nothing unless tools/Test-InWorld.ps1 launched the game.</ModDescription>
+  </PropertyGroup>
+</Project>
