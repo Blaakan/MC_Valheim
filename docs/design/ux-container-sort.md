@@ -10,8 +10,8 @@
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/`; item and piece prefab names checked against the installed 1.0.16 game data (`StreamingAssets/SoftRef/manifest_extended`) and the JotunnDoc item list (generated from 1.0.7) / piece list (1.0.12); item sources checked on valheim.weirdgloop.org (2026-09-28) |
 | Status | Implemented (0.1.0), smoke test passed 2026-09-29 (loads, patches cleanly, JitCheck clean: 278 methods, 0 failures), in-game testing pending |
 
-"Container" and not "Chest" in the GUID: carts, ships and barrels use the same panel. A later "Sort bags" mod for the
-player inventory would be `Inventory.Sort`.
+"Container" and not "Chest" in the GUID: carts, ships and barrels use the same panel. A "Sort bags" mod for the
+player inventory would have been `Inventory.Sort` (the idea is cancelled in the sheet).
 
 ## Goal
 
@@ -38,7 +38,7 @@ Precise meaning of the criteria (3.4):
 - **Biome**: progression order Meadows → Black Forest → Swamp → Ocean → Mountain → Plains → Mistlands → Ashlands →
   Deep North, items of unknown biome (modded, unobtainable test items) last; inside a biome by type, then name.
 
-Non-goals: sorting the player inventory ("Sort bags" is a separate backlog idea), auto-sort on open or close (players
+Non-goals: sorting the player inventory (the separate "Sort bags" idea is cancelled in the sheet), auto-sort on open or close (players
 dislike losing their spatial memory), sorting chests that are not open (quick-stack / remote containers), locked or
 favourite slots, a keyboard hotkey, search/filter (separate idea "Search chest"), sorting by weight or value.
 
@@ -805,8 +805,7 @@ the stale-copy guard.
 2. A button-offset setting if UI mods collide (not added).
 3. Translations for the English labels.
 4. Whether sorting should be offered for tombstones.
-5. Whether the later "Sort bags" mod should get the sort and merge routine through a Core mod (runtime sharing) or
-   its own copy.
+5. Closed: a "Sort bags" mod would have shared the sort and merge routine, but the idea is cancelled in the sheet.
 
 ### Unverified names and values
 

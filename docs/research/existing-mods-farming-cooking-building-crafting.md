@@ -19,10 +19,10 @@ Research done 2026-09 (2026-09-28), about three weeks after Valheim 1.0 (Deep No
 | # | Idea | Cat. | Scope | User said exists | Coverage found |
 |---|------|------|-------|------------------|----------------|
 | 1 | Breeding revamp (lowest parent + chance of +1) | Farming | Revamp | No | partial |
-| 2 | Ashlands trees / crops burn outside shield | Farming | Revamp | No | none |
+| 2 | Ashlands trees (plant trees in the Ashlands; unsheltered saplings burn, grown trees are scorched) | Farming | Revamp | No | partial |
 | 3 | Forge of Potential revamp | Crafting | QoL | No | partial |
-| 4 | Easy plant | Farming | QoL | Yes | **full** |
-| 5 | Plant "everything" | Farming | QoL | Yes | **full** |
+| 4 | Easy plant (cancelled) | Farming | QoL | Yes | **full** |
+| 5 | Plant "everything" (cancelled) | Farming | QoL | Yes | **full** |
 | 6 | Unlock biome feast in the biome, not after | Cooking | QoL | No | none (only generic trader configurators) |
 | 7 | Harpoon works on tamed animals | Farming | QoL | No | **full** (released 2026-09-27) |
 | 8 | One click repair all | Crafting | QoL | Yes | **full** |
@@ -62,7 +62,7 @@ What stands out:
   - Barber: a `Barber` piece plus `PlayerCustomizaton.ShowBarberGui`.
 - **Many flagship mods are deprecated or stuck before 1.0:** Jewelcrafting (deprecated 2026-05), Valheim Enchantment System, WardIsLove, BetterWards, UnderTheRadar, Tameable Collector, Player Heads. This leaves real gaps for gems, wards, player trophies and pet transport.
 - **Genuine gaps (nothing found):**
-  - Ashlands burn/scorch for grown plants.
+  - Scorched Trees from planted trees left outside a shield in the Ashlands.
   - Feast unlock on biome discovery.
   - New trophies for trophy-less creatures.
   - Tames as real ship passengers.
@@ -99,27 +99,45 @@ The user's rule is "offspring level = lowest of the two parents, plus a chance o
 - **Configurable:** min / avg / max / random-parent / vanilla, a per-species chance, and a cap.
 - **Networking:** the result must be decided only by the ZDO owner. Show both parents' levels on hover, as TameCraft and Smoothbrain Ranching do.
 
-## 2. Ashlands trees (Revamp) — coverage: none
+## 2. Ashlands trees (Revamp) — coverage: partial
 
-The request: inside a shield everything is safe. Outside, crops burn out and trees turn into scorched trees.
+The request (sheet text of 2026-09-29):
+1. Trees without a biome restriction can be planted in the Ashlands.
+2. A sapling or crop that is not inside a shield burns away and is destroyed.
+3. Inside a shield, it grows by its own rules.
+4. A fully grown tree outside a shield turns into a Scorched Tree after a delay.
+5. A fully grown tree inside a shield stays unhurt.
+
+Coverage is partial. PlantEverything comes close to the planting half through config: vanilla tree saplings can grow in any biome, so also under a shield in the Ashlands, and its defaults remove an unsheltered sapling silently once its grow time is over. No mod burns saplings on a timer, and none turns grown trees into Scorched Trees. Seasons uses the same "dies outside the shield" rule for winter cold.
 
 **Vanilla hooks**
-- `Plant.UpdateHealth` sets `Status.TooHot` when a plant is in `Heightmap.Biome.AshLands` without `m_tolerateHeat` and not `ShieldGenerator.IsInsideShield`. The cold equivalent is `Status.TooCold` in Mountain and DeepNorth without `m_tolerateCold`.
-- This check only applies while growing. `Plant.Grow` spawns the grown prefab (a `Pickable` crop or a `TreeBase` tree) and destroys the sapling. After that, nothing re-checks heat. `m_destroyIfCantGrow` handles unhealthy saplings.
+- `Plant.UpdateHealth` checks the biome (`WrongBiome`) before heat. It then sets `TooHot` for a plant in the Ashlands that has no `m_tolerateHeat` and is not inside `ShieldGenerator.IsInsideShield`. An unhealthy plant never grows, and `Plant.Grow` destroys it only when `m_destroyIfCantGrow` is set. Nothing burns it.
+- Once `Plant.Grow` has spawned the tree (`TreeBase`), no shield rule applies to it. Outside a dome, cinder fire can burn it (`Cinder.CanBurn`). An active dome never spawns cinders inside (`CinderSpawner.SpawnCinder`) and destroys the ones that enter it (`ShieldGenerator.CheckObjectInsideShield`), which costs fuel.
+- The vanilla Scorched Tree (`$prop_ashlandstree`) is the `AshlandsTree*` family: `AshlandsTree1`, `AshlandsTree3` to `AshlandsTree6` and `AshlandsTree6_big` in the 1.0.16 manifest.
 
 | Mod | Status | Notes |
 |-----|--------|-------|
-| — | — | Nothing found that burns or scorches grown crops or trees depending on shield coverage. |
-| [PlantEverything](https://thunderstore.io/c/valheim/p/Advize/PlantEverything/) (Advize) — related | 1.21.3, 2026-09-25, 1.0 tagged | Its `EnforceBiomes` config (and related options) lifts biome, cultivated-ground, open-sky and space requirements. It goes in the opposite direction to this idea, so we must stay compatible. |
-| [ServersideQoL PrefabConfigurator](https://thunderstore.io/c/valheim/p/ArgusMagnus/ServersideQoL_PrefabConfigurator/) (ArgusMagnus) — related | 2.0.14, 2026-09-20, updated post-1.0, server-only | A generic prefab-field editor (grow time, required space and so on). Shows how far pure data tweaks go without code. |
+| [PlantEverything](https://thunderstore.io/c/valheim/p/Advize/PlantEverything/) (Advize) — partial | 1.21.3, 2026-09-25, 1.0 tagged | Comes close to lines 1 and 3 through config, and to line 2 only as a silent removal. `EnforceBiomesVanilla` (default on) writes the temperate biomes (fir also Mountain) into the vanilla saplings' `Plant.m_biome` and `Piece.m_onlyInBiome`. Turned off, every vanilla sapling and crop can be planted and grow in any biome, the Ashlands included. `PlantsRequireShielding` (default on) keeps the vanilla heat rule, so a shield is needed there. Its saplings get `m_destroyIfCantGrow` unless `PlaceAnywhere` is on, so an unsheltered sapling is removed without any burn when its grow time ends. Adds a heat-tolerant `Ashwood_Sapling` (Beech Seeds + Sulfur) that grows `AshlandsTree3/4/5/6_big`. Nothing scorches grown trees. It rewrites these fields on the prefabs at start and on every config change, and patches `Plant.Grow`, `Plant.GetHoverText` and `TreeBase.Awake`. GPL source on [GitHub](https://github.com/AdvizeGH/Advize_ValheimMods). |
+| [Seasons](https://thunderstore.io/c/valheim/p/shudnal/Seasons/) (shudnal) — same pattern for cold | 1.10.3, 2026-09-29, 1.0 tagged | Crops and pickables can perish in winter, at once or (a config option) gradually over a set number of seconds. The shield generator works as a greenhouse (against winter only, by default), and fire heat protects plants. Must be installed on the server and every client. Source on [GitHub](https://github.com/shudnal/Seasons). |
+| [PlantEasily](https://thunderstore.io/c/valheim/p/Advize/PlantEasily/) (Advize) — compatibility | 2.2.2, 2026-09-24, 1.0 tagged | Grid planting. Its ghost check reads the ghost's `Plant.m_biome` and flags `TooHot` outside a shield in the Ashlands. By default (`PreventInvalidPlanting`) it refuses spots where the plant cannot grow. |
+| [CropUtils](https://thunderstore.io/c/valheim/p/NoPetRides/CropUtils/) (NoPetRides) — compatibility | 2.1.0, 2026-09-18, 1.0 tagged | Pattern planting. When its planting tool is used, it refuses spots where a crop could never grow, checking the biome plus Ashlands heat and Mountain / Deep North cold "the same way Plant.UpdateHealth does" (its README, 2.0.1 notes). It reads `Plant.m_biome` from the selected piece prefab. Source on [GitHub](https://github.com/nopetrides/modding/tree/main/ValheimMods/Crop_Utils). |
+| [TreesReborn](https://thunderstore.io/c/valheim/p/TastyChickenLegs/TreesReborn/) (TastyChickenLegs) — related | 1.1.3, 2026-09-11, 1.0 tagged | Replants a sapling when a stump is destroyed. According to a Nexus snippet ([Nexus 2312](https://www.nexusmods.com/valheim/mods/2312)), its config maps `AshlandsTreeStump` to PlantEverything's `Ashwood_Sapling`. If a chopped Scorched Tree leaves such a stump (unverified), our scorched trees could keep regrowing. |
+| [ServersideQoL PrefabConfigurator](https://thunderstore.io/c/valheim/p/ArgusMagnus/ServersideQoL_PrefabConfigurator/) (ArgusMagnus) — related | 2.0.14, 2026-09-20, updated post-1.0, server-only | Generic prefab-field editor (plant grow time, space and more). It shows how far pure data tweaks go; it has no heat or scorch logic. |
 
 **Inspiration**
-- **Genuinely new.** It makes the Shield Generator the heart of an Ashlands farm or orchard, and it gives fuel (bones) a steady purpose.
-- **Implementation:**
-  - A low-frequency, owner-only check on grown `Pickable` crops and `TreeBase` trees inside AshLands, and on Plant-grown prefabs only (never world-generated trees).
-  - Outside a shield, apply "heat exposure" with a grace timer stored in the ZDO, so players get a refuel window. Then swap the prefab: a crop becomes a burnt crop (a Pickable variant that yields ash or coal, or nothing), and a tree becomes a vanilla Ashlands dead or burnt tree prefab.
-  - Use ZDO timestamps so unloaded zones catch up when they load.
-- **Decide first:** whether heat-tolerant plants (`m_tolerateHeat`) are exempt, and whether cold and Deep North get the mirror mechanic ("frost-bitten").
+- **Covered only through config:** planting trees in the Ashlands and growing them under a shield (PlantEverything with `EnforceBiomesVanilla` off). That setting opens every biome at once, crops included. Ours adds only the Ashlands, only to a fixed list of trees without a special biome, and keeps the shield requirement.
+- **The gap:**
+  - a visible, timed burn of unsheltered saplings (vanilla stalls them; PlantEverything removes them silently at the end of their grow time);
+  - grown trees turning into Scorched Trees outside a shield, which no mod does.
+- **Borrow from Seasons:**
+  - a gradual death over a configurable time rather than an instant one;
+  - the shield as the greenhouse;
+  - the rule that the mod runs on the server and on every client, with the server's settings.
+- **Compatibility:**
+  - Re-apply our Ashlands bit to the selected prefab before the ghost is made and to instances as they load, because PlantEverything rewrites the sapling prefabs when it starts and whenever its config changes.
+  - Skip heat-tolerant saplings (such as its `Ashwood_Sapling`), and respect its `PlantsRequireShielding` off.
+  - PlantEasily (ghost) and CropUtils (prefab) already refuse unsheltered Ashlands spots, which fits the burn rule.
+- **Balance:** Scorched Trees drop Ashwood, so this makes Ashwood renewable, as PlantEverything's Ashwood sapling and TreesReborn's stump replanting already do. Decide whether the scorched result keeps the vanilla drops.
 
 ## 3. Forge of Potential revamp (QoL) — coverage: partial
 
@@ -156,6 +174,8 @@ Desired behavior:
 
 ## 4. Easy plant (QoL) — coverage: full
 
+Cancelled in the idea sheet.
+
 | Mod | Status | Notes |
 |-----|--------|-------|
 | [PlantEasily](https://thunderstore.io/c/valheim/p/Advize/PlantEasily/) (Advize) | 2.2.2, 2026-09-24, 1.0 tagged, client-side | Grid planting (rows × columns, resizable with keybinds), snapping, random rotation, and red highlighting that blocks invalid spots. Bulk harvest and optional auto-replant. Gamepad support. Source: [AdvizeGH/Advize_ValheimMods](https://github.com/AdvizeGH/Advize_ValheimMods) (GPL, so ideas only). The reference implementation. |
@@ -165,6 +185,8 @@ Desired behavior:
 **Inspiration:** do not rebuild this. PlantEasily is mature, maintained and client-side. At most, make our farming features (#2, #15, any new crops) behave correctly with its grid ghosting, which in practice means vanilla `Piece` and `Plant` components on the Cultivator piece table. A skill- or tool-tier-gated grid size (like ImpactfulSkills) is the only differentiator left.
 
 ## 5. Plant "everything" (QoL) — coverage: full
+
+Cancelled in the idea sheet.
 
 | Mod | Status | Notes |
 |-----|--------|-------|

@@ -407,7 +407,7 @@ The sender broadcasts and every receiver renders locally. Vanilla does no server
 - `GetMapData()` / `SetMapData()` *(private)*: map format version 8, compressed. It contains explored and exploredOthers bitmaps, every pin with `m_save == true` (name, pos, type, checked, ownerID, author), and the public-position flag.
 - It is stored per world in the character file (`PlayerProfile.SetMapData/GetMapData`, inside `m_worldData`).
 - Shared map data (cartography table, `MapTable` RPC `"MapData"`, ZDO `s_data`) goes through `Minimap.GetSharedMapData` / `AddSharedMapData`. Shared pins arrive with `m_ownerID != 0` and render greyed.
-- Unknown `PinType` values are coerced to `Icon3` with a warning (`AddPin`). **Do not persist custom enum values.** Use `PinType.None` plus a custom `m_icon` with `save: false`, or keep your own save.
+- Unknown `PinType` values (any int `>= m_visibleIconTypes.Length`) are coerced to `Icon3` with a warning (`AddPin`), and the pin is then saved as `Icon3`. A mod can make custom values valid by growing `m_visibleIconTypes` (grow only) and appending `m_icons` in a `Minimap.Start` postfix, which runs before `Minimap.Update` loads the saved pins (`LoadMapData`); Cartur's Map Pins and BetterMap do this. A valid type with no `m_icons` entry gets a null sprite (a white square). A player without the mod, or with it disabled when the world loads, still turns such pins into `Icon3` for good (see the Cartography table revamp in [exploration-player.md](exploration-player.md)). Otherwise use `PinType.None` plus a custom `m_icon` with `save: false`, or keep your own save.
 
 ### Multiplayer authority
 Local, except player-position pins (`ZNet.GetOtherPublicPlayers`) and pings/shouts, which come from `Chat`.
@@ -649,6 +649,7 @@ Cautions (learned for Crafting Search and Sort):
 
 ### Sort bags (QoL, exists)
 
+- **Status**: cancelled in the idea sheet. The notes below stay as research.
 - **Feasibility**: easy.
 - **Who needs the mod**: client-only. The player inventory is local and saved in the character file; carts and ships are containers and follow "Sort chest".
 - **Hooks**:

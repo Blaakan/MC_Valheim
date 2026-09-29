@@ -10,6 +10,7 @@ Research done 2026-09 (2026-09-28), about three weeks after Valheim 1.0 (Deep No
   - `updated post-1.0`: released after 2026-09-09 but without the tag. It probably works.
   - `pre-1.0`: last release before 2026-09-09. Assume it is broken until tested. Hosting blogs report that 1.0 changed the item DB, the ZNetScene registry, skills and piece categories. Jotunn 2.30 shipped a 1.0 fix on launch day.
   - `deprecated`: Thunderstore's deprecated flag is set.
+- **Refreshed sections** (section 1, Cartography table revamp, and section 19, Wish bone deep north fix, both written 2026-09-29) write the status as `vX.Y.Z, updated YYYY-MM-DD, 1.0: yes|likely|unknown|dead`, as [existing-mods-combat-ux.md](existing-mods-combat-ux.md) does: `yes` = the author says it supports 1.0 (usually the `1.0 tagged` category), `likely` = `updated post-1.0` without that claim, `unknown` = `pre-1.0`, `dead` = deprecated or unchanged since 2021-2022.
 - **AI** means the author tagged the package "AI Generated" on Thunderstore. A lot of 2026 mods carry this tag, so treat their code quality as unknown.
 - **Licenses**: we only borrow ideas. Code under GPL (for example Advize's mods) must never be copied into our repos.
 - **Vanilla hooks** list what the decompiled 1.0.16 code already provides. They are cited as `Class.Member` and were checked in `.ref/decompiled/assembly_valheim`.
@@ -36,6 +37,7 @@ Research done 2026-09 (2026-09-28), about three weeks after Valheim 1.0 (Deep No
 | 16 | New ability depending on skill level | New | No | partial |
 | 17 | Better shops | New | Partially | partial |
 | 18 | Late game quest | New | (blank) | partial |
+| 19 | Wish bone deep north fix | QoL | No | none |
 
 What stands out:
 
@@ -48,43 +50,42 @@ What stands out:
 
 ## 1. Cartography table revamp (QoL) — coverage: partial
 
-The user's description, "More pins when near table", can be read three ways:
+The idea (sheet text rewritten 2026-09-29): next to a cartography table, the large map offers extra pin icons for points of interest (dungeon, cave, tower, stone, plant, creature paw...); away from a table the map stays vanilla; and a pin that another player shared through the table and that you removed is not added back by the next table read.
 
-- (a) the table unlocks extra pin icons, types or metadata;
-- (b) standing near a table shows more pins, such as shared pins, auto pins or tracked objects;
-- (c) pins are shared through the table.
-
-Mods exist for all three, but none of them ties the extra pins to being near the table.
+**Coverage: partial.** Extra placeable pin icons already exist in several mods (Cartur's Map Pins has a 158-icon grid with dungeon, cave and creature icons; BetterMap adds a row per new icon to the vanilla pin legend; RavenwoodMapPins and the MoreMapPins family load up to 250 PNG icons), but they are always available: none ties the extra icons to standing next to a table. No mod remembers a single removed table pin while keeping vanilla table sharing: Asocial Cartography and Pintervention cut table pins by category, distance or player; Better Cartography Table makes sharing opt-in and lets you delete public pins for everyone at the table; The Greatest Map keeps erased markers erased, but for everyone, with server permission and through its own server store instead of the table.
 
 **Vanilla hooks**
-- `MapTable.OnRead` / `MapTable.OnWrite` store the compressed shared map, including pins, in the table ZDO (`ZDOVars.s_data`). Writing is gated by `PrivateArea.CheckAccess`.
-- `Minimap.GetSharedMapData` / `Minimap.AddSharedMapData` produce and merge that data.
-- Players get only 5 pin icons (`Minimap.PinType.Icon0..Icon4`) plus special types (Death, Boss, ...).
-- `MapTable.UseItem` is an empty stub that returns false. It is a free hook for "use an item on the table".
+- `MapTable.OnRead` → `Minimap.AddSharedMapData` adds back every other player's table pin that has no local saved pin within 1 m, so a removed shared pin returns on the next read. `MapTable.OnWrite` reads first, then stores `Minimap.GetSharedMapData` (explored areas plus every saved non-Death pin on the writer's map, other players' pins included) in the table ZDO (`ZDOVars.s_data`); writing is gated by `PrivateArea.CheckAccess`.
+- Players get 5 pin icons (`Minimap.PinType.Icon0..Icon4`). `Minimap.AddPin` turns any type beyond `m_visibleIconTypes` into `Icon3`; that array is built in `Minimap.Start`, before saved pins load.
+- `MapTable` keeps no list of instances, and no other game class refers to it. `MapTable.UseItem` is an empty stub that nothing calls: an item used on the table reaches its two `Switch`es, and `OnRead` / `OnWrite` ignore it.
 
 | Mod | Status | Notes |
 |-----|--------|-------|
-| [Better Cartography Table](https://thunderstore.io/c/valheim/p/nbusseneau/Better_Cartography_Table/) (nbusseneau) | 0.8.1, 2025-08-12, pre-1.0 (built on Jotunn 2.26) | Pins can be private, public or guild. Changes show in real time when several players use a table at once. Supports NoMap runs. Public and guild pins are stored separately and mirrored into vanilla shared pins. MIT, [GitHub](https://github.com/nbusseneau/BetterCartographyTable). The best-engineered mod in this space. |
-| [ZenMap](https://thunderstore.io/c/valheim/p/ZenDragon/ZenMap/) (ZenDragon) | 1.11.0, 2026-09-13, 1.0 tagged | The map is only usable at a table. The view is locked to the table's position, and the revealed area grows over about 7 game days (1250 m radius by default). The table live-tracks ships, carts, mounts, tombstones and players. Parchment "snapshot" maps can be carried. Pins are attached to signs. Hardcore/NoMap philosophy. |
-| [Pinnacle](https://thunderstore.io/c/valheim/p/ComfyMods/Pinnacle/) (ComfyMods) | 1.17.0, 2026-09-16, 1.0 tagged | Pin manager: search, edit and filter pins, plus more icons through sprite names and pin scaling. Pure UI QoL. |
-| [Cartur's Map Pins](https://thunderstore.io/c/valheim/p/Cartur/Carturs_Map_Pins/) | 1.6.0, 2026-09-27, updated post-1.0, AI | Automatically pins ore, dungeons, camps, chests and minibosses when you get close. 158 icons, and a pin editor for icon, color, size and opacity. |
+| [Cartur's Map Pins](https://thunderstore.io/c/valheim/p/Cartur/Carturs_Map_Pins/) (Cartur) | v1.6.0, updated 2026-09-27, 1.0: likely | Icon grid on the large map next to the vanilla pin buttons (158 icons: dungeons by name, caves, creatures, mushrooms, ores...), a shift-click pin editor (icon, colour, size) and automatic pins for ore, dungeons, camps, chests and more. Saves its icons as `PinType` ints from 100 upward by growing `m_visibleIconTypes` in a `Minimap.Start` postfix (grow only), the technique this idea needs; it grows the array even while its custom icons are switched off, so saved pins never lose their type. 1.6.0 added a PinSharing setting (share all, only hand-placed or no pins to the table). Always on, not tied to a table. Tagged AI Generated. [GitHub](https://github.com/jekkle/cartur-map-pins). |
+| [BetterMap](https://thunderstore.io/c/valheim/p/xtavim/BetterMap/) (xtavim) | v1.1.0, updated 2026-09-24, 1.0: yes | Auto-pins creatures (drawn as their trophies), boats, carts, ore, crypts, caves and more. The vanilla pin legend gets a row for each new icon, so they can be placed by hand and hidden with a right click like vanilla's. A deleted auto pin stays deleted. Removing the mod turns its pins into a plain icon. Client and server (ServerSync). |
+| [Pinnacle](https://thunderstore.io/c/valheim/p/ComfyMods/Pinnacle/) (ComfyMods) | v1.17.0, updated 2026-09-16, 1.0: yes | Pin manager: search, edit and filter. Name tags such as `[:sprite_name]`, `[#ff0000]` and `[150%]` change a pin's icon, colour and size for Pinnacle users, while vanilla players see the vanilla icon. |
+| [RavenwoodMapPins](https://thunderstore.io/c/valheim/p/JamesJonesTV/RavenwoodMapPins/) (JamesJonesTV) | v3.0.1, updated 2026-09-11, 1.0: yes | A pin menu with 250 bundled 32x32 icons, ordered by file number (renumbering shifts the icons of placed pins). Known issue: the cartography table option draws over the menu's bottom row. It ships the DLL of KG's MoreMapPins. The family: [MoreMapPins](https://thunderstore.io/c/valheim/p/arielle/MoreMapPins/) (arielle's rework, v1.3.0, updated 2025-09-26, 1.0: unknown) and [MorePins](https://thunderstore.io/c/valheim/p/BlackViking/MorePins/) (BlackViking's remake, v420.0.12, updated 2026-06-06, 1.0: unknown); KG's original MoreMapPins is deprecated, yet icon packs such as PixelMapIcons (TheOllix) and [Sakey's Cozy Pixel Map Icons](https://thunderstore.io/c/valheim/p/Sakey/SakeysCozyPixelMapIcons/) (v1.1.2, updated 2026-09-17) still depend on it. |
+| [Asocial Cartography](https://thunderstore.io/c/valheim/p/VentureValheim/Asocial_Cartography/) (VentureValheim) | v1.0.0, updated 2026-09-10, 1.0: yes | Client-side. Stops adding your hand-placed pins to the table (default) and/or receiving other players' pins; `ReceivePinRadius` drops incoming pins that sit near one of yours (vanilla uses 1 m; 50-200 m recommended). Applies to the 5 player icons, optionally to boss and Hildir pins, and to custom types listed by id. All or nothing: no memory of single removed pins. Its `GetSharedMapData` patch swaps `m_pins` for a filtered list during the write, and a transpiler replaces the `AddPin` call in `AddSharedMapData`. |
+| [Pintervention](https://thunderstore.io/c/valheim/p/ComfyMods/Pintervention/) (ComfyMods) | v1.3.0, updated 2025-03-19, 1.0: unknown | Panel (Ctrl+F) to hide table pins by the player who placed them; a switch to stop reading pins and map data from tables; stores player names on the table ZDO. |
+| [Better Cartography Table](https://thunderstore.io/c/valheim/p/nbusseneau/Better_Cartography_Table/) (nbusseneau) | v0.8.1, updated 2025-08-12, 1.0: unknown | Pins are private by default and shared one by one to a table as public or guild pins, stored apart from vanilla shared pins and mirrored into them for unmodded players. Using the table opens the map; there public pins can be crossed off, removed (from the table, for everyone) or unshared; away from the table they cannot be removed. Real-time updates when several players use one table. Jotunn, MIT, [GitHub](https://github.com/nbusseneau/BetterCartographyTable); strongly recommended on the server too. |
+| [The Greatest Map](https://thunderstore.io/c/valheim/p/DeathMonger/TheGreatestMap/) (DeathMonger) | v1.7.0, updated 2026-09-29, 1.0: likely | Server and every client. Markers sync through the mod's own server store and merge at tables or between players standing together; the table carries only exploration (player markers are no longer read from or written to tables). An erasure is a dated tombstone that wins over older copies, so erased markers stay erased for everyone; erasing needs the server to allow it. Recorded markers use item and trophy icons. Tagged AI Generated. |
+| [ServersideQoL AutoMapTables](https://thunderstore.io/c/valheim/p/ArgusMagnus/ServersideQoL_AutoMapTables/) (ArgusMagnus) | v2.1.1, updated 2026-09-27, 1.0: likely | Server-only: adds pins for portals, ships, ore deposits and dungeons that players found to map tables, with vanilla pin types and short labels (Cu, Ag...). An option discards players' own pins from tables. [GitHub](https://github.com/ArgusMagnus/ValheimServersideQoL). |
 
 Also relevant:
-- [CartographySkill](https://thunderstore.io/c/valheim/p/Advize/CartographySkill/) (Advize, 3.2.0, 2026-09-11, 1.0 tagged): a skill that grows the explore radius. Its roadmap mentions table features that have not been built.
-- [Exploration](https://thunderstore.io/c/valheim/p/Smoothbrain/Exploration/) (Smoothbrain, 1.0.4, 2026-02-05, pre-1.0): recording to a table unlocks at level 20 and map copying at level 40.
-- [MoreMapPins](https://thunderstore.io/c/valheim/p/KGvalheim/MoreMapPins/) (KG): custom pin icons. KG's mods are now largely deprecated.
+- [ZenMap](https://thunderstore.io/c/valheim/p/ZenDragon/ZenMap/) (ZenDragon, v1.11.0, updated 2026-09-13, 1.0: yes): the map is only usable at a table (NoMap style); ships, carts, mounts and tombstones are tracked on it.
+- [PlayerMapLayers](https://thunderstore.io/c/valheim/p/Zephyrfit/PlayerMapLayers/) (Zephyrfit, v0.2.13, updated 2026-09-27, 1.0: likely, AI Generated): per-player exploration layers and explicit per-pin sharing through the server; reading a table opens the map.
+- [SharedMap](https://thunderstore.io/c/valheim/p/TXC/SharedMap/) (TXC, v2.1.0, updated 2026-09-26, 1.0: yes): server-synced public markers that only their owner or an admin can delete; table pins stay vanilla.
+- Automatic POI pinners, for a later "suggest an icon" extra: [AutoPOI](https://thunderstore.io/c/valheim/p/noodle_house/AutoPOI/) (noodle_house, v1.0.0, updated 2026-09-26, 1.0: likely; a deleted pin stays deleted) and [AutoWaypoints](https://thunderstore.io/c/valheim/p/Ab5oluteZer0/AutoWaypoints/) (Ab5oluteZer0, v1.0.2, updated 2026-09-29, 1.0: likely, AI Generated). The older [AMPED - Auto Map Pins Enhanced](https://thunderstore.io/c/valheim/p/raziell74/AMPED_Auto_Map_Pins_Enhanced/) (raziell74, v1.3.50, updated 2023-01-24, 1.0: dead; also Nexus mod 2199) auto-pinned resources, locations, spawners and creatures.
 
 **Inspiration**
 
-- **Idea: make the table the "map room".** While you are inside the table's radius or ward, grant a "Cartographer" status (like Rested). The map UI then unlocks:
-  - an extended pin palette (more icons, colors, notes, categories);
-  - pin search (Pinnacle-style);
-  - team or public pins (Better Cartography Table's per-pin visibility, stored on the table ZDO);
-  - live-tracked assets (ships, carts, tames, portals by tag), as ZenMap does.
-- **Keep:** the normal vanilla map everywhere else, and mirror our data into vanilla shared pins so unmodded clients degrade gracefully.
-- **Avoid:** ZenMap's NoMap stance, which is too hardcore for a QoL mod.
-- **Watch:** Better Cartography Table is the closest competitor, and it has not been updated for 1.0.
-- **Could integrate with:** the Spyglass ("pin what I look at") and the Compendium (discovered locations).
+- **Borrow** Cartur's Map Pins' registration: a fixed block of type ints, `m_visibleIconTypes` grown (never shrunk) in a `Minimap.Start` postfix for every new `Minimap`, sprites appended to `m_icons`. Its 1.6.0 changelog also warns that a cloned vanilla pin button keeps vanilla's right-click wiring: rewire both clicks.
+- **Borrow** BetterMap's placement of the new icons in the vanilla pin legend, where a right click hides a type as it does for vanilla icons.
+- **Borrow** Better Cartography Table's idea that the table is where shared pins are managed, but stay small: no separate pin layer, no server part.
+- **Differ:** per-pin dismissal instead of Asocial Cartography's and Pintervention's all-or-nothing filters, and keep it personal: a dismissed pin stays on the table for everyone else (vanilla never lets a player delete another player's table pin; Better Cartography Table and The Greatest Map delete for everyone). BetterMap and AutoPOI already keep deleted auto pins deleted; this does the same for table pins.
+- **Differ:** the extra icons appear only next to a table, which gives the table a purpose in normal (non-NoMap) worlds.
+- **Watch:** type-int collisions (Cartur uses 100 upward), UI overlap with other icon grids, and mods that hook the table read/write path (Asocial Cartography, Pintervention, Better Cartography Table, PlayerMapLayers, The Greatest Map).
+- **Could integrate with:** the Spyglass ("pin what I look at" with a POI icon), the Ping system revamp (typed pings) and the Compendium, implemented as the MC [Encyclopedia](../../src/Exploration/Compendium.Encyclopedia) mod: it lists no places yet (locations are outside its 0.1.0 scope), so a later locations page could list the POI pins, and its paw print, drawn in code without an asset file, can serve as the Creature pin icon.
 
 ## 2. Sleep through the day (QoL) — coverage: partial
 
@@ -549,6 +550,33 @@ Also: TraderQuest (RustyMods, deprecated 2025-03) and [Lost Scrolls II](https://
   - Hildir's key-based persistence.
 - **Ship curated content.** Do not rely only on admin-authored quests.
 - **Avoid:** MMO-style token economies that bypass progression.
+
+## 19. Wish bone deep north fix (QoL) — coverage: none
+
+**Vanilla hooks and 1.0 facts**
+- The Wishbone pings the closest loaded object that carries a `Beacon` component, within that Beacon's own range (`SE_Finder.UpdateStatusEffect`, `Beacon.FindClosestBeaconInRange`). Nothing else counts.
+- Checked in the 1.0.16 asset bundles: the Deep North Viking Graveyard (`ShipSetting02`/`ShipSetting03`, about 150 per world according to the wiki) buries gem pickables (`Pickable_MorkHallaTreasure`), and the Deep North shipwrecks bury a chest (`shipwreck_vikingship_chest`). Both get a 20 m `Beacon` only on the copy nested in the location prefab. After generation the objects are re-created from their standalone prefabs (`ZNetScene.CreateObject`), which have no Beacon, so the Wishbone misses them. The Black Forest, Swamp and Plains shipwreck chests (`shipwreck_karve_chest`) have the same gap.
+- Already detected in the Deep North: the graveyard and village chests (`TreasureChest_deepnorth_village`, 30 m, as the wiki says) and the Memorial Site chests (`TreasureChest_memorial_buried`, 40 m).
+- None of these chests is destroyed when emptied (`Container.m_autoDestroyEmpty` is off), so a looted chest keeps pinging until it is broken. Steam threads report this (search snippets). The wiki's Wishbone page says an opened object stops pinging; that is true for pickables and ore, not for chests.
+- We found no report of the missing beacons on Steam or on mod pages.
+
+| Mod | Status | Notes |
+|-----|--------|-------|
+| [Smart Wishbone](https://thunderstore.io/c/valheim/p/Goldenrevolver/Smart_Wishbone/) (Goldenrevolver) | v1.0.2, updated 2023-10-17, 1.0: unknown | Replaces the Wishbone's `SE_Finder` with its own finder: a YAML list of tracked prefabs with ranges and boss-key conditions, hotkeys to cycle targets, server sync. Its search skips every Beacon whose prefab is not in its YAML. It adds beacons only to `Destructible` objects in `Destructible.Awake`, so it cannot reach the graveyard gems (`PickableItem`) or the wreck chests (`Container`). MIT, [GitHub](https://github.com/Goldenrevolver/SmartWishbone). |
+| [Wishbone Direction](https://www.nexusmods.com/valheim/mods/3305) (MbIwA) | version unknown, updated 2026-04-10, 1.0: unknown (Nexus, search snippet) | A HUD arrow, world marker or compass toward a Wishbone target within 30 m (silver veins, muddy scrap piles, buried treasure and chests). Needs Jotunn. Whether it reads Beacons, and would then show the restored ones, is not documented. |
+| [Extended Wishbone Tweaks](https://www.nexusmods.com/valheim/mods/906) (MofoMojo) | v1.2, updated 2021-04-10, 1.0: dead (Nexus, search snippet) | Adds copper, tin and Deathsquitos as targets, and configurable ranges for silver, buried chests and mud piles. |
+| [Exploration](https://thunderstore.io/c/valheim/p/Smoothbrain/Exploration/) (Smoothbrain) | v1.0.4, updated 2026-02-05, 1.0: unknown | An exploration skill that also grows the Wishbone radius: it transpiles `SE_Finder.UpdateStatusEffect` and `Beacon.FindClosestBeaconInRange` to scale every Beacon's range ([source](https://github.com/blaxxun-boop/Exploration)). A larger range does not help objects that have no Beacon, but it will scale the restored ones. |
+| [Valheim Community Patch](https://thunderstore.io/c/valheim/p/MidnightMods/ValheimCommunityPatch/) (MidnightMods) | v0.30.1, updated 2026-09-29, 1.0: yes | Vanilla bug and performance fixes with no gameplay change. Its readme and changelog list no Wishbone or Beacon fix. |
+
+Also: Early Wishbone (Digitalroot; Eikthyr can drop the Wishbone), MagneticWishbone (Riintouge; turns it into an item magnet) and WishboneSlot-style mods change how the Wishbone is obtained, worn or used, not what it finds.
+
+**Inspiration**
+
+- **Status:** nobody fixes this. Every Wishbone mod works with the beacons the game already has or adds its own targets: Smart Wishbone adds beacons only to destructibles, and the dead Extended Wishbone Tweaks added copper, tin and Deathsquitos. None covers pickables or location chests.
+- **Idea:** restore the designers' own beacons: the same prefabs and the same 20 m range that the location prefabs set, and nothing else.
+- **Guard:** add a Beacon only when the object has none (Smart Wishbone checks children and parents before adding one), so a future game fix makes the mod a no-op.
+- **Extra:** an option to stop pinging emptied chests, which also stops a looted graveyard chest from hiding the gems beside it. Remove the chest's Beacon rather than filter `Beacon.FindClosestBeaconInRange`: Exploration transpiles that method and Smart Wishbone never calls it.
+- **Upstream:** the fix fits Valheim Community Patch's scope (vanilla bug fixes). Once ours is tested, offer it there or report it to Iron Gate.
 
 ---
 

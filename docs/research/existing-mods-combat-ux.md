@@ -19,176 +19,284 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
 
 ## Combat
 
-### Weapon revamp (Revamp): new moves on roll / jump / parry, a unique move per weapon type
+### Weapon revamp (Revamp): a slight rework with a roll attack, a parry attack and a jump attack
 
-**Coverage: partial.** Several recent mods add running and jump attacks, per-weapon "special" attacks, or a quickstep dash. None of them offers a coherent set of *context* moves: roll-attack, plunge from a jump, riposte after a parry, plus one signature move per weapon type, all feeling like vanilla.
+**Coverage: partial.** GCO already has jump attacks, but only inside a large overhaul. Parry follow-ups exist as a sped-up secondary counter (PPR) or as damage buffs (GrindstoneSkills' Riposte, Combat Momentum). No mod found adds a roll attack: the vanilla input buffer already lets an attack fire as a roll ends, and one mod suppresses part of that as an exploit. For livelier swings, GCO tunes lunge, attack movement and swing speed, and a few small mods cancel or chain attacks. Nobody ships the three context attacks as a light, standalone layer on the vanilla moveset.
 
 | Mod | Status | Notes |
 |---|---|---|
-| [Goo's Combat Overhaul (gnls)](https://thunderstore.io/c/valheim/p/gnls/GoosCombatOverhaul/) | v2.1.2, updated 2026-09-26, 1.0: yes (targets 1.0.16) | Souls-like overhaul. Running and jump attacks per weapon type (jump attack = press attack before landing), "planted" lunges, a hyperarmor system with 5 modes, stagger buildup rework, positional bonuses (Sneak, Flank, Execution, Counter). Uses YAML per-weapon profiles plus console commands. Needs ConditionalConfigSync. Reuses vanilla animations. Closed source. About 8.4K downloads. |
-| [SpecialAttack (MM94)](https://thunderstore.io/c/valheim/p/MM94/SpecialAttack/) | v1.2.2, updated 2026-09-27, 1.0: yes (rebuilt for Unity 6) | One special per weapon category (10 categories), on the secondary attack or a custom key. Examples: sword 3-hit chain, sledge aftershock rings, spear pin, knife smoke vanish. Extra hits unlock with skill level. Cooldown HUD. A "Quickstep" dash replaces the roll. Tagged AI Generated, under 1K downloads. |
-| [SecondaryAttacks (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/SecondaryAttacks/) | v1.2.13, updated 2026-09-27, 1.0: likely | New secondary attacks for bows, staves, bombs, every melee class and blood magic. YAML with per-prefab overrides, plus a list of usable animation names. Cooldown HUD, optional quickstep for knives and fists. About 12K downloads. |
-| [AttackCancleCounter (IDRdhnTM)](https://thunderstore.io/c/valheim/p/IDRdhnTM/AttackCancleCounter/) | v1.2.0, 2025-11-16, 1.0: unknown | Cancels an attack mid-animation into a parry or dodge, and allows a "counter" while chaining attacks. |
-| Related | | [Valheim Legends 1.0 port (momos3939)](https://thunderstore.io/c/valheim/p/momos3939/ValheimLegends/) (v0.7.10, 2026-09-11, 1.0: yes) has class abilities, including the Duelist's "Riposte" (parry and counter in one move). [GrindstoneSkills (MilkyTeam)](https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/) (v0.9.1, 2026-09-27) buffs your next attack after a parry. |
+| [Goo's Combat Overhaul (gnls)](https://thunderstore.io/c/valheim/p/gnls/GoosCombatOverhaul/) | v2.1.2, updated 2026-09-26, 1.0: yes (targets 1.0.16) | Souls-like overhaul. Jump attack: jump, then press primary before landing (a deliberate jump qualifies at once; stepping off a ledge needs 1 s of airtime). Running attack: sprint into primary. Both borrow a chain step of the family (often the finisher) with their own tuning, and a jump attack does not advance the combo. Also per-family lunge, attack movement, swing and recovery speed, block canceling after the hit, hyperarmor, and a "Counter" bonus against targets that are mid-attack. No roll attack and no parry attack. YAML per weapon, needs ConditionalConfigSync. Closed source, listed under AI Generated. About 8.6K downloads. |
+| [PPR – Perfect Parry & Reflect (LJS)](https://thunderstore.io/c/valheim/p/LJS/PPR/) | v1.2.6, updated 2026-09-26, 1.0: likely | A stricter perfect parry (0.1 s by default) opens a 1 s counter window: the secondary attack then plays at 2× animation speed, and damage taken is halved during the window. Also reflects blocked projectiles. Tagged AI Generated. About 2.5K downloads. |
+| [GrindstoneSkills (MilkyTeam)](https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/) | v0.10.0, updated 2026-09-29, 1.0: likely | "Riposte", a perk of its new Defense skill from level 25: an attack started within 2 s of a parry deals 25% more melee damage and staggers what it hits (not bosses). The parry window widens with Defense (0.35 s at 100). Server and every client. About 650 downloads. |
+| [Combat Momentum (SENEZ)](https://thunderstore.io/c/valheim/p/SENEZ/CombatMomentum/) | v1.0.0, 2026-07-10, 1.0: unknown | Each perfect parry adds a Momentum stack (up to 5, 10 s each): +10% damage and +8% attack speed per stack, and a 20% chance of double damage at 5 stacks. About 330 downloads. |
+| [SpecialAttack (MM94)](https://thunderstore.io/c/valheim/p/MM94/SpecialAttack/) | v1.2.2, updated 2026-09-27, 1.0: yes (rebuilt for Unity 6) | One special per weapon category (10 categories) on the secondary attack or a custom key, extra hits unlocked by skill level, cooldown HUD. A "Quickstep" dash replaces the roll. Tagged AI Generated, about 1K downloads. |
+| [SecondaryAttacks (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/SecondaryAttacks/) | v1.2.14, updated 2026-09-29, 1.0: yes (tagged Deep North) | New secondary attacks for every weapon class and Blood Magic. YAML with per-prefab overrides, plus a reference list of usable animation names. Optional quickstep for knives and fists. Tagged AI Generated. About 12.6K downloads. |
+| [AttackCancel (MrGay)](https://thunderstore.io/c/valheim/p/MrGay/AttackCancel/) | v1.27.0, updated 2026-09-14, 1.0: yes (requires Valheim 1.0.x) | Block during an attack cancels it into the block/parry state; Block + Jump cancels it into the vanilla directional roll. Tagged AI Generated. About 1.6K downloads. |
+| [AttackCancleCounter (IDRdhnTM)](https://thunderstore.io/c/valheim/p/IDRdhnTM/AttackCancleCounter/) | v1.2.0, 2025-11-16, 1.0: unknown | Cancels an attack mid-animation into a parry or dodge, and allows a "counter" when cancelling while chaining attacks. About 1.7K downloads. |
+| [Cancel Animation Cancels (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/Cancel_Animation_Cancels/) | v1.0.3, updated 2026-09-09, 1.0: yes (tagged Deep North) | The opposite view: treats vanilla block, dodge and emote cancels as exploits and restarts the combo after one (it watches a 0.25 s window after an attack). For unarmed, spears, axes, battleaxes and atgeirs, a dodge started right after an attack clears the queued attacks, and the primary attack is suppressed while block and attack are held during a dodge. A compatibility trap for a roll attack pressed mid-roll with block still held. Server-synced. Tagged AI Generated. About 1.3K downloads. |
+| [Sword Heavy Slash (Fai)](https://thunderstore.io/c/valheim/p/Fai/Sword_Heavy_Slash/) | v1.0.0, 2026-09-22, 1.0: yes (built for Valheim 1.0) | Swords play `dualaxes0` as their third combo hit and `greatsword2` as their secondary attack, and hide the shield during the heavy attack. Shows that other families' animation triggers play on a sword. Tagged AI Generated. About 80 downloads. |
+| [ChainAttacks (blacks7ar)](https://thunderstore.io/c/valheim/p/blacks7ar/ChainAttacks/) | v1.0.3, updated 2026-09-13, 1.0: yes (tagged Deep North) | After the first swing, the next combo swings skip their starting animation, so the chain flows continuously. About 5.5K downloads. |
+| Related | | [Valheim Legends 1.0 port (momos3939)](https://thunderstore.io/c/valheim/p/momos3939/ValheimLegends/) (v0.7.12, 2026-09-29, 1.0: yes) has the Duelist's "Riposte", an evasive stance that strikes back at incoming attacks. [WeaponArts (j1gA)](https://thunderstore.io/c/valheim/p/j1gA/WeaponArts/) (v0.14.1, 2026-09-26, 1.0: yes, tested with 1.0.16) gives one active art per weapon type on a key. [Quickstep (shudnal)](https://thunderstore.io/c/valheim/p/shudnal/Quickstep/) (v1.0.15, 2026-09-17, 1.0: yes) replaces the roll with a dash. [Movement (PIXPIX)](https://thunderstore.io/c/valheim/p/PIXPIX/Movement/) (v0.7.3, 2026-03-02, 1.0: unknown) has an airborne "Slam" on its own key and a landing roll. [WeaponsAttackAnimationManager (blacks7ar)](https://thunderstore.io/c/valheim/p/blacks7ar/WeaponsAttackAnimationManager/) ([Nexus 2708](https://www.nexusmods.com/valheim/mods/2708)) (v1.0.3, 2025-03-11, dead: deprecated) remapped primary and secondary animations per weapon; its README lists the vanilla attack animation names from before 1.0. |
 
 **Inspiration.**
-- **Borrow** GCO's input model (a running attack is a primary attack above a speed threshold; a jump attack is a primary attack before landing) and its idea of per-weapon YAML profiles. Also borrow SpecialAttack's skill-gated unlocks, which give progression a reason to exist.
+- **Vanilla today:** you can already swing in the air (no ground check in `Humanoid.StartAttack`), an attack pressed late in a roll fires as it ends (0.5 s input buffer), and a parry staggers the attacker, who then takes double damage. The three moments exist; they just play the normal swing.
+- **Borrow:**
+  - GCO's input rules for the jump attack (primary before landing after a deliberate jump, a second of airtime when stepping off a ledge) and its choice to borrow the family's finisher without advancing the combo.
+  - PPR's short counter window after a parry, and GrindstoneSkills' 2 s riposte window.
+  - Sword Heavy Slash's proof that other families' triggers play on a weapon, and the vanilla animation names listed by WeaponsAttackAnimationManager and SecondaryAttacks.
 - **What they get wrong:**
-  - Most of them overload the vanilla secondary attack or add a new key.
-  - Many spawn flashy projectiles (sword waves, exploding axes) that do not look like Valheim.
-  - GCO changes stamina, stagger, PvP and AI in one package, so you cannot adopt only the moveset.
+  - GCO only comes as a full overhaul (stamina, hyperarmor, PvP, enemy behaviour).
+  - PPR puts its counter on the secondary attack; GrindstoneSkills and Combat Momentum only add numbers.
+  - SpecialAttack and SecondaryAttacks add specials on the secondary slot or on new keys, with effects that do not look like Valheim.
+  - Nobody has a roll attack, and Cancel Animation Cancels even suppresses some attacks queued through a roll for some weapons.
 - **How ours can differ:**
-  - Keep the vanilla inputs and make moves depend on context: attack during or right after a roll = roll-attack; attack while airborne = plunge; attack inside a short window after a perfect block = riposte.
-  - Give each weapon type exactly one signature move.
-  - Build everything on the vanilla `ItemDrop.SharedData` attack data and the `Attack` class with existing animator states, so it stays multiplayer-safe.
-  - Hook the moves into the adrenaline revamp. Vanilla already awards adrenaline on a perfect block inside `Humanoid.BlockAttack` through a per-item perfect-block adrenaline value.
+  - A slight, standalone layer: the primary attack becomes a roll attack, a parry attack or a jump attack when started in a short window after that action, each with its own vanilla animation and a modest bonus. The secondary attack keeps its vanilla role.
+  - Optional light swing tuning (movement while swinging, lunge, tempo), mild by default.
+  - Technically client-only with vanilla animations; it ships as Both, with the server's settings for everyone.
+  - A per-move adrenaline bonus that the Adrenaline revamp can pay. The moves cost no adrenaline: the bar is kept for the trinket proc.
+  - Detect GCO, PPR, Cancel Animation Cancels and the quickstep mods, and warn or turn off the overlapping move.
 
-### Sneak revamp (Revamp): Sneak XP on sneak attacks, fewer early detections
+### Sneak revamp (Revamp): Sneak XP on sneak attacks, much stealthier when standing still
 
-**Coverage: partial.** SmartSkills already gives bonus Sneak XP on backstabs. Nothing current changes early-game detection. The one mod that did both is dead.
+**Coverage: partial.** The XP line is covered. SecondaryAttacks (1.0, updated 2026-09-29) grants Sneak XP whenever a hit triggers the vanilla backstab, detected on the victim's owner the way we planned it, and Goo's Combat Overhaul can award Sneak XP with its sneak bonus. Both ship inside large combat mods. SmartSkills does it too, but its Thunderstore build predates 1.0 (the GitHub source has a 1.0 fix). No mod makes a crouched player who stands still harder to see: current sneak mods scale movement speed, noise or the whole stealth curve with skill.
 
 | Mod | Status | Notes |
 |---|---|---|
-| [SmartSkills (Smoothbrain)](https://thunderstore.io/c/valheim/p/Smoothbrain/SmartSkills/) | v1.0.2, 2024-06-21, 1.0: unknown | Sneak raises backstab damage and gives bonus Sneak XP on a backstab. Also changes other skills (swim XP, catch-up XP). Open source: [blaxxun-boop/SmartSkills](https://github.com/blaxxun-boop/SmartSkills). About 120K downloads. |
-| [SNEAKer (blacks7ar)](https://thunderstore.io/c/valheim/p/blacks7ar/SNEAKer/) | v1.1.8, updated 2026-09-15, 1.0: yes (tagged Deep North) | Sneak movement speed scales with Sneak skill; configurable XP multiplier; ServerSync. About 138K downloads. |
-| [Valheim Combat Overhaul (Kyresel / leseryk)](https://thunderstore.io/c/valheim/p/Kyresel/CombatOverhaul/) ([Nexus 591](https://www.nexusmods.com/valheim/mods/591)) | v1.7.8, 2021-04, dead (deprecated) | Implemented exactly this idea: XP for a successful stealth attack (scaled by the weapon's backstab bonus, lower for projectiles) and less effective enemy detection at low Sneak skill. A 2022 reupload ([HHPatch](https://thunderstore.io/c/valheim/p/NotMyMods/CombatOverhaul_HHPatch/)) is also deprecated. |
-| [Goo's Combat Overhaul](https://thunderstore.io/c/valheim/p/gnls/GoosCombatOverhaul/) | see above | "Sneak" positional damage bonus against unaware targets, scaling with skill. |
+| [SecondaryAttacks (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/SecondaryAttacks/) | v1.2.14, updated 2026-09-29, 1.0: yes (tagged Deep North) | Mostly new secondary attacks (see Weapon revamp). Its General section also grants Sneak XP whenever any attack triggers the vanilla backstab (`Backstab Sneak Skill Raise Amount`, default 1, server-synced): a `Character.RPC_Damage` prefix and postfix on the victim's owner compare `m_backstabTime`, and an RPC sends the XP to the attacker's client. By default it also doubles the skill-based part of the crouched visibility reduction and the crouched speed at Sneak 100, and adds a knife "Sneak Ambush" that charges while crouched. Nothing depends on standing still. Tagged AI Generated, about 12.7K downloads. Source: [sighsorry1029/SecondaryAttacks](https://github.com/sighsorry1029/SecondaryAttacks). |
+| [SmartSkills (Smoothbrain)](https://thunderstore.io/c/valheim/p/Smoothbrain/SmartSkills/) | v1.0.2, updated 2024-06-21, 1.0: unknown | Sneak raises backstab damage, and every hit on an unaware enemy (not alerted, no target) gives bonus Sneak XP (20 by default). The source decides this on the attacker's client (`Character.Damage` prefix), with no crouch check and no cooldown. The repo got "fixes for 1.0" on 2026-09-12 (source version 1.0.3), not yet released on Thunderstore. Open source: [blaxxun-boop/SmartSkills](https://github.com/blaxxun-boop/SmartSkills). About 120K downloads. |
+| [SNEAKer (blacks7ar)](https://thunderstore.io/c/valheim/p/blacks7ar/SNEAKer/) | v1.1.8, updated 2026-09-15, 1.0: yes (tagged Deep North) | Sneak movement speed scales with Sneak skill; configurable Sneak XP multiplier; ServerSync. It rewards moving, not standing still. About 139K downloads. |
+| [Sneaky Viking (Brutaliaa)](https://thunderstore.io/c/valheim/p/Brutaliaa/Sneaky_Viking/) | v1.0.0, updated 2026-09-24, 1.0: yes (tagged Deep North) | Walking, running, jumping and dodging make less noise as Sneak rises (up to 80% less at skill 100). ServerSync. Source: [Brutaliaa/SneakyViking](https://github.com/Brutaliaa/SneakyViking). About 100 downloads. |
+| [SetUpSkills (Neocor)](https://thunderstore.io/c/valheim/p/Neocor/SetUpSkills/) | v0.1.0, updated 2026-09-22, 1.0: yes (built for 1.0.x) | Makes hard-coded skill numbers configurable, including the stealth curve at skill 100 (visibility in darkness, weight of light) and sneak stamina, through transpilers on `Player.UpdateStealth` and `Player.OnSneaking`. Nothing depends on movement. Source: [NeocorDK/SetUpSkills](https://github.com/NeocorDK/SetUpSkills). |
+| [Goo's Combat Overhaul (gnls)](https://thunderstore.io/c/valheim/p/gnls/GoosCombatOverhaul/) | v2.1.2, updated 2026-09-26, 1.0: yes (targets 1.0.16) | A "Sneak" damage bonus against unaware targets that scales with Sneak skill and, per its README, can award Sneak XP. No stillness rule. Part of a large combat overhaul (see Weapon revamp); tagged AI Generated, closed source, about 8.6K downloads. |
+| [Valheim Combat Overhaul (Kyresel / leseryk)](https://thunderstore.io/c/valheim/p/Kyresel/CombatOverhaul/) ([Nexus 591](https://www.nexusmods.com/valheim/mods/591)) | v1.7.8, updated 2021-04-22, 1.0: dead (deprecated) | Sneak XP for a successful sneak attack, the amount set by the weapon's backstab bonus and lower for projectiles, plus sneak-attack damage scaled by Sneak skill (half of vanilla at skill 0). Its README names early detection as a problem but leaves the detection formula unchanged. The reuploads are deprecated too: [HHPatch](https://thunderstore.io/c/valheim/p/NotMyMods/CombatOverhaul_HHPatch/) and blacks7ar's [CombatOverhaulREwrite](https://thunderstore.io/c/valheim/p/blacks7ar/CombatOverhaulREwrite/) (v1.2.5, 2025-03-11). |
+| Related | | [ImpactfulSkills (MidnightMods)](https://thunderstore.io/c/valheim/p/MidnightMods/ImpactfulSkills/) (v0.20.2, updated 2026-09-28) raises sneak speed with skill and reduces sneak noise from Sneak 50. [BetterStealthIndicator (Jaybirds)](https://thunderstore.io/c/valheim/p/Jaybirds/BetterStealthIndicator/) (v0.4.16, updated 2026-09-27, tagged AI Generated) is a clearer stealth HUD. |
 
 **Inspiration.**
 - **Vanilla today:**
-  - Sneak XP only comes from moving while sneaking near enemies (`Player.UpdateStealth` raises Sneak).
-  - The backstab multiplier is applied in `Character`'s damage handling. It only applies when the victim's AI is not alerted, and each creature can only be backstabbed once every 300 s.
-  - The stealth factor is a lerp between light level and Sneak skill (`Player.UpdateStealth`). At skill 0 the lerp starts high, which is why early-game sneaking feels useless.
+  - Sneak XP only comes from moving while crouched (`Player.OnSneaking`: 1 per second near unaware enemies, 0.1 otherwise). Standing still earns nothing.
+  - The sneak attack is the backstab in `Character.RPC_Damage`, decided on the victim's owner: damage × the weapon's backstab bonus when the victim is not alerted, at most once per 300 s per victim. It gives no XP.
+  - The stealth factor (`Player.UpdateStealth`) depends on crouching, light and Sneak skill only, never on movement, so holding still is no better than crawling.
+- **Borrow:**
+  - SecondaryAttacks' detection (compare `m_backstabTime` around `Character.RPC_Damage` on the victim's owner, then an RPC to the attacker), which confirms our design.
+  - Kyresel's lower XP for projectiles. Kyresel also paid more XP for a bigger backstab bonus; ours scales by the victim's max HP instead. SmartSkills' rule is simpler but pays for any hit on an unaware enemy and ignores the vanilla cooldown.
 - **Ours:**
-  - Grant Sneak XP on a backstab, scaled by creature tier or damage dealt.
-  - Flatten the low-skill end of the stealth curve, or give a bonus at night, in cover or in dark armor.
-  - Add a subtle readout on the existing stealth HUD element so players can learn the system. [BetterStealthIndicator (Jaybirds)](https://thunderstore.io/c/valheim/p/Jaybirds/BetterStealthIndicator/) is a UI reference for this.
-  - Keep Kyresel's design, but ship it maintained and server-synced.
+  - A clear "hold still" reward, which no mod offers: after a second without moving, a crouched player's stealth factor drops (for example it halves), shown by the vanilla stealth bar and a status icon. A floor keeps it from stacking with other stealth effects (for example the Sneak tiers of New ability depending on skill level) into full invisibility. Ambushes and bow shots from cover become a real tactic, and monster perception stays untouched.
+  - Sneak-attack XP in a small standalone mod, scaled by the victim's max HP with no floor (weak creatures pay almost nothing, training dummies nothing), for players who do not want a whole combat overhaul. It stays off when SecondaryAttacks, GCO or SmartSkills already pays sneak XP.
 
-### Trinket revamp (Revamp): passive effect plus an adrenaline boost
+### Trinket revamp (Revamp): a slightly weaker passive effect tied to the adrenaline revamp
 
-**Coverage: partial.** The exact concept exists as a small value tweak (BetterTrinkets). There is no deeper redesign.
+**Coverage: full.** BetterTrinkets does the mechanic as asked: an always-on weaker passive that a full bar doubles. It also has an unofficial 1.0 patch. Passive_Trinket_Modifiers and Balrond Battle Flow do the same with more control. What is left for us is the tie-in with our Adrenaline revamp.
 
 | Mod | Status | Notes |
 |---|---|---|
-| [BetterTrinkets (Schwifty)](https://thunderstore.io/c/valheim/p/Schwifty/BetterTrinkets/) | v1.0.0, 2026-02-28, 1.0: unknown | Trinket effects are always active as a weaker passive. Full adrenaline **doubles** the effect for the trinket's normal duration. All 13 trinkets have config values. The mod is client-side, which is a balance and multiplayer concern. About 2.6K downloads. |
-| [MultiTrinket (QQMZR)](https://thunderstore.io/c/valheim/p/QQMZR/MultiTrinket/) | v1.0.1, 2026-03-04, 1.0: unknown | For mods that add extra trinket slots: uses the highest adrenaline cost of all equipped trinkets and triggers all of them together. Source: [MoistMonster22/MultiTrinket](https://github.com/MoistMonster22/MultiTrinket). |
-| [ClassTrinkets (JamesJonesTV)](https://thunderstore.io/c/valheim/p/JamesJonesTV/ClassTrinkets/) | v1.0.2, 2026-02-12, 1.0: unknown | Adds 40 new trinkets (8 classes x 5 ranks) with static stats. This is new content, not a rework of the mechanic. |
+| [BetterTrinkets (Schwifty)](https://thunderstore.io/c/valheim/p/Schwifty/BetterTrinkets/) | v1.0.0, updated 2026-02-28, 1.0: unknown | Trinket effects are always active as a weaker passive, and a full bar **doubles** the effect for the trinket's normal duration. Config for all 13 pre-Deep North trinkets. Client-side, which is a balance concern in multiplayer. About 2.7K downloads. |
+| [BetterTrinkets Deep North Compat (Gabadur)](https://thunderstore.io/c/valheim/p/Gabadur/BetterTrinkets_Deep_North_Compat/) | v1.0.9, updated 2026-09-18, 1.0: yes (unofficial port) | AI-assisted binary patch of the BetterTrinkets DLL for Valheim 1.0, keeping its config. The two trinkets added by 1.0 are left out on purpose. About 440 downloads. |
+| [Passive_Trinket_Modifiers (Gabadur)](https://thunderstore.io/c/valheim/p/Gabadur/Passive_Trinket_Modifiers/) | v0.35.1, updated 2026-09-27, 1.0: yes (supports the Deep North Neckstabber and Witch Crown) | Standalone replacement for BetterTrinkets' passive handling. Each trinket has a passive section and a "doubled" section (values and duration while the full-bar doubling runs), a long list of `SE_Stats` fields can be set, and there is a global adrenaline gain multiplier. The one-shot health, stamina and eitr gains are left out. AI Generated tag, about 160 downloads. |
+| [Balrond Battle Flow (Balrond)](https://thunderstore.io/c/valheim/p/Balrond/balrond_battle_flow/) | see Adrenaline revamp | Every trinket is redesigned as a passive that scales from 0% at 0 adrenaline to 100% at 100 adrenaline. Tooltips show the current and maximum values. Surge and Overcharge at a full bar. |
+| [Surge (Ezomic)](https://thunderstore.io/c/valheim/p/Ezomic/Surge/) | see Adrenaline revamp | Per-trinket adrenaline costs. |
+| [MultiTrinket (QQMZR)](https://thunderstore.io/c/valheim/p/QQMZR/MultiTrinket/) | v1.0.1, updated 2026-03-04, 1.0: unknown | For extra trinket-slot mods (needs ExtraSlots and ExtraSlots Custom Slots): uses the highest cost of the equipped trinkets and triggers them all together. Source: [MoistMonster22/MultiTrinket](https://github.com/MoistMonster22/MultiTrinket). About 580 downloads. |
+| Related | | [ClassTrinkets (JamesJonesTV)](https://thunderstore.io/c/valheim/p/JamesJonesTV/ClassTrinkets/) (v1.0.2, 2026-02-12, 1.0: unknown) adds 40 static-stat trinkets: new content, not a rework. RPG Equipment ([Nexus 3992](https://www.nexusmods.com/valheim/mods/3992), per search snippets) has an option that divides the combined trinket cost by the number of trinkets equipped. |
 
 **Inspiration.**
 - **Vanilla:**
-  - A trinket contributes max adrenaline through `SharedData.m_maxAdrenaline` (summed as an equipment modifier in `Player`) and has a `m_fullAdrenalineSE`.
-  - When the bar fills, `Player.AddAdrenaline` applies the full-adrenaline status effect of every equipped item and resets the bar to 0.
-  - `Player` also has a tiered `m_adrenalineEffects` list (status effects by adrenaline level) that we could reuse for "build-up" tiers.
-- **Borrow** BetterTrinkets' split into a passive and a surge.
+  - A trinket adds adrenaline capacity (`SharedData.m_maxAdrenaline`).
+  - Its effect only exists after a full bar (`m_fullAdrenalineSE`, 30 to 120 s per the wiki). `Player.AddAdrenaline` applies it for every equipped item.
+  - An `m_equipStatusEffect` is applied on equip by `Humanoid.UpdateEquipmentStatusEffects` and already shows in the item tooltip, so a passive needs no UI work.
+- **Borrow:**
+  - BetterTrinkets' passive-plus-proc split;
+  - Passive_Trinket_Modifiers' separate passive and proc settings per trinket;
+  - Battle Flow's scaling with the bar, and its tooltips showing current and maximum values;
+  - Surge's per-trinket costs.
+- **What they get wrong:**
+  - BetterTrinkets is client-side and pre-1.0, and its 1.0 patch skips the two Deep North trinkets.
+  - Passive_Trinket_Modifiers drops the one-shot gains.
+  - Battle Flow gives 0% at an empty bar, so it still depends on the vanilla build-up, and it has no config yet.
 - **Ours:**
-  - Make the numbers server-authoritative.
-  - Show the passive and the surge separately in the tooltip.
-  - Consider a "build-up" tier that uses `m_adrenalineEffects` so a partly full bar also matters.
-  - Design it together with the adrenaline and boss-power revamps below, as one system.
+  - An always-on passive a bit weaker than the proc (config %), optionally growing with the bar.
+  - The vanilla proc on top, without stacking.
+  - Ships as Both: the server refuses players without the mod, and its numbers apply to everyone.
+  - All 15 vanilla trinkets.
+  - The Adrenaline revamp makes the bar fill at a steady pace.
 
-### Adrenaline revamp (Revamp): "it sucks, change it"
+### Adrenaline revamp (Revamp): faster build-up that is fair across weapons, and a trinket proc every fight
 
-**Coverage: partial.** The only mods found are numeric tweaks (gain, decay and delay multipliers). Nobody has redesigned how adrenaline is earned or spent.
-
-| Mod | Status | Notes |
-|---|---|---|
-| [AdrenalineModifier (mightywa33ior)](https://thunderstore.io/c/valheim/p/mightywa33ior/AdrenalineModifier/) | v1.0.1, 2025-10-05, 1.0: unknown | Multipliers for adrenaline growth, decay and decay delay. Source: [lukeadickinson/valhiem-adrenalinemodifier](https://github.com/lukeadickinson/valhiem-adrenalinemodifier). About 3K downloads. |
-| [BetterTrinkets](https://thunderstore.io/c/valheim/p/Schwifty/BetterTrinkets/) | see above | Turns adrenaline into a bonus on top of the passive effect instead of a gate. |
-| [ForsakenPowerOverhaul (momos3939)](https://thunderstore.io/c/valheim/p/momos3939/ForsakenPowerOverhaul/) | see Boss power | Makes guardian power activation feed the adrenaline boost. |
-
-**Inspiration.**
-- **Vanilla is highly data-driven:**
-  - Decay, decay delay and gain are driven by `AnimationCurve`s on `Player` (`m_adrenalineDegen`, `m_adrenalineDegenDelay`, `m_adrenalineGainMultiplier`).
-  - There is a world-level multiplier, `Game.m_adrenalineRate`.
-  - Status effects can modify gain through `SE_Stats.m_adrenalineModifier`, and give it up front through `m_adrenalineUpFront`.
-  - Individual actions give fixed amounts, for example `Player.m_staggerEnemyAdrenaline` and the perfect-block adrenaline mentioned above.
-  - Activating a guardian power adds a flat 10 (`Player.m_adrenalineGuardianPower`).
-- A pure numbers mod is therefore trivial, which is why that is all anyone has made.
-- **Ours can change the model:**
-  - Earn adrenaline from risky, skilled play: perfect blocks and dodges, backstabs, staggers.
-  - Slow the decay while in combat.
-  - Optionally let the player **spend** it on purpose, for example on a weapon signature move or a trinket surge, instead of the automatic pop.
-  - Keep one shared resource for trinkets, boss powers and weapon moves.
-
-### Boss power revamp (Revamp): same approach as trinkets
-
-**Coverage: full.** "Weaker passive plus an activatable burst" is a well-established idea with a very popular mod. Our only differentiator would be tying it into our adrenaline and trinket design.
+**Coverage: partial.** Number tweaks exist: gain, decay and decay-delay multipliers, a longer hold before decay, and trinket costs. Balrond Battle Flow also reworks what adrenaline does for trinkets and weapons. None of the mods found adds income while fighting (TastyAdrenaline trickles adrenaline in only while Tasty Mead is active), makes gains fair across weapon speeds, or aims at one trinket proc per fight.
 
 | Mod | Status | Notes |
 |---|---|---|
-| [PassivePowers (Smoothbrain)](https://thunderstore.io/c/valheim/p/Smoothbrain/PassivePowers/) | v1.1.5, Thunderstore release 2026-02-05, 1.0: unknown | Boss powers become weaker passives, with an optional short burst on activation. Some bosses get extra powers for balance. Server-enforceable. About 490K downloads. Source: [blaxxun-boop/PassivePowers](https://github.com/blaxxun-boop/PassivePowers). The repo was pushed on 2026-09-11, so a 1.0 build may be pending. |
-| [ForsakenPowerOverhaul (momos3939)](https://thunderstore.io/c/valheim/p/momos3939/ForsakenPowerOverhaul/) | v2.2.0, 2026-09-10, 1.0: yes (port of JuneGame's mod) | Four layers: a permanent passive when the trophy is offered, an "equipped" passive for the selected power, an active buff, and a shared buff while any power is active. Cycle powers with G. Integrates with the trinket slot, and activating a power triggers the adrenaline boost. Presets plus more than 3,300 config lines. Source: [JuneGame/Valheim.ForsakenPowerOverhaul](https://github.com/JuneGame/Valheim.ForsakenPowerOverhaul). |
-| [ProgressivePowers (MidnightMods)](https://thunderstore.io/c/valheim/p/MidnightMods/ProgressivePowers/) | v0.3.3, 2026-09-14, 1.0: yes (released after 1.0) | Powers become permanent passives that get stronger as you kill more bosses. |
-| [ForsakenPowersPlusRemastered (turbero)](https://thunderstore.io/c/valheim/p/turbero/ForsakenPowersPlusRemastered/) | v2.0.4, updated 2026-09-10, 1.0: likely | Switch between earned powers with a button; change duration and cooldown; passive mode or stacking. Source: [Turbero/ForsakenPowersPlusRemastered](https://github.com/Turbero/ForsakenPowersPlusRemastered). |
+| [Balrond Battle Flow (Balrond)](https://thunderstore.io/c/valheim/p/Balrond/balrond_battle_flow/) | v0.1.2, updated 2026-09-20, 1.0: yes (tagged Deep North Update) | "Adrenaline/Trinket system rework". Weapon-type bonuses grow with the bar, and trinkets scale from 0% power at 0 adrenaline to 100% at 100 adrenaline. A Surge holds the bar at max, then an Overcharge drains it with bonuses and drawbacks. Its README describes what adrenaline does, not how it is earned. Server and client, synced, no config yet. No source link (Discord only). About 2.7K downloads. |
+| [KeepAdrenalineLonger (zopthemop)](https://thunderstore.io/c/valheim/p/zopthemop/KeepAdrenalineLonger/) | v1.0.0, updated 2026-06-05, 1.0: unknown | Replaces the 6 to 10 s decay delay with a flat 15 s, through a transpiler on `Player.AddAdrenaline`. Source: [zopthemop/valheim-keepadrenalinelonger](https://github.com/zopthemop/valheim-keepadrenalinelonger) (AGPL-3.0). About 270 downloads. |
+| [AdrenalineModifier (mightywa33ior)](https://thunderstore.io/c/valheim/p/mightywa33ior/AdrenalineModifier/) | v1.0.1, updated 2025-10-05, 1.0: unknown | Multipliers for gain, decay and decay delay: a prefix on `Player.AddAdrenaline` scales gains and decay, and a postfix scales the decay timer. Source: [lukeadickinson/valhiem-adrenalinemodifier](https://github.com/lukeadickinson/valhiem-adrenalinemodifier) (MIT). About 3.2K downloads. |
+| [Surge (Ezomic)](https://thunderstore.io/c/valheim/p/Ezomic/Surge/) | v1.0.3, updated 2026-08-16, 1.0: unknown | Sets each trinket's adrenaline cost (multiplier, flat value or per trinket) by editing `SharedData.m_maxAdrenaline` live. Its README lists the 13 pre-1.0 vanilla costs read from the game (10 to 100) and says the player's own base is 0. Source: [Ezomic/valheim-surge](https://github.com/Ezomic/valheim-surge) (MIT). AI Generated tag, about 170 downloads. |
+| [RageNAdrenaline (Jawlessjman665)](https://thunderstore.io/c/valheim/p/Jawlessjman665/RageNAdrenaline/) | v1.2.0, updated 2026-09-26, 1.0: yes (tagged Deep North Update) | Two extra meters from Terraria's Calamity mod. Rage fills while enemies are near and is spent with a key. A boss-only Adrenaline meter resets when you are hit. Both are separate from the vanilla bar and trinkets. Needs Jötunn. Source: [jawlessjman/RageNAdrenaline](https://github.com/jawlessjman/RageNAdrenaline) (MIT), also on Nexus (3362). About 16 downloads. |
+| [GrindstoneSkills (MilkyTeam)](https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/) | v0.10.0, updated 2026-09-29, 1.0: likely | Its Defense skill gives up to 25% more adrenaline from blocks and parries, and 25% less lost to unblocked hits, through a prefix on `Player.AddAdrenaline`. Source: [geraldjglasgow/ValheimMods](https://github.com/geraldjglasgow/ValheimMods/tree/main/GrindstoneSkills). About 640 downloads. |
+| Related | | [TastyAdrenaline (RiftWood)](https://thunderstore.io/c/valheim/p/RiftWood/TastyAdrenaline/) (v1.0.1, 2026-09-25, 1.0: yes) gives +1 adrenaline every 2 s while Tasty Mead is active (AI Generated, about 40 downloads). [BetterTrinkets](https://thunderstore.io/c/valheim/p/Schwifty/BetterTrinkets/) and [Passive_Trinket_Modifiers](https://thunderstore.io/c/valheim/p/Gabadur/Passive_Trinket_Modifiers/) (see Trinket revamp) make trinkets work without a full bar; the latter also has a global gain multiplier. With [ForsakenPowerOverhaul](https://thunderstore.io/c/valheim/p/momos3939/ForsakenPowerOverhaul/), activating a power triggers the trinket boost. |
 
 **Inspiration.**
-- **What they get wrong.** FPO's 3,300 config lines show that making powers passive leads to a balance explosion.
+- **Vanilla today:**
+  - No trinket, no bar. The player's own max is 0 (Surge's README; the code default is 100), so gains are ignored.
+  - Gains per the wiki:
+    - +1 per hit for one-handed weapons;
+    - +2 per hit for two-handed weapons, polearms, bows and crossbows;
+    - parry +5, perfect dodge +5, block +1 or +2, stagger +3, Forsaken power +10.
+  - The bar drains after 6 to 10 s without a gain, at 1 to 4 per second.
+  - Why bows fall behind:
+    - melee pays per character hit in a swing (`Attack.DoMeleeAttack`);
+    - an arrow pays once, with no enemy multiplier (`Projectile.OnHit`);
+    - a bow's draw only gets shorter with skill (`Humanoid.GetAttackDrawPercentage`).
+  - A Steam thread ("trinkets need a rework", 2025-09) says the build-up is too slow and asks for passives. A player's reply there explains that the decay delay shrinks from 10 to 6 s as the bar fills, and that an AoE weapon that staggers several mobs earns several chunks per hit.
+- **Borrow:**
+  - KeepAdrenalineLonger's longer hold, tied to the end of combat instead of a flat delay;
+  - RageNAdrenaline's "fills while enemies are near" and TastyAdrenaline's per-tick trickle, as income;
+  - Battle Flow's framing of adrenaline as combat momentum.
+- **What they get wrong:**
+  - The number mods scale every source alike, so bows stay behind swords.
+  - Battle Flow changes what the bar does, not how fast it fills.
+  - RageNAdrenaline adds a second meter instead of fixing the vanilla one, and TastyAdrenaline's income depends on a mead, not on fighting.
 - **Ours:**
-  - Build it as a thin layer on our adrenaline system: a small passive per defeated boss plus an adrenaline-fuelled surge, with no separate cooldown economy.
-  - Otherwise, simply recommend the existing mods and skip this idea.
+  - Income while fighting that grows with the number of enemies engaged.
+  - Weapon gains per second of attacking, so every weapon fills at the same pace.
+  - A kill bonus.
+  - A hold after combat, so chained lone fights add up.
+  - Tuned so a mid-cost trinket procs about once per real fight.
+  - Technically client-only; ships as Both, so the server refuses players without the mod and its settings apply to everyone.
 
-### Ballista revamp (Revamp): better AI, target assignment
+### Boss power revamp (Revamp): slightly stronger Forsaken powers
 
-**Coverage: partial.** Several mods expose targeting and range settings, and one adds lead prediction. None coordinates several turrets or offers target priorities.
-
-| Mod | Status | Notes |
-|---|---|---|
-| [BetterBallistas (Neobotics)](https://thunderstore.io/c/valheim/p/Neobotics/BetterBallistas/) | v1.0.0, updated 2026-09-11, 1.0: yes | Toggle targeting of enemies, tames and players; detection range; firing arc up to 180 degrees; ammo cap; unlocks the vanilla one-trophy limit; scan and turn-rate tuning. About 21K downloads. |
-| [Turrets Redo (MrGay)](https://thunderstore.io/c/valheim/p/MrGay/Turrets_Redo/) | v0.0.4, 2026-09-21, 1.0: likely | Lead shots using target velocity and projectile speed, spread control, ignores players, tames and friendly Dvergr (with optional projectile immunity), infinite ammo option. Needs ConditionalConfigSync. Tagged AI Generated, about 200 downloads. |
-| [ValheimFortress (MidnightMods)](https://thunderstore.io/c/valheim/p/MidnightMods/ValheimFortress/) | v0.37.2, 2026-09-18, 1.0: likely | Wave-arena mod that also changes ballista targeting: the ballista shoots whenever the shot would hit *any* hostile, not only its primary target. |
-| [ImFRIENDLY DAMMIT (Azumatt)](https://thunderstore.io/c/valheim/p/Azumatt/ImFRIENDLY_DAMMIT/) | date not checked | Ballistas never hit you or your tames. Overrides BetterBallistas' settings for players and tames. |
-
-**Inspiration.**
-- **Vanilla `Turret`:**
-  - Has `m_targetPlayers`, `m_targetTamed` and `m_targetEnemies` flags.
-  - Supports trophy-based target filtering (`m_configTargets`, `m_maxConfigTargets = 1`).
-  - Has a basic `m_predictionModifier` and near and far target-update intervals (`Turret.UpdateTarget`).
-- **What nobody does:**
-  - A **shared target registry**, so that neighbouring ballistas do not all shoot the same greyling.
-  - **Priority rules**: closest, highest threat, attacking a structure, or low HP.
-  - Line-of-fire checks against friendly pieces.
-- **Borrow** lead prediction from Turrets Redo and "shoot if the path hits any hostile" from ValheimFortress.
-
-### Mob AI revamp (Revamp): flee when scared, avoid strong players, do not get stuck when rooted or frozen
-
-**Coverage: partial.** Two 2026 mods implement fear and "respect" of strong players. Several data editors expose the vanilla flee settings. Nothing addresses creatures getting stuck after crowd control.
+**Coverage: full.** Longer buffs and shorter cooldowns are one config line in ValheimPlus and ForsakenPowersPlusRemastered, and BossRules can edit any stat per power. Only a small, curated "slightly stronger" preset is missing.
 
 | Mod | Status | Notes |
 |---|---|---|
-| [The Mark of Oden (PicSoul)](https://github.com/PicSoul/TheMarkOfOden) | GitHub only, created 2026-09-16, pushed 2026-09-24, 1.0: likely | Creatures judge threat from **bosses killed and species kill count, not gear**. States: Wary (will not start a fight), Fleeing, Provoked, Unafraid. Nerve depends on pack size, night and star level. Prey animals always fight back. Raid and boss-summoned creatures ignore fear. Nameplate colours show the state. Uses ServerSync. No Thunderstore or Nexus listing found. |
-| FleeOnSight ([Nexus 2764](https://www.nexusmods.com/valheim/mods/2764)) | Nexus only, date unknown (page blocked) | Listed creatures flee as soon as they are alerted, gated by bosses killed. Default: Greylings fear you after Eikthyr, Greydwarfs after the Elder. |
-| Monster AI Tweaks ([Nexus 758](https://www.nexusmods.com/valheim/mods/758), [Thunderstore](https://thunderstore.io/c/valheim/p/tweaks/MonsterAITweaks/)) | Thunderstore v0.4.0, 2022-11, 1.0: unknown (Nexus shows activity into 2026) | Per-monster target preferences (players or buildings), alertness, fire fear, sight and hearing ranges. The Nexus version adds flee and chase behaviour by diet (herbivore, carnivore, omnivore) and "use the surroundings" (for example, run into water when burning). |
-| [MonsterDB (RustyMods)](https://thunderstore.io/c/valheim/p/RustyMods/MonsterDB/) | v0.4.0, 2026-09-20, 1.0: likely | YAML editing and cloning of creatures, including the flee fields on `MonsterAI`, custom factions, attacks and spawn data. The RRR successor. Source: [RustyMods/MonsterDB](https://github.com/RustyMods/MonsterDB). |
+| [ValheimPlus, Grantapher fork](https://thunderstore.io/c/valheim/p/Grantapher/ValheimPlus_Grantapher_Temporary/) | v10.2.0, updated 2026-09-20, 1.0: yes (tagged Deep North Update) | `guardianBuffDuration` (default 300) and `guardianBuffCooldown` (default 1200) in the `[Player]` section of `valheim_plus.cfg`, synced with the rest of V+. About 360K downloads. |
+| [ForsakenPowersPlusRemastered (turbero)](https://thunderstore.io/c/valheim/p/turbero/ForsakenPowersPlusRemastered/) | v2.0.4, updated 2026-09-10, 1.0: yes (tagged Deep North Update) | Duration and cooldown config (defaults 300 and 1200 s), cycling through earned powers with a key, reset, passive mode and stacking. ServerSync. Source: [Turbero/ForsakenPowersPlusRemastered](https://github.com/Turbero/ForsakenPowersPlusRemastered). About 17K downloads. |
+| [BossRules (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/BossRules/) | v1.1.3, updated 2026-09-29, 1.0: yes (tagged Deep North Update) | YAML edits per power: duration, cooldown, regen, damage, armor, speed, skills, resistances, and the adrenaline gained on activation. Its README compares the vanilla rows (300 s / 1200 s for all seven powers, from DataForge's effects reference) with its own preset. That preset is a full rework (31 s buff, 120 s cooldown), not a slight boost. Also remote power rotation and boss-altar rules. AI Generated tag, about 8.5K downloads. |
+| [EasyVitals (s6652289)](https://thunderstore.io/c/valheim/p/s6652289/EasyVitals/) | v1.0.0, updated 2026-09-17, 1.0: likely | Boss power duration ×2 (the 20-minute cooldown unchanged) among other multipliers. Client-only, no sync. AI Generated tag, about 120 downloads. |
+| [ForsakenPowersRadius (turbero)](https://thunderstore.io/c/valheim/p/turbero/ForsakenPowersRadius/) | v1.0.1, updated 2026-09-12, 1.0: yes (tagged Deep North Update) | Raises the 10 m sharing radius (10 to 200 m), with a server-enforced option. The linked GitHub repository returns 404. About 600 downloads. |
+| [PassivePowers (Smoothbrain)](https://thunderstore.io/c/valheim/p/Smoothbrain/PassivePowers/) | v1.1.5, updated 2026-02-05, 1.0: unknown | The passive alternative: weaker permanent powers, with an optional short burst on activation. The repository ([blaxxun-boop/PassivePowers](https://github.com/blaxxun-boop/PassivePowers)) was pushed on 2026-09-11. About 490K downloads. |
+| Related | | Duration and cooldown config without sync: [ForsakenPowersRevisited (Gerbesh)](https://thunderstore.io/c/valheim/p/Gerbesh/ForsakenPowersRevisited/) (v1.0.0, 2026-01-14, 1.0: unknown). Passive models: [ForsakenPowerOverhaul](https://thunderstore.io/c/valheim/p/momos3939/ForsakenPowerOverhaul/) (v2.2.0, 2026-09-10, 1.0: yes), [ProgressivePowers](https://thunderstore.io/c/valheim/p/MidnightMods/ProgressivePowers/) (v0.3.3, 2026-09-14, 1.0: yes), [PassivePowers (Jawlessjman665)](https://thunderstore.io/c/valheim/p/Jawlessjman665/PassivePowers/) (v1.2.3, 2026-09-27, 1.0: yes). Shorter waits: [ForsakenRest](https://thunderstore.io/c/valheim/p/JXR_Creations/ForsakenRest/) and [PowerCooldownOnSleep](https://thunderstore.io/c/valheim/p/VibeODrone/PowerCooldownOnSleep/) clear or advance the cooldown when you sleep. |
 
 **Inspiration.**
-- **Vanilla `MonsterAI` already has most flee settings**, and most prefabs leave them unused:
-  - `m_fleeIfLowHealth`, `m_fleeIfNotAlerted`, `m_fleeIfHurtWhenTargetCantBeReached`, `m_fleeTimeSinceHurt`.
-  - `m_crownFearRange`: the 1.0 Crown of Valheim makes ordinary creatures flee.
-  - `BaseAI` has `m_fleeRange` and `m_fleeAngle`.
-- Data editors (MonsterDB, Monster AI Tweaks) only set these values.
-- **Borrow** Mark of Oden's "progression, not gear" threat model: it cannot be cheesed by borrowing armor.
-- **Ours adds behaviour instead of data:**
-  - Morale breaks: flee at low HP, or when the pack leader dies.
-  - Weak creatures give a clearly out-levelled player a wide berth.
-  - An **unstick routine** after root, freeze or stagger: re-path, hop, or reposition when the creature has not moved toward its target for N seconds. Nobody has done this.
-- The AI runs on the zone owner, so all logic must work for whichever client owns the creature.
-- [Valheim Community Patch](https://thunderstore.io/c/valheim/p/MidnightMods/ValheimCommunityPatch/) (v0.30.0, 2026-09-27) fixes a related vanilla bug: creatures stuck at 0 HP.
+- **Vanilla:**
+  - A power is one `SE_Stats` (`GP_*`) with `m_ttl` (buff length) and `m_cooldown`.
+  - `Player.ActivateGuardianPower` shares it by hash with players within 10 m, adds 10 adrenaline, and starts the cooldown from the activator's copy.
+  - Each receiver uses its own `ObjectDB` copy of the effect, so data edits are enough.
+- **What they get wrong:**
+  - The config mods leave the "how much" to the user.
+  - BossRules' preset changes the powers' character.
+  - EasyVitals doubles the duration without sync.
+- **Ours:**
+  - A tiny data-only mod with a curated preset: a bit longer, a bit sooner, a bit stronger.
+  - The same model and radius, with per-power multipliers applied from stored originals.
+  - The vanilla tooltip shows the new numbers.
+  - Ships as Both: the server refuses players without the mod, and its multipliers apply to everyone.
+  - Otherwise, recommend a ValheimPlus or ForsakenPowersPlusRemastered config and skip this idea.
 
-### Training dummies can attack enemies (Revamp)
+### Blood trinket (New): drop to 15% HP on proc, then heal back
 
-**Coverage: none.** The only related mod goes the opposite way: dummies hunt *players*.
+**Coverage: none.** No trinket or item was found that sets the player's HP low on purpose for a timed window. The related mods reward or protect low HP.
 
 | Mod | Status | Notes |
 |---|---|---|
-| [TouchGrass (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/TouchGrass/) | v1.0.7, 2026-09-10, 1.0: likely | DPS and XP training meter, configurable dummy damage, "dummies can hunt players at night", and anti-macro stationary fatigue. |
-| [DPS (JereKuusela)](https://thunderstore.io/c/valheim/p/JereKuusela/DPS/) | v1.7.0, 2026-09-10, 1.0: likely | Spawn, reset and kill dummy commands, with configurable resistances and status effects. A test tool, not a gameplay feature. |
-| [OdinTrainingPlace (OdinPlus)](https://thunderstore.io/c/valheim/p/OdinPlus/OdinTrainingPlace/) | v1.6.6, 2026-09-19, 1.0: yes | Its dummies are passive; none of them attacks anything. |
+| [GrindstoneSkills (MilkyTeam)](https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/) | v0.10.0, updated 2026-09-29, 1.0: likely | Defense skill. "Desperation" doubles damage reduction below 25% health. "Last Stand" (level 100) leaves you at 1 HP and untouchable for 2 s on a killing blow. Would soften our window. |
+| [UndyingAmulet (Gamesmodding)](https://thunderstore.io/c/valheim/p/Gamesmodding/UndyingAmulet/) | v1.1.1, updated 2026-09-27, 1.0: yes (needs Valheim 1.0.15 or newer) | Cheat death from the inventory: a lethal hit restores 50% health with 30 s of immunity, on a 30 min cooldown. While it is ready, it also gives +50% sprint speed, half stamina costs and 20% lifesteal. Needs Jötunn. AI Generated tag, about 130 downloads. |
+| [EpicLoot (RandyKnapp)](https://thunderstore.io/c/valheim/p/RandyKnapp/EpicLoot/) | v0.14.13, updated 2026-09-24, 1.0: yes | "LowHealth" variants of magic effects apply at 30% HP or less by default. Blood shardstones such as Bloodrage (see Blood stone revamp in the backlog). About 2.26M downloads. |
+| [JardsAdditions (jard_hu)](https://thunderstore.io/c/valheim/p/jard_hu/JardsAdditions/) | v2.1.0, updated 2025-12-15, 1.0: unknown | Optional bloodstone vampirism (off by default) that grows with missing HP. About 2.2K downloads. |
+| [ValheimLegends (momos3939)](https://thunderstore.io/c/valheim/p/momos3939/ValheimLegends/) | v0.7.12, updated 2026-09-29, 1.0: yes | Class mod. The Berserker trades health for speed and damage. AI Generated tag, about 4.6K downloads. |
 
 **Inspiration.**
-- **Vanilla 1.0** has the T.W.I.G. training dummy (Call to Arms). It uses its own faction, `Character.Faction.TrainingDummy`, and `BaseAI.IsEnemy` makes that faction hostile **only to Players**.
-- One faction rule and a target-selection hook are enough to make dummies decoys that draw aggro, or sparring partners that hit monsters. There is no prior art.
-- **Watch out for:** balance as a base defence (keep damage low, or make them decoys only), and the trap of farming skill XP by letting monsters fight a dummy.
+- **Vanilla:**
+  - Bloodstone weapons already reward low HP: `Attack.ModifyDamage` adds `m_damageMultiplierPerMissingHP` per missing HP (wiki: 0.2%).
+  - Blood-magic costs are a share of current HP.
+  - Going low today means casting a blood staff or taking hits.
+- **Borrow:**
+  - GrindstoneSkills' and UndyingAmulet's low-HP safety nets, as an optional 1 HP floor during the window;
+  - EpicLoot's 30% "low health" threshold, as a reference point.
+- **Ours:**
+  - A trinket proc that makes the bloodstone bonus peak for 10 s, then gives the HP back, with no eitr and no weapon swap.
+  - It pairs with the Blood stone revamp's blood rite, but that idea's lifesteal does nothing during the window, while HP is clamped.
+  - The Trinket revamp gives it no passive, because its proc is not an `SE_Stats`.
+
+### Ballista revamp (Revamp): turns and shoots faster, aims better, several targets per ballista
+
+**Coverage: partial.** ReBallista (first released 2026-09-13) now does much of "better aim, turns faster" for the vanilla ballista: lead from velocity and flight time, faster tracking, no spread, a lower aim on short creatures, and homing bolts. BetterBallistas, ZenWorldSettings and MultiTargetBallista lift the one-trophy limit. For the vanilla ballista, no mod says it keeps its target until it dies, prefers a target it can hit, or keeps tracking while it reloads (vanilla: the closest creature, re-picked every second). ValheimFortress's Automated Ballista and Zarkow Turret Defense have such target rules, but only for their own new pieces.
+
+| Mod | Status | Notes |
+|---|---|---|
+| [ReBallista (Skarif)](https://thunderstore.io/c/valheim/p/Skarif/ReBallista/) | v1.0.416, updated 2026-09-29, 1.0: yes (tagged Deep North Update) | Never targets players or tames. Leads shots from the target's velocity and the bolt's flight time. Reworked turning and acceleration for a fast traverse. Lowers the aim point for short creatures (Ticks, Necks, Leeches). Removes spread. Bolts home in, up to 65 degrees per second within 25 m. About 2.5K downloads; no source link. |
+| [BetterBallistas (Neobotics)](https://thunderstore.io/c/valheim/p/Neobotics/BetterBallistas/) | v1.0.0, updated 2026-09-11, 1.0: yes | Number of target trophies per ballista (its README notes that vanilla code already supports several). Targeting toggles for enemies, tames and players, detection range, firing arc up to 180 degrees, ammo cap. Scan arc, sweep interval and turn rate, but the turn rate only applies while scanning with no target. About 21K downloads. |
+| [ZenWorldSettings (ZenDragon)](https://thunderstore.io/c/valheim/p/ZenDragon/ZenWorldSettings/) | v1.13.1, updated 2026-09-23, 1.0: yes (tagged Deep North Update) | Turret settings: max trophy targets (default 2, vanilla 1), no player or tame targeting, max ammo. With ZenHoverItem, the assigned trophies show as icons on hover. Part of a larger world-settings mod, about 100K downloads. |
+| [MultiTargetBallista (Marchiori)](https://thunderstore.io/c/valheim/p/Marchiori/MultiTargetBallista/) | v1.0.5, updated 2026-09-28, 1.0: yes (tagged Deep North Update) | Building a chest on a ballista gives it an inventory: trophies placed inside set several targets, and ammo goes in too. This replaces the vanilla hotbar flow for trophies and ammo. Tagged AI Generated, about 80 downloads. |
+| [Turrets Redo (MrGay)](https://thunderstore.io/c/valheim/p/MrGay/Turrets_Redo/) | v0.0.4, updated 2026-09-21, 1.0: yes (tagged Deep North Update) | Turn speed, projectile speed, view distance and attack rate as percentages of vanilla. Lead shots from position, collider centre, velocity and projectile speed. Spread off, or compensated for range. Ignores players, tames and friendly Dvergr (optional projectile immunity). Infinite ammo; bolts no longer hit their own turret. Needs ConditionalConfigSync. Tagged AI Generated, about 200 downloads. |
+| [ValheimPlus (Grantapher fork)](https://thunderstore.io/c/valheim/p/Grantapher/ValheimPlus_Grantapher_Temporary/) | v10.2.0, updated 2026-09-20, 1.0: yes (tagged Deep North Update) | `[Turret]` section, off by default: turn rate, attack cooldown, view distance, projectile velocity and accuracy, ignore players, unlimited ammo. |
+| [BottleShips (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/BottleShips/) | v1.1.14, updated 2026-09-26, 1.0: yes (tagged Deep North Update) | "Ballista Targeting Tweaks": trophy targets come first but other hostiles stay valid; players, tames and `PlayerSpawned` creatures are never picked. Also an ammo capacity multiplier. |
+| [TurretRevamped (blacks7ar)](https://thunderstore.io/c/valheim/p/blacks7ar/TurretRevamped/) | v1.0.4, updated 2026-09-17, 1.0: yes (tagged Deep North Update) | Attack cooldown, max ammo, horizontal and vertical angle; reloads from nearby chests; no player or tame targeting. About 26K downloads. |
+| [ValheimFortress (MidnightMods)](https://thunderstore.io/c/valheim/p/MidnightMods/ValheimFortress/) | v0.37.2, updated 2026-09-18, 1.0: yes (tagged Deep North Update) | Wave-arena mod with its own "Automated Ballista" piece, driven by its own component (`VFTurret`); the vanilla ballista is unchanged. From its source ([MidnightsFX/Valheim_Fortress](https://github.com/MidnightsFX/Valheim_Fortress), `VFTurret.cs`): it keeps its target until the target dies, picks the closest valid enemy it has a clear line to (raycast), skips players, tames and (by config) passive animals, and can check the line of fire again before each shot. About 107K downloads. |
+| [Zarkow Turret Defense (DigitalSoftware)](https://thunderstore.io/c/valheim/p/DigitalSoftware/Zarkow_Turret_Defense/) | v1.4.1100, updated 2026-09-16, 1.0: yes (tagged Deep North Update) | New sci-fi turret pieces, not the ballista. Threat-based target choice: creatures of the ForestMonsters faction that are not alerted are only attacked within half the range; targets are re-acquired every 0.4 s, closest attackable first; threats behind walls are tracked but not shot; some missile turrets split their payload between several targets. About 87K downloads. |
+| Related | | Friendly fire only: [ServersideQoL SmartDefense (ArgusMagnus)](https://thunderstore.io/c/valheim/p/ArgusMagnus/ServersideQoL_SmartDefense/) (v2.1.0, updated 2026-09-25, 1.0: likely; server-side only, also reloads from containers) and [ImFRIENDLY DAMMIT (Azumatt)](https://thunderstore.io/c/valheim/p/Azumatt/ImFRIENDLY_DAMMIT/) (v1.1.9, updated 2025-03-14, 1.0: dead, deprecated). [G3A3 (G3A1)](https://thunderstore.io/c/valheim/p/G3A1/G3A3/) (v1.9.75, updated 2026-09-29, 1.0: likely) lists a "smart ballista" setting in a large gameplay pack, without details. [NoobBallista (GsiX)](https://thunderstore.io/c/valheim/p/GsiX/NoobBallista/) (v1.3.9, updated 2024-08-06, 1.0: unknown) is a separate ballista piece that ignores players and tames and, since 1.3.1, abandons a target when its line is blocked. |
+
+**Inspiration.**
+- **Why vanilla ballistas miss** (from the code, with ServersideQoL's 1.0 component dump of `piece_turret`; details in `docs/game/combat.md` §12):
+  - The last degrees of turning slow down in proportion to the remaining angle, and the ballista only fires within about 1.6°. A creature whose bearing changes faster than about 6° per second is followed but never shot.
+  - The turret does not move during its 2 s reload.
+  - The lead uses only the x and y distance and is doubled.
+  - The aim is taken from the turret body's pivot, while the bolt leaves from the eye.
+  - The target is re-picked every second, so a closer creature steals it.
+- **Borrow:**
+  - ReBallista's lower aim point for short creatures, and optional spread removal.
+  - BottleShips' "trophy kinds first, other hostiles after" as an option.
+  - Trophy icons on hover (ZenHoverItem) once a ballista holds several trophies.
+  - BetterBallistas' finding: vanilla code already handles several trophies, only `m_maxConfigTargets = 1` blocks it.
+  - The target rules of ValheimFortress's Automated Ballista (keep the target until it dies, pick the closest enemy with a clear line) and Zarkow's threat levels.
+- **What they skip or get wrong:**
+  - No mod applies such target rules to the vanilla ballista, and none keeps it tracking during the reload.
+  - ReBallista's homing bolts fix misses by bending the bolt, which does not look vanilla.
+  - MultiTargetBallista replaces the vanilla trophy flow with a chest.
+- **Ours:** vanilla-looking ballistas that turn visibly faster, lead correctly, keep a target until it dies and accept several trophies through the vanilla hotbar flow. Friendly fire stays with the mods above.
+
+### Mob AI revamp (Revamp): weak enemies leave strong players alone, packs flee when their leader dies
+
+**Coverage: partial.** The first two lines are now well covered. TruePassiveMobs (released 2026-09-28) does almost exactly them, including boars and necks that leave you alone and enemies that fight back when hit, and FearMe, Odin's Ótti and the unreleased 0.4.0 source of The Mark of Oden also make outclassed enemies leave you alone. Nobody makes a pack flee when its leader dies. The closest are Odin's Ótti, whose pack courage drops when a big ally is gone (but a provoked pack fights to the death), The Mark of Oden, where a creature in a fight breaks sooner as its packmates fall, and Monster AI Tweaks, where the last member of a small group flees (Nexus snippet).
+
+| Mod | Status | Notes |
+|---|---|---|
+| [TruePassiveMobs (lhoffl)](https://thunderstore.io/c/valheim/p/lhoffl/TruePassiveMobs/) | v1.1.0, updated 2026-09-28, 1.0: yes (built for 1.0) | Two features. Passive creatures (Lox, Asksvin, Moose, Boar, Hen, Neck, Bjorn by default) ignore players until damaged, then fight back for a while; skittish and territorial variants. Enemies flee from a player whose gear outclasses them: their strongest attack after your armor and resistances deals at most 10% of your max HP, and/or your weapon kills them in 3 hits or fewer, counting stars, world difficulty and player count. Attacked enemies fight back; raid creatures never flee. Stores each player's combat profile in the player ZDO and prefix-skips `MonsterAI.UpdateAI` (with a `BaseAI.UpdateAI` reverse patch). Needs Jötunn; required on the server and every client. MIT: [lhoffl/TruePassiveMobs](https://github.com/lhoffl/TruePassiveMobs). About 200 downloads. |
+| [FearMe (tulivu)](https://thunderstore.io/c/valheim/p/tulivu/FearMe/) | v1.0.1, updated 2026-09-19, 1.0: yes (updated for Deep North) | Enemies compare your equipped gear tier (per-biome config) with their own. "Cautious" ignores you (a `BaseAI.FindEnemy` postfix returns no target); "Afraid" flees (a transpiler adds a flee branch just before the `m_fleeIfHurtWhenTargetCantBeReached` check in `MonsterAI.UpdateAI`). MIT: [tulivu/ValheimMods](https://github.com/tulivu/ValheimMods/tree/main/src/FearMe). About 11K downloads. |
+| [Odin's Ótti (DrakosDJ)](https://thunderstore.io/c/valheim/p/DrakosDJ/OdinsOtti/) | v1.0.1, updated 2026-09-12, 1.0: likely | Outmatched or outnumbered enemies calmly path around your party. Party threat comes from armor, weapon, skills, food and buffs plus nearby players, tames and summons; enemy courage from the combined HP of allies within 20 m, with a bonus near their spawner. Hitting one provokes allies within 25 m, who then fight to the death. Crouching hides your threat. Tagged AI Generated, about 200 downloads, no public source found. |
+| [CowardlyGreydwarfs (omnipeach)](https://thunderstore.io/c/valheim/p/omnipeach/CowardlyGreydwarfs/) | v1.0.0, updated 2026-09-22, 1.0: yes (tagged Deep North) | Greylings and greydwarfs flee after a heavy hit or at low health, and come back when they feel strong enough. About 60 downloads. |
+| [FleeOnSight (Revel)](https://thunderstore.io/c/valheim/p/Revel/FleeOnSight/) ([Nexus 2764](https://www.nexusmods.com/valheim/mods/2764)) | v1.1.1, updated 2024-05-11, 1.0: unknown | Listed creatures flee as soon as they are alerted once a boss is dead (global key). Default: Greylings after Eikthyr, Greydwarfs after the Elder. Option to keep fighting during raids. About 3.7K downloads. |
+| Monster AI Tweaks ([Nexus 758](https://www.nexusmods.com/valheim/mods/758), [Thunderstore](https://thunderstore.io/c/valheim/p/tweaks/MonsterAITweaks/)) | v0.4.0 on Thunderstore, updated 2022-11-05, 1.0: unknown (Nexus search snippets show activity into 2026) | Per-monster target preferences, alertness, fire fear, sight and hearing ranges. The Nexus version adds flee and chase behaviour by diet and, per a Nexus snippet, groups of three or fewer fight a larger threat until one is left, which then flees. |
+| [The Mark of Oden (PicSoul)](https://github.com/PicSoul/TheMarkOfOden) ([Thunderstore](https://thunderstore.io/c/valheim/p/PICS0UL/TheMarkOfOden/)) | v0.1.0, updated 2026-09-16, 1.0: dead (Thunderstore package deprecated; the GitHub source is at 0.4.0, pushed 2026-09-24, not released) | Creatures judge threat from **bosses you helped kill and species kill count, not gear**. In the 0.4.0 source, a creature you outrank leaves you alone (it neither attacks nor runs); hit it and it fights back until, badly hurt, its nerve breaks and it flees, sooner as its packmates fall. Hunted animals (boar, neck, wolf, lox) may leave you alone but never break once provoked. Night courage, raid and boss-add exemptions, nameplate states (wary, fleeing, provoked, unafraid). MIT. The Thunderstore upload is tagged AI Generated. |
+| Related | | [MonsterDB (RustyMods)](https://thunderstore.io/c/valheim/p/RustyMods/MonsterDB/) (v0.4.0, updated 2026-09-20, 1.0: likely) edits the vanilla `MonsterAI` flee fields per creature. [Cautious Creatures (coemt)](https://thunderstore.io/c/valheim/p/coemt/Cautious_Creatures/) (deprecated, 2023) made up to six creatures behave like deer. |
+
+**Inspiration.**
+- **Vanilla:**
+  - The only "this player is too strong" rule is the Crown of Valheim: non-boss creatures that target a player in crown mode flee from them (`MonsterAI.m_crownFearRange`). The other flee settings (`m_fleeIfLowHealth`, `m_fleeIfNotAlerted`, `m_fleeIfHurtWhenTargetCantBeReached`) ignore who the player is.
+  - Creatures have no leader or group link, and a death is only seen on the dying creature's owner.
+- **Differs from** The Mark of Oden's "progression, not gear" model: the sheet asks for gear ("fully geared from Ashlands"), so ours compares the creature's best hit with the player's real armor and max HP.
+- **Borrow:**
+  - TruePassiveMobs' "can it hurt you" test (the enemy's best hit after your armor, against your max HP) and its player profile stored in the player ZDO, which works whoever owns the creature.
+  - FearMe's "cautious" state: ignore the player without running away.
+- **Ours adds:**
+  - The rout: kill a Troll, a Greydwarf Shaman or a Greydwarf Brute and the greydwarfs around it break and flee for a while. Nobody does this.
+  - Weak creatures calmly keep their distance while they sense the player (a sneaking player can still close in) instead of fleeing in panic, and fight back when hit by a player or cornered ("except if frightened"). Bosses, tames, raid creatures and training dummies are never affected.
+- **Build or recommend:** TruePassiveMobs already ships the first two lines. We could recommend it and build only the rout, or build both in one mod, since they share the flee plumbing.
+- The AI runs on whichever client owns each creature, so all logic must work there: player strength travels in the player ZDO, and the leader's death as an RPC to each follower's owner.
+
+### Training dummies revamp (Revamp): fight hostile creatures, ON/OFF switch, a dummy per weapon type
+
+**Coverage: none.** No mod makes dummies fight creatures, switches them off, or gives them other weapons. TouchGrass goes the other way (dummies can hunt players at night) and lets you change one dummy's damage type, which is the closest thing to "a dummy per weapon type". This idea also absorbs More training dummies (see that section for the utility variants).
+
+| Mod | Status | Notes |
+|---|---|---|
+| [TouchGrass (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/TouchGrass/) | v1.0.7, updated 2026-09-10, 1.0: yes (tagged Deep North Update) | Using a dummy opens a window that sets that dummy's damage amount and type. Config for dummy health and recipe. Optional "night aggro" slides dummies toward players within 16 m (they cannot walk). Crowding limit (by default a 5th dummy within 4 m is refused). DPS and XP meter, stationary skill fatigue. Tagged AI Generated, about 1.9K downloads. |
+| [OdinTrainingPlace (OdinPlus)](https://thunderstore.io/c/valheim/p/OdinPlus/OdinTrainingPlace/) | v1.6.6, updated 2026-09-19, 1.0: yes | Wooden dummy and a mechanical dummy for blocking practice, among other training pieces. None of them attacks creatures. About 248K downloads. |
+| [DPS (JereKuusela)](https://thunderstore.io/c/valheim/p/JereKuusela/DPS/) | v1.7.0, updated 2026-09-10, 1.0: likely | Console commands to spawn, reset and kill dummies, with configurable resistances and status effects. A test tool, not a gameplay feature. |
+
+**Inspiration.**
+- **Vanilla T.W.I.G.** (ServersideQoL's 1.0 component dump and the wiki): `piece_TrainingDummy` is itself a `Humanoid` with `MonsterAI` and `Piece`. It has 2,500 HP and regenerates fully in 30 s, cannot walk, sees 30 m up to 90° off its facing, hears nothing, and only attacks once alerted (10 m alert range). `m_aiSkipTarget` is true, so creatures never pick it on their own. Every attack deals 1 damage (wiki).
+- **No prior art** for dummies that fight creatures, can be switched off or wield other weapons. One faction rule (`BaseAI.IsEnemy`) and a per-dummy alert range make dummies fight hostile creatures; creatures never pick a dummy on their own (`m_aiSkipTarget`) and only fight back when a dummy hits them while they have no target.
+- **Borrow** from TouchGrass: per-dummy settings on interaction (on the alternate key, so E stays the ON/OFF switch) and the crowding limit, which also stops dummy walls.
+- **Watch out for:** base-defence balance (tanky, regenerating decoys), loot farms (a creature killed by a dummy drops its loot), TouchGrass using the same interact key and moving dummies at night, and our other combat ideas, which must ignore dummies (adrenaline income, the Mob AI weakness test, Sneak XP on backstabs).
 
 ### Increase base HP/Stamina with stats (Revamp): running, jumping, and so on
 
@@ -206,28 +314,74 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
 - **Ours:** a small, capped bonus from existing skills only (Run, Jump, Swim, Sneak), with no new "Vitality" skill. That keeps it a light touch next to food.
 - Only build this if it fits our progression philosophy; VitalityRewrite already covers the idea.
 
-### Better tower shields (Revamp): an immovable wall that cannot parry, heavily slowed, blocks nearly everything
+### Better tower shields (Revamp): a two-handed wall that cannot parry, heavily slowed, blocks nearly everything, with a low-damage, heavy-stagger bash
 
-**Coverage: partial.** GCO is close to the vision, but it only comes as part of a huge overhaul. The standalone mods only change numbers.
+**Coverage: partial.** GCO is closest to the wall stance, but only inside a huge overhaul and without a two-handed rule or a bash. CaptainValheim and ShieldBash add shield strikes whose damage grows with block power, for every shield, and keep tower shields one-handed. The standalone tower-shield mods only change numbers. No mod makes tower shields two-handed or gives them a low-damage, heavy-stagger bash.
 
 | Mod | Status | Notes |
 |---|---|---|
-| [Goo's Combat Overhaul](https://thunderstore.io/c/valheim/p/gnls/GoosCombatOverhaul/) | see above, 1.0: yes | Tower shields keep blocking until a blocked hit empties your stamina. A successful block prevents stagger and knockback, covers a wider angle and reduces the remaining physical damage. You cannot parry or run while blocking, and the equipment penalty is heavier. |
-| [ZenCombat (ZenDragon)](https://thunderstore.io/c/valheim/p/ZenDragon/ZenCombat/) | v1.0.2, updated 2026-09-25, 1.0: likely | Tower shield "block charges": every N blocks (default 5) triggers a counter-attack. "Reliable block": block defence always applies while you have stamina, even when staggered. Also dodge on a separate button, auto-equip shield, and more. Closed source (the [GitHub repo](https://github.com/ZenDragonX/ZenMods_Valheim/wiki) is only a wiki and issue tracker). About 97K downloads. |
-| [Make Tower Shields Great Again (FactoriaTeam)](https://thunderstore.io/c/valheim/p/FactoriaTeam/Make_Tower_Shields_Great_Again/) ([Nexus 2900](https://www.nexusmods.com/valheim/mods/2900)) | v0.0.4, 2024-10-25, 1.0: unknown | Stat buffs, extra resistances, and knockback damage dealt on block, scaled by block level. |
-| [Valheim Combat Overhaul (Kyresel)](https://thunderstore.io/c/valheim/p/Kyresel/CombatOverhaul/) | 2021, dead | No parry, but blocks damage beyond block power. Surplus damage drains stamina instead of health. Lower block stamina cost, "stickiness" to the opponent, and the vanilla -20% movement penalty. |
+| [Goo's Combat Overhaul](https://thunderstore.io/c/valheim/p/gnls/GoosCombatOverhaul/) | see above, 1.0: yes | Tower shields keep blocking until a blocked hit empties your stamina. A successful block prevents stagger and knockback, covers a wider angle and reduces the remaining physical damage. You cannot parry or run while blocking, and the equipment penalty is heavier. No two-handed rule and no shield bash. |
+| [CaptainValheim (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/CaptainValheim/) | v1.0.11, updated 2026-09-27, 1.0: yes (rebuilt for 1.0.7, tagged Deep North) | Shields as weapons. With an empty right hand, the primary attack is a shield strike built from a clone of the vanilla unarmed attack; its damage comes from block power and its push from deflection force (×0.4 each by default), scaled by the Blocking skill. The page describes no stagger tuning. Also a shield throw, a charge (block + secondary attack), projectile reflection and the vanilla block-charge counter. Every shield gets it through a global fallback, tower shields stay one-handed, and its techniques check `ItemType.Shield`. Patches `Humanoid.GetCurrentWeapon`, `StartAttack`, `Pickup`, `BlockAttack` (prefix and transpiler) and `Character.RPC_Damage`, among others. Source: [sighsorry1029/CaptainValheim](https://github.com/sighsorry1029/CaptainValheim) (GPL-3.0 and MIT license files). Tagged AI Generated. About 2.5K downloads. |
+| [ShieldBash (Mexanik)](https://thunderstore.io/c/valheim/p/Mexanik/ShieldBash/) | v1.5.5, 2026-07-04, 1.0: unknown | A bash on its own key (F by default) with its own animation and hit and miss sounds. Blunt damage scales with block power and the Blocking skill, plus enemy knockback and a dynamic stamina cost; no stagger setting on the page. Needs Jotunn 2.29.1. About 6.5K downloads. |
+| [ZenCombat (ZenDragon)](https://thunderstore.io/c/valheim/p/ZenDragon/ZenCombat/) | v1.0.2, updated 2026-09-25, 1.0: yes (tagged Deep North) | Tower shield "block charges": turns on the vanilla block-charge counter, so every N blocks (default 5) trigger a counter-attack; the default list is the Wood, Bone, Iron, Serpentscale, Blackmetal and Flametal tower shields. "Reliable block": block defence still applies while a hit staggers you, as long as you have stamina (tower shields only by default). Also knockback scaling, a dodge button and auto-equip of your last shield. Closed source (the [GitHub repo](https://github.com/ZenDragonX/ZenMods_Valheim/wiki) is only a wiki and issue tracker). About 97K downloads. |
+| [Make Tower Shields Great Again (FactoriaTeam)](https://thunderstore.io/c/valheim/p/FactoriaTeam/Make_Tower_Shields_Great_Again/) ([Nexus 2900](https://www.nexusmods.com/valheim/mods/2900)) | v0.0.4, 2024-10-25, 1.0: unknown | +20% tower block armor (more with quality), extra resistances, knockback damage on block scaled by the Blocking skill, and a heavier slow (-25%, against -20% in vanilla per its page) with +10% run and walk stamina. A data pack built on WackysDatabase 2.4.31 and ReliableBlock 1.0.0, both from before 1.0. About 3.5K downloads. |
+| [ReliableBlock (Korppis)](https://thunderstore.io/c/valheim/p/Korppis/ReliableBlock/) | v1.0.0, 2022-06-14, 1.0: dead (unchanged since 2022) | A block or parry keeps mitigating while you have stamina, even when the leftover damage fills the stagger bar; you still stagger. A `Humanoid.BlockAttack` transpiler. Source: [karkkant/valheim-reliable_block](https://github.com/karkkant/valheim-reliable_block). About 140K downloads. |
+| [ReliableBlockRebuilt (RYEO)](https://thunderstore.io/c/valheim/p/RYEO/ReliableBlockRebuilt/) | v1.1.0, updated 2026-09-26, 1.0: yes (built and startup-tested on 1.0.16) | Preview fork of ReliableBlock with the same rule, for the local player only; it disables itself when `BlockAttack` does not match the code it inspected. MIT, source: [anneryeo/valheim-reliable-block](https://github.com/anneryeo/valheim-reliable-block). Tagged AI Generated. About 40 downloads. |
+| [GrindstoneSkills (MilkyTeam)](https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/) | v0.10.0, updated 2026-09-29, 1.0: likely | Perks of its new Defense skill (not the vanilla Blocking skill): "Shield bash" (up to a 15% chance that a normal block staggers the attacker), up to 25% more poise, and "Shield Wall" from level 50 (players within 4 m behind a blocking player take 10% less damage). Server and every client. Source: [geraldjglasgow/ValheimMods](https://github.com/geraldjglasgow/ValheimMods). About 650 downloads. |
+| [Combat Adjustments (Mushroom_Vikings)](https://thunderstore.io/c/valheim/p/Mushroom_Vikings/CombatAdjustments/) | v0.8.3, updated 2026-09-24, 1.0: yes (checked against 1.0.7 per its design doc) | Hold-block rework: an equipped shield adds a flat amount to the stagger bar (a `Character.GetStaggerTreshold` postfix; Flametal tower +70 at max quality), and tower and round shields get +5% block armor and +20% durability. No slow, parry or two-handed change. Server-set, needs MushroomSync. Source: [NickSpinosa/Valheim_Mushroom_Mods](https://github.com/NickSpinosa/Valheim_Mushroom_Mods). About 200 downloads. |
+| [WeaponArts (j1gA)](https://thunderstore.io/c/valheim/p/j1gA/WeaponArts/) | v0.14.1, updated 2026-09-26, 1.0: yes (tested with 1.0.16) | One active art per weapon type on a key; the tower shield's is "Taunt": nearby monsters come to you and you take less damage. Source: [tbsj1ga/WeaponArtsValheim](https://github.com/tbsj1ga/WeaponArtsValheim). Tagged AI Generated. About 290 downloads. |
+| [Valheim Combat Overhaul (Kyresel)](https://thunderstore.io/c/valheim/p/Kyresel/CombatOverhaul/) ([Nexus 591](https://www.nexusmods.com/valheim/mods/591)) | v1.7.8, 2021-04-22, 1.0: dead (deprecated) | No parry, but blocks damage beyond block power: surplus damage drains stamina instead of health, and no stagger while stamina remains. 40% less block stamina than other shields (Nexus snippet), halved knockback on a block, and "stickiness" to the opponent. |
 
 **Inspiration.**
-- **Vanilla `Humanoid.BlockAttack`:**
-  - A perfect block needs `m_timedBlockBonus > 1`, and tower shields do not have it.
-  - Block power scales with skill; the stamina drain is based on excess damage.
-- **Borrow** GCO's "hold until stamina is empty, no stagger or knockback" and Kyresel's "overflow drains stamina, not HP".
-- **Ours:** a standalone, cleanly configurable "shield wall" stance:
-  - Heavy slow while blocking (much stronger than vanilla).
-  - Frontal immunity to stagger, knockback and most AoE and projectiles.
-  - No parry.
-  - Optionally a shield bash, or a "brace" that roots you in place.
-- It must not clash with GCO or ZenCombat. Detect them and warn, or document the incompatibility.
+- **Vanilla already provides most parts:**
+  - The `TwoHandedWeaponLeft` equip rules, and `m_attachOverride` for the back model and the armor stand slot.
+  - The unarmed combo, which already plays in the shield stance with an empty right hand.
+  - A block formula where very high block armor absorbs almost everything (less damage, stamina, stagger and push per hit), and a block-charge counter that is switched off.
+  - A stagger lever independent of damage: a landed hit adds its physical and lightning damage × `HitData.m_staggerMultiplier` to the victim's stagger bar. "Low damage, heavy stagger" is a small blunt value with a large multiplier on the bash's `Attack`.
+- **Borrow:**
+  - GCO's "hold until stamina is empty, no stagger or knockback".
+  - ReliableBlock (and its 1.0 fork) and ZenCombat: the block still counts when a hit staggers you. Ours goes further and prevents that stagger while stamina lasts.
+  - CaptainValheim's empty-hand strike built from the cloned unarmed attack, with Blocking skill scaling.
+  - Make Tower Shields Great Again's knockback on block, and GrindstoneSkills' block that sometimes staggers the attacker (an optional extra).
+- **What they get wrong:**
+  - GCO locks the stance inside a huge overhaul.
+  - CaptainValheim and ShieldBash give every shield a strike whose damage grows with block power, and keep tower shields one-handed, so you still carry a sword.
+  - Make Tower Shields Great Again only changes numbers and depends on mods from before 1.0; Combat Adjustments only enlarges the stagger bar.
+- **Ours:** a standalone tower-shield identity.
+  - Two-handed under the vanilla rules; very slow when carried, slower still while bracing.
+  - Much more block armor, no parry, and a frontal block that also stops AoE and projectiles.
+  - A small, cheap bash on the normal attack button: low damage, heavy stagger. It is crowd control that sets up allies (staggered enemies take double damage), not a damage source.
+- Detect GCO, ZenCombat, CaptainValheim, ShieldBash and ReliableBlock (either version) and warn.
+
+### Dual wielding (New): a one-handed weapon in each hand
+
+**Coverage: full.** Two maintained 1.0 mods already let you hold two one-handed weapons and attack with both: DualWielder plays the vanilla dual-axe and dual-knife moves and alternates the weapons per combo step, and balrond DualMastery strikes with both weapons in its own animation, with a Dual Wield skill for the off hand. The most downloaded one, Smoothbrain's DualWield, uses custom clips and same-type pairs, and its 1.0 fixes are only in its source so far. Valheim Ascended has an off-hand slot inside an RPG overhaul. What is left is polish on the DualWielder approach: each hit from the weapon that lands it, the vanilla dual stance, the knives' own combo length and consistent equip handling.
+
+| Mod | Status | Notes |
+|---|---|---|
+| [DualWielder (RustyMods)](https://thunderstore.io/c/valheim/p/RustyMods/DualWielder/) | v1.1.2, updated 2026-09-26, 1.0: yes (tagged Deep North Update) | Any two one-handed weapons (sword + axe works, spears too) except the Abyssal Harpoon; a second one-handed weapon always goes to the left hand, and a key (Left Alt by default) swaps the hands. An `Attack.Start` prefix swaps the clone's trigger for the vanilla `dualaxes` or `dual_knives` set (any knife in the pair picks the knives) with 4 chain levels, and uses the left weapon for the whole 2nd and 4th steps. The secondary becomes `dualaxes_secondary` (any axe in the pair) or `dual_knives_secondary`; a spear in the main hand keeps its own secondary. No stance change: vanilla keeps the left weapon's stance. An `UnequipItem` prefix moves the left weapon to the right hand when the right one leaves. A cloned back joint holds the sheathed left weapon. No asset bundle. Its README still lists a damage merge option, a damage modifier and a "DualWielder" skill, but the 1.1.2 source ("overhauled plugin") only has a config lock and the swap key. Categorized client-side, but it uses ServerSync and a version check: a server with the mod refuses players without it. Extracted from the deprecated Almanac Class System. Source: [RustyMods/DualWielder](https://github.com/RustyMods/DualWielder) (no license file found). About 32.8K downloads. |
+| [balrond DualMastery (Balrond)](https://thunderstore.io/c/valheim/p/Balrond/balrond_DualMastery/) | v0.2.8, updated 2026-09-28, 1.0: yes (a Deep North fix in 0.2.3, tagged Deep North Update) | Any two one-handed weapons. A "custom dual wield attack animation" in which both weapons strike in sequence, each with its own damage; speed, range and angle depend on the weapons. A new Dual Wield skill sets the off-hand damage from 50% (skill 0) to 75% (skill 100). The secondary attack replaces the weapons' own special attacks: it repeats the primary without the off-hand penalty, for more stamina. A spear in the pair takes over and plays as a vanilla spear. The README says no configuration is needed; 0.2.8 added a damage scale setting. Server and every client; its page says it is not compatible with other dual wield mods. No public source found. About 10.6K downloads. |
+| [DualWield (Smoothbrain)](https://thunderstore.io/c/valheim/p/Smoothbrain/DualWield/) | v1.0.10, updated 2026-02-05, 1.0: unknown (the [GitHub source](https://github.com/blaxxun-boop/DualWield) has "fixes for 1.0" from 2026-09-10 and version 1.0.12, last pushed 2026-09-26, not on Thunderstore) | Axes, clubs, knives and swords, both of the same skill; no spears; an exclusion list. Its own clips from an embedded AssetBundle (plus a special attack for dual axes), swapped in on each client through an `AnimatorOverrideController` in a `ZSyncAnimation.RPC_SetTrigger` prefix, so players without the mod see the normal one-handed swing. Every `Hit` event also strikes with the left weapon (a second `DoMeleeAttack` with a mirrored angle, in an `Attack.OnAttackTrigger` prefix), with per-step damage, speed and stamina tables per weapon type that scale the item's shared damage during the hit. One off-hand skill per type (or a shared one). A `SetupEquipment` prefix moves the left weapon to the right hand when the right hand empties (not inside `EquipItem` or `UnequipAllItems`). Transpilers on `Humanoid.EquipItem`, `ShowHandItems` and `Attack.DoMeleeAttack`; left trails; ServerSync. No license file. About 553K downloads. |
+| [Valheim Ascended (kpttr)](https://thunderstore.io/c/valheim/p/kpttr/Valheim_Ascended/) | v0.4.1, updated 2026-09-29, 1.0: yes (its changelog has a Valheim 1.0 section; the README still names Valheim 0.221.12) | RPG overhaul (classes, talents, abilities, enchanting) with persistent main-hand and off-hand slots: a one-handed weapon in each hand survives sheathing and save/load, a spear displaces the pair, and a capstone talent allows two two-handed weapons. The page does not describe how the pair attacks. Built as a co-op mod; its README asks for the same mod on every client and the server (for its boats). Tagged AI Generated. About 9.4K downloads. |
+| Related | | Dual weapons as single items: [DualSwords (AlexDrake)](https://thunderstore.io/c/valheim/p/AlexDrake/DualSwords/) (v1.0.2, updated 2026-09-21, 1.0: yes, tagged Deep North Update; also [Nexus 3698](https://www.nexusmods.com/valheim/mods/3698), per a Nexus snippet) builds 22 dual swords (14 from vanilla swords, 8 more with Valheim Armory) that copy the combat and animations of `AxeBerzerkr`. [DualSwords (SunRay)](https://thunderstore.io/c/valheim/p/SunRay/DualSwords/) (v0.4.1, updated 2026-07-31, 1.0: unknown) has craftable dual swords with the vanilla dual-axe animations; needs Jötunn. [Warfare (Therzie)](https://thunderstore.io/c/valheim/p/Therzie/Warfare/) (v1.9.4, updated 2026-09-22, 1.0: yes, tagged Deep North Update) adds dual knives from bone to flametal, a dual scimitar, a dual axe and a dual scythe; its roadmap lists dual war pikes, axes and swords for all tiers. A Nexus "Dual wield" mod ([1649](https://www.nexusmods.com/valheim/mods/1649)) has been removed (Nexus snippet). |
+
+**Inspiration.**
+- **Vanilla already has the moves:** the Berserkir axes (`AxeBerzerkr`) and Skoll and Hati (`KnifeSkollAndHati`) are single items whose attacks play the player's dual-axe and dual-knife animation sets. Blocking without a shield already works: the left item blocks first (`Humanoid.GetCurrentBlocker`). What vanilla lacks is an equip rule: `Humanoid.EquipItem` takes a one-handed weapon out of the left hand.
+- **Borrow:**
+  - DualWielder's vanilla dual triggers on the per-swing clone: no assets, and players without the mod see the same moves. Also its swap key and its left back joint.
+  - balrond DualMastery's off-hand damage factor (50% to 75%), and its secondary attack that drops the off-hand penalty for more stamina.
+  - Smoothbrain's left weapon trails, exclusion list and its rule that spears stay out (their secondary throws the weapon).
+- **What they get wrong:**
+  - Smoothbrain replaces clips on each client, only pairs weapons of the same skill, and scales the items' shared damage during each hit. Its Thunderstore release predates 1.0.
+  - DualWielder always sends a second one-handed weapon to the left hand, so changing the main weapon takes an unequip or the swap key. It switches weapons per chain step rather than per hit, keeps the left weapon's own stance, and sets 4 chain levels for the knives, while the wiki gives Skoll and Hati a 3-hit combo (whether a fourth trigger exists is unverified). Its README still lists a skill and damage options that the 1.1.2 code no longer has.
+  - balrond DualMastery is closed source and adds a skill; Valheim Ascended ties its off-hand slot to an RPG overhaul.
+- **Ours, if we build it:**
+  - Any two one-handed swords, axes, clubs or knives; a key held while equipping picks the main hand.
+  - The vanilla dual stance and triggers, read from the vanilla dual items at runtime. Every hit uses the weapon that lands it (damage, status effect, skill, durability), with an off-hand factor.
+  - Blocking with the off-hand weapon, as vanilla does, or with the better of the two.
+  - Consistent hide and show, eating, load, death and torch handling; left trails and a second back slot.
+  - Technically client-only; it ships as Both, with the server's settings for everyone.
+- **Or recommend DualWielder:** it is maintained on 1.0 and already works without assets.
 
 ### Crossbow revamp (QoL): stays loaded
 
@@ -312,24 +466,24 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
   - Cleansing (remove poison or burning).
 - Theme them with the ritual system rather than making another big staff pack.
 
-### More training dummies (New)
+### More training dummies (New): merged into Training dummies revamp
 
-**Coverage: partial.** OdinTrainingPlace is the maintained reference. Nothing builds on the vanilla T.W.I.G.
+Merged into the Training dummies revamp in the idea sheet: the per-weapon dummies live there; the variants below stay optional extras.
+
+**Coverage: partial.** For the utility variants left here, DPS and TouchGrass already give DPS readouts and configurable resistances or damage, and OdinTrainingPlace has its own training pieces. The mods for the dummies themselves are listed under Training dummies revamp.
 
 | Mod | Status | Notes |
 |---|---|---|
-| [OdinTrainingPlace (OdinPlus)](https://thunderstore.io/c/valheim/p/OdinPlus/OdinTrainingPlace/) | v1.6.6, 2026-09-19, 1.0: yes (updated in 1.6.5) | Archery target (also for crossbows), wooden dummy, mechanical block-training dummy, woodcutting pole, flint rock, running track, swimming pool, and XP potions. About 247K downloads. Focused on skill grinding. |
-| [TargetPractice (Norheim)](https://thunderstore.io/c/valheim/p/Norheim/TargetPractice_Valheim/) ([Nexus 1246](https://www.nexusmods.com/valheim/mods/1246)) | v1.0.2, 2021, dead | A dummy and 4 archery targets. |
-| [DPS (JereKuusela)](https://thunderstore.io/c/valheim/p/JereKuusela/DPS/) | v1.7.0, 2026-09-10, 1.0: likely | Configurable dummies (resistances, status effects) and DPS, stamina and XP meters. |
-| [TouchGrass (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/TouchGrass/) | v1.0.7, 2026-09-10, 1.0: likely | Training meter, configurable dummy damage, anti-macro fatigue. |
+| [OdinTrainingPlace (OdinPlus)](https://thunderstore.io/c/valheim/p/OdinPlus/OdinTrainingPlace/) | v1.6.6, updated 2026-09-19, 1.0: yes (updated in 1.6.5) | Archery target (also for crossbows), wooden dummy, mechanical block-training dummy, woodcutting pole, flint rock, running track, swimming pool, and XP potions. About 248K downloads. Focused on skill grinding. |
+| [TargetPractice (Norheim)](https://thunderstore.io/c/valheim/p/Norheim/TargetPractice_Valheim/) ([Nexus 1246](https://www.nexusmods.com/valheim/mods/1246)) | v1.0.2, updated 2021-08-24, 1.0: dead | Deprecated. A dummy and 4 archery targets. |
+| [DPS (JereKuusela)](https://thunderstore.io/c/valheim/p/JereKuusela/DPS/) | v1.7.0, updated 2026-09-10, 1.0: likely | Configurable dummies (resistances, status effects) and DPS, stamina and XP meters. |
+| [TouchGrass (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/TouchGrass/) | v1.0.7, updated 2026-09-10, 1.0: yes (tagged Deep North Update) | DPS, DPH and XP meter on the vanilla dummy, per-dummy damage amount and type, anti-macro fatigue. |
+| [ParrySense (Kallik)](https://thunderstore.io/c/valheim/p/Kallik/ParrySense/) | v0.1.1, updated 2026-09-01, 1.0: unknown | Client-side parry-timing feedback (too early, parry, too late) against any attacker. Source: [khallik/ParrySense](https://github.com/khallik/ParrySense). |
 
 **Inspiration.**
-- **Ours:** variants of the vanilla T.W.I.G. rather than new standalone skill grinders:
-  - Resistance or weakness dummies for testing damage types.
-  - A **parry and dodge trainer** that swings on a readable timer.
-  - A moving archery target.
-  - A mounted or tall dummy.
-  - An optional DPS readout, borrowed from DPS and TouchGrass.
+- The dummies themselves are planned in Training dummies revamp. The optional variants left here: a resistance or weakness dummy, a parry trainer that swings on a telegraphed rhythm, a DPS readout, a moving archery target, and a tall dummy.
+- Reuse the DPS readouts of DPS or TouchGrass rather than building one.
+- ParrySense's timing feedback pairs well with a parry trainer that swings on a rhythm.
 - Keep XP gains neutral. TouchGrass's fatigue idea shows why: players exploit dummies to macro-farm skills.
 
 ---
@@ -373,6 +527,8 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
 - **Avoid** auto-sorting on open. QuickStackPlus deliberately does not do it, and it destroys players' spatial memory.
 
 ### Sort bags (QoL)
+
+Cancelled in the idea sheet.
 
 **Coverage: full** for the player inventory. For modded backpacks, the coverage is unclear.
 
@@ -493,10 +649,12 @@ Also worth a look:
 
 1. **Already well covered, only worth doing inside a bigger integrated module:**
    - Sort chest, sort bags, search chest, search crafting station and the loot filter. A wave of 1.0-era mods appeared in September 2026.
-   - Boss powers made passive, and HP/stamina from activity.
+   - Boss powers made passive or boosted (duration and cooldown configs), trinkets as passives, and HP/stamina from activity.
+   - Dual wielding one-handed weapons: DualWielder and balrond DualMastery work on 1.0, and Smoothbrain's DualWield has 1.0 fixes in its source.
 2. **Real gaps:**
    - A maintained "crossbow stays loaded" mod: the only precedent is deprecated.
-   - A real adrenaline redesign, a tower-shield "wall" stance as a standalone mod, and ballista target assignment.
-   - Mob AI unsticking and morale, dummies that fight monsters, multi-player rituals.
+   - A redesign of how adrenaline is earned, a tower-shield "wall" stance as a standalone mod, and a better target choice for the vanilla ballista (ReBallista now covers aim and turning).
+   - Pack morale (a pack flees when its leader dies), dummies that fight monsters, can be switched off and come in one type per weapon, and multi-player rituals.
    - Typed and contextual pings, and a notification feed confirmed on 1.0.
-3. **Design lever.** Trinkets, adrenaline, boss powers and the weapon signature moves can share one resource. Nobody has built them as one system; every existing mod treats them separately.
+   - A trinket that trades HP for a short low-HP window (Blood trinket), a stealth bonus for standing still (Sneak revamp) and a roll attack (Weapon revamp).
+3. **Design lever.** Adrenaline and trinkets work as one system: the Adrenaline revamp decides how the bar fills, the Trinket revamp what a trinket gives, and the Weapon revamp's roll, parry and jump attacks earn a per-move adrenaline bonus but cost none, so the bar is kept for the trinket proc. Boss powers stay separate (the Boss power revamp only asks for slightly stronger powers). Balrond Battle Flow (2026-09) is the first mod found that reworks adrenaline and trinkets together, but it does not change how adrenaline is earned.
