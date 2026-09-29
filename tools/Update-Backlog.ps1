@@ -7,8 +7,9 @@
     The sheet's Status column (Idea, Implemented, Cancelled: the 'data' tab of the sheet) is shown for ideas no mod
     implements yet; a mod in src/ overrides it with a link to the mod (Status 'Implemented' in the sheet). The script
     also lists what is out of date: sheet rows that differ from the research snapshot (new, changed or removed
-    ideas: run a research pass and update idea-research.json), and sheet Status cells that do not match the repo
-    (update them in the sheet). A changed Status needs no research: the online run copies it into the snapshot
+    ideas: run a research pass and update idea-research.json), sheet Status cells that do not match the repo, and
+    EXISTS ALREADY cells the research clearly contradicts (coverage full or none). The user maintains the sheet: these
+    lists are what to give them. A changed Status needs no research: the online run copies it into the snapshot
     (Windows PowerShell 5.1 only, the writer that made the file), so -Offline shows it too.
 .PARAMETER Offline
     Use the ideas stored in idea-research.json instead of downloading the sheet.
@@ -102,7 +103,8 @@ $items = foreach ($r in $rows) {
     }
 }
 
-# Me tell what is out of date. Sheet row vs research snapshot (research pass needed), sheet Status vs repo.
+# Me tell what is out of date. Sheet row vs research snapshot (research pass needed), sheet Status vs repo,
+# sheet EXISTS ALREADY vs research coverage. User keep sheet: me only list cells for user.
 # Compare exact (-cne): snapshot is verbatim copy, case and spacing count too.
 $drift = @()
 $statusSync = @()
@@ -127,6 +129,16 @@ foreach ($r in $rows) {
     $mod = $modsByIdea[(Norm $r.n)]
     if ($mod -and $r.st -ne $mod.SheetStatus) { $statusFix += "$($r.n): '$($r.st)' -> '$($mod.SheetStatus)'" }
     if (-not $mod -and $r.st -eq 'Implemented') { $statusFix += "$($r.n): 'Implemented' but no mod in src/ has <ModIdea>$($r.n)</ModIdea> (typo in a ModIdea, or the cell is wrong)" }
+}
+# Me compare EXISTS ALREADY with research coverage. Only clear contradictions (partial = user judgment), and only for
+# ideas still to decide (Status Idea, no mod yet): for built or cancelled ones the cell change nothing.
+$existsCheck = @()
+foreach ($r in $rows) {
+    $res = $byName[(Norm $r.n)]
+    if (-not $res -or $r.st -ne 'Idea' -or $modsByIdea.ContainsKey((Norm $r.n))) { continue }
+    $cov = "$($res.coverage)".Trim()
+    if ($r.e -ne 'Yes' -and $cov -eq 'full') { $existsCheck += "$($r.n): '$($r.e)', but the research found mods that already do all of it (coverage full): 'Yes'?" }
+    if ($r.e -ne 'No' -and $cov -eq 'none') { $existsCheck += "$($r.n): '$($r.e)', but the research found no mod doing it (coverage none): 'No'?" }
 }
 
 # Me keep snapshot status = sheet status. Only Windows PowerShell 5.1 write the file: its ConvertTo-Json made
@@ -256,4 +268,11 @@ if ($drift) {
 if ($statusFix) {
     Write-Step 'Sheet Status cells to update (the repo says otherwise)'
     foreach ($s in $statusFix) { Write-Warn2 $s }
+}
+if ($existsCheck) {
+    Write-Step 'Sheet EXISTS ALREADY cells the research contradicts (check them)'
+    foreach ($s in $existsCheck) { Write-Warn2 $s }
+}
+if ($statusFix -or $existsCheck) {
+    Write-Host '      The user maintains the sheet: give them these cells to change (never edit the sheet yourself).'
 }

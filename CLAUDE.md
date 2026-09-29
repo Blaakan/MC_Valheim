@@ -4,12 +4,12 @@ Mono-repo of Valheim 1.0 mods (BepInEx 5 + HarmonyX) published by **MC**. Goal: 
 features that build on the vanilla experience. The idea backlog is `docs/backlog.md` (source: the user's
 Google Sheet, CSV export: https://docs.google.com/spreadsheets/d/1nd_oWjYyphCcjt5F0SrstpkMK_UzDdKwj0U1UC3FHG0/export?format=csv).
 Sheet columns: CATEGORY, NAME, DESCRIPTION, SCOPE, EXISTS ALREADY, Status (dropdown from the sheet's `data` tab:
-`Idea` | `Implemented` | `Cancelled`; a mod in `src/` = `Implemented`). Keep the Status cells true:
-`./tools/Update-Backlog.ps1` (online) lists the cells the repo contradicts and the sheet rows that changed since the
-research (`idea-research.json` keeps a verbatim copy of each row; the online run copies Status changes into it).
-The edit link is not in this public repo: ask the user for it (or use your local memory). In the built-in browser,
-typing and paste do not reach the Status chips: click the chip's arrow, then the value; check the result in the CSV
-export. Never enter Google credentials yourself.
+`Idea` | `Implemented` | `Cancelled`; a mod in `src/` = `Implemented`). **The user maintains the sheet: never edit it.**
+`./tools/Update-Backlog.ps1` (online) lists the sheet rows that changed since the research (`idea-research.json`
+keeps a verbatim copy of each row; the online run copies Status changes into it; changed rows need a research pass)
+and the sheet cells the repo contradicts (Status vs the mods in `src/`, EXISTS ALREADY vs the research coverage).
+Whenever a task changes what the sheet should say (a mod implements or drops an idea, research contradicts a cell, an
+idea overlaps or merges with another), end it with the list of sheet cells for the user to change.
 
 ## House rules (whole folder)
 
@@ -21,7 +21,7 @@ export. Never enter Google credentials yourself.
 - **Never credit Claude in commits** (no `Co-Authored-By`, no "Generated with" lines).
 - Commit locally at each milestone. Remote `origin` = https://github.com/Blaakan/MC_Valheim (GitHub): push only when the user asks.
   Exception: the backlog mod workflow (below) commits nothing before its pause; the user's OK there covers the
-  commit, the push, the test issue and the idea's sheet Status.
+  commit, the push and the test issue.
 - **Never commit game code.** Decompiled source lives in `.ref/` (git-ignored). In docs, cite `Class.Method`
   instead of pasting game code (at most ~5 lines when truly essential).
 
@@ -117,7 +117,7 @@ when `src/Shared` changes) (+ `Test-InWorld.ps1` when a mod has self-tests) + in
 
 Use it when the user assigns a backlog idea, usually "implement <idea> from the backlog" plus a list of expected
 behaviours. One pause: **nothing is committed, pushed or posted until the user says OK**, and that one OK covers the
-commit, the push, the test issue and the idea's sheet Status (steps 7-8). Work on `main` (solo repo: no feature branch, no pull request).
+commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no feature branch, no pull request).
 
 1. **Understand.** First run `git status` and `git log --oneline origin/main..HEAD`: if the tree is dirty or commits
    are waiting to be pushed, tell the user and ask whether they belong to this run. Read the idea's section in
@@ -159,14 +159,14 @@ commit, the push, the test issue and the idea's sheet Status (steps 7-8). Work o
    release); decisions, assumptions and extras to confirm; the files changed (`git status`); what was verified (build,
    smoke test) and what was not (in-game, "(unverified)" names); the test list (`./tools/Get-TestTodo.ps1 -Mod
    <Feature>`); the proposed commit message(s); what the push will publish (this run's commit(s) plus any commit
-   already in `git log --oneline origin/main..HEAD`). Then say exactly what the OK does: "commit on main, push to
-   origin (public repo), open the public issue 'In-game tests: <ModName> <Version>' and set the idea's Status to
-   Implemented in the sheet". Wait for an explicit OK. On
+   already in `git log --oneline origin/main..HEAD`); the sheet cells the user will need to change (the idea's Status =
+   `Implemented`, and any other cell the run made wrong). Then say exactly what the OK does: "commit on main, push to
+   origin (public repo) and open the public issue 'In-game tests: <ModName> <Version>'". Wait for an explicit OK. On
    change requests: apply, re-verify, pause again.
 7. **Commit and push** after the OK: stage this run's files by path (never `git add -A`), caveman commit message(s),
    no Claude credit (in commits and in the issue), `git push origin main`. Then rebuild (`dotnet build
-   ValheimMods.slnx`) so the deployed DLL's build id is the pushed commit, not `<hash>+dirty`. Then set the idea's
-   sheet Status to `Implemented` (see the sheet note at the top), and re-run `./tools/Update-Backlog.ps1`.
+   ValheimMods.slnx`) so the deployed DLL's build id is the pushed commit, not `<hash>+dirty`. Then re-run
+   `./tools/Update-Backlog.ps1` and give the user its list of sheet cells to change (never edit the sheet yourself).
 8. **Test list as a GitHub issue**, after the push so the commit and file paths resolve on GitHub:
    `gh issue create --repo Blaakan/MC_Valheim --title "In-game tests: <ModName> <Version>" --body-file <scratch file>`.
    Body in normal English: build under test (commit hash), `TESTING.md` as the source of truth, the design doc path,
@@ -202,9 +202,12 @@ commit, the push, the test issue and the idea's sheet Status (steps 7-8). Work o
   `SinglePlayer`), `ModMultiplayerNotes` (player-facing; required unless Client + Compatible), `ModRequires`
   (GUIDs of MC mods needed at runtime, `;`-separated, no cycles), `ModDependencies` (external Thunderstore strings),
   `ModNetworkVersion` (Both mods: bump when RPC names/payloads or ZDO keys/formats change), `ModDescription`.
-- **Client-side and multiplayer-compatible whenever possible.** If the server must have it, or it can't work in
-  multiplayer, say why in `ModMultiplayerNotes`. Think through hand-offs: an item/structure touched by the mod
-  reaching a player without it must behave sanely.
+- **Mods that change the experience are required everywhere** (user rule): odds, costs, fuel, combat, balance, world
+  rules. `ModSide=Both`, the server refuses players without the mod after a short grace and sends its gameplay
+  settings to every player (copy Breeding's `PlayerCheck` + server settings; `AllowPlayersWithoutMod`, default
+  false). Only pure UI/QoL helpers that change nothing for others stay client-side. Either way the code stays
+  multiplayer-compatible: say in `ModMultiplayerNotes` who needs it and why, and think through hand-offs (an
+  item/structure touched by the mod reaching a player without it must behave sanely).
 - Features toggle live: patches are applied only while the feature is Active (enabled + deps active + server ok),
   so patch code doesn't check `Enabled`. Dependents of a disabled/missing mod go inactive and show why; they never
   crash (only touch another mod's types from patches/`OnActivated`).
