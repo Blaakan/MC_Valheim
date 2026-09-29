@@ -20,7 +20,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | [Crossbow revamp](#crossbow-revamp) | Combat | easy | full | [Crossbow Stays Loaded 0.1.0](../src/Combat/Crossbow.StaysLoaded) (in development) |
 | [Shift + E to feed 5 items to furnaces and kilns](#shift--e-to-feed-5-items-to-furnaces-and-kilns) | Crafting | easy | full | [Batch Station Feeding 0.1.0](../src/Crafting/Stations.BatchFeed) (in development) |
 | [Harpoon to work on tamed animals](#harpoon-to-work-on-tamed-animals) | Farming | easy | full | [Harpoon Hooks Tames 0.1.0](../src/Farming/Harpoon.HooksTames) (in development) |
-| [Search crafting station](#search-crafting-station) | UX | easy | full | idea |
+| [Search crafting station](#search-crafting-station) | UX | easy | full | [Crafting Search and Sort 0.1.0](../src/UX/Crafting.SearchSort) (in development) |
 | [Loot filter](#loot-filter) | UX | easy | full | idea |
 | [Sort chest](#sort-chest) | UX | easy | full | idea |
 | [Sort bags](#sort-bags) | UX | easy | full | idea |
@@ -88,7 +88,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | Crafting | One trinket per trophy | New | hard | Both | yes | partial | idea |
 | Crafting | Enchanting | New | very-hard | Both | yes | full | idea |
 | UX | Sort bags | QoL | easy | Client | no | full | idea |
-| UX | Search crafting station | QoL | easy | Client | no | full | idea |
+| UX | Search crafting station | QoL | easy | Client | no | full | [Crafting Search and Sort 0.1.0](../src/UX/Crafting.SearchSort) (in development) |
 | UX | Loot filter | QoL | easy | Client | no | full | idea |
 | UX | Sort chest | QoL | easy | Client | no | full | idea |
 | UX | notifications stay longer and show multiple | QoL | medium | Client | no | partial | idea |
@@ -1251,7 +1251,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 
 ### Search crafting station
 
-- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
+- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** [Crafting Search and Sort 0.1.0](../src/UX/Crafting.SearchSort) (in development)
 - **Approach:** Add a search field above m_recipeListRoot. MVP: write the terms into Player.s_FilterCraft and call UpdateCraftingPanel(false); Clear() it when the field is empty, because a [''] filter hides everything. Better: a GetAvailableRecipes postfix with AND matching, ingredient names and a 'craftable only' toggle, active only during our refresh. Add a sort dropdown bound to the vanilla 'sortcraft' key and clear the filter on Hide.
 - **Hooks:** `Player.s_FilterCraft (vanilla static filter)`, `Player.GetAvailableRecipes (postfix)`, `InventoryGui.UpdateCraftingPanel (private, refresh)`, `InventoryGui.UpdateRecipeList (private)`, `InventoryGui.SortMethod / 'sortcraft' unique key`, `InventoryGui.Awake/Hide`, `Chat.HasFocus`, `Recipe.m_resources`
 - **Risks:** s_FilterCraft is static and shared with the console, so a stale filter survives. GetAvailableRecipes is also called by other mods (recipe browsers, EpicLoot UIs), so the filter must be scoped with a flag. Crafting-panel reskins and craft-from-containers mods may relayout the panel.
