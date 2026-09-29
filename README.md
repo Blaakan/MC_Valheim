@@ -34,6 +34,7 @@ clearly who needs to install it and how it behaves in multiplayer. Details: [doc
 | [Batch Station Feeding](src/Crafting/Stations.BatchFeed) | Crafting | QoL | only you (client-side) | works | in development |
 | [Harpoon Hooks Tames](src/Farming/Harpoon.HooksTames) | Farming | QoL | only you (client-side) | works | in development |
 | [Crafting Search and Sort](src/UX/Crafting.SearchSort) | UX | QoL | only you (client-side) | works | in development |
+| [Loot Pickup Filter](src/UX/AutoPickup.Filter) | UX | QoL | only you (client-side) | works | in development |
 
 The full list of planned ideas, with feasibility and existing mods, is in [docs/backlog.md](docs/backlog.md).
 

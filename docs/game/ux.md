@@ -135,9 +135,18 @@ Local. Container edits are legal only because the panel is shown only while the 
 - `InventoryGui.Awake` (postfix): add buttons, search fields or overlays. Clone `m_stackAllButton` / `m_takeAllButton` to keep the vanilla look.
 - `InventoryGui.Show` / `Hide` / `CloseContainer` *(private)*: set up and tear down per-open state. `CloseContainer` runs while the container is still owned, before `SetInUse(false)`.
 - `InventoryGui.UpdateContainer` *(private)* (postfix): per-frame container-panel logic.
-- `InventoryGrid.UpdateGui` *(private)* (postfix): per-slot overlays such as dimming, highlight or badges. After this runs, `m_elements[y*w+x]` corresponds to each item's `m_gridPos`.
+- `InventoryGrid.UpdateGui` *(private)* (postfix): per-slot overlays such as dimming, highlight or badges. After this runs, `m_elements[y*w+x]` corresponds to each item's `m_gridPos`. Guard the index: extended-inventory mods put items outside the vanilla grid area. Mod: [Loot Pickup Filter](../../src/UX/AutoPickup.Filter) draws its red/green badges here, on `m_playerGrid` and `ContainerGrid` only.
 - `InventoryGui.OnSelectedItem` / `OnRightClickItem` *(private)*: custom click modifiers, e.g. Alt+click.
 - `InventoryGrid.DropItem`: drop, swap and merge rules.
+
+Learned for Loot Pickup Filter ([design](../design/ux-autopickup-filter.md)):
+- **Middle click on a slot**: not wired by vanilla, and not used by QuickStackStore or InventoryActions (they use Alt + click). Poll the key in an `InventoryGui.Update` postfix and find the slot with `InventoryGrid.GetHoveredElement()` *(private)*.
+- **`GetHoveredElement()` is pure geometry** (`ZInput.pointerPosition` against each slot rect): it also returns a slot hidden under the skills, texts, trophies, achievements, variant or split dialog, or under another mod's menu. Check the UI raycast too (`EventSystem.RaycastAll`: the first hit must be inside the slot; skip the shown item tooltip, the private static `UITooltip.m_tooltip`).
+- Panels that can cover the grids: `m_skillsDialog`, `m_textsDialog`, `m_trophiesPanel`, `m_achievementsPanel`, `m_variantDialog`, `m_splitDialog` (Esc/B closes them first). `m_dragGo` is non-null while an item is dragged.
+- **Gamepad**: `InventoryGrid.UpdateGamepad` runs only while the grid's `m_uiGroup.IsActive` and `ZInput.IsExclusiveGamepadActive()`; `InventoryGrid.GetGamepadSelectedItem()` gives the selected item. `JoyRStick` (right stick click) is not read by vanilla in the inventory. **`UIGamePad` has no modifier check**: LT + R3 still fires a `UIGamePad` bound to R3, but only while its group is interactive, so per-group gestures keep two mods apart (shared map of the MC inventory mods: [ux-autopickup-filter.md §3.4](../design/ux-autopickup-filter.md)).
+- **`Show` does no layout**: `InventoryGui.Show(Container, int)` only sets the Animator bool and the active group, so in a `Show` postfix the panel may still sit at its hidden or animating transform. Place added UI from the `Update` postfix once the panel's scale is non-zero, and again when its size, position or scale changes (`SetInventorySize` grows `m_player`).
+- Clicking a recipe activates the crafting group (`m_uiGroups[3]`), clicking a slot its grid's group. A `UIGroupHandler` on an object that also has a `CanvasGroup` makes everything under it non-interactable while another group is active: check the parent chain before hanging a button on `m_player`.
+- `InventoryGui.Hide` runs every frame while the player is dead or teleporting: keep a `Hide` postfix cheap.
 
 ---
 
@@ -229,11 +238,14 @@ The **ZDO owner** is authoritative. Only one player can hold a container open. O
 `Player` (auto pickup), `Humanoid` (the pickup itself), `ItemDrop` (world item: MonoBehaviour, Hoverable, Interactable).
 
 ### Flow
-- `Player.FixedUpdate` calls `AutoPickup(dt)` *(private)*. It returns early while teleporting or when `m_enableAutoPickup` *(private static)* is false. That flag is toggled by button `"AutoPickup"` (V) or JoyAutoPickup + JoyAltKeys and shows `$hud_autopickup:$hud_on/off` top-left.
+- `Player.FixedUpdate` calls `AutoPickup(dt)` *(private)* for the local player only (owned ZDO and `m_localPlayer == this`). It returns early while teleporting or when `m_enableAutoPickup` *(private static)* is false. That flag is toggled by button `"AutoPickup"` (V) or JoyAutoPickup + JoyAltKeys and shows `$hud_autopickup:$hud_on/off` top-left.
+  - The toggle sits in the `Player.TakeInput()` branch of `Player.Update`: **V does nothing while the inventory (or chat, console, a menu) is open.**
+  - The flag is static and never saved: every game start begins with auto pickup on, and within one game run it **survives logout and character changes** (V off, log out, load another character: still off).
 - `AutoPickup` runs `Physics.OverlapSphereNonAlloc(pos + up, m_autoPickupRange = 2f, m_colliders[100], "item" layer)`. For each `ItemDrop` found (floating-terrain dummies resolve to their parent):
-  1. **Skip** if `!m_autoPickup`, `IsPiece()` (items placed on item stands or tables), `HaveUniqueKey(m_shared.m_name)` (quest item already owned), or the view is invalid.
+  1. **Skip** if `!m_autoPickup`, `IsPiece()` (items placed on item stands or tables: no rigidbody + `Piece` + `WearNTear`), `HaveUniqueKey(m_shared.m_name)` (quest item already owned), or the view is invalid. The checks run in this order with a short-circuit OR, so **`IsPiece()` is the only `ItemDrop` instance method called before `RequestOwn`**, and only for drops whose `m_autoPickup` is true.
   2. If `!CanPickup()`, call `RequestOwn()`.
   3. Otherwise skip items in tar. Then `Load()`, skip if `!m_inventory.CanAddItem` or the item would exceed `GetMaxCarryWeight()`. Pull the item towards the player at 15 m/s and call `Pickup(go)` below 0.3 m.
+- A filter placed after step 1 (for example an `Inventory.CanAddItem` postfix, as the LootFilter mod does) runs after `RequestOwn`: the client keeps claiming ownership of items it will never take (backoff up to 30 s). Filter before the ownership request.
 - `ItemDrop.CanPickup(autoPickupDelay = true)` fails for 0.5 s after spawn (`c_AutoPickupDelay`) and requires **ZDO ownership**. `RequestOwn()` retries with backoff (0.2 s × 2^n, capped at 30 s) and sends `RPC_RequestOwn`. The current owner answers by `SetOwner(requester)`.
 - Manual pickup: `ItemDrop.Interact` → `ItemDrop.Pickup(Humanoid)`. If not owner, it polls `PickupUpdate` every 0.05 s until ownership arrives.
 - **`Humanoid.Pickup(GameObject go, bool autoequip = true, bool autoPickupDelay = true)`** is the core rule method:
@@ -244,7 +256,16 @@ The **ZDO owner** is authoritative. Only one player can hold a container open. O
   - pickup effects
   - `ShowPickupMessage(item, stack)`, which shows top-left `"$msg_added <name>"` with amount and icon
   - informs the radial menu (`Hud.instance.m_radialMenu.OnAddItem`)
+- Other paths into `Humanoid.Pickup`, none of them through auto pickup: `ItemDrop.Interact` (E, `JoyUse`; eats consumable pieces), fishing (`FishingFloat.Catch` → `ItemDrop.Pickup` or `Fish.Pickup`) and the console `spawn <item> p` (`Player.Pickup(go, autoequip: false, autoPickupDelay: false)`).
+- **Hand harvesting goes through auto pickup.** Many Use interactions do not put the item in the inventory: they spawn an `ItemDrop` on the ground, and only `AutoPickup` collects it (with V off it stays there):
+  - `Pickable.Interact` → `RPC_Pick` (on the ZDO owner) → `Drop` (berries, mushrooms, pickable flint/stone/branches, thistle, crops...); `PickableItem` the same way;
+  - `Fermenter` tap (`RPC_Tap`), `CookingStation` done item (`RPC_RemoveDoneItem` → `SpawnItem`; a station with an `m_addFoodSwitch`, the stone oven, is used through that `Switch` → `OnAddFoodSwitch`, so a check on the resolved `Interactable` sees a `Switch`, not the `CookingStation`), `Beehive` / `SapCollector` (`RPC_Extract`), `ItemStand` (`RPC_DropItem`), `ArmorStand` slot switches (`UseItem` → `RPC_DropItemByName`; not the pose switch), a `Smelter`'s `m_emptyOreSwitch` (`OnEmpty` → `RPC_EmptyProcessed`), `ArcheryTarget` (`DropArrows`), Shift + E on a saddled tame (`Sadle.Interact` with `alt` → `Tameable.DropSaddle`);
+  - the scythe: the harvest attack (`Attack`, local player only) calls `Pickable.Interact(Player.m_localPlayer, ...)` **directly** for every harvestable pickable in its radius, not through `Player.Interact`.
+
+  All the others start in the private `Player.Interact(GameObject go, bool hold, bool alt)` (gates: `InAttack`, `InDodge`, 0.2 s between hold repeats; target = `go.GetComponentInParent<Interactable>()`). Doors, chests, beds, portals, crafting stations and the other vanilla interactables spawn nothing on Use; smelter output that pops out on its own is not an interaction. In multiplayer the drop is created by the bush's or station's ZDO owner and reaches other clients after the network delay.
 - A player drop (`Humanoid.DropItem`) calls `ItemDrop.OnPlayerDrop()`, which sets `m_autoPickup = false`. This is **local to the dropping client's instance and not networked**; other players will still auto-pick it up.
+- **Item type key.** `ItemDrop.Awake` sets `m_itemData.m_dropPrefab = ObjectDB.instance.GetItemPrefab(<prefab name>)`, whose `name` is the spawn name. `ItemDrop.DropItem` instantiates `item.m_dropPrefab`, so a drop with a **null** `m_dropPrefab` only comes from that `Awake` lookup failing (an object that is not an ObjectDB item, typically an unregistered modded prefab): fall back to `Utils.GetPrefabName(drop.gameObject)`. Key filters by prefab name, never by `m_shared.m_name` (a token several modded items can share).
+- A `Projectile` with `m_respawnItemOnHit` (thrown weapons such as spears) drops the item back through `ItemDrop.DropItem` with `m_autoPickup` still true: vanilla auto-picks it.
 - World item upkeep: `ItemDrop.SlowUpdate` runs every 10 s on the owner.
   - `TerrainCheck`
   - `TimedDestruction`: despawn after 3600 s unless inside a player base, a player is within 25 m, it sits in tar, or it is a piece
@@ -257,7 +278,8 @@ ZDO `s_itemData` (byte[]: version byte 109 + `ItemData.Save`), `s_spawnTime`, `s
 The ZDO owner of the ItemDrop. Pickup is a client ownership grab followed by a local inventory add and a network destroy. No server logic is involved, so pickup filters are **client-only**.
 
 ### Patch points
-- `Player.AutoPickup` (private): the filter decision. The only per-item gate is the `ldfld ItemDrop::m_autoPickup` check, so a small transpiler can replace it with `MyFilter.Allow(itemDrop)`. Otherwise use a prefix that re-implements the loop, which conflicts more easily.
+- `Player.AutoPickup` (private): the filter decision. Without a transpiler or a copy of the loop: open a scope in a `Player.AutoPickup` prefix (local player, `Priority.First`), close it in a finalizer, and in an `ItemDrop.IsPiece` postfix answer `true` for rejected drops while the scope is open. Vanilla then skips them before `RequestOwn` (never claimed), and everything outside auto pickup keeps the vanilla answer. Mod: [Loot Pickup Filter](../../src/UX/AutoPickup.Filter) ([design](../design/ux-autopickup-filter.md)); it checks the gate order (`m_autoPickup` load → `IsPiece` → `RequestOwn`) in the original IL at activation. The alternatives are a transpiler on the `ldfld ItemDrop::m_autoPickup` check, or a prefix that re-implements the loop (conflicts more easily; a copy that still calls `IsPiece` keeps the scoped postfix working).
+- To exempt hand-harvest drops from such a filter: record the local player's positions in `Player.Interact` and `Pickable.Interact` prefixes (only for interactable kinds that drop items) and tag drops born near them in an `ItemDrop.Awake` postfix (Loot Pickup Filter's harvest grace).
 - `Humanoid.Pickup`: blocks both manual and auto pickup. Also a good place for "on picked up" reactions (postfix, `__result`).
 - `Character.ShowPickupMessage`: rewrite or silence pickup toasts.
 - `Player.m_autoPickupRange` is a public field and can be set directly.
@@ -416,6 +438,8 @@ Local, except player-position pins (`ZNet.GetOtherPublicPlayers`) and pings/shou
 2. **Native.** Postfix `ZInput.ResetKBMButtons` (private) and call the private `AddButton(name, path, altKey, showHints, rebindable: true)` by reflection. `GetButtonDown("MyButton")` then works, and `ZInput.Save` persists it. It still will **not** appear in the Settings key list, which is a serialized prefab list (`KeyboardMouseSettings.m_keys` of `KeySetting`), unless you also clone a row into that page. Jotunn's `InputManager`/`ButtonConfig` automates this.
 3. Gamepad keys are scarce. Prefer chords with `JoyAltKeys`, as vanilla does, or a radial entry.
 
+**Keys ZInput cannot read** (learned for Loot Pickup Filter): `ZInput.GetKeyDown/GetKey(KeyCode, logWarning)` read `Mouse0`-`Mouse4` through the Input System. `ZInput.IsKeyCodeValid` rejects `None`, `Mouse5`, `Mouse6` and every code above `JoystickButton19`: those never fire. A keyboard `KeyCode` missing from ZInput's private KeyCode-to-Key map (for example `F13`-`F15`, `Hash`, `At`) maps to `Key.None`, and reading it **throws `ArgumentOutOfRangeException` on every call** (`logWarning` only logs before the throw). Validate a configured `KeyboardShortcut` once, on bind and on `SettingChanged`, with `ZInput.IsKeyCodeValid` plus, for keyboard keys, the private static `ZInput.TryKeyCodeToKey` (it works before `ZInput` exists), and catch `ArgumentException` around the read anyway.
+
 ### Patch points
 - `Player.TakeInput` / `PlayerController.TakeInput` (block gameplay while a custom UI is focused)
 - `ZInput.ResetKBMButtons` (add buttons)
@@ -548,7 +572,8 @@ Cautions (learned for Crafting Search and Sort):
   - `sortcraft <Original|Name|Type|Weight>` (unique key `"sortcraft"`)
   - `inventorysize <rows>` (cheat)
   - `bind <keycode> <command>` / `unbind` / `resetbinds` (stored in `PlatformPrefs` `"ConsoleBindings"`, executed from `Chat.Update`)
-- **Our debug commands**: postfix `Terminal.InitTerminal` and create `new Terminal.ConsoleCommand("vm_…", …, isCheat: false)`. Use `isCheat: true` only when the command really cheats, because it taints the player's achievements.
+- **Our debug commands**: postfix `Terminal.InitTerminal` and create `new Terminal.ConsoleCommand("vm_…", …, isCheat: false)`. Use `isCheat: true` only when the command really cheats, because it taints the player's achievements. The constructor defaults are `isCheat: false` and `hideBehindDevCommands: false`, so such a command works without `devcommands`, in the F5 console and in chat (`/name`). A mod feature can also register its commands when it activates and remove them from `Terminal.commands` when it deactivates (Loot Pickup Filter does).
+- **Tab completion only completes the first argument**: `Terminal.UpdateInput` calls `tabCycle` on the second word only (the first word completes the command name, from a list cached per terminal on first use). It matches options by prefix, and works in the chat too (`Chat` sets `m_tabPrefix = '/'`). Put the argument that needs completion (an item name) first. `GetTabOptions` caches the first fetch unless the command is registered with `alwaysRefreshTabOptions: true` (the first Tab may happen in the main menu, before ObjectDB is filled).
 
 ### Per-character and per-machine persistence summary (for UX mods)
 | Store | Scope | API |
@@ -565,6 +590,7 @@ Cautions (learned for Crafting Search and Sort):
 
 ### Loot filter (QoL, exists: https://www.nexusmods.com/valheim/mods/116)
 
+- **Status**: implemented as [Loot Pickup Filter](../../src/UX/AutoPickup.Filter) (0.1.0). The design that shipped differs from the sketch below: no transpiler; a `Player.AutoPickup` prefix/finalizer opens a scope in which an `ItemDrop.IsPiece` postfix answers "piece" for rejected drops, so they are skipped before `RequestOwn` (checked against the original IL at activation). Three modes (Everything, Skip ignored, Only selected) with two separate per-character lists in `Player.m_customData`, a mode button cloned from Take all above the player panel, middle-click marking in the inventory and open chests (controller: right stick click on your own grid), red/green badges from an `InventoryGrid.UpdateGui` postfix, `lootfilter` / `lootfilter_ignore` / `lootfilter_select` commands for items not at hand. The V toggle stays the master switch. Hand-harvest drops (Use on bushes, stations, stands; scythe) are exempt, because they only reach the inventory through auto pickup (§5), including the stone oven through its food switch. No list editor panel yet (planned). See [docs/design/ux-autopickup-filter.md](../design/ux-autopickup-filter.md).
 - **Feasibility**: easy.
 - **Who needs the mod**: client-only. Pickup is an ownership grab followed by a local inventory add (§5); nothing server-side changes.
 - **Hooks**:

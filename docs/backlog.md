@@ -21,7 +21,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | [Shift + E to feed 5 items to furnaces and kilns](#shift--e-to-feed-5-items-to-furnaces-and-kilns) | Crafting | easy | full | [Batch Station Feeding 0.1.0](../src/Crafting/Stations.BatchFeed) (in development) |
 | [Harpoon to work on tamed animals](#harpoon-to-work-on-tamed-animals) | Farming | easy | full | [Harpoon Hooks Tames 0.1.0](../src/Farming/Harpoon.HooksTames) (in development) |
 | [Search crafting station](#search-crafting-station) | UX | easy | full | [Crafting Search and Sort 0.1.0](../src/UX/Crafting.SearchSort) (in development) |
-| [Loot filter](#loot-filter) | UX | easy | full | idea |
+| [Loot filter](#loot-filter) | UX | easy | full | [Loot Pickup Filter 0.1.0](../src/UX/AutoPickup.Filter) (in development) |
 | [Sort chest](#sort-chest) | UX | easy | full | idea |
 | [Sort bags](#sort-bags) | UX | easy | full | idea |
 
@@ -89,7 +89,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | Crafting | Enchanting | New | very-hard | Both | yes | full | idea |
 | UX | Sort bags | QoL | easy | Client | no | full | idea |
 | UX | Search crafting station | QoL | easy | Client | no | full | [Crafting Search and Sort 0.1.0](../src/UX/Crafting.SearchSort) (in development) |
-| UX | Loot filter | QoL | easy | Client | no | full | idea |
+| UX | Loot filter | QoL | easy | Client | no | full | [Loot Pickup Filter 0.1.0](../src/UX/AutoPickup.Filter) (in development) |
 | UX | Sort chest | QoL | easy | Client | no | full | idea |
 | UX | notifications stay longer and show multiple | QoL | medium | Client | no | partial | idea |
 | UX | Search chest | QoL | medium | Client | no | full | idea |
@@ -1270,7 +1270,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 
 ### Loot filter
 
-- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
+- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** [Loot Pickup Filter 0.1.0](../src/UX/AutoPickup.Filter) (in development)
 - **Approach:** A small transpiler on Player.AutoPickup replaces the m_autoPickup field check with LootFilter.Allow(drop), which returns drop.m_autoPickup && !blocked(prefabName/itemType). Items are toggled with Alt+right-click in the inventory and marked with a tinted overlay. The list is stored per character in Player.m_customData['vm.lootfilter'] with a BepInEx default list. An optional three-state V toggle cycles Off / All / Filtered.
 - **Hooks:** `Player.AutoPickup (transpile ldfld ItemDrop::m_autoPickup)`, `ItemDrop.m_autoPickup`, `ItemDrop.m_itemData.m_dropPrefab`, `InventoryGui.OnRightClickItem`, `InventoryGrid.UpdateGui`, `InventoryElement.m_noteleport (overlay template)`, `Player.m_customData`, `Humanoid.Pickup (left untouched for manual pickup)`
 - **Risks:** Transpiler collisions with other AutoPickup patchers (pickup-range and pickup-selector mods, ValheimPlus remnants). Never overwrite m_autoPickup, because it also encodes 'dropped by me'. Token name collisions between modded items, so key on the prefab name. No save or network risk.

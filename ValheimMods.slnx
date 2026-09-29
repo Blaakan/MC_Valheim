@@ -20,6 +20,7 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/UX/">
+    <Project Path="src/UX/AutoPickup.Filter/MC.UX.AutoPickup.Filter.csproj" />
     <Project Path="src/UX/Crafting.SearchSort/MC.UX.Crafting.SearchSort.csproj" />
   </Folder>
 </Solution>
