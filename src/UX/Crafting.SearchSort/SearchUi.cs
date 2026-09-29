@@ -452,7 +452,7 @@ internal static class SearchUi
 
     private static void BuildSortButton(InventoryGui gui, float width)
     {
-        // Container panel text button (Sort Chest clone the same one): both mods look alike.
+        // Container panel text button (Sort Chest clone its neighbour, Place stacks): both mods look alike.
         var src = gui.m_takeAllButton != null ? gui.m_takeAllButton : gui.m_stackAllButton;
         if (src == null)
         {

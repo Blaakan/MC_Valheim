@@ -21,6 +21,7 @@
   </Folder>
   <Folder Name="/UX/">
     <Project Path="src/UX/AutoPickup.Filter/MC.UX.AutoPickup.Filter.csproj" />
+    <Project Path="src/UX/Container.Sort/MC.UX.Container.Sort.csproj" />
     <Project Path="src/UX/Crafting.SearchSort/MC.UX.Crafting.SearchSort.csproj" />
   </Folder>
 </Solution>

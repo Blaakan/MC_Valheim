@@ -851,7 +851,8 @@ internal static class FilterUi
         }
     }
 
-    // Controller, only while your inventory grid is the focused group (chest grid R3 belong to Sort chest).
+    // Controller, only while your inventory grid is the focused group. Chest grid: Sort chest use View/Select and L3,
+    // nobody read R3 there.
     private static void HandleGamepad(InventoryGui gui)
     {
         if (!Plugin.GamepadControls.Value || !ZInput.IsExclusiveGamepadActive())

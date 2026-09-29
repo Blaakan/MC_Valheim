@@ -357,16 +357,19 @@ does the same once. Per frame: `ZInput.GetKeyDown(main, logWarning: false)`, mod
 with `JoyRTrigger` held → toggle the lists panel; else `ToggleMark(m_playerGrid.GetGamepadSelectedItem())`. Chest
 slots are mouse only.
 
-**Shared gamepad map of the MC inventory mods** (the Sort Chest design carries the same table):
+**Shared gamepad map of the MC inventory mods** (the Sort Chest design, `docs/design/ux-container-sort.md` 3.3,
+carries the same table):
 
-| Focused group (`InventoryGui.m_uiGroups`) | R3 (`JoyRStick`) | LT + R3 | RT + R3 | L3 (`JoyLStick`) |
-|---|---|---|---|---|
-| 0 container grid | Sort Chest: sort | Sort Chest: sort (`UIGamePad` has no modifier check); Loot Pickup Filter: nothing | Sort Chest: sort; Loot Pickup Filter: nothing | Sort Chest: change criterion |
-| 1 player grid | Loot Pickup Filter: mark / unmark | Loot Pickup Filter: change mode | Loot Pickup Filter: lists panel | vanilla / none |
-| 2 side panels, 3 crafting | none of ours | none | none | vanilla multi-craft (crafting group, held) |
+| Focused group (`InventoryGui.m_uiGroups`) | View/Select (`JoyBack`) | L3 (`JoyLStick`) | R3 (`JoyRStick`) | LT + R3 | RT + R3 |
+|---|---|---|---|---|---|
+| 0 container grid | Sort Chest: sort | Sort Chest: change criterion | none of ours | none of ours | none of ours |
+| 1 player grid | none of ours | none of ours | Loot Pickup Filter: mark / unmark | Loot Pickup Filter: change mode | Loot Pickup Filter: lists panel |
+| 2 side panels, 3 crafting | none of ours | none of ours | none of ours | none of ours | none of ours |
 
-Sort Chest's `UIGamePad`s fire only while the container group is active, our gestures only while the player group is
-active: one press never reaches both. InventoryActions also uses R3: `GamepadControls = false` leaves it to that mod.
+Sort Chest's `UIGamePad`s (View/Select, L3; no modifier check, so LT/RT + those keys act the same) fire only while the
+container group is active, our R3 gestures only while the player group is active: one press never reaches both, and no
+MC mod reads R3 in the container grid. Vanilla reads View/Select nowhere in the inventory and L3 only while held, as the
+multi-craft modifier (any group). InventoryActions also uses R3: `GamepadControls = false` leaves it to that mod.
 
 **Badges** (`MarkerOverlay`). An `Image` child per slot (`MC_LootFilterMark`, 16 × 16, 3 px inset,
 `raycastTarget = false`), created lazily in the `UpdateGui` postfix for `m_playerGrid` and `ContainerGrid` only. Shown
@@ -522,8 +525,9 @@ builds only), `Patches/` (`PlayerPatches`, `PickablePatches`, `ItemDropPatches`,
   prefix, and never skips the call, so the harvest record happens even when it replaces the press with a batch; its
   `MessageHud.ShowMessage` prefix mutes only Center messages during its own batch loop, and ours are top-left (C02).
 - **One Click Repair All**: mutes only Center messages during its loop; ours are top-left (C03).
-- **Sort Chest** (upcoming): buttons on the container panel and R3/L3 while the container grid is focused (gamepad map
-  in 3.4). Its cross-mod test with this mod goes into its own `TESTING.md`.
+- **Sort Chest** (upcoming): buttons on the container panel, and View/Select (sort) and L3 (change criterion) while the
+  container grid is focused; it never reads R3 (gamepad map in 3.4). Its cross-mod test with this mod goes into its own
+  `TESTING.md`.
 
 ---
 
@@ -558,7 +562,7 @@ builds only), `Patches/` (`PlayerPatches`, `PickablePatches`, `ItemDropPatches`,
 | Mark gesture in Everything mode | — | No change; hint |
 | Mark gesture while dragging, with the split dialog, over a dialog or another mod's menu | — | Ignored (dialog checks + UI raycast) |
 | Marking many items quickly | — | Badges at once; messages at most one per second |
-| Controller, container grid focused, R3 | — | Nothing of ours (left to Sort Chest) |
+| Controller, container grid focused, R3 | — | Nothing (no MC mod reads R3 there; Sort Chest uses View/Select and L3) |
 | Controller: mark a chest item | — | Not possible in 0.1.0; move it to your inventory |
 | Item type you no longer carry in a list | — | Shown in tooltip / lists panel; removed by command or by picking one up and marking it |
 | Recipe clicked, then the button | Crafting group active | Button still clickable (parent choice) |
@@ -614,7 +618,8 @@ sees and have a simple alternative.
     the two ways: pick one up by hand (never filtered) and middle-click it, or use `lootfilter` /
     `lootfilter_ignore` / `lootfilter_select`. The editor panel is planned for 0.2.0.
 14. **Shared gamepad map** (3.4): our controller gestures work only while the player grid is focused; chest slots are
-    marked with the mouse only. This keeps R3 free for Sort Chest in the container grid.
+    marked with the mouse only. Sort Chest uses View/Select and L3 only while the container grid is focused, so no
+    press reaches both mods, and no MC mod reads R3 in the container grid.
 15. **Mark messages rate-limited** to one per second; badges are the main feedback.
 16. **Display name "Loot Pickup Filter"** (lead decision, to confirm with the user: the GUID `MC.UX.AutoPickup.Filter`
     and the display name are permanent after release). UI labels keep "Auto pickup".

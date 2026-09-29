@@ -42,10 +42,15 @@ Almost every UX feature in this chapter is client-only. A few need care: anythin
   - `MoveAll(from)` ("Take all") tries each item's same grid position first, then any slot.
   - `StackAll(from, message)` ("Place stacks") only moves items whose `m_shared.m_name` already exists in the target. It skips items the local player has equipped and shows `$msg_stackall N` / `$msg_stackall_none`.
   - `MoveItemToThis(from, item)` (Ctrl-click) and `MoveItemToThis(from, item, amount, x, y)` (drag/drop).
-- `ItemData.IsSameType(other)` compares `m_shared.m_name` + `m_worldLevel`, plus `m_quality` when `m_maxQuality > 1`. **It ignores `m_customData`**, so merging stacks can lose per-item custom data.
+- `ItemData.IsSameType(other)` compares `m_shared.m_name` + `m_worldLevel`, plus `m_quality` when `m_maxQuality > 1`. **It ignores `m_customData`**, `m_variant`, the crafter, `m_durability`, `m_pickedUp` and `m_cheated`, so merging stacks can lose per-item data.
+- The two vanilla merge paths treat per-item data differently:
+  - `Inventory.AddItem(ItemData)` (pickup, Ctrl-click, Place stacks through `StackAll`) tops up an existing stack one unit at a time and sets the target's `m_cheated` when the added item is cheated.
+  - The drag merge (`InventoryGrid.DropItem` → `MoveItemToThis(from, item, amount, x, y)` → private `AddItem(item, amount, x, y)`) only adds to the target's `m_stack`: the target keeps all its own data, including its `m_cheated` flag, and the source's custom data is dropped.
+- **Loading an inventory is strict** (`Inventory.Load` → private `AddItem(prefabHash, …)`): each stack is clamped to `m_maxStackSize` (the excess is lost), then placed at its saved position through the private `AddItem(item, amount, x, y)`, which **drops the item** when `x` is out of range or the slot already holds a different item, and merges into a same-type item there. Code that rearranges an inventory must leave unique positions inside the grid and stacks no larger than `m_maxStackSize`. `Inventory.Load` into a scratch `new Inventory(name, null, w, h)` (nobody subscribed to `m_onChanged`, not the player inventory) only instantiates and destroys item prefabs: no save, no cheated-item message.
+- `m_dropPrefab` is set by `ItemDrop.Awake` to the item prefab, so `m_dropPrefab.name` is the spawn name of items loaded from a save or a chest. `m_shared` is a per-instance copy in builds: compare items by `m_shared.m_name` or the prefab name, never `m_shared` by reference.
 - `Inventory.Changed(bool success=false, bool cheatedStateChanged=false)` *(private)* recomputes `m_totalWeight`, shows the 1.0 "picked up cheated item" center messages, then calls `m_onChanged`. Every public mutator calls it, so N single-item operations mean N change events.
 - There is **no sort API**. Helper views exist: `GetAllItemsInGridOrder()` (used by the radial menu, `Valheim.UI.ItemGroupConfig` / `HammerItemElement`), `GetAllItemsSortedByName()` (unused), `GetAllItemsOfType(...)`, `GetHotbar(includeEmpty)` (row 0, 8 slots) and `GetBoundItems()`.
-- `GetAllItems()` returns the **live list**. Changing `m_gridPos` or `m_stack` on those items directly and then calling `Changed()` once is the cheapest way to rearrange an inventory.
+- `GetAllItems()` returns the **live list**. Changing `m_gridPos` or `m_stack` on those items directly and then calling `Changed()` once is the cheapest way to rearrange an inventory (one container save). Mod: [Sort Chest](../../src/UX/Container.Sort) sorts open containers this way ([design](../design/ux-container-sort.md)).
 
 ### "Bags" in 1.0
 There is no bag or backpack item and no nested inventory in vanilla 1.0. The candidates for "bags" are:
@@ -59,12 +64,12 @@ A real nested-bag item would be a "New" feature. It could serialize an `Inventor
 ### Data and persistence
 - `Inventory.Save(ZPackage)` writes version `109`, a `ushort` count, then `ItemData.Save` per item. That format has compact flags: bit `1` = `m_pickedUp`, bit `128` = has custom data, and so on. `Inventory.Load` handles every older version.
 - ItemData fields that matter for UX:
-  - `m_stack`, `m_durability`, `m_quality`, `m_variant`
+  - `m_stack`, `m_durability` (saved as the integer `(int)(m_durability * 100)` and read back `* 0.01f`, so an item in memory and the same item reloaded can differ in float bits: compare the saved integer), `m_quality`, `m_variant`
   - `m_worldLevel`: 1.0 world-level scaling. Crafting and counting ignore items below `Game.m_worldLevel`.
   - `m_pickedUp`, `m_crafterID/Name`
   - `m_customData`: a `Dictionary<string,string>` that is saved, synced inside container data, and copied by `Clone()`
   - `m_gridPos`, `m_equipped`
-  - `m_cheated`: 1.0 achievements; a cheated flag propagates onto stacks it merges into
+  - `m_cheated`: 1.0 achievements (console `spawn` sets it; the tooltip then shows a grey "cheated" line); `AddItem(ItemData)` merges spread it onto the target stack, the drag merge keeps the target's flag (see Flow above)
   - `m_dropPrefab`
 - SharedData fields that matter for UX: `m_name` ($token), `m_itemType`, `m_maxStackSize`, `m_weight`, `m_value`, `m_teleportable`, `m_questItem`, `m_autoStack`, `m_maxQuality`, `m_icons[]`.
 - `ItemType` enum values: None 0, Material 1, Consumable 2, OneHandedWeapon 3, Bow 4, Shield 5, Helmet 6, Chest 7, Ammo 9, Customization 10, Legs 11, Hands 12, Trophy 13, TwoHandedWeapon 14, Torch 15, Misc 16, Shoulder 17, Utility 18, Tool 19, Attach_Atgeir 20, Fish 21, TwoHandedWeaponLeft 22, AmmoNonEquipable 23, Trinket 24.
@@ -129,10 +134,10 @@ A real nested-bag item would be a "New" feature. It could serialize an `Inventor
 None of its own. The grid shows the live `Inventory`. `m_dragItem` / `m_dragInventory` / `m_dragAmount` *(private)* hold the drag state.
 
 ### Multiplayer authority
-Local. Container edits are legal only because the panel is shown only while the local client owns the container's ZDO.
+Local. Container edits are legal only because the panel is shown only while the local client owns the container's ZDO. Owning is needed but not always enough: the local copy of a ship's storage can be stale (§4), so a mod that rewrites a whole container should first compare `Inventory.Save` bytes with `ZDOVars.s_items`.
 
 ### Patch points
-- `InventoryGui.Awake` (postfix): add buttons, search fields or overlays. Clone `m_stackAllButton` / `m_takeAllButton` to keep the vanilla look.
+- `InventoryGui.Awake` (postfix): add buttons, search fields or overlays. Clone `m_stackAllButton` / `m_takeAllButton` to keep the vanilla look. Mod: [Sort Chest](../../src/UX/Container.Sort) clones `m_stackAllButton` twice here and shows the clones from an `InventoryGui.Show(Container, int)` postfix (reading `m_currentContainer`).
 - `InventoryGui.Show` / `Hide` / `CloseContainer` *(private)*: set up and tear down per-open state. `CloseContainer` runs while the container is still owned, before `SetInUse(false)`.
 - `InventoryGui.UpdateContainer` *(private)* (postfix): per-frame container-panel logic.
 - `InventoryGrid.UpdateGui` *(private)* (postfix): per-slot overlays such as dimming, highlight or badges. After this runs, `m_elements[y*w+x]` corresponds to each item's `m_gridPos`. Guard the index: extended-inventory mods put items outside the vanilla grid area. Mod: [Loot Pickup Filter](../../src/UX/AutoPickup.Filter) draws its red/green badges here, on `m_playerGrid` and `ContainerGrid` only.
@@ -147,6 +152,14 @@ Learned for Loot Pickup Filter ([design](../design/ux-autopickup-filter.md)):
 - **`Show` does no layout**: `InventoryGui.Show(Container, int)` only sets the Animator bool and the active group, so in a `Show` postfix the panel may still sit at its hidden or animating transform. Place added UI from the `Update` postfix once the panel's scale is non-zero, and again when its size, position or scale changes (`SetInventorySize` grows `m_player`).
 - Clicking a recipe activates the crafting group (`m_uiGroups[3]`), clicking a slot its grid's group. A `UIGroupHandler` on an object that also has a `CanvasGroup` makes everything under it non-interactable while another group is active: check the parent chain before hanging a button on `m_player`.
 - `InventoryGui.Hide` runs every frame while the player is dead or teleporting: keep a `Hide` postfix cheap.
+
+Learned for Sort Chest ([design](../design/ux-container-sort.md)):
+- **Cloning a panel button** (`m_stackAllButton` / `m_takeAllButton`): their `onClick` handlers are added in `InventoryGui.Awake` with `AddListener` (runtime listeners, not copied by `Object.Instantiate`). A clone brings along its `UIGamePad` (`m_zinputKey` / `m_keyCode`, `m_hint`, `m_blockingElements`, and the private serialized `alternativeGroupHandler`: while that group is active the pad fires whatever its own group), plus glyph switchers (`UIInputHint`) and `Localize` components that would show the vanilla key and rewrite the label. Instantiate under an inactive parent, then clear or strip them.
+- **`UIGamePad`** (`assembly_valheim`): `Start` caches `m_group = GetComponentInParent<UIGroupHandler>()` and hides `m_hint`; there is no `Awake`/`OnEnable`, so a fresh clone cannot fire before its first `Update`. It fires `Button.OnSubmit` on `ZInput.GetButtonDown(m_zinputKey)` only while the button is interactable and its group (or `alternativeGroupHandler`) is active, with one 2-frame lock shared by every `UIGamePad` (`m_lastInteractFrame`). Setting `m_group` after `Start` ties a pad to one grid's group. The hint shows only while the pad is interactive and a gamepad is active. Glyph text for any ZInput button: `Localization.instance.Localize("$KEY_<button>")`.
+- **Gamepad buttons with a container open**: `Player.TakeInput` is false while `InventoryGui.IsVisible()`. `JoyBack` (View/Select) has no reader in `assembly_valheim` there (`JoyMap`, which shares Select on some layouts, is ignored by `Minimap.Update` while the inventory is visible). `JoyLStick` is read only as the **held** multi-craft modifier (`InventoryGui.UpdateRecipe`, `OnCraftPressed`), in any group, and the left stick also moves the grid selection, so accidental clicks are likely. `JoyRStick` is not read. MC map: container grid View/Select = Sort Chest sort, L3 = Sort Chest criterion; player grid R3 = Loot Pickup Filter ([ux-container-sort.md §3.3](../design/ux-container-sort.md)).
+- `InventoryGui.Show(container)` opens with `activeGroup = 1` (player grid focused); JoyTabLeft/Right reach the container grid (`m_uiGroups[0]`).
+- **The container panel may come up late**: `UpdateContainer` activates `m_container` only once the local client owns the ZDO, which on a server can be many frames after `Show`, and the open animation can start near zero scale. Measure added UI only once `m_container` is active and its `lossyScale` is non-degenerate.
+- No vanilla localization token for "Sort", "Type" or "By name" (the 1.0.16 English table has `$inventory_takeall`, `$inventory_stackall`, `$menu_name`, `$hud_category`, `$biome_*`).
 
 ---
 
@@ -211,7 +224,8 @@ Local player. Crafting runs entirely client-side against the player inventory.
 - The same request → owner check → hand ownership → response pattern is used by `StackAll()` (RPC_RequestStack) and `TakeAll()` (tombstones; a 2 s cooldown and `ClaimOwnership()` on the requester).
 - **In-use state.** `m_inUse` is local to the owner. `UpdateUseVisual` mirrors it into `ZDOVars.s_inUse` (int) so other clients swap the `m_open` / `m_closed` visuals.
 - **Saving.** `OnContainerChanged` → `Save()` when the local client is owner and not loading. `Save` writes `Inventory.Save` bytes into `ZDOVars.s_items` and remembers `DataRevision`.
-- **Loading.** `CheckForChanges` (1 s) → `Load()` runs only if the ZDO `DataRevision` changed and the local client is **not** using the container, then calls `UpdateRows()`, which grows the height to fit legacy items.
+- **Loading.** `CheckForChanges` (1 s) → `Load()` runs only if the ZDO `DataRevision` changed and the local client is **not** using the container (`Load` returns early while the local `m_inUse` is true), then calls `UpdateRows()`, which sets the height to `max(m_height, highest item y + 1)` (legacy items in extra rows; the height shrinks back on a later load once those rows are empty).
+- **`m_inUse` can get stuck (ship storage).** `SetInUse` only works on the owner, and `InventoryGui.UpdateContainer` calls `SetInUse(true)` every frame while the panel shows. `Ship.UpdateOwner` (every 2 s) hands the ship ZDO, which a ship's container uses through `m_rootObjectOverride` (prefab data, unverified), to a player aboard when the owner is not aboard, with no in-use check. A player who opened the ship storage from the dock therefore loses ownership, the panel hides, and that player's `m_inUse` stays true (the later `SetInUse(false)` is ignored without ownership), so `Load` never runs again on that client: when it later owns and opens the storage again, its copy can be older than `ZDOVars.s_items`, and any save (a vanilla item move included) overwrites the newer data. The same gap exists for an open granted within about a second of another player's change. Carts are protected: `Vagon.RPC_RequestOwn` refuses while the cart's container is in use.
 - Destruction (`OnDestroyed`, owner only) drops everything, or moves it into `m_destroyedLootPrefab` containers.
 - `m_autoDestroyEmpty` containers (e.g. the temporary drop containers spawned from a `m_destroyedLootPrefab`) self-destroy when the owner sees them empty and unused.
 - Vanilla bug worth knowing: `Awake` registers `"RPC_Discovered"` but `Interact` invokes `"discovered"`. The discover flag never persists, so `m_discoverStat` increments on every open.
@@ -220,7 +234,7 @@ Local player. Crafting runs entirely client-side against the player inventory.
 ZDO keys: `s_items` (byte[]), `s_inUse` (int), `s_addedDefaultItems` (bool), `s_cheated` (bool, affects default items).
 
 ### Multiplayer authority
-The **ZDO owner** is authoritative. Only one player can hold a container open. Ownership moves to the opener and stays with them after closing. Any code that edits `container.GetInventory()` must run on the owner, which is always true while `InventoryGui` shows the container. Reading is always safe: every client in range reloads `s_items` every second, so any client can *search* nearby containers read-only.
+The **ZDO owner** is authoritative. Only one player can hold a container open. Ownership moves to the opener and stays with them after closing. Any code that edits `container.GetInventory()` must run on the owner, which is always true while `InventoryGui` shows the container; check `IsOwner()` again at click time (the panel of a ship's storage hides when `Ship.UpdateOwner` takes the ship away, and mods like MultiUserChest show it to non-owners), and before rewriting the whole inventory check that the local copy matches `ZDOVars.s_items` (stuck `m_inUse` above). [Sort Chest](../../src/UX/Container.Sort) does both (`ContainerSorter.LocalCopyCurrent`: exact bytes, else the stored bytes loaded into a scratch `Inventory` and saved again). Reading is always safe: every client in range reloads `s_items` every second, so any client can *search* nearby containers read-only.
 
 ### Patch points
 - `Container.RPC_RequestOpen` (owner-side access policy)
@@ -612,6 +626,7 @@ Cautions (learned for Crafting Search and Sort):
 
 ### Sort chest (QoL, exists)
 
+- **Status**: implemented as [Sort Chest](../../src/UX/Container.Sort) (0.1.0). The design that shipped differs from the sketch below: two clones of `m_stackAllButton` on the container panel, **Sort** and a criterion button that cycles By name / By type / By biome (saved in the config; changing it does not sort); every container except tombstones (Take all there restores the player's slot layout). Sort runs only when the local client owns the open container at click time **and** its local copy matches `ZDOVars.s_items` (stuck `m_inUse` on ship storage, §4), cancels a drag like Take all, and never refuses on a drag. The merge is stricter than `IsSameType`: only items that would save identically apart from stack and position (quality, world level, variant, crafter, saved durability, picked-up, cheated, equipped, custom data) combine, and nothing else changes. Type order is built on the shared `src/Shared/ItemKinds.cs` (same classification as Crafting Search and Sort, so an item lands in the matching group); biome order comes from a curated table of 355 item prefabs (raw materials, drops, trophies, trader goods, feasts), a scan of vegetation and spawn-list drops, and recipe / smelter / cooking / fermenter derivation (latest of the inputs and of the station's build materials), unknown last. Gamepad: View/Select sorts and L3 changes the criterion, only while the container grid is focused. No auto-sort, no hotkey, no locked slots. See [docs/design/ux-container-sort.md](../design/ux-container-sort.md).
 - **Feasibility**: easy.
 - **Who needs the mod**: client-only. The opener owns the container ZDO while the panel is visible (`InventoryGui.UpdateContainer` requires `Container.IsOwner()`), and `Inventory.Changed` → `Container.OnContainerChanged` → `Save()` writes `ZDOVars.s_items` for everyone.
 - **Hooks**:
@@ -673,7 +688,7 @@ Cautions (learned for Crafting Search and Sort):
 - **Risks**:
   - Keystrokes leaking into game hotkeys: E and Tab close the inventory in `InventoryGui.Update`, and console binds fire. The `Chat.HasFocus` postfix plus a bind guard fix this. Test on gamepad (`InventoryGrid.UpdateGamepad` ignores focus).
   - Performance: `UpdateGui` runs per frame per grid, so cache localized names (vanilla's `Localization` LRU holds only 100 entries).
-  - Conflicts with other mods that also reuse `BuildUi.m_searchField` or re-layout the container panel.
+  - Conflicts with other mods that also reuse `BuildUi.m_searchField` or re-layout the container panel. MC: Sort Chest already uses View/Select and L3 while the container grid is focused, and puts two buttons after Place stacks (or in a second row on the side away from the grid): pick another gamepad key and place the field elsewhere.
   - Revealing contents of warded or private chests if nearby search ignores access checks.
 
 ### Search crafting station (QoL, new)
@@ -772,7 +787,7 @@ Cautions (learned for Crafting Search and Sort):
   - a `Inventory.Changed` reverse patch
   - the stack-merge/sort routine used by all sort features
 - **Grouping items "by type"** (sort chest, sort bags, filters): build the groups on `MC.Shared.ItemKinds.Classify(SharedData)` (`src/Shared/ItemKinds.cs`, added with Crafting Search and Sort), so the same item lands in the same group in every MC mod. It keeps tools, pickaxes, the scythe and torches out of the weapons (vanilla `IsWeapon()` counts torches as weapons) and puts tankards (`Feaster` animation) with Misc.
-- **Everything here is client-only except pings**, which are opt-in per client. Container edits are safe as long as they happen while `InventoryGui` shows the container (ownership guaranteed).
+- **Everything here is client-only except pings**, which are opt-in per client. Container edits are safe as long as they happen while `InventoryGui` shows the container (ownership guaranteed); a mod that rewrites a whole container should also check `IsOwner()` at click time and that the local copy matches `ZDOVars.s_items` (stuck `m_inUse` on ship storage, §4).
 - **Compatibility checklist**:
   - EpicLoot (`ItemData.m_customData`, tooltips, inventory overlays): never merge stacks with differing custom data; append rather than replace tooltip text.
   - Jotunn (`LocalizationManager`, `InputManager`, GUIManager styles): fine alongside if we do not assume exclusive ownership of `Localization`.

@@ -405,14 +405,15 @@ client).
   moved), then the hierarchy of the cloned controls. Confirms the placement (T01, T27) without screenshots.
 - Once per station and tab: `Crafting list at station '<key>' (<tab> tab), N rows:` then per row
   `<prefab> <m_itemType> <m_skillType> <m_animationState> food=<hp>/<stamina>/<eitr> -> <ItemKind> -> <option(s)>`.
-  Confirms the station tokens and the unverified classifications (T21, T22). Sort Chest logs the same `ItemKind` format.
+  Confirms the station tokens and the unverified classifications (T21, T22). Sort Chest logs the item type, skill and
+  animation of every item with its own type group, in its own format (`Biome index: ...` Debug lines, its T14).
 
 ### 3.13 Coordination with other MC mods
 
-- **Sort Chest** (upcoming) puts its controls on the container panel (`m_container`); our row and menu stay inside
-  `m_crafting`. Both clone `m_takeAllButton` and should share the menu pattern (recipe-row clones, close on outside
-  click, no blocker, navigation `None`, in-clone hint rule). Its type groups are built on `ItemKinds.Classify`, so an
-  item lands in the same group in both mods (C02).
+- **Sort Chest** (upcoming) puts two buttons (clones of `m_stackAllButton`, no menu, no text field) on the container
+  panel (`m_container`); our row and menu stay inside `m_crafting`. It uses the same clone rules (navigation `None`,
+  in-clone hint rule). Its type groups are built on `ItemKinds.Classify`, so an item lands in the same group in both
+  mods (its TESTING.md C03).
 - **Loot Pickup Filter** (upcoming) uses the player inventory panel (`m_player`). A text field there uses the same
   `Chat.HasFocus` postfix pattern (ORed postfixes coexist); our F key never takes the focus from a focused TMP field
   (C03). MC hotkeys that work while the inventory is open must check `Chat.instance.HasFocus()`.

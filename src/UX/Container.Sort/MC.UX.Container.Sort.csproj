@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Sort Chest</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Sort chest</ModIdea>
+    <ModSide>Client</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Only you need it; it works on vanilla servers and with friends who do not have it. Sorting saves the chest the same way as moving items by hand while you have it open, so everyone sees the new order.</ModMultiplayerNotes>
+    <ModRequires></ModRequires>
+    <ModDescription>Adds a Sort button to chests, carts and ships. It rearranges the contents from top left to bottom right by name, type or biome, and can first combine partial stacks of the same item.</ModDescription>
+  </PropertyGroup>
+</Project>
