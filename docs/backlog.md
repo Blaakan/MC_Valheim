@@ -22,7 +22,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | [Harpoon to work on tamed animals](#harpoon-to-work-on-tamed-animals) | Farming | easy | full | [Harpoon Hooks Tames 0.1.0](../src/Farming/Harpoon.HooksTames) (in development) |
 | [Search crafting station](#search-crafting-station) | UX | easy | full | [Crafting Search and Sort 0.1.0](../src/UX/Crafting.SearchSort) (in development) |
 | [Loot filter](#loot-filter) | UX | easy | full | [Loot Pickup Filter 0.1.0](../src/UX/AutoPickup.Filter) (in development) |
-| [Sort chest](#sort-chest) | UX | easy | full | idea |
+| [Sort chest](#sort-chest) | UX | easy | full | [Sort Chest 0.1.0](../src/UX/Container.Sort) (in development) |
 | [Sort bags](#sort-bags) | UX | easy | full | idea |
 
 ## Overview
@@ -90,7 +90,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 | UX | Sort bags | QoL | easy | Client | no | full | idea |
 | UX | Search crafting station | QoL | easy | Client | no | full | [Crafting Search and Sort 0.1.0](../src/UX/Crafting.SearchSort) (in development) |
 | UX | Loot filter | QoL | easy | Client | no | full | [Loot Pickup Filter 0.1.0](../src/UX/AutoPickup.Filter) (in development) |
-| UX | Sort chest | QoL | easy | Client | no | full | idea |
+| UX | Sort chest | QoL | easy | Client | no | full | [Sort Chest 0.1.0](../src/UX/Container.Sort) (in development) |
 | UX | notifications stay longer and show multiple | QoL | medium | Client | no | partial | idea |
 | UX | Search chest | QoL | medium | Client | no | full | idea |
 | UX | Ping system revamp | QoL | hard | Depends | no | partial | idea |
@@ -1289,7 +1289,7 @@ QoL, trivial or easy, client-side only, no custom assets.
 
 ### Sort chest
 
-- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** idea
+- **Scope:** QoL · **Feasibility:** easy · **Who needs it:** Client · **Custom assets:** no · **Status:** [Sort Chest 0.1.0](../src/UX/Container.Sort) (in development)
 - **Approach:** A Sort button is cloned from Stack All. On click, only when the local client is owner and no drag is active, merge partial stacks of IsSameType items with identical m_customData (OR the m_cheated flags). Order by type group, localized name, quality and stack, reassign m_gridPos row-major, and call Inventory.Changed once so Container.Save writes ZDO s_items. Auto-sort on close and locked slots are optional.
 - **Hooks:** `InventoryGui.Awake (clone m_stackAllButton)`, `InventoryGui.m_currentContainer`, `Container.IsOwner`, `Inventory.GetAllItems`, `Inventory.Changed (private, reverse patch)`, `InventoryGui.SetupDragItem`, `InventoryGui.CloseContainer (auto-sort on close)`, `Container.OnContainerChanged/Save`
 - **Risks:** IsSameType ignores m_customData (EpicLoot and similar mods), so the merge must compare custom data explicitly. Do not rebuild with AddItem, which works per unit and fires Changed per call. UI reskins and other sort mods (Quick Stack-Store-Sort-Trash, AzuAutoStore) occupy the same button area.
