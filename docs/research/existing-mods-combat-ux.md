@@ -191,7 +191,7 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
   - Ships as Both: the server refuses players without the mod, and its multipliers apply to everyone.
   - Otherwise, recommend a ValheimPlus or ForsakenPowersPlusRemastered config and skip this idea.
 
-### Blood trinket (New): drop to 15% HP on proc, then heal back
+### Blood trinket (New): drop to 15% HP on proc, then heal it back over a few seconds after 10 s
 
 **Coverage: none.** No trinket or item was found that sets the player's HP low on purpose for a timed window. The related mods reward or protect low HP.
 
@@ -209,11 +209,11 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
   - Blood-magic costs are a share of current HP.
   - Going low today means casting a blood staff or taking hits.
 - **Borrow:**
-  - GrindstoneSkills' and UndyingAmulet's low-HP safety nets, as an optional 1 HP floor during the window;
   - EpicLoot's 30% "low health" threshold, as a reference point.
+  - Not borrowed: GrindstoneSkills' and UndyingAmulet's low-HP safety nets. The window has no 1 HP floor, so a big hit kills.
 - **Ours:**
-  - A trinket proc that makes the bloodstone bonus peak for 10 s, then gives the HP back, with no eitr and no weapon swap.
-  - It pairs with the Blood stone revamp's blood rite, but that idea's lifesteal does nothing during the window, while HP is clamped.
+  - A trinket proc that makes the bloodstone bonus peak for up to 10 s (heals still work, so the player can end it sooner), then gives the HP back over a few seconds, with no eitr and no weapon swap.
+  - It pairs with the Blood stone revamp's blood rite: nothing is clamped in the window, so that idea's lifesteal works there too.
   - The Trinket revamp gives it no passive, because its proc is not an `SE_Stats`.
 
 ### Ballista revamp (Revamp): turns and shoots faster, aims better, several targets per ballista
@@ -284,7 +284,7 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
 
 ### Training dummies revamp (Revamp): fight hostile creatures, ON/OFF switch, a dummy per weapon type
 
-**Coverage: none.** No mod makes dummies fight creatures, switches them off, or gives them other weapons. TouchGrass goes the other way (dummies can hunt players at night) and lets you change one dummy's damage type, which is the closest thing to "a dummy per weapon type". This idea also absorbs More training dummies (see that section for the utility variants).
+**Coverage: none.** No mod makes dummies fight creatures, switches them off, or gives them other weapons. TouchGrass goes the other way (dummies can hunt players at night) and lets you change one dummy's damage type, which is the closest thing to "a dummy per weapon type". This idea also absorbs More training dummies (cancelled in the idea sheet; see that section for the utility variants).
 
 | Mod | Status | Notes |
 |---|---|---|
@@ -294,8 +294,8 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
 
 **Inspiration.**
 - **Vanilla T.W.I.G.** (ServersideQoL's 1.0 component dump and the wiki): `piece_TrainingDummy` is itself a `Humanoid` with `MonsterAI` and `Piece`. It has 2,500 HP and regenerates fully in 30 s, cannot walk, sees 30 m up to 90° off its facing, hears nothing, and only attacks once alerted (10 m alert range). `m_aiSkipTarget` is true, so creatures never pick it on their own. Every attack deals 1 damage (wiki).
-- **No prior art** for dummies that fight creatures, can be switched off or wield other weapons. One faction rule (`BaseAI.IsEnemy`) and a per-dummy alert range make dummies fight hostile creatures; creatures never pick a dummy on their own (`m_aiSkipTarget`) and only fight back when a dummy hits them while they have no target.
-- **Borrow** from TouchGrass: per-dummy settings on interaction (on the alternate key, so E stays the ON/OFF switch) and the crowding limit, which also stops dummy walls.
+- **No prior art** for dummies that fight creatures, can be switched off or wield other weapons. One faction rule (`BaseAI.IsEnemy`) and a longer alert range used against creatures alone make dummies fight hostile creatures, while players and tames still meet the vanilla dummy; creatures never pick a dummy on their own (`m_aiSkipTarget`) and only fight back when a dummy hits them while they have no target.
+- **Borrow** from TouchGrass: per-dummy settings on interaction (on the alternate key, so E stays the ON/OFF switch; they default to vanilla) and the crowding limit, which also stops dummy walls.
 - **Watch out for:** base-defence balance (tanky, regenerating decoys), loot farms (a creature killed by a dummy drops its loot), TouchGrass using the same interact key and moving dummies at night, and our other combat ideas, which must ignore dummies (adrenaline income, the Mob AI weakness test, Sneak XP on backstabs).
 
 ### Increase base HP/Stamina with stats (Revamp): running, jumping, and so on
@@ -468,9 +468,9 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
 
 ### More training dummies (New): merged into Training dummies revamp
 
-Merged into the Training dummies revamp in the idea sheet: the per-weapon dummies live there; the variants below stay optional extras.
+Cancelled in the idea sheet: merged into the Training dummies revamp.
 
-**Coverage: partial.** For the utility variants left here, DPS and TouchGrass already give DPS readouts and configurable resistances or damage, and OdinTrainingPlace has its own training pieces. The mods for the dummies themselves are listed under Training dummies revamp.
+**Coverage: partial.** The per-weapon dummies live in the Training dummies revamp, whose section lists the mods for them. For the utility variants left here (optional extras for that mod), DPS and TouchGrass already give DPS readouts and configurable resistances or damage, and OdinTrainingPlace has its own training pieces.
 
 | Mod | Status | Notes |
 |---|---|---|

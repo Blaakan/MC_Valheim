@@ -1024,20 +1024,20 @@ the lower parent's level, with a chance of +1.*
 
 ### Farming — Ashlands trees (Revamp)
 *Now: tree saplings are "wrong biome" in the Ashlands, saplings that may grow there but do not tolerate heat stall as
-"too hot" outside a shield, and no rule checks shields once a tree has grown. Target: trees without a special biome
-(beech, birch, oak, pine, fir) can be planted in the Ashlands. A sapling outside a shield burns and is destroyed;
-inside one it grows by its own rules. A grown tree outside a shield turns into a Scorched Tree after a delay, and
-stays unhurt inside one.*
+"too hot" outside a shield, and no rule checks shields once a tree or crop has grown. Target: trees without a
+special biome (beech, birch, oak, pine, fir) can be planted in the Ashlands. A sapling outside a shield burns and is
+destroyed; inside one it grows by its own rules. A grown tree or crop outside a shield turns into a Scorched Tree
+after a delay, and stays unhurt inside one.*
 
 - **Feasibility:** medium. The mod has three small parts, all using vanilla prefabs: an Ashlands bit on the biome
-  masks of the temperate tree saplings, an owner-side exposure timer on saplings and planted trees in the Ashlands,
-  and a swap to a vanilla Scorched Tree. The effort goes into load-order safety (a shield can load after the plants
-  it covers), PlantEverything compatibility and tuning.
+  masks of the temperate tree saplings, an owner-side exposure timer on saplings and on the trees and crops grown
+  from them in the Ashlands, and a swap to a vanilla Scorched Tree. The effort goes into load-order safety (a shield
+  can load after the plants it covers), PlantEverything compatibility and tuning.
 - **Who needs the mod:** everyone. The planting player's client checks placement, but growth, burning and scorching
-  run on whoever owns the sapling or tree ZDO (usually a nearby client, `ZDOMan.ReleaseNearbyZDOS`). A vanilla owner
-  sees a beech sapling in the Ashlands as "wrong biome" and never grows or burns it. The mod changes the game rules,
-  so the server refuses players without it (the Breeding Star Inheritance `PlayerCheck` pattern) and sends its
-  settings to everyone.
+  run on whoever owns the sapling, tree or crop ZDO (usually a nearby client, `ZDOMan.ReleaseNearbyZDOS`). A vanilla
+  owner sees a beech sapling in the Ashlands as "wrong biome" and never grows or burns it. The mod changes the game
+  rules, so the server refuses players without it (the Breeding Star Inheritance `PlayerCheck` pattern) and sends
+  its settings to everyone.
 - **Assets:** none. The result is the vanilla Scorched Tree (the `AshlandsTree*` prefabs; `$prop_ashlandstree` is
   "Scorched Tree" in English), and the burn uses a vanilla effect prefab.
 - **Hooks:**
@@ -1049,20 +1049,23 @@ stays unhurt inside one.*
     placed instance and CropUtils (which reads the prefab) all see the bit.
   - `Plant.Awake` (postfix): put the bit back on a target instance as it loads (PlantEverything only rewrites
     prefabs), and attach the exposure component in the Ashlands.
-  - `Plant.Grow` (postfix): flag a tree grown in the Ashlands (`__result`) and attach the component to it.
-  - `TreeBase.Awake` (private; postfix): attach the component to flagged trees that load later.
+  - `Plant.Grow` (postfix): flag a tree or crop grown in the Ashlands (`__result`, the new object: a tree with a
+    `TreeBase` or a crop with a `Pickable`) and attach the component to it.
+  - `TreeBase.Awake` and `Pickable.Awake` (both private; postfix): attach the component to flagged trees and crops
+    that load later.
   - `ShieldGenerator.IsInsideShield`, `Heightmap.FindBiome`, `ZNetView.IsOwner`.
   - `Plant.Destroy` (private; the vanilla `IDestructible` path), `ZNetScene.GetPrefab`, `ZNetView.SetLocalScale`,
     `ZNetScene.Destroy`.
-  - `Plant.GetHoverText` (postfix: burn countdown).
-  - `SlowUpdate.GetAllInstaces` and `ZNetScene.m_instances` (attach the component to objects already loaded when the
-    feature turns on).
+  - `Plant.GetHoverText` (postfix: burn countdown) and `Pickable.GetHoverText` (postfix: scorch countdown on flagged
+    crops).
+  - `SlowUpdate.GetAllInstaces` (saplings) and `ZNetScene.m_instances` (trees and crops, which are not
+    `SlowUpdate`s): attach the component to objects already loaded when the feature turns on.
 - **Sketch:**
   - **Plant trees in the Ashlands (line 1).** The targets are a config list of sapling prefabs. The default is the
     vanilla tree saplings whose biome list includes Meadows: `Beech_Sapling`, `Birch_Sapling`, `Oak_Sapling`,
     `PineTree_Sapling` and `FirTree_Sapling` (the wiki lists them for Meadows, Black Forest and Plains, and fir also
-    for Mountain). `FirTree_big_Sapling` (the Deep North timber tree) stays out unless the sheet says otherwise. The
-    list is fixed rather than read from the biome masks, because PlantEverything rewrites those masks (with it,
+    for Mountain). `FirTree_big_Sapling` (the Deep North timber tree) stays out. The list
+    is fixed rather than read from the biome masks, because PlantEverything rewrites those masks (with it,
     `FirTree_big_Sapling` also gets the temperate biomes). Heat-tolerant saplings are never targets. If the saplings
     have `m_vegetationGroundOnly` *(prefab, unverified)*, placement keeps the vanilla Ashlands ground rule, so they
     cannot be planted on or next to lava.
@@ -1076,28 +1079,36 @@ stays unhurt inside one.*
   - **Saplings inside a shield (line 3).** Nothing to add. The sapling follows its own vanilla rules (biome,
     cultivated ground, open sky, space), so a crop whose biome list has no Ashlands stays "wrong biome", as in
     vanilla.
-  - **Grown trees outside a shield are scorched (line 4).** The `Plant.Grow` postfix sets a custom ZDO bool on the
-    tree when the sapling stood in the Ashlands and was not heat tolerant, so world trees are never touched. It also
-    attaches the component to that tree: the tree's `TreeBase.Awake` already ran inside `Plant.Grow` (during
-    `Instantiate`), before the flag existed. The `TreeBase.Awake` postfix attaches it to flagged trees that load
-    later (after a reload, or on another player's machine). Past `TreeScorchDelay` (config, for example 10 min of
-    exposure), the owner does four things:
+  - **Grown trees and crops outside a shield are scorched (line 4).** The sheet names trees; a fully grown crop
+    outside a shield is treated the same way (decided by the user, 2026-09-29). A crop ends up there when the shield
+    it grew under shrinks, breaks or runs out of fuel. The `Plant.Grow` postfix sets a custom ZDO bool on the grown
+    object when the sapling stood in the Ashlands and was not heat tolerant, so world trees and wild pickables are
+    never touched. A tree carries a `TreeBase`; a crop grows into a separate `Pickable` object (for example
+    `Pickable_Carrot`). Vines (`Plant.m_attachDistance` above 0) are skipped: a `Vine` also carries a `Pickable`
+    (`Vine.Awake` reads it), but it hangs on a piece, where a tree cannot stand. The postfix also attaches the
+    component to the grown object, because its `TreeBase.Awake` or `Pickable.Awake` already ran inside `Plant.Grow`
+    (during `Instantiate`), before the flag existed. The `TreeBase.Awake` and `Pickable.Awake` postfixes attach it to
+    flagged objects that load later (after a reload, or on another player's machine). Past `ScorchDelay` (config,
+    for example 10 min of exposure, the same for trees and crops), the owner does four things:
     - spawns a random configured scorched prefab (`ZNetScene.GetPrefab`; default `AshlandsTree1`, `3`, `4`, `5`, `6`)
-      at the tree's position and rotation;
-    - gives it the tree's scale (`ZNetView.SetLocalScale`, times a config factor). The scale is saved and sent to
-      other players only if the prefab's `ZNetView` has `m_syncInitialScale` *(prefab, unverified)*;
+      at the tree's or crop's position and rotation;
+    - gives it a scale (`ZNetView.SetLocalScale`): the tree's scale times a config factor, or for a crop its own
+      config value (`CropScorchScale`), since a crop's scale says nothing about tree size. The scale is saved and
+      sent to other players only if the prefab's `ZNetView` has `m_syncInitialScale` *(prefab, unverified)*;
     - plays the burn effect;
-    - removes the old tree with `ZNetScene.Destroy`. The new tree is a plain vanilla object without the flag.
-  - **Grown trees inside a shield (line 5).** The exposure stays 0, so the tree is never scorched. Vanilla already keeps
-    cinder fire out of an active dome (see the vanilla facts below). Other fire (fire arrows, a fire lit before the
-    shield came up) hurts trees as in vanilla. An optional `TreeBase.RPC_Damage` prefix could ignore
+    - removes the old tree or crop with `ZNetScene.Destroy`. The new tree is a plain vanilla object without the
+      flag.
+  - A one-shot crop harvested before the delay ends never becomes a Scorched Tree: `Pickable.SetPicked` destroys it
+    when it is picked (see §3), and the component with it.
+  - **Grown trees and crops inside a shield (line 5).** The exposure stays 0, so they are never scorched. Vanilla
+    already keeps cinder fire out of an active dome (see the vanilla facts below). Other fire (fire arrows, a fire lit
+    before the shield came up) hurts trees as in vanilla. An optional `TreeBase.RPC_Damage` prefix could ignore
     `HitType.CinderFire` hits on flagged trees inside a shield.
   - Exposure counts only time while the object is loaded, and lives in the ZDO. It carries over reloads and owner
     changes, but does not keep adding up while nobody is nearby. Small extra: the `Plant.GetHoverText` postfix shows
-    the burn countdown.
+    the burn countdown, and the `Pickable.GetHoverText` postfix the scorch countdown on flagged crops.
   - Live toggle: undo the prefab edits and destroy the live components (tracked in a static list). Saved exposure
     resumes on reactivation.
-  - Grown crops (pickables) are left alone, because the sheet text burns only plants that are still growing.
   - Vanilla facts this relies on (checked in `.ref`, 1.0.16):
     - `Plant.UpdateHealth` returns `Healthy` for the first 10 s after planting. It then checks the biome
       (`WrongBiome`) before heat: `TooHot` means Ashlands, `!m_tolerateHeat` and not
@@ -1123,8 +1134,12 @@ stays unhurt inside one.*
       shield check.
     - `Plant.Grow` spawns a random `m_grownPrefabs` entry, turned up to 11.25° from the sapling's yaw and scaled by
       `Random(m_minScale, m_maxScale)` (`ZNetView.SetLocalScale`). The new object's `Awake` runs inside `Instantiate`.
-      `Plant.Grow` then calls `TreeBase.Grow` (the grow animation, sent to everybody), destroys the sapling and
-      returns the new object. It runs on the sapling owner, which owns the new ZDO (`ZDOMan.CreateNewZDO`).
+      `Plant.Grow` then calls `TreeBase.Grow` when the new object is a tree (the grow animation, sent to
+      everybody), destroys the sapling and returns the new object: a tree with a `TreeBase`, or a crop with a
+      `Pickable`. It runs on the sapling owner, which owns the new ZDO (`ZDOMan.CreateNewZDO`).
+    - `TreeBase` and `Pickable` are `MonoBehaviour`s, not `SlowUpdate`s, with a private `Awake`; neither checks
+      shields, and `Cinder.CanBurn` never burns a pickable. On the owner, `Pickable.SetPicked` destroys a pickable
+      that has no `m_respawnTimeMinutes` and no `m_hideWhenPicked` (a one-shot crop) when it is picked.
     - `ZNetView.SetLocalScale` writes the scale to the ZDO only when the prefab's `m_syncInitialScale` is set.
     - `Heightmap.GetBiome` picks one of the four corner biomes by distance weight, so near a biome edge it can differ
       from `WorldGenerator.GetBiome`. Use `Heightmap.FindBiome` (`FindHeightmap` + `GetBiome`, as
@@ -1134,30 +1149,38 @@ stays unhurt inside one.*
     generator's radius is 0 before its first update. Keep the grace and count exposure only while loaded. A
     generator that unloads before its trees costs them at most one tick.
   - The dome shrinks with fuel (from 30 m when full to 10 m when almost empty, code defaults), and cinder rain drains
-    fuel. Trees near the edge are therefore scorched when fuel drops. Warn players through sapling hover text
-    (`TreeBase` has no hover text).
+    fuel. Trees and grown crops near the edge are therefore scorched when fuel drops. Warn players through sapling
+    and crop hover text (`TreeBase` has no hover text).
+  - Crop fields: a crop that does not tolerate heat grows in the Ashlands only under a shield, and only if its biome
+    list includes the Ashlands *(prefab, unverified per crop)*. With PlantEverything's `EnforceBiomesVanilla` off,
+    every crop can. Such a field left outside a shield becomes one Scorched Tree per crop, at crop spacing
+    (`Plant.m_growRadius`, prefab): a dense, overlapping thicket with many new objects. Keep `CropScorchScale` small
+    and check in game how a scorched field looks and performs.
   - Install: saplings already stalled outside a shield when the mod is installed burn about a minute after they load.
+    Trees and crops that grew before the install carry no flag and are never scorched.
   - Balance: the vanilla Scorched Tree drops Ashwood and Charcoal Resin (wiki) and cannot be planted in vanilla, so
-    this makes Ashwood renewable (PlantEverything's `Ashwood_Sapling` already does). Alternatives: a stump
+    this makes Ashwood renewable (PlantEverything's `Ashwood_Sapling` already does). Crops add another route: a
+    crop field grown under a shield, then left without fuel, becomes a grove of Scorched Trees. Alternatives: a stump
     (`AshlandsTreeStump1..3`) or a smaller drop table.
   - Size and variants: Scorched Trees are large (wiki), while sapling-grown trees keep their own scale, so set the
-    scale factor in game. The manifest has no `AshlandsTree2`, and `AshlandsTree6_big` is a big variant. Which
-    `AshlandsTree*` prefabs are free-standing trees must be checked.
+    scale factor and `CropScorchScale` in game. The manifest has no `AshlandsTree2`, and `AshlandsTree6_big` is a big
+    variant. Which `AshlandsTree*` prefabs are free-standing trees must be checked.
   - PlantEverything rewrites the sapling fields (`Plant.m_biome`, `Piece.m_onlyInBiome`, `m_tolerateHeat`,
     `m_destroyIfCantGrow`) on the prefabs, not on live instances, when it starts and whenever its config changes;
     hence the ghost-time and `Awake` re-apply. With its `PlantsRequireShielding` off every plant tolerates heat, so
-    the burn rule does nothing; respect that. Its `m_destroyIfCantGrow` (on unless `PlaceAnywhere` is on) already
-    removes an unsheltered sapling when its grow time ends. It also patches `Plant.Grow` (a transpiler),
+    the burn and scorch rules do nothing; respect that. Its `m_destroyIfCantGrow` (on unless `PlaceAnywhere` is on)
+    already removes an unsheltered sapling when its grow time ends. It also patches `Plant.Grow` (a transpiler),
     `Plant.GetHoverText` (a grow timer, shown only while healthy) and `TreeBase.Awake`; postfixes on the same methods
     coexist.
   - PlantEasily and CropUtils refuse to plant where a plant cannot grow (biome, heat, cold). PlantEasily reads the
     ghost's `Plant.m_biome`; CropUtils reads the selected prefab's, and only when its planting tool is used. With
     either mod, unsheltered Ashlands spots are refused before planting, which fits the burn rule.
-  - Uninstall: planted trees and scorched trees are vanilla prefabs and stay. Target saplings in the Ashlands go back
-    to "wrong biome". Vanilla ignores the custom ZDO keys.
+  - Uninstall: planted trees, grown crops and scorched trees are vanilla prefabs and stay. Target saplings in the
+    Ashlands go back to "wrong biome". Vanilla ignores the custom ZDO keys.
   - Unverified *(prefab)*: the tree saplings' biome masks, `m_onlyInBiome`, `m_vegetationGroundOnly` and
-    `m_destroyIfCantGrow`, which tree each sapling grows, `m_syncInitialScale` on the Scorched Tree prefabs, the
-    Scorched Trees' drops and stumps, and how the burn effects look.
+    `m_destroyIfCantGrow`, which tree each sapling grows, the crop saplings' biome masks and `m_growRadius`,
+    `m_syncInitialScale` on the Scorched Tree prefabs, the Scorched Trees' drops and stumps, and how the burn effects
+    look.
 
 ### Farming — Cultivator revamp (Revamp)
 *Now: the cultivator plants crops and tree saplings; wild bushes, mushrooms and forage can only be picked.
@@ -1371,7 +1394,8 @@ Target: the cultivator digs up a wild plant into a transplant item that you plan
   - Duplicates PlantEverything.
   - Balance, for example Ashlands or Mistlands plants anywhere.
   - Interaction with the Ashlands trees idea: its burn rule covers every sapling in the Ashlands without
-    `m_tolerateHeat`, cloned ones included.
+    `m_tolerateHeat`, cloned ones included, and its scorch rule turns the trees and pickables they grow there into
+    Scorched Trees once they stand outside a shield.
 
 ### Cooking — Unlock biome feast in the biome, not after (QoL)
 *Each feast becomes available while the player is in its biome, not one biome later.*

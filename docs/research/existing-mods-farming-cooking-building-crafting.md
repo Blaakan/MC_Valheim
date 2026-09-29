@@ -19,7 +19,7 @@ Research done 2026-09 (2026-09-28), about three weeks after Valheim 1.0 (Deep No
 | # | Idea | Cat. | Scope | User said exists | Coverage found |
 |---|------|------|-------|------------------|----------------|
 | 1 | Breeding revamp (lowest parent + chance of +1) | Farming | Revamp | No | partial |
-| 2 | Ashlands trees (plant trees in the Ashlands; unsheltered saplings burn, grown trees are scorched) | Farming | Revamp | No | partial |
+| 2 | Ashlands trees (plant trees in the Ashlands; unsheltered saplings burn, grown trees and crops are scorched) | Farming | Revamp | No | partial |
 | 3 | Forge of Potential revamp | Crafting | QoL | No | partial |
 | 4 | Easy plant (cancelled) | Farming | QoL | Yes | **full** |
 | 5 | Plant "everything" (cancelled) | Farming | QoL | Yes | **full** |
@@ -62,7 +62,7 @@ What stands out:
   - Barber: a `Barber` piece plus `PlayerCustomizaton.ShowBarberGui`.
 - **Many flagship mods are deprecated or stuck before 1.0:** Jewelcrafting (deprecated 2026-05), Valheim Enchantment System, WardIsLove, BetterWards, UnderTheRadar, Tameable Collector, Player Heads. This leaves real gaps for gems, wards, player trophies and pet transport.
 - **Genuine gaps (nothing found):**
-  - Scorched Trees from planted trees left outside a shield in the Ashlands.
+  - Scorched Trees from planted trees and crops left outside a shield in the Ashlands.
   - Feast unlock on biome discovery.
   - New trophies for trophy-less creatures.
   - Tames as real ship passengers.
@@ -108,11 +108,13 @@ The request (sheet text of 2026-09-29):
 4. A fully grown tree outside a shield turns into a Scorched Tree after a delay.
 5. A fully grown tree inside a shield stays unhurt.
 
-Coverage is partial. PlantEverything comes close to the planting half through config: vanilla tree saplings can grow in any biome, so also under a shield in the Ashlands, and its defaults remove an unsheltered sapling silently once its grow time is over. No mod burns saplings on a timer, and none turns grown trees into Scorched Trees. Seasons uses the same "dies outside the shield" rule for winter cold.
+Decided by the user (2026-09-29): a fully grown crop outside a shield is treated like a tree, so it also turns into a Scorched Tree after the delay (for example when the shield it grew under breaks or runs out of fuel).
+
+Coverage is partial. PlantEverything comes close to the planting half through config: vanilla tree saplings can grow in any biome, so also under a shield in the Ashlands, and its defaults remove an unsheltered sapling silently once its grow time is over. No mod burns saplings on a timer, and none turns grown trees or crops into Scorched Trees. Seasons uses the same "dies outside the shield" rule for winter cold.
 
 **Vanilla hooks**
 - `Plant.UpdateHealth` checks the biome (`WrongBiome`) before heat. It then sets `TooHot` for a plant in the Ashlands that has no `m_tolerateHeat` and is not inside `ShieldGenerator.IsInsideShield`. An unhealthy plant never grows, and `Plant.Grow` destroys it only when `m_destroyIfCantGrow` is set. Nothing burns it.
-- Once `Plant.Grow` has spawned the tree (`TreeBase`), no shield rule applies to it. Outside a dome, cinder fire can burn it (`Cinder.CanBurn`). An active dome never spawns cinders inside (`CinderSpawner.SpawnCinder`) and destroys the ones that enter it (`ShieldGenerator.CheckObjectInsideShield`), which costs fuel.
+- Once `Plant.Grow` has spawned the tree (`TreeBase`) or the crop (`Pickable`, a separate object from the sapling), no shield rule applies to it. Outside a dome, cinder fire can burn a tree (`Cinder.CanBurn`), but not a crop. An active dome never spawns cinders inside (`CinderSpawner.SpawnCinder`) and destroys the ones that enter it (`ShieldGenerator.CheckObjectInsideShield`), which costs fuel.
 - The vanilla Scorched Tree (`$prop_ashlandstree`) is the `AshlandsTree*` family: `AshlandsTree1`, `AshlandsTree3` to `AshlandsTree6` and `AshlandsTree6_big` in the 1.0.16 manifest.
 
 | Mod | Status | Notes |
@@ -128,7 +130,7 @@ Coverage is partial. PlantEverything comes close to the planting half through co
 - **Covered only through config:** planting trees in the Ashlands and growing them under a shield (PlantEverything with `EnforceBiomesVanilla` off). That setting opens every biome at once, crops included. Ours adds only the Ashlands, only to a fixed list of trees without a special biome, and keeps the shield requirement.
 - **The gap:**
   - a visible, timed burn of unsheltered saplings (vanilla stalls them; PlantEverything removes them silently at the end of their grow time);
-  - grown trees turning into Scorched Trees outside a shield, which no mod does.
+  - grown trees and crops turning into Scorched Trees outside a shield, which no mod does.
 - **Borrow from Seasons:**
   - a gradual death over a configurable time rather than an instant one;
   - the shield as the greenhouse;
@@ -137,7 +139,7 @@ Coverage is partial. PlantEverything comes close to the planting half through co
   - Re-apply our Ashlands bit to the selected prefab before the ghost is made and to instances as they load, because PlantEverything rewrites the sapling prefabs when it starts and whenever its config changes.
   - Skip heat-tolerant saplings (such as its `Ashwood_Sapling`), and respect its `PlantsRequireShielding` off.
   - PlantEasily (ghost) and CropUtils (prefab) already refuse unsheltered Ashlands spots, which fits the burn rule.
-- **Balance:** Scorched Trees drop Ashwood, so this makes Ashwood renewable, as PlantEverything's Ashwood sapling and TreesReborn's stump replanting already do. Decide whether the scorched result keeps the vanilla drops.
+- **Balance:** Scorched Trees drop Ashwood, so this makes Ashwood renewable, as PlantEverything's Ashwood sapling and TreesReborn's stump replanting already do. Crops add another route: a crop field grown under a shield, then left without fuel, becomes a grove of Scorched Trees. Decide whether the scorched result keeps the vanilla drops.
 
 ## 3. Forge of Potential revamp (QoL) — coverage: partial
 
