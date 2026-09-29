@@ -53,7 +53,7 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
   - A slight, standalone layer: the primary attack becomes a roll attack, a parry attack or a jump attack when started in a short window after that action, each with its own vanilla animation and a modest bonus. The secondary attack keeps its vanilla role.
   - Optional light swing tuning (movement while swinging, lunge, tempo), mild by default.
   - Technically client-only with vanilla animations; it ships as Both, with the server's settings for everyone.
-  - A per-move adrenaline bonus that the Adrenaline revamp can pay. The moves cost no adrenaline: the bar is kept for the trinket proc.
+  - A per-move adrenaline bonus that the Adrenaline revamp can pay. The moves cost no adrenaline: the bar is kept for the trinket, which the player triggers (Trinket revamp).
   - Detect GCO, PPR, Cancel Animation Cancels and the quickstep mods, and warn or turn off the overlapping move.
 
 ### Sneak revamp (Revamp): Sneak XP on sneak attacks, much stealthier when standing still
@@ -83,44 +83,47 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
   - A clear "hold still" reward, which no mod offers: after a second without moving, a crouched player's stealth factor drops (for example it halves), shown by the vanilla stealth bar and a status icon. A floor keeps it from stacking with other stealth effects (for example the Sneak tiers of New ability depending on skill level) into full invisibility. Ambushes and bow shots from cover become a real tactic, and monster perception stays untouched.
   - Sneak-attack XP in a small standalone mod, scaled by the victim's max HP with no floor (weak creatures pay almost nothing, training dummies nothing), for players who do not want a whole combat overhaul. It stays off when SecondaryAttacks, GCO or SmartSkills already pays sneak XP.
 
-### Trinket revamp (Revamp): a slightly weaker passive effect tied to the adrenaline revamp
+### Trinket revamp (Revamp): vanilla trinkets fired by the player with a key; the bar fills while fighting and never drains
 
-**Coverage: full.** BetterTrinkets does the mechanic as asked: an always-on weaker passive that a full bar doubles. It also has an unofficial 1.0 patch. Passive_Trinket_Modifiers and Balrond Battle Flow do the same with more control. What is left for us is the tie-in with our Adrenaline revamp.
+**Coverage: partial.** No mod found lets the player fire a vanilla trinket: every trinket mod keeps the automatic pop or turns trinkets into passives. The other parts exist separately. RageNAdrenaline spends its own meters (not the vanilla bar) with a key, AdrenalineModifier can stop the drain, and Odin (Nexus, per search snippets) stops it while enemies are near. The passive-trinket mods that matched the earlier version of this idea (BetterTrinkets, Passive_Trinket_Modifiers, Balrond Battle Flow) now matter as conflicts.
 
 | Mod | Status | Notes |
 |---|---|---|
-| [BetterTrinkets (Schwifty)](https://thunderstore.io/c/valheim/p/Schwifty/BetterTrinkets/) | v1.0.0, updated 2026-02-28, 1.0: unknown | Trinket effects are always active as a weaker passive, and a full bar **doubles** the effect for the trinket's normal duration. Config for all 13 pre-Deep North trinkets. Client-side, which is a balance concern in multiplayer. About 2.7K downloads. |
-| [BetterTrinkets Deep North Compat (Gabadur)](https://thunderstore.io/c/valheim/p/Gabadur/BetterTrinkets_Deep_North_Compat/) | v1.0.9, updated 2026-09-18, 1.0: yes (unofficial port) | AI-assisted binary patch of the BetterTrinkets DLL for Valheim 1.0, keeping its config. The two trinkets added by 1.0 are left out on purpose. About 440 downloads. |
-| [Passive_Trinket_Modifiers (Gabadur)](https://thunderstore.io/c/valheim/p/Gabadur/Passive_Trinket_Modifiers/) | v0.35.1, updated 2026-09-27, 1.0: yes (supports the Deep North Neckstabber and Witch Crown) | Standalone replacement for BetterTrinkets' passive handling. Each trinket has a passive section and a "doubled" section (values and duration while the full-bar doubling runs), a long list of `SE_Stats` fields can be set, and there is a global adrenaline gain multiplier. The one-shot health, stamina and eitr gains are left out. AI Generated tag, about 160 downloads. |
-| [Balrond Battle Flow (Balrond)](https://thunderstore.io/c/valheim/p/Balrond/balrond_battle_flow/) | see Adrenaline revamp | Every trinket is redesigned as a passive that scales from 0% at 0 adrenaline to 100% at 100 adrenaline. Tooltips show the current and maximum values. Surge and Overcharge at a full bar. |
-| [Surge (Ezomic)](https://thunderstore.io/c/valheim/p/Ezomic/Surge/) | see Adrenaline revamp | Per-trinket adrenaline costs. |
-| [MultiTrinket (QQMZR)](https://thunderstore.io/c/valheim/p/QQMZR/MultiTrinket/) | v1.0.1, updated 2026-03-04, 1.0: unknown | For extra trinket-slot mods (needs ExtraSlots and ExtraSlots Custom Slots): uses the highest cost of the equipped trinkets and triggers them all together. Source: [MoistMonster22/MultiTrinket](https://github.com/MoistMonster22/MultiTrinket). About 580 downloads. |
-| Related | | [ClassTrinkets (JamesJonesTV)](https://thunderstore.io/c/valheim/p/JamesJonesTV/ClassTrinkets/) (v1.0.2, 2026-02-12, 1.0: unknown) adds 40 static-stat trinkets: new content, not a rework. RPG Equipment ([Nexus 3992](https://www.nexusmods.com/valheim/mods/3992), per search snippets) has an option that divides the combined trinket cost by the number of trinkets equipped. |
+| [RageNAdrenaline (Jawlessjman665)](https://thunderstore.io/c/valheim/p/Jawlessjman665/RageNAdrenaline/) | v1.2.0, updated 2026-09-26, 1.0: yes (tagged Deep North Update) | The closest model, on meters of its own. Rage fills while enemies are near, drains when none are, plays a sound once when full, and is spent with a key (a Jötunn button with a gamepad binding). A boss-only Adrenaline meter is spent the same way and resets when you are hit. The default keys are F and G, and D-pad up and left: the vanilla Forsaken power, radial menu and hotbar inputs, and the button does not block them. Separate from the vanilla bar and trinkets. Source: [jawlessjman/RageNAdrenaline](https://github.com/jawlessjman/RageNAdrenaline) (MIT). About 16 downloads. |
+| [AdrenalineModifier (mightywa33ior)](https://thunderstore.io/c/valheim/p/mightywa33ior/AdrenalineModifier/) | v1.0.1, updated 2025-10-05, 1.0: unknown | `AdrenalineDecayMultiplier` at 0 stops the drain. Its prefix on `Player.AddAdrenaline` scales every negative amount, though, so the miss and unblocked-hit penalties go too. The pop stays automatic. Source: [lukeadickinson/valhiem-adrenalinemodifier](https://github.com/lukeadickinson/valhiem-adrenalinemodifier) (MIT). About 3.2K downloads. |
+| [KeepAdrenalineLonger (zopthemop)](https://thunderstore.io/c/valheim/p/zopthemop/KeepAdrenalineLonger/) | v1.0.0, updated 2026-06-05, 1.0: unknown | Only a longer delay (a flat 15 s) before the drain: the bar still empties between fights. About 270 downloads. |
+| Odin ([Nexus 3188](https://www.nexusmods.com/valheim/mods/3188)) | version and date unknown, 1.0: unknown (Nexus, from search snippets) | An all-in-one admin and gameplay mod. Per search snippets: running, attacking and dodging turn stamina into adrenaline, blocks and parries add more, adrenaline does not decay while enemies are near, each trinket has a cooldown that survives a trinket swap, and each vanilla trinket has its own cost. The snippets mention no manual trigger. |
+| [Balrond Battle Flow (Balrond)](https://thunderstore.io/c/valheim/p/Balrond/balrond_battle_flow/) | see Adrenaline revamp | Conflict. Every trinket becomes a passive that scales with the bar (0% at 0 adrenaline, 100% at 100). At the max, a Surge holds the bar for a short time, then an Overcharge drains it with bonuses and drawbacks. |
+| [BetterTrinkets (Schwifty)](https://thunderstore.io/c/valheim/p/Schwifty/BetterTrinkets/) | v1.0.0, updated 2026-02-28, 1.0: unknown | Conflict. A weaker always-on passive, doubled for the trinket's normal duration by a full bar. Config for the 13 pre-Deep North trinkets. Client-side. About 2.7K downloads. Unofficial 1.0 patch: [BetterTrinkets Deep North Compat (Gabadur)](https://thunderstore.io/c/valheim/p/Gabadur/BetterTrinkets_Deep_North_Compat/) (v1.0.9, updated 2026-09-18, 1.0: yes), which leaves out the two Deep North trinkets. |
+| [Passive_Trinket_Modifiers (Gabadur)](https://thunderstore.io/c/valheim/p/Gabadur/Passive_Trinket_Modifiers/) | v0.35.1, updated 2026-09-27, 1.0: yes (supports the Deep North Neckstabber and Witch Crown) | Conflict. A passive section and a "doubled" section per trinket, many `SE_Stats` fields, and a global adrenaline gain multiplier. AI Generated tag, about 160 downloads. |
+| [MultiTrinket (QQMZR)](https://thunderstore.io/c/valheim/p/QQMZR/MultiTrinket/) | v1.0.1, updated 2026-03-04, 1.0: unknown | For extra trinket-slot mods (needs ExtraSlots and ExtraSlots Custom Slots): uses the highest cost of the equipped trinkets and fires them all together. The linked repository has only a README. About 580 downloads. |
+| [Surge (Ezomic)](https://thunderstore.io/c/valheim/p/Ezomic/Surge/) | see Adrenaline revamp | Per-trinket costs, edited live on `SharedData.m_maxAdrenaline`. Works with ours: the bar follows the current max. |
+| Related | | [ClassTrinkets (JamesJonesTV)](https://thunderstore.io/c/valheim/p/JamesJonesTV/ClassTrinkets/) (v1.0.2, 2026-02-12, 1.0: unknown) adds 40 static-stat trinkets: new content, not a rework. RPG Equipment ([Nexus 3992](https://www.nexusmods.com/valheim/mods/3992), per search snippets) has an option that divides the combined trinket cost by the number of trinkets equipped. [Valheim Level System (Lorska)](https://thunderstore.io/c/valheim/p/Lorska/Valheim_Level_System_by_Lorska/) (v0.99.9, 2026-09-14, 1.0: yes, tagged Deep North Update; also Nexus 2797): its changelog adds an "AdrenalineHoldover" that counts the bar as full for a set time after a trinket fires, and a Tactician class that keeps 20% of the adrenaline used. |
 
 **Inspiration.**
 - **Vanilla:**
-  - A trinket adds adrenaline capacity (`SharedData.m_maxAdrenaline`).
-  - Its effect only exists after a full bar (`m_fullAdrenalineSE`, 30 to 120 s per the wiki). `Player.AddAdrenaline` applies it for every equipped item.
-  - An `m_equipStatusEffect` is applied on equip by `Humanoid.UpdateEquipmentStatusEffects` and already shows in the item tooltip, so a passive needs no UI work.
+  - A trinket adds adrenaline capacity (`SharedData.m_maxAdrenaline`), and its effect (`m_fullAdrenalineSE`, 30 to 120 s per the wiki) fires by itself the moment the bar is full (`Player.AddAdrenaline`), often at the end of a fight or while running away.
+  - The bar drains 6 to 10 s after the last gain, so the next fight starts from zero.
+  - The Forsaken power is the vanilla model of a power on a key, with a "not ready" message while it cools down.
 - **Borrow:**
-  - BetterTrinkets' passive-plus-proc split;
-  - Passive_Trinket_Modifiers' separate passive and proc settings per trinket;
-  - Battle Flow's scaling with the bar, and its tooltips showing current and maximum values;
-  - Surge's per-trinket costs.
+  - RageNAdrenaline's key trigger and its one-time "full" sound;
+  - the Forsaken power's "not ready" message, and the vanilla bar flash;
+  - MultiTrinket's "fire every equipped trinket together", which the vanilla pop already does.
 - **What they get wrong:**
-  - BetterTrinkets is client-side and pre-1.0, and its 1.0 patch skips the two Deep North trinkets.
-  - Passive_Trinket_Modifiers drops the one-shot gains.
-  - Battle Flow gives 0% at an empty bar, so it still depends on the vanilla build-up, and it has no config yet.
+  - RageNAdrenaline's default keys clash with vanilla actions (both fire), and its meters are separate from the trinkets.
+  - AdrenalineModifier's zero decay also drops the penalties, and the pop stays automatic.
+  - KeepAdrenalineLonger still empties the bar between fights.
+  - The passive mods change what a trinket gives, which the sheet now asks to keep as it is.
 - **Ours:**
-  - An always-on passive a bit weaker than the proc (config %), optionally growing with the bar.
-  - The vanilla proc on top, without stacking.
-  - Ships as Both: the server refuses players without the mod, and its numbers apply to everyone.
-  - All 15 vanilla trinkets.
-  - The Adrenaline revamp makes the bar fill at a steady pace.
+  - Vanilla trinket effects and costs, with no lasting item data change.
+  - A bar that fills while fighting and never drains (the Adrenaline revamp).
+  - A full bar that waits, with a flash, a message and a tooltip line naming the key.
+  - One key (and a gamepad combination per layout) that fires every equipped trinket through the vanilla pop.
+  - Ships as Both: the server refuses players without the mod, and its settings apply to everyone.
 
-### Adrenaline revamp (Revamp): faster build-up that is fair across weapons, and a trinket proc every fight
+### Adrenaline revamp (Revamp): faster build-up that is fair across weapons, no decay, and a full bar every fight
 
-**Coverage: partial.** Number tweaks exist: gain, decay and decay-delay multipliers, a longer hold before decay, and trinket costs. Balrond Battle Flow also reworks what adrenaline does for trinkets and weapons. None of the mods found adds income while fighting (TastyAdrenaline trickles adrenaline in only while Tasty Mead is active), makes gains fair across weapon speeds, or aims at one trinket proc per fight.
+**Coverage: partial.** Number tweaks exist: gain, decay and decay-delay multipliers, a longer hold before decay, and trinket costs. Balrond Battle Flow also reworks what adrenaline does for trinkets and weapons. None of the mods found adds income while fighting (TastyAdrenaline trickles adrenaline in only while Tasty Mead is active), makes gains fair across weapon speeds, or aims at one full bar per fight.
 
 | Mod | Status | Notes |
 |---|---|---|
@@ -130,7 +133,7 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
 | [Surge (Ezomic)](https://thunderstore.io/c/valheim/p/Ezomic/Surge/) | v1.0.3, updated 2026-08-16, 1.0: unknown | Sets each trinket's adrenaline cost (multiplier, flat value or per trinket) by editing `SharedData.m_maxAdrenaline` live. Its README lists the 13 pre-1.0 vanilla costs read from the game (10 to 100) and says the player's own base is 0. Source: [Ezomic/valheim-surge](https://github.com/Ezomic/valheim-surge) (MIT). AI Generated tag, about 170 downloads. |
 | [RageNAdrenaline (Jawlessjman665)](https://thunderstore.io/c/valheim/p/Jawlessjman665/RageNAdrenaline/) | v1.2.0, updated 2026-09-26, 1.0: yes (tagged Deep North Update) | Two extra meters from Terraria's Calamity mod. Rage fills while enemies are near and is spent with a key. A boss-only Adrenaline meter resets when you are hit. Both are separate from the vanilla bar and trinkets. Needs Jötunn. Source: [jawlessjman/RageNAdrenaline](https://github.com/jawlessjman/RageNAdrenaline) (MIT), also on Nexus (3362). About 16 downloads. |
 | [GrindstoneSkills (MilkyTeam)](https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/) | v0.10.0, updated 2026-09-29, 1.0: likely | Its Defense skill gives up to 25% more adrenaline from blocks and parries, and 25% less lost to unblocked hits, through a prefix on `Player.AddAdrenaline`. Source: [geraldjglasgow/ValheimMods](https://github.com/geraldjglasgow/ValheimMods/tree/main/GrindstoneSkills). About 640 downloads. |
-| Related | | [TastyAdrenaline (RiftWood)](https://thunderstore.io/c/valheim/p/RiftWood/TastyAdrenaline/) (v1.0.1, 2026-09-25, 1.0: yes) gives +1 adrenaline every 2 s while Tasty Mead is active (AI Generated, about 40 downloads). [BetterTrinkets](https://thunderstore.io/c/valheim/p/Schwifty/BetterTrinkets/) and [Passive_Trinket_Modifiers](https://thunderstore.io/c/valheim/p/Gabadur/Passive_Trinket_Modifiers/) (see Trinket revamp) make trinkets work without a full bar; the latter also has a global gain multiplier. With [ForsakenPowerOverhaul](https://thunderstore.io/c/valheim/p/momos3939/ForsakenPowerOverhaul/), activating a power triggers the trinket boost. |
+| Related | | [TastyAdrenaline (RiftWood)](https://thunderstore.io/c/valheim/p/RiftWood/TastyAdrenaline/) (v1.0.1, 2026-09-25, 1.0: yes) gives +1 adrenaline every 2 s while Tasty Mead is active (AI Generated, about 40 downloads). [BetterTrinkets](https://thunderstore.io/c/valheim/p/Schwifty/BetterTrinkets/) and [Passive_Trinket_Modifiers](https://thunderstore.io/c/valheim/p/Gabadur/Passive_Trinket_Modifiers/) (see Trinket revamp) make trinkets work without a full bar; the latter also has a global gain multiplier. [ForsakenPowerOverhaul](https://thunderstore.io/c/valheim/p/momos3939/ForsakenPowerOverhaul/) keeps the vanilla +10 adrenaline when a power is activated (its README). |
 
 **Inspiration.**
 - **Vanilla today:**
@@ -146,7 +149,7 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
     - a bow's draw only gets shorter with skill (`Humanoid.GetAttackDrawPercentage`).
   - A Steam thread ("trinkets need a rework", 2025-09) says the build-up is too slow and asks for passives. A player's reply there explains that the decay delay shrinks from 10 to 6 s as the bar fills, and that an AoE weapon that staggers several mobs earns several chunks per hit.
 - **Borrow:**
-  - KeepAdrenalineLonger's longer hold, tied to the end of combat instead of a flat delay;
+  - KeepAdrenalineLonger's longer hold and AdrenalineModifier's decay multiplier, taken to the end: no decay while a trinket is equipped;
   - RageNAdrenaline's "fills while enemies are near" and TastyAdrenaline's per-tick trickle, as income;
   - Battle Flow's framing of adrenaline as combat momentum.
 - **What they get wrong:**
@@ -157,8 +160,8 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
   - Income while fighting that grows with the number of enemies engaged.
   - Weapon gains per second of attacking, so every weapon fills at the same pace.
   - A kill bonus.
-  - A hold after combat, so chained lone fights add up.
-  - Tuned so a mid-cost trinket procs about once per real fight.
+  - No decay, so chained lone fights add up.
+  - Tuned so the bar of a mid-cost trinket fills about once per real fight; the player then triggers the trinket (Trinket revamp).
   - Technically client-only; ships as Both, so the server refuses players without the mod and its settings apply to everyone.
 
 ### Boss power revamp (Revamp): slightly stronger Forsaken powers
@@ -191,7 +194,7 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
   - Ships as Both: the server refuses players without the mod, and its multipliers apply to everyone.
   - Otherwise, recommend a ValheimPlus or ForsakenPowersPlusRemastered config and skip this idea.
 
-### Blood trinket (New): drop to 15% HP on proc, then heal it back over a few seconds after 10 s
+### Blood trinket (New): drop to 15% HP when triggered, then heal it back over a few seconds after 10 s
 
 **Coverage: none.** No trinket or item was found that sets the player's HP low on purpose for a timed window. The related mods reward or protect low HP.
 
@@ -212,9 +215,9 @@ Research done 2026-09 (snapshot taken 2026-09-28, about three weeks after Valhei
   - EpicLoot's 30% "low health" threshold, as a reference point.
   - Not borrowed: GrindstoneSkills' and UndyingAmulet's low-HP safety nets. The window has no 1 HP floor, so a big hit kills.
 - **Ours:**
-  - A trinket proc that makes the bloodstone bonus peak for up to 10 s (heals still work, so the player can end it sooner), then gives the HP back over a few seconds, with no eitr and no weapon swap.
+  - A trinket that, when the player triggers it, makes the bloodstone bonus peak for up to 10 s (heals still work, so the player can end it sooner), then gives the HP back over a few seconds, with no eitr and no weapon swap.
   - It pairs with the Blood stone revamp's blood rite: nothing is clamped in the window, so that idea's lifesteal works there too.
-  - The Trinket revamp gives it no passive, because its proc is not an `SE_Stats`.
+  - With the Trinket revamp, the player picks the moment of the drop, for example right before a bloodstone combo.
 
 ### Ballista revamp (Revamp): turns and shoots faster, aims better, several targets per ballista
 
@@ -649,12 +652,12 @@ Also worth a look:
 
 1. **Already well covered, only worth doing inside a bigger integrated module:**
    - Sort chest, sort bags, search chest, search crafting station and the loot filter. A wave of 1.0-era mods appeared in September 2026.
-   - Boss powers made passive or boosted (duration and cooldown configs), trinkets as passives, and HP/stamina from activity.
+   - Boss powers made passive or boosted (duration and cooldown configs), and HP/stamina from activity.
    - Dual wielding one-handed weapons: DualWielder and balrond DualMastery work on 1.0, and Smoothbrain's DualWield has 1.0 fixes in its source.
 2. **Real gaps:**
    - A maintained "crossbow stays loaded" mod: the only precedent is deprecated.
-   - A redesign of how adrenaline is earned, a tower-shield "wall" stance as a standalone mod, and a better target choice for the vanilla ballista (ReBallista now covers aim and turning).
+   - A redesign of how adrenaline is earned, trinkets fired by the player with a key (no mod does it for vanilla trinkets), a tower-shield "wall" stance as a standalone mod, and a better target choice for the vanilla ballista (ReBallista now covers aim and turning).
    - Pack morale (a pack flees when its leader dies), dummies that fight monsters, can be switched off and come in one type per weapon, and multi-player rituals.
    - Typed and contextual pings, and a notification feed confirmed on 1.0.
    - A trinket that trades HP for a short low-HP window (Blood trinket), a stealth bonus for standing still (Sneak revamp) and a roll attack (Weapon revamp).
-3. **Design lever.** Adrenaline and trinkets work as one system: the Adrenaline revamp decides how the bar fills, the Trinket revamp what a trinket gives, and the Weapon revamp's roll, parry and jump attacks earn a per-move adrenaline bonus but cost none, so the bar is kept for the trinket proc. Boss powers stay separate (the Boss power revamp only asks for slightly stronger powers). Balrond Battle Flow (2026-09) is the first mod found that reworks adrenaline and trinkets together, but it does not change how adrenaline is earned.
+3. **Design lever.** Adrenaline and trinkets work as one system: the Adrenaline revamp decides how the bar fills (income while fighting, no decay), the Trinket revamp when a trinket fires (a full bar waits for the player's key; vanilla effects and costs), and the Weapon revamp's roll, parry and jump attacks earn a per-move adrenaline bonus but cost none, so the bar is kept for the trinket. Boss powers stay separate (the Boss power revamp only asks for slightly stronger powers). Balrond Battle Flow (2026-09) is the first mod found that reworks adrenaline and trinkets together, but it does not change how adrenaline is earned.

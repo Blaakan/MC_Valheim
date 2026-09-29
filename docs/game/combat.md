@@ -532,7 +532,7 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
     - Jump attack: the finisher or the secondary animation with extra stagger; optionally a downward pull on the body and a small area slam on landing. `Character.m_onLand` only fires after a drop of more than 0.8 m, so a short jump on flat ground may not reach it (jump height is prefab data, unverified): fall back to the first `IsOnGround()` after the attack.
     - Check each trigger with `ZSyncAnimation.HasParameter` at start-up and fall back to the weapon's secondary animation. Trigger names such as `swing_longsword`, `atgeir_attack`, `greatsword_secondary` or `dualaxes` come from mod READMEs *(unverified)*: dump every weapon's `m_attackAnimation` and chain levels at runtime. Sword Heavy Slash already plays `dualaxes0` and `greatsword2` on swords, so borrowing another family's trigger works.
   - Bonus: `Attack.DoMeleeAttack` gives the finisher ×2 damage and ×1.2 push only when `m_attackChainLevels > 1`, so the moves use `m_damageMultiplier` instead. Starting values to tune: roll attack ×1.3 damage, parry attack ×1.5 damage and ×2 stagger, jump attack ×1.2 damage and ×2 stagger. A normal combo already ends on that ×2 finisher, so a move that plays the finisher animation at ×1.3 hits less hard than the vanilla finisher: tune against it.
-  - Adrenaline: vanilla pays the clone's `m_attackAdrenaline` per enemy hit, times the victim's `m_enemyAdrenalineMultiplier` (`Attack.DoMeleeAttack`), so that field is the per-move bonus. The Adrenaline revamp can pay a per-move bonus for them; the moves cost no adrenaline, because the bar is kept for the trinket proc. It does not time these moves (their `m_attackAnimation` differs from the weapon's own) and pays the weapon's learned amount × the clone's `m_attackAdrenaline` / the weapon's. A move that borrows the secondary animation stays untimed too, because the Adrenaline revamp compares it with the primary attack it was cloned from. A parry attack on a family without a chain (`m_attackChainLevels` 1 or less, prefab data) would keep the vanilla trigger and be timed as a normal swing with no per-move bonus: give it another trigger.
+  - Adrenaline: vanilla pays the clone's `m_attackAdrenaline` per enemy hit, times the victim's `m_enemyAdrenalineMultiplier` (`Attack.DoMeleeAttack`), so that field is the per-move bonus. The Adrenaline revamp can pay a per-move bonus for them; the moves cost no adrenaline, because the bar is kept for the trinket, which the player triggers (Trinket revamp). It does not time these moves (their `m_attackAnimation` differs from the weapon's own) and pays the weapon's learned amount × the clone's `m_attackAdrenaline` / the weapon's. A move that borrows the secondary animation stays untimed too, because the Adrenaline revamp compares it with the primary attack it was cloned from. A parry attack on a family without a chain (`m_attackChainLevels` 1 or less, prefab data) would keep the vanilla trigger and be timed as a normal swing with no per-move bonus: give it another trigger.
   - Livelier swings (optional, mild by default):
     - Movement and turning while swinging: raise the clone's `m_speedFactor` / `m_speedFactorRotation` (code default 0.2; prefab values unverified) per family. The clip's `Stop` event (`Humanoid.OnStopMoving`) sets both to 0 on the current attack, so patch it too to keep some movement through the recovery.
     - Lunge: scale the forward root motion in a `Character.AddRootMotion` prefix while attacking. Root motion only accumulates during a dodge, attack or emote, and `Character.ApplyRootMotion` uses it when it is larger than the input velocity.
@@ -585,46 +585,67 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
     - MC Harpoon Hooks Tames sets `m_backstabBonus = 1` on harpoon hits against tames (`Character.Damage` prefix), so hooking a tame never grants sneak XP.
   - `Player.OnDeath` clears all status effects (`SEMan.RemoveAllStatusEffects`); the stillness check re-adds the SE on its own.
 
-### Trinket revamp (Revamp) — a slightly weaker always-on passive with an adrenaline interaction, tied to the Adrenaline revamp
-- **Feasibility:** medium.
-- **Who needs the mod:** technically client-only; ships as Both (the server refuses players without the mod and sends its settings to everyone), because it changes combat balance. The trinket's `m_equipStatusEffect` (`Humanoid.UpdateEquipmentStatusEffects`) and its `m_fullAdrenalineSE` (the pop in `Player.AddAdrenaline`) are both passed as objects to `SEMan.AddStatusEffect` on the wearer's own client, not looked up by hash. Custom status effects therefore need no registration on other machines.
-- **Assets:** no (vanilla icons and models).
+### Trinket revamp (Revamp) — vanilla trinkets and costs; the bar fills while fighting and never drains, and the player triggers the trinket with a key
+- **Feasibility:** easy on its own: one prefix and finalizer pair, a key and a HUD cue. The build-up it relies on (income while fighting, no decay) is the Adrenaline revamp's work (medium), and the two are tuned together.
+- **Who needs the mod:** technically client-only; ships as Both (the server refuses players without the mod and sends its settings to everyone), because it changes combat balance.
+  - Adrenaline lives on the owning player: `Player.AddAdrenaline`, the pop and the key all run on the wearer's own client, and only the value is mirrored to the player's ZDO `adrenaline` key.
+  - The pop passes the trinket's `m_fullAdrenalineSE` object to `SEMan.AddStatusEffect` on that client, so nothing is looked up on other machines.
+  - No item data is changed for good, so a trinket that reaches a player without the mod (on a server that allows such players) works as in vanilla.
+- **Assets:** no. Vanilla bar flash, messages and pop effect; an optional vanilla sound.
 - **Hooks:**
-  - `ObjectDB.Awake` (private) / `ObjectDB.CopyOtherDB` postfix: build the passives and set `SharedData.m_equipStatusEffect` on `ItemType.Trinket` items (optionally `m_maxAdrenaline` too).
-  - `Humanoid.UpdateEquipmentStatusEffects` (private): applies the trinket's equip SE, no patch needed.
-  - `Player.AddAdrenaline`: the vanilla pop, no patch needed.
-  - `Player.GetAdrenaline` / `Player.GetMaxAdrenaline`: the bar fill.
-  - `SEMan.HaveStatusEffect`: is the proc running.
-  - `SE_Stats.UpdateStatusEffect`: overridden in a subclass.
-  - `ItemDrop.ItemData.GetTooltip`: no patch needed. It prints the equip SE through the private `GetStatusEffectTooltip`, and the proc under `$item_fulladrenaline`.
+  - `Player.AddAdrenaline`: a prefix hides the equipped items' `m_fullAdrenalineSE` for the length of the call, outside the trigger, and a finalizer puts them back (no pop). The trigger itself calls this method.
+  - `Player.Update` (private): a postfix for `Player.m_localPlayer` reads the trigger key. It checks `Player.TakeInput` (protected), `Hud.InRadial` and `Player.InPlaceMode`.
+  - `Player.GetAdrenaline` / `Player.GetMaxAdrenaline`: is the bar full.
+  - `SEMan.GetStatusEffect(int)`: is an equipped trinket's effect still running (for the option that refuses a refresh).
+  - `Hud.AdrenalineBarFlash` (public), `Hud.UpdateAdrenaline` (private; optional postfix for a key label on the bar) and `Player.Message`: the feedback.
+  - `ItemDrop.ItemData.GetTooltip` (static overload): one line naming the key after the `$item_fulladrenaline` line.
+  - From the Adrenaline revamp: its `Player.UpdateStats(float)` prefix (no decay) and its income while fighting.
 - **Sketch:**
-  - Vanilla: a trinket only adds adrenaline capacity (`SharedData.m_maxAdrenaline`, summed as an equipment modifier). Its effect only exists after a full bar (`m_fullAdrenalineSE`, 30 to 120 s per the wiki).
-  - 1.0.16 has 15 trinkets in `ObjectDB`, costing 10 to 100: the 13 listed by Surge, plus the Deep North Neckstabber (`TrinketBloodGoldHealth`, 65 per the wiki) and Witch Crown (`TrinketBloodGoldStamina`, 60 per the wiki) (runtime item dump, 2026-09-29). `TrinketDNGold` and `TrinketDNNornThread`, listed as SoftRef names in building-crafting.md, are only models and icons in the SoftRef `manifest_extended`, with no item prefab or status effect.
-  1. **Tied to the Adrenaline revamp.** The trinket part assumes the revamp's steady build-up. Ship it as a second feature of the same mod, or as its own mod with `ModRequires` on the adrenaline mod. The framework then turns it off, and says why, when the adrenaline mod is missing or disabled.
-  2. **Passive bonus, slightly nerfed.** On every ObjectDB init, build one passive per trinket whose `m_fullAdrenalineSE` is an `SE_Stats`:
-     - copy its fields into an instance of our `SE_Stats` subclass (`ScriptableObject.CreateInstance`) with a new name, so its `NameHash()` differs from the proc's (do not copy the private cached `m_nameHash`);
-     - no duration (`m_ttl` 0);
-     - one-shot and timed gains set to 0: `m_healthUpFront`, `m_staminaUpFront`, `m_eitrUpFront`, `m_adrenalineUpFront`, `m_healthOverTime`, `m_staminaOverTime`, `m_eitrOverTime`;
-     - continuous stats × a strength factor (config, starting value 0.75, with per-trinket overrides): the regen multipliers' part above 1, armor, skill levels, damage percentages, speed and swim speed, stamina-use modifiers;
-     - damage-resistance steps one weaker (they are enums), in a new `m_mods` list, not the proc's;
-     - assign it as the trinket's `m_equipStatusEffect`, after checking that vanilla trinkets have none *(prefab – verify)*. Vanilla then applies it on equip and shows it in the tooltip.
-  3. **Interaction with adrenaline.** Both parts are toggles, and both are on by default.
-     - (a) Build-up: the passive grows with the bar, from a floor (config, e.g. 50% of the passive) at empty to 100% at full. The subclass recomputes its fields from the stored base values × that factor, a few times per second, in `UpdateStatusEffect`. It reads the fill from `Player.GetAdrenaline() / GetMaxAdrenaline()`.
-     - (b) Proc: a full bar still pops the vanilla full effect, one-shot gains included, for its vanilla duration. While it runs (`SEMan.HaveStatusEffect` on the proc's hash), the passive gives nothing, so the two do not stack.
-  4. Some trinkets' procs are only one-shot gains (the wiki gives Brimstone 100 health and 100 stamina at once). They get no passive, or a small regen passive by config: a decision for the user. Trinkets whose `m_fullAdrenalineSE` is not an `SE_Stats` (the Blood trinket's custom effect) get no passive either.
-  5. Costs: optionally even out `m_maxAdrenaline` of the 15 vanilla trinkets (10 to 100; matched by prefab name, from stored originals), so the Adrenaline revamp's "one proc per fight" target holds for each. Modded trinkets keep their own cost: the Blood trinket has its own cost config.
+  - Vanilla today:
+    - A trinket adds adrenaline capacity (`SharedData.m_maxAdrenaline`, 10 to 100 for the 15 vanilla trinkets). Its effect (`m_fullAdrenalineSE`, 30 to 120 s per the wiki) only exists after a full bar.
+    - The pop is automatic. After every call, `Player.AddAdrenaline` tests for a full bar. A gain is only added below the max, but the full-bar test also runs for a call that adds nothing, so any gain at a full bar pops. The pop adds, or refreshes with `ResetTime`, the effect of every equipped item that has one, empties the bar and plays `m_adrenalinePopEffects`. With no such item, vanilla sets the bar to the max and keeps it there.
+    - `Player.UpdateStats(float)` drains the bar once the private `m_adrenalineDegenTimer` runs out (6 to 10 s after the last gain, per the wiki).
+    - The bar is not saved. `Player.Save` does not write it, and nothing reads the ZDO `adrenaline` key. Death and logout spawn a new `Player` (`Game.SpawnPlayer`), so the bar starts empty.
+    - The Forsaken power is the vanilla model of a power on a key: `Player.StartGuardianPower` answers "not ready" (`$hud_powernotready`) while it cools down.
+  1. **Tied to the Adrenaline revamp.** The build-up the sheet asks for (passive income while fighting, on top of the existing sources, and no decay over time) is the Adrenaline revamp's point 2 and its no-decay rule (point 4). Ship this idea as a second feature of the same mod, or as its own mod with `ModRequires` on the adrenaline mod. The framework then turns it off, and says why, when the adrenaline mod is missing or disabled.
+  2. **Trinket stats as they are.** No `SharedData` edit: every trinket keeps its vanilla bonus (`m_fullAdrenalineSE`) and cost (`m_maxAdrenaline`), modded trinkets included.
+  3. **No automatic pop; a full bar stays full.**
+     - A `Player.AddAdrenaline` prefix (local player, feature active, outside our trigger) sets the `m_fullAdrenalineSE` of every equipped item to null for that call, and a finalizer puts the effects back, also after an exception. Vanilla then takes its own "no effect" branch: no pop, and the bar is set to exactly the max. Later gains are ignored, as vanilla does at the max.
+     - No transpiler is needed: the gain scaling (`Game.m_adrenalineRate`, the `m_adrenalineGainMultiplier` curve, `SEMan.ModifyAdrenaline`) and the tier effects run unchanged, and so do other mods' patches on the method.
+     - Why it is safe: `m_fullAdrenalineSE` is read only by this method and the tooltip, and nothing else runs during the call. Only the outermost call hides and restores (a depth counter), because a status effect added during the call can call `AddAdrenaline` again (`SE_Stats.StartupEffects`).
+     - Other characters, and the local player while the feature is inactive, keep vanilla behaviour.
+     - Losses still count: the melee-miss and unblocked-hit penalties lower a full bar (the Adrenaline revamp turns them off by default). Only the drain over time is gone.
+  4. **Trigger.**
+     - The input, read in the `Player.Update` postfix:
+       - Keyboard: a configurable key, by default one that vanilla leaves free, for example H. Vanilla's default bindings (the `ZInput` defaults, in assembly_utils) put the Forsaken power (`GP`) on F, the radial menu on G, emotes on T, auto-pickup on V, sit on X, walk on C, hide on R, auto-run on Q and use on E, and debug mode reads Z, B, K and L in `Player.Update`.
+       - Gamepad, Default layout: a configurable combination, by default the alt button (LT, which is also block) + right-stick click. Vanilla reads the right-stick click without the alt button for hide and the radial menu (`Player.Update`, `Player.HandleRadialInput`), and with it only in build mode. The D-pad is taken: down is the Forsaken power (`JoyGP`), up and the sides are the hotbar, and alt + D-pad zooms the camera or the minimap.
+       - Gamepad, Alternative 1 and 2 layouts: alt + right-stick click is already the alternative-placement toggle there (`JoyAltPlace`, which `Player.Update` reads outside build mode too), so these layouts need another default, to check in game.
+     - The key works whenever `Player.TakeInput` is true (it is false while dead, in a menu or typing) and neither the radial menu (`Hud.InRadial`) nor placement mode (`Player.InPlaceMode`) is active, also mid-swing or mid-roll: it plays no animation.
+     - With a full bar (`GetAdrenaline()` at least `GetMaxAdrenaline()`, max above 0) and at least one equipped item with an `m_fullAdrenalineSE`, it opens the trigger scope and calls `Player.AddAdrenaline(0)`. The prefix leaves the effects in place, and the vanilla pop runs unchanged: every equipped trinket fires, a running effect is refreshed, the bar empties and the pop effect plays.
+     - Cost: the full bar, as in vanilla. A partly filled bar does nothing except a short "not full" message, like the Forsaken power's `$hud_powernotready`.
+     - A trigger while the effect still runs refreshes it and costs the full bar, as the vanilla pop does (`SE_Stats.ResetTime` restarts the time and re-runs the one-shot gains). An option can refuse the trigger instead while an equipped trinket's effect runs (`SEMan.GetStatusEffect`).
+  5. **Feedback.**
+     - When the bar becomes full: `Hud.AdrenalineBarFlash` and a message naming the key. While it stays full, the flash repeats every few seconds (config). An optional short vanilla sound, prefab picked at runtime *(unverified)*.
+     - The trigger plays the vanilla pop effect (`Player.m_adrenalinePopEffects`; the SoftRef `manifest_extended` lists `fx_Adrenaline1`, unverified that it is this one).
+     - Tooltip: an `ItemDrop.ItemData.GetTooltip` postfix adds the key after the `$item_fulladrenaline` line.
+     - `Hud.UpdateAdrenaline` shows the bar whenever it is above 0. With no drain, a partly filled bar stays on screen between fights: it now reads as a stored resource.
+  6. **Edge cases.**
+     - Swapping trinkets keeps the bar. A bar above a cheaper trinket's cost counts as full, and the next adrenaline change sets it to the new max.
+     - With no trinket at all (max 0), vanilla drains and hides the bar: the Adrenaline revamp's no-decay rule only runs while the max is above 0.
+     - Death and logout empty the bar (not saved; a new `Player` spawns). Carrying it over through `Player.m_customData` is possible but not planned.
+     - Mods that add trinket slots fire every equipped trinket with one trigger, because the vanilla pop loops over all equipped items.
 - **Risks:**
-  - `SharedData` edits are global and not saved. Reapply them on every ObjectDB init (`Awake` in a world, `CopyOtherDB` in the main menu) from stored originals, so they never compound.
-  - `SEMan.AddStatusEffect` skips an SE whose `NameHash()` is already present, so a passive with the proc's name would block the proc. `NameHash()` caches its value in the private `m_nameHash`, so a field-by-field copy by reflection must skip that field.
-  - `StatusEffect.Clone` is a shallow copy (`MemberwiseClone`). Per-instance changes may only touch value fields, never shared lists such as `m_mods`.
-  - When the pop hits a proc that is still running, `Player.AddAdrenaline` calls `ResetTime`, and `SE_Stats.ResetTime` re-runs the one-shot gains (vanilla behaviour).
-  - An always-on passive at 75% is a large buff over vanilla uptime. "Slightly nerfed" needs playtesting; the server's numbers apply to everyone.
-  - A modded trinket cloned from a vanilla prefab after our postfix inherits that trinket's passive. The Blood trinket clears `m_equipStatusEffect` on its clone.
-  - Extra trinket slots (ExtraSlots with MultiTrinket, RPG Equipment on Nexus) stack several passives.
-  - Conflicts: BetterTrinkets, its 1.0 patch and Passive_Trinket_Modifiers put passives on the same items, Balrond Battle Flow replaces trinket effects, and Surge edits `m_maxAdrenaline`. Detect them and step aside, or document it.
+  - Hiding `m_fullAdrenalineSE` changes shared item data for the length of one call. Restore it in a finalizer, only in the outermost call. Another mod that reads the field inside `Player.AddAdrenaline` (its own prefix or postfix) sees no effect while it is hidden: cross-test MultiTrinket (no public source).
+  - Fallback, if hiding proves fragile with another mod: a transpiler that adds one test to the full-bar branch, matched by its field and local loads, not by offsets, logging once and leaving the feature inactive with a reason when it does not match. KeepAdrenalineLonger also transpiles this method (the decay delay, a different instruction).
+  - Other `Player.AddAdrenaline` patches (the Adrenaline revamp, GrindstoneSkills, AdrenalineModifier) see the trigger as a call with 0 and pass it through. The Weapon revamp's parry detector only listens inside `Humanoid.BlockAttack`.
+  - Tier effects: if the player prefab lists any in `m_adrenalineEffects` (`AdrenalineRush` to `AdrenalineRush4` exist in the SoftRef `manifest_extended`; prefab data, unverified), a bar held at one level keeps that effect between fights. Check at runtime.
+  - Balance: a bar that never drains means most fights start with a trigger ready. It can also be filled on training dummies (weapon hits on a dummy still pay) or weak mobs before a hard fight. Tune with the Adrenaline revamp; the server's settings apply to everyone.
+  - Keys: RageNAdrenaline defaults to F and G (and D-pad up and left), and SpecialAttack, WeaponArts and other mods add their own keys. Keep ours configurable, per gamepad layout too.
+  - Conflicts: mods that change what trinkets give or when they fire rely on the vanilla full-bar moment: BetterTrinkets and its 1.0 patch, Passive_Trinket_Modifiers, and Balrond Battle Flow (its Surge holds a full bar, then its Overcharge drains it). Detect them and step aside, or document it. MultiTrinket fires several trinkets together: cross-test. Surge only edits costs, and the bar follows the current max.
+  - The Blood trinket ignores a refresh (its `ResetTime` does nothing), so a trigger during its window spends the bar for nothing unless the refuse option is on.
   - The NG+ world-level rule for equipping trinkets (`Humanoid.EquipItem`) still applies.
 
-### Adrenaline revamp (Revamp) — faster build-up that is fair across weapons, income while fighting, a trinket proc every fight
+### Adrenaline revamp (Revamp) — faster build-up that is fair across weapons, income while fighting, no decay, a full bar every fight
 - **Feasibility:** medium. Each part is a small patch on the local player, and the work is in the tuning. The decay and gain curves and the per-weapon and per-creature values are prefab data, so dump them at runtime first. Then every weapon family needs a test fight.
 - **Who needs the mod:** technically client-only; ships as Both (the server refuses players without the mod and sends its settings to everyone), because it changes combat balance. Adrenaline lives on the owning player (`Player.AddAdrenaline`, mirrored to ZDO `adrenaline`), and the remote signals already reach that client:
   - stagger adrenaline, through `Character.RPC_AddAdrenaline` when another client owns the staggered creature;
@@ -632,8 +653,8 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   - kill credit, through `Game.RPC_RegisterKill` on each player who hit the creature.
 - **Assets:** no (optional: an "in combat" cue on the adrenaline bar).
 - **Hooks:**
-  - `Player.AddAdrenaline` is the single funnel. A gain sets the decay delay (`m_adrenalineDegenDelay` curve), is multiplied by `Game.m_adrenalineRate`, the `m_adrenalineGainMultiplier` curve and `SEMan.ModifyAdrenaline`, and only counts below max. At max, it pops every equipped `m_fullAdrenalineSE` and resets the bar.
-  - `Player.UpdateStats(float)` (private, every FixedUpdate on the owner): decay starts once the private `m_adrenalineDegenTimer` runs out.
+  - `Player.AddAdrenaline` is the single funnel. A gain sets the decay delay (`m_adrenalineDegenDelay` curve), is multiplied by `Game.m_adrenalineRate`, the `m_adrenalineGainMultiplier` curve and `SEMan.ModifyAdrenaline`, and only counts below max. At max, vanilla pops every equipped `m_fullAdrenalineSE` at once and resets the bar; the Trinket revamp holds that pop until the player presses its key.
+  - `Player.UpdateStats(float)` (private, every FixedUpdate on the owner): decay starts once the private `m_adrenalineDegenTimer` runs out. A prefix raises that timer to at least 1 s on every tick while a trinket is equipped, before vanilla counts it down, so it never runs out (no decay, point 4).
   - Sources to tag:
     - `Attack.DoMeleeAttack`: per character hit, and the miss penalty `Player.m_attackMissAdrenaline`;
     - `Attack.DoAreaAttack`: once per attack, × the highest enemy multiplier;
@@ -672,7 +693,7 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
      - A weapon-hit amount of 0 or less is kept as it is, because data or another mod turned it off.
   2. **Passive income while in a fight.**
      - The local player counts as "in combat" for a few seconds after hitting an enemy, being hit by one, blocking, or being reported as the target of an alerted monster (`Player.RPC_OnTargeted` with `alerted`). That RPC carries no targeter, so it only counts while an alerted enemy that is not a dummy is near (`BaseAI.GetAllInstances`, `IsAlerted`).
-     - `Faction.TrainingDummy` is ignored for the combat state, the engaged count and the kill bonus. Hitting a dummy is a player action and `BaseAI.IsEnemy` makes it an enemy, so a row of dummies would otherwise pay income, a large engaged count and trinket procs with no danger. Weapon hits on a dummy still pay (point 3), so a trinket can be tried out on one.
+     - `Faction.TrainingDummy` is ignored for the combat state, the engaged count and the kill bonus. Hitting a dummy is a player action and `BaseAI.IsEnemy` makes it an enemy, so a row of dummies would otherwise pay income, a large engaged count and full bars with no danger. Weapon hits on a dummy still pay (point 3), so a trinket can be tried out on one.
      - While in combat, a `Player.UpdateStats` postfix adds `base + perEnemy × max(0, engaged − 1)` per second, capped. It goes through `AddAdrenaline` once per second, so `Game.m_adrenalineRate` and status-effect modifiers still apply.
      - "Engaged" = the sum of `m_enemyAdrenalineMultiplier` over the distinct enemies (by ZDOID) the player hit or was hit by in the last ~10 s. A swarm of cheap mobs counts as one or two enemies, as point 1 intends.
      - Income needs a player action in the last few seconds, not only being targeted, so standing next to a stuck or caged monster earns nothing.
@@ -683,17 +704,17 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
      - Melee pays once per swing, plus a small, capped bonus per extra enemy hit: cleaving still pays, but not × N.
      - Projectiles pay per arrow that hits, divided by the projectiles per attack.
      - `m_attackUseAdrenaline` on staffs follows the same rule (wiki: Trollstav +12 per cast).
-  4. **A trinket proc every fight, and across chained fights.**
+  4. **A full bar every fight, and across chained fights.**
      - **Kill bonus**, from `Game.RPC_RegisterKill`. It runs on every credited player's client, also when another client owned the creature, and is larger for bosses (`bossNumber > 0`). The RPC carries only the creature's name token (`m_name`), boss number, kill modifiers and attacker count, not its `m_enemyAdrenalineMultiplier`. The bonus is paid only when the name matches an enemy the player fought in this combat (a dummy never enters that list), scaled by that enemy's multiplier.
-     - **Hold after combat.** After the last combat event, `m_adrenalineDegenTimer` is held at a configurable value. The starting value is 45 s, long enough to walk to the next lone monster. After the hold, the bar drains slower: scale the amount when `AddAdrenaline` is called from `UpdateStats`.
+     - **No decay.** While a trinket is equipped (max above 0), a `Player.UpdateStats(float)` prefix raises the private `m_adrenalineDegenTimer` to at least 1 s before vanilla counts it down, so the vanilla drain never runs: the bar keeps what it earned between fights, and lone fights chain on their own. With no trinket, vanilla drains the bar as before. With the Trinket revamp, a full bar then waits for the player's key; without it, vanilla pops the trinket as soon as the bar fills.
      - **Starting targets**, to tune: one enemy fills about half of a 60-cost trinket. A group of four or five, or two or three chained lone fights, fill it.
-     - Trinket costs range from 10 to 100, so tune together with the Trinket revamp. It can even out the costs through `SharedData.m_maxAdrenaline`.
+     - Trinket costs range from 10 to 100, and the Trinket revamp keeps them as they are, so tune against them.
   5. Small extra: a debug readout (log line or overlay) of the gains per source per fight, for tuning.
-  - The bar only feeds the trinket proc: Weapon revamp moves cost no adrenaline (point 3), and boss powers keep their own cooldown (the Boss power revamp is a separate small boost; activation still gives +10).
+  - The bar only feeds the trinket, which the player triggers (Trinket revamp): Weapon revamp moves cost no adrenaline (point 3), and boss powers keep their own cooldown (the Boss power revamp is a separate small boost; activation still gives +10).
 - **Risks:**
   - Prefab data: the curves `m_adrenalineDegen`, `m_adrenalineDegenDelay` and `m_adrenalineGainMultiplier`, every weapon's `m_attackAdrenaline` and `m_attackUseAdrenaline`, each projectile's `m_adrenaline` and each creature's `m_enemyAdrenalineMultiplier`. Dump them before choosing numbers; the wiki values above are not checked in code.
   - Without a trinket (max 0) nothing changes: `AddAdrenaline` ignores gains when the max is 0.
-  - Farming: training dummies are excluded by faction (point 2). A trapped mob is a real enemy, so require recent damage dealt or taken, and cap the income per fight.
+  - Farming: training dummies are excluded by faction (point 2). A trapped mob is a real enemy, so require recent damage dealt or taken, and cap the income per fight. With no decay, a bar filled anywhere is kept, so weapon hits on a dummy (or on weak mobs) can fill it before a hard fight. Keep the vanilla dummy pay (to try a trinket out) or pay nothing for dummy hits: a decision to tune.
   - Context tagging misses `AddAdrenaline` calls from other mods; they pass through unchanged. Animation-speed mods change the measured attack time, which is correct because they also change the hit rate.
   - `Game.m_adrenalineRate` (a world modifier) and SE modifiers still multiply every gain, income included. An example is GP_Fader's +100% (wiki and BossRules' table of the vanilla effects; prefab value, unverified).
   - Mods that change the same gains (give our prefix an explicit Harmony priority; it never skips the call, so the Weapon revamp's parry detector still sees it):
@@ -736,13 +757,13 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   - Mods that edit the same effects or fields: ValheimPlus (`guardianBuffDuration` / `guardianBuffCooldown`), ForsakenPowersPlusRemastered, ForsakenPowersRevisited, BossRules, EasyVitals, PassivePowers. The last writer wins, so detect them and step aside.
   - Balance and PvP: keep the defaults small; the server's settings apply to everyone.
 
-### Blood trinket (New) — when it procs, drop to 15% HP; after 10 s, heal back what it took over a few seconds
+### Blood trinket (New) — when the player triggers it, drop to 15% HP; after 10 s, heal back what it took over a few seconds
 - **Feasibility:** medium. The effect is one small custom status effect. Most of the work is the new item: prefab clone, recipe, icon and texts.
 - **Who needs the mod:** everyone; it ships as Both (the server refuses players without the mod and sends its settings to everyone). A new item prefab must exist on every client (`ObjectDB`, `ZNetScene`) for drops, chests and the trinket visual (`VisEquipment.SetTrinketItem` syncs the prefab name). A player without the mod loses the item. The effect itself is local: the vanilla pop passes the SE object to `SEMan.AddStatusEffect` on the wearer's client, and HP changes reach others through the owner's ZDO `health`.
 - **Assets:** yes, an icon at least. The model can be a recoloured clone of a vanilla trinket.
 - **Hooks:**
   - `ObjectDB.Awake` / `ObjectDB.CopyOtherDB` (item, recipe, status effect) and `ZNetScene.Awake` (prefab).
-  - `Player.AddAdrenaline`: the vanilla pop adds `m_fullAdrenalineSE`, no patch needed.
+  - `Player.AddAdrenaline`: the vanilla pop, run by the Trinket revamp's trigger, adds `m_fullAdrenalineSE`; no patch needed here.
   - A `StatusEffect` subclass (not an `SE_Stats`) overriding `Setup`, `UpdateStatusEffect` and `ResetTime`. The base `IsDone` and `Stop` are enough (point 4).
   - `Character.SetHealth` (writes only on the owner), `Character.GetMaxHealth` and `Character.Heal`.
   - `Character.RPC_Heal` (private), no patch: it caps every heal at `GetMaxHealth` and ignores a character at 0 HP or dead.
@@ -752,9 +773,9 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   - `ItemDrop.ItemData.GetTooltip`.
 - **Sketch:**
   1. **Item.** A new trinket cloned from a vanilla trinket prefab, for example `TrinketBloodGoldHealth` (the Neckstabber). It gets its own name, icon and `m_maxAdrenaline` (config; starting value 70, balance unverified), and a proposed Ashlands-tier recipe around Bloodstone (`GemstoneRed`) *(recipe and station to test)*. Its `m_fullAdrenalineSE` is our "blood pact" effect.
-     - Cost: 70 is a bit above the 60-cost trinket the Adrenaline revamp tunes against, so it pops a little less than once per fight. The Trinket revamp's cost levelling (its point 5) covers only the vanilla trinkets, so this config is the Blood trinket's cost.
-     - Clear `m_equipStatusEffect` on the clone. The source may carry one (the Trinket revamp gives the Neckstabber a passive), and the Blood trinket gets no passive: the Trinket revamp skips trinkets whose proc is not an `SE_Stats`.
-  2. **Proc: drop to 15%, once.** When the bar fills, vanilla `Player.AddAdrenaline` adds our effect on the local player (`SEMan.AddStatusEffect` clones it and calls `Setup`). `Setup` records the current HP and, if it is above 15% of max, sets it to 15% with `Character.SetHealth`. This is not a hit: no armor, no Staff of Protection shield, no unblocked-hit adrenaline loss, and HP never reaches 0. Nor is it a blood-magic payment (`SetHealth`, not `Character.UseHealth`), so the *Blood magic XP* idea pays no XP for it.
+     - Cost: 70 is a bit above the 60-cost trinket the Adrenaline revamp tunes against, so its bar fills a little less than once per fight. The Trinket revamp keeps the vanilla costs, so this config is the Blood trinket's own cost.
+     - Clear `m_equipStatusEffect` on the clone, in case the source trinket carries one (prefab data, or another mod's passive): the Blood trinket has no passive.
+  2. **Trigger: drop to 15%, once.** When the player triggers the trinket (the Trinket revamp's key, with a full bar), the vanilla pop in `Player.AddAdrenaline` adds our effect on the local player (`SEMan.AddStatusEffect` clones it and calls `Setup`). The Blood trinket needs the Trinket revamp (`ModRequires`), so the drop never comes at a moment the player did not choose: without it, vanilla would pop the trinket as soon as the bar fills. `Setup` records the current HP and, if it is above 15% of max, sets it to 15% with `Character.SetHealth`. This is not a hit: no armor, no Staff of Protection shield, no unblocked-hit adrenaline loss, and HP never reaches 0. Nor is it a blood-magic payment (`SetHealth`, not `Character.UseHealth`), so the *Blood magic XP* idea pays no XP for it.
      - `Setup` stores the amount taken (HP before minus HP after; 0 when HP was already at or below 15%) in a value field of the clone, for the heal-back.
      - This is the only time the trinket sets HP. It never holds HP down afterwards.
   3. **The 10 s window: heals work, and you can die**, as decided by the user (2026-09-29).
@@ -762,12 +783,12 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
      - Damage still counts: a hit bigger than what is left kills. There is no 1 HP floor or other protection. That is the trinket's risk.
   4. **Then heal back what it took, over a few seconds.**
      - After the window, `UpdateStatusEffect` heals the stored amount in ticks with `Character.Heal`, over a short time (config; starting value 3 s). The last tick pays what rounding left.
-     - This works like the vanilla heal over time in `SE_Stats`: `SE_Stats.Setup` splits `m_healthOverTime` into ticks of `m_healthOverTimeInterval`, and `SE_Stats.UpdateStatusEffect` calls `Character.Heal` per tick. Those fields do not fit as they are: their ticks are counted from `Setup`, so they would heal during the window instead of after it, and the Trinket revamp would build a passive from an `SE_Stats` proc.
+     - This works like the vanilla heal over time in `SE_Stats`: `SE_Stats.Setup` splits `m_healthOverTime` into ticks of `m_healthOverTimeInterval`, and `SE_Stats.UpdateStatusEffect` calls `Character.Heal` per tick. Those fields do not fit as they are: their ticks are counted from `Setup`, so they would heal during the window instead of after it.
      - The heal-back is the full amount taken, whatever heals came in the window. `Character.RPC_Heal` caps each tick at the current max HP, so a player who is already full, or healed to full in the window, gets nothing more, and HP never goes above max.
      - `m_ttl` is 10 s plus the heal time, so the base `IsDone` ends the effect and its icon counts down both phases. `SEMan.Update` calls `UpdateStatusEffect` before `IsDone`, so a last tick paid when the time runs out still lands.
      - Death in the window or during the heal-back: `Player.OnDeath` calls `SEMan.RemoveAllStatusEffects`, which stops the effect, and the rest of the heal-back is dropped. `Stop` heals nothing (and `Character.RPC_Heal` refuses a heal at 0 HP anyway). The respawn starts at full HP (`Player.Load` turns a saved HP of 0 into max).
      - Logout: status effects are not saved (`SEMan` has no save code, and `Player.Save` writes the current HP but no status effect), so the rest of the heal-back is lost and the player comes back at the saved HP. A mead's effect is lost the same way. Carrying it over (the amount in `Player.m_customData`, which `Player.Save` writes, paid after the next spawn) is possible but not planned.
-     - Override `ResetTime` to do nothing, so a second proc during the window or the heal-back does not restart the timer. Vanilla `Player.AddAdrenaline` calls `ResetTime` on a running full-adrenaline effect and still empties the bar. HP is not dropped again either: the drop is in `Setup`, which runs only when the effect is added.
+     - Override `ResetTime` to do nothing, so a second trigger during the window or the heal-back does not restart the timer. The trigger runs the vanilla pop, which calls `ResetTime` on a running full-adrenaline effect and still empties the bar. HP is not dropped again either: the drop is in `Setup`, which runs only when the effect is added.
   5. **Why it pays.**
      - Bloodstone weapons multiply every hit by `1 + missing HP × m_damageMultiplierPerMissingHP` (`Attack.ModifyDamage`). The wiki gives 0.2% per HP, so +34% at 200 max HP with 15% left. `m_damageMultiplierByTotalHealthMissing` scales with the missing share.
      - Blood-magic health costs are a share of current HP, so casting is cheap in the window.
@@ -778,7 +799,7 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   - `Character.SetHealth` writes only on the owner. The pop runs on the owner, so that is fine, but never call it for other players.
   - `StatusEffect.Clone` is a shallow copy (`MemberwiseClone`). Keep per-instance state (amount taken, heal-back paid so far) in value fields.
   - New-item risks: uninstalling deletes the item, and players without the mod lose it. The prefab name, recipe and station must be checked at runtime.
-  - The proc rate comes from the adrenaline system: tune the cost together with the Adrenaline revamp. Extra trinket slots (MultiTrinket) can pop it together with another trinket.
+  - How often the bar fills comes from the adrenaline system: tune the cost together with the Adrenaline revamp. With extra trinket slots (MultiTrinket), one trigger fires it together with the other equipped trinkets.
   - It overlaps the Blood stone revamp's blood rite (pay HP, no regen, optional last-stand ward). Nothing is clamped in the window, so that idea's lifesteal lifts HP there (and lowers the bloodstone bonus). The rite's no-regen option (`m_healthRegenMultiplier = 0`) stops only the food regen tick in `Player.UpdateFood`, not `Character.Heal`, so the heal-back still lands during a rite. The trinket adds no `Character.ApplyDamage` prefix: if a rite is active in the window, only the rite's optional ward can catch a lethal hit. Design them together.
   - PvP: 15% HP is an easy kill until the player heals. The server's settings apply to everyone.
 
@@ -895,7 +916,7 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   - Dummies killed by creatures refund their materials (`Character.ApplyDamage` → `Piece.DropResources`).
   - Ballistas with no trophy set shoot dummies, in vanilla too (`BaseAI.FindClosestCreature` ignores `m_aiSkipTarget`); the Ballista revamp skips them.
   - Other MC ideas must ignore dummies:
-    - Adrenaline revamp: a dummy is an enemy of players, so hitting one pays vanilla adrenaline (`Attack.DoMeleeAttack`: `m_attackAdrenaline` × its `m_enemyAdrenalineMultiplier`, prefab value unverified). A row of dummies, more with one per weapon type, would give free income, a large engaged-enemy count and trinket procs with no danger: that mod ignores `Faction.TrainingDummy` for combat state, engaged enemies and the kill bonus. Weapon hits on a dummy still pay (its point 3), as in vanilla, so a trinket can be tried out on one.
+    - Adrenaline revamp: a dummy is an enemy of players, so hitting one pays vanilla adrenaline (`Attack.DoMeleeAttack`: `m_attackAdrenaline` × its `m_enemyAdrenalineMultiplier`, prefab value unverified). A row of dummies, more with one per weapon type, would give free income, a large engaged-enemy count and full trinket bars with no danger: that mod ignores `Faction.TrainingDummy` for combat state, engaged enemies and the kill bonus. Weapon hits on a dummy still pay (its point 3), as in vanilla, so a trinket can be tried out on one. With no decay, a bar filled there is kept for the next fight (see the Adrenaline revamp).
     - Mob AI revamp: dummies run `MonsterAI` and hit players for 1, so its weakness test would mark every dummy weak and stop it attacking players. That mod never affects `Faction.TrainingDummy`.
     - Sneak revamp: an OFF dummy is never alerted, so every hit on it is a backstab (`Character.RPC_Damage`: unalerted AI, once per 300 s per dummy), and sneaking near it pays full vanilla Sneak XP (`BaseAI.InStealthRange`, as near any dummy that has not seen you). That mod gives no sneak-attack XP for `Faction.TrainingDummy` victims.
   - Reused sword animations make a spear or bow dummy look off until it has its own clips.
