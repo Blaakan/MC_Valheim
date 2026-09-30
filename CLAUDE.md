@@ -194,7 +194,9 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
 ## Mod code conventions
 
 - `Plugin.cs`: `internal sealed partial class Plugin : ModPlugin`, overriding only `BindConfig`, `OnActivated`,
-  `OnDeactivated` (never `Awake`/`Start`/`Update`/`OnDestroy`). The build generates `ModInfo` and the
+  `OnDeactivated` (plus `LocalBlocker` when another mod can make it unable to run; never
+  `Awake`/`Start`/`Update`/`OnDestroy`). Patch classes that must survive the live toggle (item/prefab/RPC
+  registration) get `[AlwaysOnPatch]` (docs/modding/framework.md, "Content that stays registered"). The build generates `ModInfo` and the
   `BepInPlugin` / `BepInProcess` (Client mods) / soft `BepInDependency` attributes from the csproj. Never
   hardcode GUID/name/version.
 - csproj metadata (single source of truth, validated by the build): `ModName`, `Version`, `ModScope`, `ModIdea`

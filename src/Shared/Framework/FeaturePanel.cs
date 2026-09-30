@@ -284,7 +284,8 @@ internal sealed class FeaturePanel : MonoBehaviour
         switch (f.State)
         {
             case nameof(ModState.Error): return 0;
-            case nameof(ModState.MissingDependency): return 1;
+            case nameof(ModState.MissingDependency):
+            case nameof(ModState.Conflict): return 1;
             case nameof(ModState.ServerMissing):
             case nameof(ModState.ServerMismatch): return 2;
             default: return 3;

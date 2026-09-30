@@ -11,8 +11,12 @@ namespace MC.Shared;
 //   SinglePlayer mod  -> only when no other player fully connected.
 //
 // Hello protocol v1 (per mod, so each mod dll own its rpc names):
-//   client -> server  "<guid>.Hello"     "1|<netVersion>|<version>"         (right after connect)
-//   server -> client  "<guid>.HelloAck"  "1|on|<netVersion>|<version>"      (or "1|off|..." when server copy not Active)
+//   client -> server  "<guid>.Hello"      "1|<netVersion>|<version>|<on|off>" (right after connect; last field = client
+//                                                                            side ready: on, deps ok, no error. Old
+//                                                                            copies send no last field = unknown)
+//   server -> client  "<guid>.HelloAck"   "1|on|<netVersion>|<version>"      (or "1|off|..." when server copy not Active)
+//   client -> server  "<guid>.HelloState" "on" | "off"                       (client side ready changed while connected)
+// Server mod code ask PeerCompatible (has mod, same network version, side not off) to refuse players.
 // Server also re-send HelloAck to all peers when its copy turn on/off, so clients follow live.
 // ZRpc keep order on one connection, and server send its PeerInfo only after ours, so first ack arrive before
 // server PeerInfo. No ack by then = server no have mod. Vanilla peer ignore unknown rpc, so vanilla never break.
@@ -34,18 +38,27 @@ internal static class NetworkGate
 
     private static ModDescriptor _info;
     private static Func<bool> _isActive = () => true;
+    private static Func<bool> _isLocalReady = () => true;
     private static ServerCheck _server = ServerCheck.None;
     private static string _serverVersion = "";
     private static int _serverNetVersion;
+    private static ZRpc _serverRpc;          // client: connection to server (hello sent on it)
+    private static bool? _sentReady;         // client: side-ready value server last heard, this connection
     private static readonly Dictionary<ZRpc, string> ClientHellos = new Dictionary<ZRpc, string>();
+    private static readonly Dictionary<ZRpc, bool> ClientReady = new Dictionary<ZRpc, bool>();
+
+    // Server: a connected player's side-ready state changed (HelloState). Mod code re-check that player.
+    public static event Action<ZNetPeer> PeerStateChanged;
 
     private static string HelloRpc => _info.Guid + ".Hello";
     private static string AckRpc => _info.Guid + ".HelloAck";
+    private static string StateRpc => _info.Guid + ".HelloState";
 
-    public static void Install(ModDescriptor info, Func<bool> isActive)
+    public static void Install(ModDescriptor info, Func<bool> isActive, Func<bool> isLocalReady = null)
     {
         _info = info;
         _isActive = isActive ?? (() => true);
+        _isLocalReady = isLocalReady ?? (() => true);
         var needsWorldEvents = info.ServerOnly || info.NeedsServer || info.SinglePlayerOnly;
         if (!needsWorldEvents)
         {
@@ -135,10 +148,77 @@ internal static class NetworkGate
         }
     }
 
+    // ModPlugin call me after every refresh. Client connected to server: side ready changed = tell server. Same = one
+    // compare. Server, single player, menu: nothing.
+    public static void OnLocalReadyChanged()
+    {
+        try
+        {
+            if (_info == null || !_info.NeedsServer || _serverRpc == null || _sentReady == null)
+            {
+                return;
+            }
+            var ready = _isLocalReady();
+            if (ready == _sentReady.Value || !_serverRpc.IsConnected())
+            {
+                return;
+            }
+            _sentReady = ready;
+            _serverRpc.Invoke(StateRpc, ready ? "on" : "off");
+            Log.Info($"Told the server that {_info.Name} is now {(ready ? "on" : "off")} on this game.");
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("NetworkGate.OnLocalReadyChanged", e);
+        }
+    }
+
     // Mod code can ask: does this connected player run the mod too? (server side, Both mods)
     public static bool PeerHasMod(ZNetPeer peer) => peer?.m_rpc != null && ClientHellos.ContainsKey(peer.m_rpc);
 
-    private static string HelloPayload() => $"{Protocol}|{_info.NetworkVersion}|{_info.Version}";
+    // Server: network version the player's copy said in hello. -1 = no hello or unreadable.
+    public static int PeerNetworkVersion(ZNetPeer peer)
+    {
+        if (peer?.m_rpc == null || !ClientHellos.TryGetValue(peer.m_rpc, out var hello) || hello == null)
+        {
+            return -1;
+        }
+        var parts = hello.Split('|');
+        return parts.Length >= 2 && parts[0] == Protocol && int.TryParse(parts[1], out var v) ? v : -1;
+    }
+
+    // Server: player's side ready (on, deps ok, no error)? Null = unknown (no hello, or old copy that never say).
+    public static bool? PeerReady(ZNetPeer peer)
+    {
+        if (peer?.m_rpc == null || !ClientReady.TryGetValue(peer.m_rpc, out var ready))
+        {
+            return null;
+        }
+        return ready;
+    }
+
+    // Server: player can play by this mod's rules: has mod, same network version, own side not turned off.
+    // Unknown side state (old copy) count as fine: same as before this check existed.
+    public static bool PeerCompatible(ZNetPeer peer) =>
+        PeerHasMod(peer) && PeerNetworkVersion(peer) == _info.NetworkVersion && PeerReady(peer) != false;
+
+    // Server: short why-not text for logs. Null = compatible.
+    public static string PeerProblem(ZNetPeer peer)
+    {
+        if (!PeerHasMod(peer))
+        {
+            return "does not have the mod";
+        }
+        var net = PeerNetworkVersion(peer);
+        if (net != _info.NetworkVersion)
+        {
+            return $"has another version of the mod (network version {net}, the server has {_info.NetworkVersion})";
+        }
+        return PeerReady(peer) == false ? "has the mod turned off" : null;
+    }
+
+    private static string HelloPayload() =>
+        $"{Protocol}|{_info.NetworkVersion}|{_info.Version}|{(_isLocalReady() ? "on" : "off")}";
 
     private static string AckPayload() => $"{Protocol}|{(_isActive() ? "on" : "off")}|{_info.NetworkVersion}|{_info.Version}";
 
@@ -159,7 +239,10 @@ internal static class NetworkGate
         _server = ServerCheck.None;
         _serverVersion = "";
         _serverNetVersion = 0;
+        _serverRpc = null;
+        _sentReady = null;
         ClientHellos.Clear();
+        ClientReady.Clear();
         WorldChanged();
     }
 
@@ -178,8 +261,18 @@ internal static class NetworkGate
                 peer.m_rpc.Register<string>(HelloRpc, (rpc, hello) =>
                 {
                     ClientHellos[rpc] = hello ?? "";
+                    var parts = (hello ?? "").Split('|');
+                    if (parts.Length >= 4 && parts[0] == Protocol)
+                    {
+                        ClientReady[rpc] = parts[3] == "on";
+                    }
+                    else
+                    {
+                        ClientReady.Remove(rpc);
+                    }
                     rpc.Invoke(AckRpc, AckPayload());
                 });
+                peer.m_rpc.Register<string>(StateRpc, OnClientState);
             }
             else
             {
@@ -192,6 +285,8 @@ internal static class NetworkGate
                     ParseAck(ack);
                     WorldChanged();
                 });
+                _serverRpc = peer.m_rpc;
+                _sentReady = _isLocalReady();
                 peer.m_rpc.Invoke(HelloRpc, HelloPayload());
                 WorldChanged();
             }
@@ -199,6 +294,35 @@ internal static class NetworkGate
         catch (Exception e)
         {
             PatchGuard.Report("NetworkGate.OnNewConnection", e);
+        }
+    }
+
+    // Server: client side ready changed. Only for peers that said hello (state before hello = ignored).
+    private static void OnClientState(ZRpc rpc, string state)
+    {
+        try
+        {
+            if (rpc == null || !ClientHellos.ContainsKey(rpc))
+            {
+                return;
+            }
+            var ready = state == "on";
+            if (ClientReady.TryGetValue(rpc, out var old) && old == ready)
+            {
+                return;
+            }
+            ClientReady[rpc] = ready;
+            var net = ZNet.instance;
+            var peer = net != null ? net.GetPeer(rpc) : null;
+            Log.Info($"{(peer != null ? peer.m_playerName : "A player")} turned {_info.Name} {(ready ? "on" : "off")} on their game.");
+            if (peer != null)
+            {
+                PeerStateChanged?.Invoke(peer);
+            }
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("NetworkGate.OnClientState", e);
         }
     }
 
@@ -259,6 +383,7 @@ internal static class NetworkGate
         if (peer?.m_rpc != null)
         {
             ClientHellos.Remove(peer.m_rpc);
+            ClientReady.Remove(peer.m_rpc);
         }
         WorldChanged();
     }

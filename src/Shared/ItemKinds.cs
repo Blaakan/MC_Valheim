@@ -37,6 +37,13 @@ internal static class ItemKinds
             return ItemKind.Other;
         }
 
+        // Shield pose + Blocking skill = shield, whatever its type: MC Tower Shield Wall make tower shields two-handed
+        // (TwoHandedWeaponLeft), they must stay in shield group. Vanilla: every shield has both, nothing else has.
+        if (s.m_animationState == ItemDrop.ItemData.AnimationState.Shield && s.m_skillType == Skills.SkillType.Blocking)
+        {
+            return ItemKind.Shield;
+        }
+
         switch (s.m_itemType)
         {
             case ItemDrop.ItemData.ItemType.Ammo:

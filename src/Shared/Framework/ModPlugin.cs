@@ -22,6 +22,7 @@ internal abstract class ModPlugin : BaseUnityPlugin
     private string _initError;     // Awake blew up; never cleared, feature stay off whole session
     private FileSystemWatcher _watcher;
     private volatile bool _configFileChanged;
+    private Harmony _alwaysOn;     // [AlwaysOnPatch] classes: on from start to quit, toggle never touch
 
     // Build generate this from csproj (see ModInfo.g.cs).
     protected abstract ModDescriptor Descriptor { get; }
@@ -52,8 +53,23 @@ internal abstract class ModPlugin : BaseUnityPlugin
     {
     }
 
-    // Default: every [HarmonyPatch] class in mod dll. Override for custom patching.
-    protected virtual void ApplyPatches(Harmony harmony) => harmony.PatchAll(GetType().Assembly);
+    // Mod say why it cannot run on this game even when turned on (e.g. other mod do same job). Text = Status line
+    // (full sentence, start with "Inactive: "). Null = nothing block. Framework ask at every refresh (config, world,
+    // peer events), never per frame: keep cheap. Blocked = this side not ready, so server refuse player like mod off.
+    protected virtual string LocalBlocker() => null;
+
+    // Default: every [HarmonyPatch] class in mod dll, minus [AlwaysOnPatch] ones (those stay on, see Awake).
+    // Override for custom patching.
+    protected virtual void ApplyPatches(Harmony harmony)
+    {
+        foreach (var type in AccessTools.GetTypesFromAssembly(GetType().Assembly))
+        {
+            if (!type.IsDefined(typeof(AlwaysOnPatchAttribute), false))
+            {
+                harmony.CreateClassProcessor(type).Patch();
+            }
+        }
+    }
 
     protected void Awake()
     {
@@ -80,13 +96,26 @@ internal abstract class ModPlugin : BaseUnityPlugin
         try
         {
             BindConfig();
-            NetworkGate.Install(d, () => IsActive);
+            NetworkGate.Install(d, () => IsActive, () => ComputeLocalState() == null);
             WatchConfigFile();
         }
         catch (Exception e)
         {
             Log.Error($"Could not start (the game may have changed). Feature stays off this session. {e}");
             _initError = "Error: could not start (the game may have changed). See BepInEx/LogOutput.log.";
+        }
+
+        // Always-on patches (item/prefab registration...): own Harmony id, all or nothing. Fail = feature off this
+        // session; items it add may be lost on load, log say so.
+        try
+        {
+            ApplyAlwaysOnPatches(d);
+        }
+        catch (Exception e)
+        {
+            Log.Error($"Could not register this mod's content (the game may have changed). Feature stays off this "
+                      + $"session, and items it adds may be missing from inventories. {e}");
+            _initError = "Error: could not register this mod's items (the game may have changed). See BepInEx/LogOutput.log.";
         }
 
         FeatureRegistry.RefreshAll();
@@ -148,7 +177,39 @@ internal abstract class ModPlugin : BaseUnityPlugin
             }
         }
         Harmony?.UnpatchSelf();
+        _alwaysOn?.UnpatchSelf();
         _patched = false;
+    }
+
+    // Mod dll have [AlwaysOnPatch] classes = patch them now under <guid>.alwayson. None = no Harmony instance at all.
+    private void ApplyAlwaysOnPatches(ModDescriptor d)
+    {
+        var types = new System.Collections.Generic.List<Type>();
+        foreach (var type in AccessTools.GetTypesFromAssembly(GetType().Assembly))
+        {
+            if (type.IsDefined(typeof(AlwaysOnPatchAttribute), false))
+            {
+                types.Add(type);
+            }
+        }
+        if (types.Count == 0)
+        {
+            return;
+        }
+        _alwaysOn = new Harmony(d.Guid + ".alwayson");
+        try
+        {
+            foreach (var type in types)
+            {
+                _alwaysOn.CreateClassProcessor(type).Patch();
+            }
+        }
+        catch
+        {
+            _alwaysOn.UnpatchSelf();
+            _alwaysOn = null;
+            throw;
+        }
     }
 
     // Registry call me. Return true when patched-ness changed (so dependents re-check).
@@ -222,6 +283,8 @@ internal abstract class ModPlugin : BaseUnityPlugin
         {
             NetworkGate.OnActiveChanged();
         }
+        // Client: own side ready (on, deps ok, no error) changed = tell server (one bool compare when same).
+        NetworkGate.OnLocalReadyChanged();
         return wasPatched != _patched;
     }
 
@@ -239,6 +302,25 @@ internal abstract class ModPlugin : BaseUnityPlugin
     }
 
     private (ModState, string) ComputeState()
+    {
+        var local = ComputeLocalState();
+        if (local != null)
+        {
+            return local.Value;
+        }
+
+        var net = NetworkGate.Check(Descriptor);
+        if (net != null)
+        {
+            return net.Value;
+        }
+
+        return (ModState.Active, "Active.");
+    }
+
+    // Me = everything this game decide alone (error, Enabled, dependencies), no network. Null = this side ready.
+    // Client tell server this (NetworkGate hello + state rpc): server may refuse player whose side not ready.
+    private (ModState, string)? ComputeLocalState()
     {
         var d = Descriptor;
         if (_initError != null)
@@ -277,13 +359,21 @@ internal abstract class ModPlugin : BaseUnityPlugin
             }
         }
 
-        var net = NetworkGate.Check(d);
-        if (net != null)
+        string blocker = null;
+        try
         {
-            return net.Value;
+            blocker = LocalBlocker();
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("ModPlugin.LocalBlocker", e); // broken check never block feature
+        }
+        if (!string.IsNullOrEmpty(blocker))
+        {
+            return (ModState.Conflict, blocker);
         }
 
-        return (ModState.Active, "Active.");
+        return null;
     }
 
     private void WriteStatus()

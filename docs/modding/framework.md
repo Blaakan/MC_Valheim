@@ -37,6 +37,7 @@ Each mod keeps a read-only `Status` line in its config file and in the panel:
 | Off (disabled in settings) | You turned it off. |
 | Inactive: needs X, which is not installed | A required MC mod is missing or failed to load. |
 | Inactive: needs X, which is turned off | A required MC mod is installed but off. The panel offers a **Turn on X** button. |
+| Inactive: <reason given by the mod> | The mod cannot run on this game even though it is turned on, usually because another installed mod does the same job (for example Dual Wielding next to another dual wield mod). The mod names the reason. On a server that requires the mod, this counts like having it turned off. |
 | Inactive: the server does not have this mod | The feature needs the server to have it too. |
 | Inactive: the server has this mod turned off | The server has it, but it is off (or broken) there. Follows the server live. |
 | Inactive: the server has version A, you have B... | Client and server network versions differ (`ModNetworkVersion`). |
@@ -46,6 +47,19 @@ Each mod keeps a read-only `Status` line in its config file and in the panel:
 
 When you spawn in a world, one short message lists features that are inactive for a reason you did not choose
 (shown again only when that list changes, and not while the HUD is hidden).
+
+## Content that stays registered
+
+Most patches come and go with the live toggle. A mod that adds game content (an item, a networked prefab, an RPC
+handler) cannot work that way: an item whose prefab is unknown is dropped from inventories when a character loads,
+and the server deletes world objects whose prefab it does not know. So a patch class marked `[AlwaysOnPatch]` (next
+to its `[HarmonyPatch]`) is applied once when the game starts, under its own Harmony id (`<GUID>.alwayson`), and
+stays applied while the feature is turned off; only quitting the game removes it. Such code must check the feature
+state itself and must not rely on config entries being bound. Everything else about the content (its recipe, what
+it does when used) follows the toggle as usual. If these patches cannot be applied (usually after a game update),
+the feature stays off for the session with an error status.
+
+Uninstalling a mod that adds items still removes those items from inventories: say so in the mod's README.
 
 ## Dependencies
 
@@ -79,7 +93,14 @@ What the framework does with them:
   handshake → the feature stays off for that session. While the answer is pending the feature stays on, so load-time
   hooks run on clients exactly like on the host (players only spawn after the handshake). The host and single-player
   always count as having it. The host's log names players who joined without the mod, and mod code can ask
-  `NetworkGate.PeerHasMod(peer)`.
+  `NetworkGate.PeerHasMod(peer)`. The player's game also says whether its own side is ready (the feature is turned
+  on, its dependencies are active and it did not fail to start) and tells the server again whenever that changes
+  while connected. Server-side mod code can ask `NetworkGate.PeerCompatible(peer)` (the player has the mod, the same
+  network version, and has not turned it off), `NetworkGate.PeerProblem(peer)` (a short reason for logs, or null),
+  `NetworkGate.PeerNetworkVersion(peer)` and `NetworkGate.PeerReady(peer)` (null when unknown: a copy of the mod built
+  before this check says nothing, and counts as compatible), and subscribe to `NetworkGate.PeerStateChanged` to
+  check a player again when they turn the mod on or off. Gameplay mods use this to refuse players whose game would
+  not play by the server's rules (see the `PlayerCheck` of the Combat mods).
 - **SinglePlayer**: switches itself off while other players are fully connected (players still logging in or being
   rejected don't count).
 
@@ -209,8 +230,12 @@ internal static class CrossbowSelfTests
 ## Internals (for mod authors)
 
 - `ModPlugin` (base class of every `Plugin`): owns `Enabled`, `Status`, the Harmony instance and the life cycle.
-  Mods override `BindConfig`, `OnActivated`, `OnDeactivated` (and optionally `ApplyPatches`). They must not define
-  `Awake`, `Start`, `Update` or `OnDestroy`.
+  Mods override `BindConfig`, `OnActivated`, `OnDeactivated` (and optionally `ApplyPatches` and `LocalBlocker`). They
+  must not define `Awake`, `Start`, `Update` or `OnDestroy`. The default `ApplyPatches` patches every `[HarmonyPatch]`
+  class except the `[AlwaysOnPatch]` ones, which `Awake` applies once under `<GUID>.alwayson` (see "Content that stays
+  registered"). `LocalBlocker()` returns a status sentence when the mod cannot run on this game (state `Conflict`,
+  shown like a missing dependency, reported to the server as "not ready"), or null; the framework asks it at every
+  refresh, never per frame.
 - Generated per mod from the csproj: `ModInfo` (GUID, name, version, build id, side, multiplayer, requires) and the
   `BepInPlugin` / `BepInProcess` / `BepInDependency` attributes on the partial `Plugin` class.
 - `FeatureRegistry`: shared list of all MC mods, stored in an AppDomain slot using only BCL/BepInEx types, because

@@ -28,6 +28,14 @@ Automated coverage: `./tools/Test-Framework.ps1` (live toggle, config watching, 
 - [ ] **F08 Spawn notice:** make a feature inactive for a reason other than "Off" (for example run
   `Test-Framework.ps1 -KeepProbes`, turn Probe A off, enter a world). A top-left message says how many features are
   inactive and why.
+- [ ] **F11 Always-on patch survives the toggle:** (Sneak Ambush, the first mod with `[AlwaysOnPatch]` content) set
+  `Enabled = false` in `MC.Combat.Sneak.Ambush.cfg`, start the game and load a character that carries Smoke Screens:
+  they are still in the inventory, and no "could not register" error is logged. `./tools/Test-Framework.ps1` checks
+  the live-toggle part with Probe A.
+- [ ] **F12 Conflict status:** (Dual Wielding, the first mod with a `LocalBlocker`) install another dual wield mod
+  next to it (for example RustyMods DualWielder). The MC Mods panel shows Dual Wielding with an orange status naming
+  the other mod, the spawn notice lists it, and no Dual Wielding patch runs. `./tools/Test-Framework.ps1` checks the
+  mechanism with Probe A.
 - [ ] **F10 Quit from a world:** with MC mods active (Sleep Through the Day among them), quit the game from inside a
   world (Esc > Quit > Quit to desktop). In `BepInEx/LogOutput.log`, after the world starts shutting down, no MC mod
   logs "Activated." again and there is no "Could not activate" error. Before the fix (2026-09-29, found by the
@@ -46,6 +54,13 @@ Automated coverage: `./tools/Test-Framework.ps1` (live toggle, config watching, 
   Active.
 - [ ] **N05 Host notice:** host with Sleep Through the Day, a friend joins without it: the host's log names that
   player.
+- [ ] **N07 Player turns a Both mod off while connected:** (any Combat mod of this run, dedicated server or host with
+  the mod on) a player with the mod joins, then turns it off in the MC Mods panel. The player's log says "Told the
+  server that <mod> is now off on this game."; the server's log says "<player> turned <mod> off on their game.".
+  Turned on again: the same two lines with "on". The mod's own join check reacts as its TESTING.md says.
+- [ ] **N08 Player joins with the mod turned off:** a player whose copy of a Combat mod is off (`Enabled = false`)
+  joins a server that has it on: the server's log names the problem ("has the mod turned off") and the mod's join
+  check reacts as its TESTING.md says. A player with the mod on joins normally.
 - [ ] **N06 Dedicated server loads a Both mod:** install BepInEx and Sleep Through the Day on a dedicated server
   (`valheim_server.exe`, updated to the same game version as the clients): the server log shows the mod's
   `[MC:ready]` line and "Activated", and no error from the MC Mods panel (the server has no screen).

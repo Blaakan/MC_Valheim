@@ -5,7 +5,8 @@
     Launch game -> both Active and patched -> edit A's config file on disk (Enabled = false) while the game runs
     -> A deactivates, B deactivates with "needs Probe A, which is turned off", B's Status written to its cfg
     -> A back on -> both re-activate and B's patch runs again. Then close game and remove probes.
-    Covers: live toggle, config file watching, dependency gating + recovery, patch/unpatch, status write-back.
+    Covers: live toggle, config file watching, dependency gating + recovery, patch/unpatch, status write-back,
+    always-on patches ([AlwaysOnPatch] in Probe A stay applied while A is off), LocalBlocker (Probe A's Test.Block).
 .PARAMETER KeepProbes
     Leave probe mods installed afterwards (to look at the MC Mods panel by hand).
 .EXAMPLE
@@ -37,6 +38,13 @@ function Set-Enabled([string]$Guid, [bool]$Value) {
     $text = [regex]::Replace($text, '(?m)^(Enabled\s*=\s*)(true|false)', "`${1}$($Value.ToString().ToLower())")
     [IO.File]::WriteAllText($cfg, $text, (New-Object System.Text.UTF8Encoding($false)))
 }
+function Set-Setting([string]$Guid, [string]$Key, [string]$Value) {
+    $cfg = Join-Path $cfgDir "$Guid.cfg"
+    if (-not (Test-Path $cfg)) { return }
+    $text = [IO.File]::ReadAllText($cfg)
+    $text = [regex]::Replace($text, "(?m)^($Key\s*=\s*)\S+", "`${1}$Value")
+    [IO.File]::WriteAllText($cfg, $text, (New-Object System.Text.UTF8Encoding($false)))
+}
 function Get-Status([string]$Guid) {
     $cfg = Join-Path $cfgDir "$Guid.cfg"
     if (-not (Test-Path $cfg)) { return $null }
@@ -66,6 +74,7 @@ function Check([string]$Name, [bool]$Ok, [string]$Detail = '') {
 
 Set-Enabled 'MC.Core.Probe.A' $true
 Set-Enabled 'MC.Core.Probe.B' $true
+Set-Setting 'MC.Core.Probe.A' 'Block' 'false'
 $launch = Get-Date
 $proc = @(& (Join-Path $PSScriptRoot 'Start-Game.ps1')) | Where-Object { $_ -is [System.Diagnostics.Process] } | Select-Object -First 1
 
@@ -77,6 +86,7 @@ try {
     Check 'B ready' (Wait-Log '\[MC:ready\] MC\.Core\.Probe\.B' 1 30)
     Check 'main menu' (Wait-Log 'Valheim version: ' 1 $TimeoutSec)
     Check 'B patch applied (active)' (Wait-Log 'Probe B\] \[probe\] patch running' 1 30)
+    Check 'A always-on patch applied' (Wait-Log 'Probe A\] \[probe\] always-on patch running, feature on' 1 30)
     Start-Sleep 2
     Check 'B status Active in cfg' ((Get-Status 'MC.Core.Probe.B') -eq 'Active.') "got '$(Get-Status 'MC.Core.Probe.B')'"
     # Negative test: Probe A has a method using a dll never deployed. JitCheck must catch it (proves it compiles for real).
@@ -86,6 +96,7 @@ try {
     Write-Step 'Turn A off by editing its cfg on disk'
     Set-Enabled 'MC.Core.Probe.A' $false
     Check 'A deactivated' (Wait-Log 'Probe A\] Deactivated: Off' 1 15)
+    Check 'A always-on patch stays on while A is off' (Wait-Log 'Probe A\] \[probe\] always-on patch running, feature off' 1 15)
     Check 'B deactivated because of A' (Wait-Log 'Probe B\] Deactivated: Inactive: needs Probe A, which is turned off\.' 1 15)
     Start-Sleep 2
     $aStatus = Get-Status 'MC.Core.Probe.A'
@@ -108,9 +119,20 @@ try {
     Check 'A re-activated' (Wait-Log 'Probe A\] Activated\.' 2 15)
     Check 'B re-activated by itself' (Wait-Log 'Probe B\] Activated\.' 2 15)
     Check 'B patch re-applied' (Wait-Log 'Probe B\] \[probe\] patch running' 2 15)
+    Check 'A always-on patch still on after re-activation' (Wait-Log 'Probe A\] \[probe\] always-on patch running, feature on' 2 15)
     Start-Sleep 2
     Check 'A status Active in its own cfg' ((Get-Status 'MC.Core.Probe.A') -eq 'Active.') "got '$(Get-Status 'MC.Core.Probe.A')'"
     Check 'B status Active in cfg' ((Get-Status 'MC.Core.Probe.B') -eq 'Active.') "got '$(Get-Status 'MC.Core.Probe.B')'"
+
+    Write-Step 'Block A through its LocalBlocker (Test.Block = true)'
+    Set-Setting 'MC.Core.Probe.A' 'Block' 'true'
+    Check 'A deactivated by its blocker' (Wait-Log 'Probe A\] Deactivated: Inactive: blocked by the Block setting of the probe\.' 1 15)
+    Check 'B deactivated because A is inactive' (Wait-Log 'Probe B\] Deactivated: Inactive: needs Probe A, which is inactive\.' 1 15)
+    Start-Sleep 2
+    Check 'A status shows the blocker' ((Get-Status 'MC.Core.Probe.A') -eq 'Inactive: blocked by the Block setting of the probe.') "got '$(Get-Status 'MC.Core.Probe.A')'"
+    Set-Setting 'MC.Core.Probe.A' 'Block' 'false'
+    Check 'A re-activated when unblocked' (Wait-Log 'Probe A\] Activated\.' 3 15)
+    Check 'B re-activated when A unblocked' (Wait-Log 'Probe B\] Activated\.' 3 15)
 
     $text = Read-LogText
     # Expected: the JitCheck negative-test error from Probe A. Anything else = bug.

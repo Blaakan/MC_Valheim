@@ -14,4 +14,5 @@ internal enum ModState
     ServerOnly,          // server-side mod, but me just a client of remote server
     SinglePlayerOnly,    // single-player mod, but session is multiplayer
     Error,               // patching or start blew up; see log
+    Conflict,            // mod say it cannot run on this game (LocalBlocker), e.g. other mod do same job
 }
