@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Sneak Ambush</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>Revamp</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Sneak revamp</ModIdea>
+    <!-- Both: user rule (gameplay mod = required everywhere). Stealth, smoke, blind, XP change fight for everyone,
+         and creature owner (a player's game, host too; dedicated server own no creature) run the smoke rule. Server refuse
+         players without me, with me off, or other network version (PlayerCheck), and send its rules (ServerRules). -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. It changes combat for everyone, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. Smoke Screens only exist for games with the mod: a player without it loses any Smoke Screen that reaches their inventory, and a chest loses its Smoke Screens when such a player takes or adds an item in it. On a server without the mod, Smoke Screens dropped on the ground can be deleted.</ModMultiplayerNotes>
+    <!-- Wire and world format of me: RPC <guid>.SneakAttackXp (float victimHealth, bool ranged), <guid>.Settings /
+         <guid>.SettingsRequest (AmbushRules layout 1), ZDO keys <guid>.CloudStart/CloudDuration/CloudRadius/
+         CloudHeight (cloud) and <guid>.LastXp (creature), prefab names MC_SmokeScreen, MC_SmokeScreen_projectile,
+         MC_SmokeScreen_cloud. Bump when any of them change. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Sneak attacks give Sneak XP, sneaking is a bit easier early on, holding still hides you much better, fog hides you and bushes show their cover, and a craftable Smoke Screen hides you from creatures and makes pursuers lose you.</ModDescription>
+  </PropertyGroup>
+</Project>
