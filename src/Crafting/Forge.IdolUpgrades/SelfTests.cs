@@ -266,7 +266,8 @@ internal static class SelfTests
     // ---------- forge.popup ----------
 
     // Real pickup of a 2-star idol never seen before, fresh star cache (like a new session): the "added" message and
-    // the "New material" unlock message must show the starred icon, not an empty square.
+    // the "New material" unlock message must show the starred icon, not an empty square. Me check the message read is
+    // the idol's own, not one other tests left in the HUD queue.
     private static IEnumerator RunPopup()
     {
         var c = new Checks(PopupName);
@@ -280,21 +281,42 @@ internal static class SelfTests
         {
             StarIcons.Clear();
             player.m_knownMaterial.Remove(idolName);
-            // Tests before me queue own unlock popups (new materials): me sweep them, so the one shown is mine.
-            MessageHud.instance.ClearUnlockQueue();
-            MessageHud.instance.HideAll();
             var item = prefab.m_itemData.Clone();
             item.m_quality = 3;
             item.m_dropPrefab = prefab.gameObject;
             dropped = ItemDrop.DropItem(item, 1, player.transform.position + Vector3.up, Quaternion.identity);
             yield return null;
+
+            // Tests before me leave HUD work waiting: top-left messages ("new item", "added"...; HUD show one per
+            // second, so mine wait behind them and old icon stay on screen), unlock popups, text fades. Me throw it all
+            // away in same frame as pickup and blank the screen: next top-left message and next unlock popup are mine.
+            // Me put nothing back (old news of other tests).
+            var hud = MessageHud.instance;
+            hud.ClearUnlockQueue();
+            hud.m_msgQeue.Clear();
+            hud._crossFadeTextBuffer.Clear();
+            hud.HideAll();
+            hud.currentMsg = new MessageHud.MsgData(); // Nothing on screen: no merge with old message ("x2").
+            hud.m_msgQueueTimer = 1f; // Screen idle long enough: next queued message show on next Update.
             c.Check(player.Pickup(dropped.gameObject, false, false), "pickup of the dropped 2-star idol");
             dropped = null;
-            yield return null;
-            var hud = MessageHud.instance;
+
+            // Mine = the 'added' message this pickup queued. Me wait till HUD show that very message, then read icon.
+            var addedText = Localization.instance.Localize("$msg_added " + idolName);
+            var mine = hud.m_msgQeue.FirstOrDefault(m => m != null && m.m_text == addedText);
+            var shownBy = Time.realtimeSinceStartup + 3f;
+            while (mine != null && !ReferenceEquals(hud.currentMsg, mine) && Time.realtimeSinceStartup < shownBy)
+            {
+                yield return null;
+            }
+            var ownShown = mine != null && ReferenceEquals(hud.currentMsg, mine);
+            c.Check(ownShown, mine == null
+                ? $"the pickup queues the idol's own 'added' message '{addedText}'"
+                : $"the 'added' message on screen is the idol's own, shows '{hud.m_messageText.text}'");
             var shownIcon = hud.m_messageIcon.sprite;
-            SelfTest.Note(PopupName, $"message icon: {Describe(shownIcon)}; image type {hud.m_messageIcon.type}, "
-                                     + $"mesh {hud.m_messageIcon.useSpriteMesh}, material {(hud.m_messageIcon.material != null ? hud.m_messageIcon.material.name : "none")}");
+            SelfTest.Note(PopupName, $"message: '{hud.m_messageText.text}' (idol's own: {ownShown}); icon: {Describe(shownIcon)}; "
+                                     + $"image type {hud.m_messageIcon.type}, mesh {hud.m_messageIcon.useSpriteMesh}, "
+                                     + $"material {(hud.m_messageIcon.material != null ? hud.m_messageIcon.material.name : "none")}");
             c.Check(shownIcon != null && StarIcons.IsStarSprite(shownIcon), "the 'added' message shows the starred icon");
             SelfTest.Screenshot(PopupName, "added");
             yield return null;
