@@ -18,14 +18,17 @@ internal static class ForgeRefine
     internal struct Plan
     {
         internal Piece.Requirement Idol;   // the idol requirement that set the chance
+        internal ItemDrop IdolPrefab;      // idol to spend: the recipe's own, or a higher tier (IdolTierRule)
         internal string IdolName;
         internal int Amount;
         internal int Level;                // -1 = none held (only possible with no-cost)
         internal float Chance;
+        internal int BaseTier;             // tier of the recipe's own idol, -1 = modded idol
+        internal int Tier;                 // tier of IdolPrefab (= BaseTier when not raised)
     }
 
     // Idol requirement of a Forge recipe at target quality: first upgrader requirement with an amount (vanilla take
-    // the first one whatever its amount). Null = not an idol recipe.
+    // the first one whatever its amount). Null = not an idol recipe. The idol is the one the item level need.
     internal static bool TryPlan(Inventory inventory, Recipe recipe, int targetQuality, out Plan plan)
     {
         plan = default;
@@ -45,7 +48,12 @@ internal static class ForgeRefine
                 continue;
             }
             plan.Idol = req;
-            plan.IdolName = req.m_resItem.m_itemData.m_shared.m_name;
+            var own = IdolCatalog.IdolOfPrefab(req.m_resItem);
+            var needed = IdolTierRule.Effective(req, targetQuality);
+            plan.IdolPrefab = needed != null ? needed.Prefab : req.m_resItem;
+            plan.BaseTier = own != null ? own.Tier : -1;
+            plan.Tier = needed != null ? needed.Tier : plan.BaseTier;
+            plan.IdolName = plan.IdolPrefab.m_itemData.m_shared.m_name;
             plan.Amount = amount;
             plan.Level = IdolChoice.LevelToSpend(inventory, plan.IdolName, amount);
             plan.Chance = IdolLevels.Chance(Mathf.Max(0, plan.Level));
@@ -81,7 +89,21 @@ internal static class ForgeRefine
         }
 
         // Vanilla: stats count the cheated inputs; the new item is marked cheated when inputs or the station are.
-        var cheated = inventory.ItemCheated(recipe.m_resources) || player.NoCostCheat();
+        // Inputs = the idol the level need (swap), not the recipe's own.
+        var swapped = IdolSwap.Begin(player, recipe, quality);
+        bool cheatedInputs;
+        try
+        {
+            cheatedInputs = inventory.ItemCheated(recipe.m_resources);
+        }
+        finally
+        {
+            if (swapped)
+            {
+                IdolSwap.End();
+            }
+        }
+        var cheated = cheatedInputs || player.NoCostCheat();
         var stationView = station != null ? station.GetComponent<ZNetView>() : null;
         var stationCheated = stationView != null && stationView.GetZDO() != null && stationView.GetZDO().GetBool(ZDOVars.s_cheated);
         var roll = Random.Range(0f, 1f);
@@ -100,7 +122,8 @@ internal static class ForgeRefine
         var outcome = success ? "success"
             : rules.Failure == FailureMode.Destroy ? "failed, item destroyed"
             : lower < level ? $"failed, down to level {lower}" : "failed, item stays at level 1";
-        Log.Info($"Refinement of {(item.m_dropPrefab != null ? item.m_dropPrefab.name : name)} to level {quality} with a level {plan.Level} idol "
+        Log.Info($"Refinement of {(item.m_dropPrefab != null ? item.m_dropPrefab.name : name)} to level {quality} with {plan.IdolPrefab.name} "
+                 + $"at level {plan.Level}{(plan.Tier != plan.BaseTier ? $" (own idol tier {plan.BaseTier}, raised by item level)" : "")} "
                  + $"({plan.Chance * 100f:0}% chance, roll {roll * 100f:0.0}): {outcome}.");
         if (success)
         {
@@ -135,7 +158,10 @@ internal static class ForgeRefine
                     var amount = req.GetAmount(quality);
                     if (amount > 0)
                     {
-                        inventory.RemoveItem(req.m_resItem.m_itemData.m_shared.m_name, amount);
+                        // Same idol the checks asked for (IdolSwap raise every idol requirement, not only ours).
+                        var raised = IdolTierRule.Effective(req, quality);
+                        var drop = raised != null ? raised.Prefab : req.m_resItem;
+                        inventory.RemoveItem(drop.m_itemData.m_shared.m_name, amount);
                     }
                 }
             }
@@ -184,7 +210,7 @@ internal static class ForgeRefine
         inventory.RemoveItem(item);
         player.Message(MessageHud.MessageType.Center,
             Localization.instance.Localize("$msg_upgrader_broke", name, level.ToString()), 0, null);
-        var share = plan.Idol.m_resItem.m_itemData.m_shared.m_breakReturnIngreientsAmount;
+        var share = plan.IdolPrefab.m_itemData.m_shared.m_breakReturnIngreientsAmount;
         if (share <= 0f)
         {
             return;

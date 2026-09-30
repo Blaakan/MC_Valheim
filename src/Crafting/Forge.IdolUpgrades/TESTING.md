@@ -5,10 +5,11 @@ When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
 **Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
-Mods panel). Smoke test (`./tools/Test-Smoke.ps1`) passed 2026-09-29: loads, patches cleanly, JitCheck clean (437
+Mods panel). Smoke test (`./tools/Test-Smoke.ps1`) passed 2026-09-30: loads, patches cleanly, JitCheck clean (494
 methods, 0 failures). Automated in-world self-tests (`./tools/Test-InWorld.ps1 -Mod Forge.IdolUpgrades`) pass:
 `forge.catalog`, `forge.icons`, `forge.tooltip`, `forge.popup`, `forge.idols` (includes what turning the mod off does to a running
-idol upgrade), `forge.refine`. No hands-on in-game test yet.
+idol upgrade), `forge.refine`, `forge.tiers` (the idol tier rule against the ForgeUpgradeChart of the idea sheet, and a
+level 6 Stone axe that asks for and spends a Bronze idol at the Forge). No hands-on in-game test yet.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). Find a
 Forge of Potential (Mountains location), or place one with `spawn UpgradeStation` (it is big: step back so you are
@@ -19,7 +20,9 @@ matter here). Names checked in the 1.0.16 game data: idols `Upgrader0Weapon` …
 metals `Wood`, `Bronze`, `Iron`, `Silver`, `BlackMetal`, `BlackMarble`, `FlametalNew` (Flametal), `Gold` (Bloodgold);
 trophies `TrophyDeer`, `TrophyBoar`, `TrophyNeck`, `TrophyEikthyr`, `TrophyBjorn`, `TrophyGhost`, `TrophyBlob_Frost`, `TrophyWolf`, `TrophyUlv`, `TrophyFenring`,
 `TrophySGolem`, `TrophyDragonQueen`, `TrophyForestTroll` / `TrophyFrostTroll` (same "Troll Trophy" item), every other
-trophy of the README table, and Kall's drop `CrownJewel` (Crown Jewel). Every vanilla idol has 65% success
+trophy of the README table, and Kall's drop `CrownJewel` (Crown Jewel). Items and their own idol (game data, listed by
+the `forge.tiers` self-test): `AxeStone` (Stone axe) and `ArmorLeatherChest` use Wooden idols (`Upgrader0Weapon`,
+`Upgrader0Armor`), `AxeFlint` (Flint axe) a Bronze one (`Upgrader1Weapon`), `AxeBlackMetal` a Black Metal one. Every vanilla idol has 65% success
 and 100% break on failure in the game data (so vanilla destroys the item on every failure). Do not use `nocost` in
 the idol and refinement tests: it makes everything free.
 
@@ -55,7 +58,8 @@ the idol and refinement tests: it makes everything free.
   `Upgrader4Weapon`. In the UPGRADE tab select the axe. Expected: the idol under the requirements shows its 3 stars,
   the text says "95% chance with a 3-star idol. A failure costs 1 level.", the button reads "Attempt
   Refinement (95%)". Watch `./tools/Watch-Log.ps1 -Mine`: each attempt logs "Refinement of AxeBlackMetal to level N
-  with a level L idol (C% chance, roll R): success / failed".
+  with Upgrader4Weapon at level L (C% chance, roll R): success / failed". Keep the axe at level 5 or below here: from
+  level 6 it needs Flametal idols (T20).
 - [ ] **T09 Failure costs a level:** with an axe at level 3 or more, refine with plain idols (35%) until one fails
   (the log line says "failed, down to level N"). Expected: the axe loses 1 level (default LevelsLost), one idol is
   gone, the message says "Refining of ... failed, downgraded to level N". Nothing is destroyed, no material comes back.
@@ -63,6 +67,19 @@ the idol and refinement tests: it makes everything free.
   failure leaves it at level 1).
 - [ ] **T10 Success like vanilla:** on a success, the axe gains one level, full durability, you as its crafter, the
   current world level; if it was equipped it is taken off (vanilla does the same). Mod data on it stays (C07).
+- [ ] **T20 Higher idols at high levels:** `spawn AxeStone 1 5` (a level 5 Stone axe), 2 plain `Upgrader0Weapon`.
+  Expected: the UPGRADE tab asks for the Wooden Battle Idol; refine it to level 6 (retry on a failure). At level 6 the
+  requirement becomes the **Bronze** Battle Idol, the text adds "From level 6 this item needs Bronze idols." (with
+  "You carry none." when you have no Bronze idol), the row is greyed and the button is off although you still carry
+  a Wooden idol. `spawn Upgrader1Weapon`: the button lights up; a refinement spends the Bronze idol, the Wooden idol
+  stays, and the log line names `Upgrader1Weapon` "(own idol tier 0, raised by item level)". Then check:
+  `spawn ArmorLeatherChest 1 6` asks for the Bronze **Protection** Idol (`Upgrader1Armor`); `spawn AxeFlint 1 4` asks
+  for its own Bronze idol, and at level 6 for an Iron one; a level 4 Stone axe asks for the Wooden idol again.
+- [ ] **T21 Tier settings live:** while the game runs set `LevelsOnOwnIdol = 3`: a level 4 Stone axe now asks for the
+  Bronze idol ("From level 4 ..."). Set `LevelsPerIdolTier = 1`: level 5 asks for Iron, level 6 for Silver. Set
+  `HigherIdolAtHighLevels = false`: every level asks for the Wooden idol again. Put the defaults back, then
+  `spawn AxeStone 1 40`: it asks for the **Bloodgold** Battle Idol (`Upgrader7Weapon`) with "From level 30 this item
+  needs Bloodgold idols."
 - [ ] **T19 Failure settings:** set `LevelsLost = 2`: a failure costs 2 levels (never below 1). Set
   `OnFailure = Destroy`: the text says "A failure destroys the item."; a failure destroys it with the vanilla message
   and gives back part of its materials; the Forge again asks for free slots like vanilla.
@@ -95,11 +112,18 @@ the idol and refinement tests: it makes everything free.
   server does not have this mod"; the Forge is vanilla, no IDOLS tab.
 - [ ] **M04 Player without the mod refused:** a friend without the mod joins a server (or host) with it. Expected:
   about a second after joining their game goes back to the menu with "Incompatible version"; the server log names
-  them. With `AllowPlayersWithoutMod = true` on the server they can play (log warning).
+  them and says why ("does not have the mod"). The same for a friend with the older build (network version 1, commit
+  `a74d917`: "has another version of the mod") and for a friend who unticks the mod in the MC Mods panel while
+  playing (refused about a second later: "has the mod turned off"). With `AllowPlayersWithoutMod = true` on the
+  server they can play (log warning).
 - [ ] **M05 Server rules for everyone:** on the host set `ChanceLevel0 = 50` and `OnFailure = Destroy`; the friend
   (own settings left at default) opens a Forge. Expected: their panel shows 50% and "A failure destroys the item.";
   their log says "Using the server's Forge rules". Change the host setting while they play: it follows. Their own
   IdolChoice still applies.
+- [ ] **M07 Server idol tiers for everyone:** on the host set `LevelsOnOwnIdol = 3`; the friend (own settings left
+  at default) selects a level 4 Stone axe at a Forge. Expected: their Forge asks for the Bronze idol; their log's
+  "Using the server's Forge rules" line says "idol one tier higher from level 4, then every 4 level(s)". Back to 5 on
+  the host: a level 4 axe asks for the Wooden idol again, without rejoining.
 - [ ] **M06 Dedicated server:** install on a dedicated server and on both players. Expected: M04 and M05 behaviour, the
   server log shows the mod loaded, no error.
 - [ ] **M02 Hand-off to a player without the mod:** (AllowPlayersWithoutMod on) give a 2-star idol to a friend without the mod. Expected: they see an
@@ -118,10 +142,14 @@ the idol and refinement tests: it makes everything free.
 - [ ] **C03 One Click Repair All:** at the Forge, press repair while the Idols tab is open. Expected: repairs happen and
   the Idols tab stays selected.
 - [ ] **C04 Another Forge mod:** with ReforgedPotential (or another Forge mod) installed, open the Forge. Expected: a
-  warning in the log names that mod; a refinement rolls only once (theirs); an idol upgrade in the IDOLS tab works and
-  no idol disappears.
+  warning in the log names that mod; a second warning says the higher idols at high levels are off on this game; a
+  level 6 Stone axe asks for its own Wooden idol (no Bronze); a refinement rolls only once (theirs); an idol upgrade
+  in the IDOLS tab works and no idol disappears.
 - [ ] **C05 Sort Chest:** put plain, 1-star and 2-star idols of one kind in a chest and sort it (stack merging on).
   Expected: each level stays in its own stack, stars still shown.
+- [ ] **C08 Crafting Search and Sort at the Forge:** with MC Crafting Search and Sort on, carry a level 6 Stone axe
+  and open the Forge's UPGRADE tab. Expected: the axe's requirement shows the Bronze idol; typing "wooden" in the
+  filter keeps the axe, typing "bronze" hides it (known limitation: the search reads the idol the game asks for).
 - [ ] **C07 EpicLoot:** refine a magic item (success, then a failure). Expected: its magic effects stay after both.
 - [ ] **C06 Loot Pickup Filter:** mark an idol for the filter. Expected: its mark and the stars both show (the mark may
   cover one star), and one filter entry covers every level of that idol.

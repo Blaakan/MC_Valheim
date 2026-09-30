@@ -2,7 +2,8 @@
 
 Upgrade Forge of Potential idols up to 3 stars with metal and trophies from their biome. More stars give better
 refinement odds, from 35% for a plain idol to 95% for a 3-star idol, and by default a failed refinement costs one
-level instead of destroying your weapon or armor.
+level instead of destroying your weapon or armor. High-level items need higher-tier idols, so an early item can no
+longer climb forever on cheap idols.
 
 ## Features
 
@@ -40,6 +41,19 @@ level instead of destroying your weapon or armor.
   the item and gives back only part of its materials. By default, a failure makes the item lose 1 level (setting
   **LevelsLost**, any number from 1; never below level 1); set OnFailure to Destroy to get the vanilla outcome back.
   The idol is always used up.
+- **Higher levels need higher idols** (setting **HigherIdolAtHighLevels**). In vanilla an item always asks for the
+  same idol, so a Meadows item can be refined forever with wooden idols. Now an item uses its own idol (the one the game
+  asks for) up to level 5. From level 6 it needs an idol one tier higher, then one more tier every 4 levels, up to
+  Bloodgold (settings **LevelsOnOwnIdol** and **LevelsPerIdolTier**). A battle idol stays a battle idol and a
+  protection idol stays a protection idol. For an item whose own idol is Wooden:
+
+  | Item level | 1-5 | 6-9 | 10-13 | 14-17 | 18-21 | 22-25 | 26-29 | 30 and up |
+  |---|---|---|---|---|---|---|---|---|
+  | Idol needed | Wooden | Bronze | Iron | Silver | Black Metal | Black Marble | Flametal | Bloodgold |
+
+  An item whose own idol is Bronze starts one column further (Iron from level 6, Silver from level 10, and so on). So
+  an item fully upgraded at the workbench (level 4) can take two refinements with its own idol, up to level 6. The
+  Upgrade tab shows the idol needed in the requirements and says why ("From level 6 this item needs Bronze idols.").
 - **The rest is vanilla.** Like vanilla, a refined (or downgraded) item comes back at full durability, with you as
   its crafter and the current world level, and taken off if you had it equipped. One difference: it is the same
   item, so any extra data other mods keep on it survives (EpicLoot magic, for example); vanilla replaces it with a
@@ -63,13 +77,16 @@ In multiplayer the server's (or host's) settings are used for everyone, except I
 |---|---|---|---|
 | General | Enabled | `true` | Turn the feature on or off. Takes effect immediately. |
 | General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
-| General | AllowPlayersWithoutMod | `false` | Server (or host) only. Off: players without the mod are refused about a second after joining (their game shows "Incompatible version"). On: they may play; their Forge works the vanilla way. |
+| General | AllowPlayersWithoutMod | `false` | Server (or host) only. Off: players without the mod, with a version that cannot talk to this one, or with it turned off are refused about a second after joining or after turning it off (their game shows "Incompatible version"). On: they may play; their Forge works the vanilla way. |
 | Refinement | ChanceLevel0 | `35` | Chance in percent that a refinement succeeds with a plain idol (0-100). |
 | Refinement | ChanceLevel1 | `55` | Same with a 1-star idol. |
 | Refinement | ChanceLevel2 | `75` | Same with a 2-star idol. |
 | Refinement | ChanceLevel3 | `95` | Same with a 3-star idol. |
 | Refinement | OnFailure | `LoseLevels` | What a failed refinement does to the item: `LoseLevels` (it loses LevelsLost levels, never below level 1) or `Destroy` (vanilla: destroyed, part of its materials back). The idol is always used up. |
 | Refinement | LevelsLost | `1` | With LoseLevels: how many levels a failure costs (1 to 100). |
+| Refinement | HigherIdolAtHighLevels | `true` | On: past LevelsOnOwnIdol, refining needs a higher-tier idol of the same kind (battle or protection). Off: every level uses the idol the game asks for, as in vanilla. |
+| Refinement | LevelsOnOwnIdol | `5` | The item uses its own idol while its level is at most this value (1 to 1000). |
+| Refinement | LevelsPerIdolTier | `4` | After that, the idol needed goes one tier up every this many levels, up to Bloodgold (1 to 1000). |
 | Refinement | IdolChoice | `Highest` | Idol used when you carry several levels: `Highest` (most stars, best chance) or `Lowest` (plain first, keep your starred idols). Clicking the idol still picks another level. Each player's own choice. |
 | Upgrade costs | Level1Material, Level1Trophies | `5`, `5` | Metal and common trophies to go from plain to 1 star. |
 | Upgrade costs | Level2Material, Level2Trophies | `10`, `3` | Metal and elite trophies to go from 1 to 2 stars. |
@@ -83,12 +100,13 @@ In multiplayer the server's (or host's) settings are used for everyone, except I
 - **Multiplayer support:** works in multiplayer.
 
 Install it on the server (or the host) and on every player's game: the server refuses players without it, and its
-settings (odds, what a failure does, upgrade costs, trophy lists) apply to everyone. On a server without the mod it
+settings (odds, what a failure does, which idol high levels need, upgrade costs, trophy lists) apply to everyone. On a server without the mod it
 turns itself off. Upgraded idols are normal idols with a higher quality: a game without the mod shows them without
 stars and its Forge cannot spend a starred idol on its own.
 
-- **Players without the mod are refused** about a second after they join; their game shows "Incompatible version".
-  The server (or host) can let them in with AllowPlayersWithoutMod = true.
+- **Players without the mod are refused** about a second after they join, and so are players with an older version
+  that cannot talk to this one or with the mod turned off on their game (also when they turn it off while playing);
+  their game shows "Incompatible version". The server (or host) can let them in with AllowPlayersWithoutMod = true.
 - **The server's settings apply to everyone** (your game logs "Using the server's Forge rules"); your own settings
   apply again in single player and when you host. Only IdolChoice stays your own.
 - **On a server without the mod** the mod turns itself off on your game (the MC Mods panel says why): the Forge is
@@ -112,6 +130,9 @@ stars and its Forge cannot spend a starred idol on its own.
   `TrophyFrostTroll`) and both count.
 - **Hildir's quest bosses** (Brenna, Geirrhafa, Zil, Thungr) count as boss trophies for their tier.
 - **Kall Fimbulbringer** drops no trophy: the Bloodgold boss step takes his Crown Jewel.
+- **An item's own idol is the game's choice**, not always its biome: the Flint axe asks for a Bronze idol, the Bronze
+  axe for an Iron one and the Iron axe for a Silver one, while the Stone axe, the Flint knife and the Flint spear use
+  Wooden idols. Higher levels start from that own idol.
 - **New Game+ worlds** (world level): like every recipe, only metal and trophies from the current world level count.
   Like every vanilla upgrade, an upgraded idol takes the current world level, so an idol found before the world level
   went up becomes usable at the Forge once upgraded.
@@ -141,9 +162,13 @@ its vanilla quality). Safe to add at any time; before removing it, see "Before r
   Odin's Blessing, Potential Forge NoFail, Forge No Destroy, Forge of Certainty, Forge of Progression, Potential
   Draught, the Forge settings of G3A3 and ImpactfulSkills' forging bonus. When another mod takes over the refinement
   first, this mod steps aside for that attempt (one roll only) and the log names the other mod; idol upgrades stay
-  safe from their takeover.
+  safe from their takeover. While such a mod is installed, **higher idols at high levels are off** on that game (the
+  log says so once): the other mod spends idols with its own rules, and asking for a higher idol it does not spend
+  would let a refinement cost nothing.
 - **EpicLoot**: a refined item keeps its magic effects (it is the same item, one level up or down).
-- **Crafting Search and Sort** (MC): its filter and sort also work in the Idols tab.
+- **Crafting Search and Sort** (MC): its filter and sort also work in the Idols tab. At the Forge its ingredient
+  search matches the idol the game asks for, not a higher one an item's level needs: a level 6 Stone axe is found by
+  "wooden", not by "bronze".
 - **Sort Chest** (MC): idols of different levels stay in separate stacks.
 - **Crossbow Stays Loaded** (MC): a refined crossbow keeps its "loaded" mark, but its full durability counts as a
   repair, so it needs a reload, the same as after vanilla refinement.

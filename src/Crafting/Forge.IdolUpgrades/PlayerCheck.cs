@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using MC.Shared;
 using UnityEngine;
@@ -7,18 +8,20 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 // What server do with one joined player after the grace.
 internal enum JoinVerdict : byte
 {
-    Skip,     // not for me: not server, player gone or not in, already being kicked
-    HasMod,   // their game answered our handshake: fine
-    Allowed,  // no mod, but AllowPlayersWithoutMod on: let in, warn
-    Refuse,   // no mod: refuse
+    Skip,        // not for me: not server, player gone or not in, already being kicked
+    Compatible,  // has the mod, same network version, not turned off on their game: fine
+    Allowed,     // not compatible, but AllowPlayersWithoutMod on: let in, warn
+    Refuse,      // not compatible: refuse
 }
 
-// Me = server (dedicated or host) refuse players whose game no have this mod: user want every player of a server on
-// same Forge rules (MC rule: mod that change the game is required on every player). Copy of MC Breeding's check.
-// Host own player is not a peer, single player has none: me never touch them. Me only see "installed" (framework
-// hello), not "turned on".
+// Me = server (dedicated or host) refuse players whose game would not refine by the server's rules: no mod, other
+// network version (older build without the idol tier rule), or mod turned off on their game (MC rule: mod that change
+// the game is required on every player). Same contract as the sibling mods (Weapons.Moveset, Sneak.Ambush,
+// Creatures.Morale): decide with NetworkGate.PeerCompatible, log PeerProblem, check again on PeerStateChanged (player
+// turn the mod on or off while connected), so a player is refused by every MC mod for the same reasons.
+// Host own player is not a peer, single player has none: me never touch them.
 // Flow: ZNet.RPC_PeerInfo postfix on server, peer ready (m_uid set) = fully in -> me wait Grace s (our hello always
-// come before PeerInfo on same connection, so grace only safety) -> NetworkGate.PeerHasMod. No mod and setting off ->
+// come before PeerInfo on same connection, so grace only safety) -> PeerCompatible. Not compatible and setting off ->
 // vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version", go back to menu, like vanilla version
 // check) + peer in vanilla kick list (ZNet.Update disconnect it DisconnectDelay s later). Me check early and cut late:
 // refused game sit on loading screen (long frames); if socket close before it read Error, vanilla UpdatePeers drop
@@ -42,32 +45,35 @@ internal static class PlayerCheck
     internal static bool HasWork => Queue.Count > 0;
 
     // Pure: self test hammer it.
-    internal static JoinVerdict Decide(bool isServer, bool connected, bool ready, bool beingKicked, bool hasMod,
+    internal static JoinVerdict Decide(bool isServer, bool connected, bool ready, bool beingKicked, bool compatible,
         bool allowWithoutMod)
     {
         if (!isServer || !connected || !ready || beingKicked)
         {
             return JoinVerdict.Skip;
         }
-        if (hasMod)
+        if (compatible)
         {
-            return JoinVerdict.HasMod;
+            return JoinVerdict.Compatible;
         }
         return allowWithoutMod ? JoinVerdict.Allowed : JoinVerdict.Refuse;
     }
 
-    // OnActivated: server turned on with players already in = check them all.
+    // OnActivated: listen for players turning the mod on/off; server turned on with players already in = check all.
     internal static void Start()
     {
         _active = true;
         Queue.Clear();
+        NetworkGate.PeerStateChanged -= OnPeerStateChanged;
+        NetworkGate.PeerStateChanged += OnPeerStateChanged;
         ScheduleAllConnected();
     }
 
-    // OnDeactivated: pending checks cancelled. Player already refused still go (vanilla kick list).
+    // OnDeactivated: stop listening, pending checks cancelled. Player already refused still go (vanilla kick list).
     internal static void Stop()
     {
         _active = false;
+        NetworkGate.PeerStateChanged -= OnPeerStateChanged;
         Queue.Clear();
     }
 
@@ -85,7 +91,8 @@ internal static class PlayerCheck
         }
     }
 
-    // RPC_PeerInfo postfix on server, peer ready. Same peer twice = keep first deadline.
+    // RPC_PeerInfo postfix on server (peer ready), or player's copy turned on/off. Same peer twice = keep first
+    // deadline (check read the state at the deadline anyway).
     internal static void Schedule(ZNetPeer peer)
     {
         if (!_active || peer == null || !peer.IsReady())
@@ -100,6 +107,19 @@ internal static class PlayerCheck
             }
         }
         Queue.Add(new Waiting { Peer = peer, Due = Time.unscaledTime + GraceSeconds });
+    }
+
+    // Framework event (server side, from the player's HelloState): same grace, then same check.
+    private static void OnPeerStateChanged(ZNetPeer peer)
+    {
+        try
+        {
+            Schedule(peer);
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("PlayerCheck.OnPeerStateChanged", e);
+        }
     }
 
     // ZNet.Update postfix, only when HasWork.
@@ -127,16 +147,17 @@ internal static class PlayerCheck
                         && peer.m_rpc.IsConnected();
         var ready = connected && peer.IsReady();
         var kicked = connected && ZNet.PeersToDisconnectAfterKick.ContainsKey(peer);
-        var hasMod = connected && NetworkGate.PeerHasMod(peer);
+        var compatible = connected && NetworkGate.PeerCompatible(peer);
         var allow = Plugin.AllowPlayersWithoutMod != null && Plugin.AllowPlayersWithoutMod.Value;
-        switch (Decide(isServer, connected, ready, kicked, hasMod, allow))
+        switch (Decide(isServer, connected, ready, kicked, compatible, allow))
         {
-            case JoinVerdict.HasMod:
-                Log.Debug($"{Who(peer)} has Forge Idol Upgrades installed: allowed.");
+            case JoinVerdict.Compatible:
+                Log.Debug($"{Who(peer)} has {ModInfo.Name}: allowed.");
                 break;
             case JoinVerdict.Allowed:
-                Log.Warning($"{Who(peer)} joined without Forge Idol Upgrades. AllowPlayersWithoutMod is on, so "
-                            + "their Forge works the vanilla way and ignores idol levels.");
+                // Not "joined": a re-check after PeerStateChanged land here too.
+                Log.Warning($"Not refusing {Who(peer)}: their game {Problem(peer)}, but AllowPlayersWithoutMod is on. "
+                            + "Their Forge works the vanilla way: no idol levels, the recipe's own idol at every level.");
                 break;
             case JoinVerdict.Refuse:
                 Refuse(peer);
@@ -146,8 +167,8 @@ internal static class PlayerCheck
 
     private static void Refuse(ZNetPeer peer)
     {
-        Log.Warning($"Refused {Who(peer)}: their game does not run Forge Idol Upgrades, which this server requires on "
-                    + "every player (everybody refines with the same rules). Their game shows \"Incompatible version\". "
+        Log.Warning($"Refused {Who(peer)}: their game {Problem(peer)}, and this server requires {ModInfo.Name} on every "
+                    + "player (everybody refines with the same rules). Their game shows \"Incompatible version\". "
                     + "To let such players in, set AllowPlayersWithoutMod = true.");
         // Vanilla client: RPC_Error set connection status, Game.FixedUpdate log out, main menu show the text. Me cut
         // socket only DisconnectDelay s later (vanilla kick use 1 s): client read Error first, even on slow loading.
@@ -157,6 +178,9 @@ internal static class PlayerCheck
             ZNet.PeersToDisconnectAfterKick[peer] = Time.time + DisconnectDelay;
         }
     }
+
+    // Framework reason ("does not have the mod", "has another version of the mod (...)", "has the mod turned off").
+    private static string Problem(ZNetPeer peer) => NetworkGate.PeerProblem(peer) ?? "cannot refine by this server's rules";
 
     private static string Who(ZNetPeer peer)
     {

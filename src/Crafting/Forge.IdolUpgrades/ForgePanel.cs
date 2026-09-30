@@ -37,9 +37,11 @@ internal static class ForgePanel
         var held = IdolChoice.LevelsHeld(inventory, plan.IdolName, plan.Amount);
 
         gui.m_itemCraftType.gameObject.SetActive(true);
-        gui.m_itemCraftType.text = plan.Level < 0
-            ? "You carry no idol of this kind."
-            : $"{percent}% chance with a {Kind(level)} idol. {FailureText(selected.ItemData.m_quality)}";
+        var tierNote = TierNote(plan);
+        gui.m_itemCraftType.text = plan.Level >= 0
+            ? $"{percent}% chance with a {Kind(level)} idol. {FailureText(selected.ItemData.m_quality)}{(tierNote.Length > 0 ? " " + tierNote : "")}"
+            : tierNote.Length > 0 ? tierNote + " You carry none."
+            : "You carry no idol of this kind.";
 
         var label = gui.m_craftButton.GetComponentInChildren<TMP_Text>();
         if (label != null && plan.Level >= 0)
@@ -66,7 +68,8 @@ internal static class ForgePanel
         {
             return;
         }
-        var plainIcon = plan.Idol.m_resItem.m_itemData.m_shared.m_icons.Length > 0 ? plan.Idol.m_resItem.m_itemData.m_shared.m_icons[0] : null;
+        var icons = plan.IdolPrefab.m_itemData.m_shared.m_icons;
+        var plainIcon = icons.Length > 0 ? icons[0] : null;
         var name = Localization.instance.Localize(plan.IdolName);
         var tooltip = plan.Level < 0
             ? name
@@ -92,6 +95,18 @@ internal static class ForgePanel
         return lost <= 0 ? "A failure costs only the idol."
             : lost == 1 ? "A failure costs 1 level."
             : $"A failure costs {lost} levels.";
+    }
+
+    // Why the idol is not the recipe's own: "From level 6 this item needs Bronze idols." Empty when not raised.
+    internal static string TierNote(ForgeRefine.Plan plan)
+    {
+        if (plan.BaseTier < 0 || plan.Tier <= plan.BaseTier)
+        {
+            return "";
+        }
+        // Offset actually used (Bloodgold cap), so the level named is where that tier started.
+        var from = IdolTierRule.FirstLevel(ServerRules.Current, plan.Tier - plan.BaseTier);
+        return $"From level {from} this item needs {IdolTierRule.TierTitle(plan.Tier)} idols.";
     }
 
     // "plain", "1-star", "2-star", "3-star".

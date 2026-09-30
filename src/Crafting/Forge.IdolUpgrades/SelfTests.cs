@@ -23,6 +23,9 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 //   forge.refine   refinement at the Forge with forced rolls: failure lose 1 level (default), destroy rule break
 //                  the item and give materials back, idol spent always,
 //                  success raise item level in place (custom data kept), idol level pick (default + click cycle)
+//   forge.tiers    idol tier by item level = the user's chart; family kept, Bloodgold cap; at the Forge a level 6
+//                  wooden-tier weapon asks for (and spends) a Bronze idol, recipe data never left swapped; notes list
+//                  which items the game puts on which idol tier
 // Me take back every item me give, forget recipes me teach, close the window, destroy the Forge, reset forced roll.
 internal static class SelfTests
 {
@@ -32,6 +35,7 @@ internal static class SelfTests
     private const string IdolsName = "forge.idols";
     private const string RefineName = "forge.refine";
     private const string PopupName = "forge.popup";
+    private const string TiersName = "forge.tiers";
 
     [Conditional("DEBUG")]
     internal static void Register()
@@ -43,6 +47,7 @@ internal static class SelfTests
         SelfTest.Register(IdolsName, RunIdols);
         SelfTest.Register(RefineName, RunRefine);
         SelfTest.Register(PopupName, RunPopup);
+        SelfTest.Register(TiersName, RunTiers);
 #endif
     }
 
@@ -56,6 +61,7 @@ internal static class SelfTests
         SelfTest.Unregister(IdolsName);
         SelfTest.Unregister(RefineName);
         SelfTest.Unregister(PopupName);
+        SelfTest.Unregister(TiersName);
         ForgeRefine.TestRoll = null;
 #endif
     }
@@ -168,13 +174,18 @@ internal static class SelfTests
         c.Check(ForgeRules.TryRead(pkg, out var back, out var clamped) && !clamped && back.Describe() == own.Describe()
                 && back.SameTiers(own) && back.LevelsLost == own.LevelsLost && back.Failure == own.Failure,
             "rules survive the wire unchanged");
+        c.Check(back != null && back.TierByLevel == own.TierByLevel && back.BaseLevels == own.BaseLevels && back.LevelsPerTier == own.LevelsPerTier,
+            "idol tier rules survive the wire");
         var wild = ForgeRules.Own();
         wild.Chance[2] = 150;
         wild.LevelsLost = 0;
+        wild.LevelsPerTier = 0;
+        wild.BaseLevels = ForgeRules.MaxLevel + 5;
         pkg = new ZPackage();
         wild.Write(pkg);
         pkg.SetPos(0);
-        c.Check(ForgeRules.TryRead(pkg, out back, out clamped) && clamped && back.Chance[2] == 100 && back.LevelsLost == 1,
+        c.Check(ForgeRules.TryRead(pkg, out back, out clamped) && clamped && back.Chance[2] == 100 && back.LevelsLost == 1
+                && back.LevelsPerTier == 1 && back.BaseLevels == ForgeRules.MaxLevel,
             "out-of-range rules from the wire are clamped");
         pkg = new ZPackage();
         pkg.Write(ForgeRules.Layout + 1);
@@ -183,7 +194,7 @@ internal static class SelfTests
         c.Check(ServerRules.Receive(new ZPackage()) == false, "single player never takes rules from a peer");
         c.Check(PlayerCheck.Decide(true, true, true, false, false, false) == JoinVerdict.Refuse
                 && PlayerCheck.Decide(true, true, true, false, false, true) == JoinVerdict.Allowed
-                && PlayerCheck.Decide(true, true, true, false, true, false) == JoinVerdict.HasMod
+                && PlayerCheck.Decide(true, true, true, false, true, false) == JoinVerdict.Compatible
                 && PlayerCheck.Decide(false, true, true, false, false, false) == JoinVerdict.Skip,
             "join check: no mod refused (or allowed by setting), mod fine, only the server acts");
         c.Report($"; chances {IdolLevels.ChancePercent(0)}/{IdolLevels.ChancePercent(1)}/{IdolLevels.ChancePercent(2)}/{IdolLevels.ChancePercent(3)}%");
@@ -775,6 +786,187 @@ internal static class SelfTests
                 {
                     inventory.RemoveItem(pair.Key, extra, -1, false);
                 }
+            }
+            ForgeRefine.TestRoll = null;
+            IdolChoice.Clear();
+            forge.Close();
+            given.TakeBack();
+            if (taught != null)
+            {
+                player.m_knownRecipes.Remove(taught);
+            }
+        }
+    }
+
+    // ---------- forge.tiers ----------
+
+    // The user's ForgeUpgradeChart (idea sheet, 2026-09-30), cell by cell: per base tier, "item level:idol tier" where
+    // the needed idol changes. Written out, not computed, so the test prove the formula against the table.
+    private static readonly string[] Chart =
+    {
+        "1:WOOD 6:BRONZE 10:IRON 14:SILVER 18:BLACKMETAL 22:BLACKMARBLE 26:FLAMETAL 30:BLOODGOLD",
+        "1:BRONZE 6:IRON 10:SILVER 14:BLACKMETAL 18:BLACKMARBLE 22:FLAMETAL 26:BLOODGOLD",
+        "1:IRON 6:SILVER 10:BLACKMETAL 14:BLACKMARBLE 18:FLAMETAL 22:BLOODGOLD",
+        "1:SILVER 6:BLACKMETAL 10:BLACKMARBLE 14:FLAMETAL 18:BLOODGOLD",
+        "1:BLACKMETAL 6:BLACKMARBLE 10:FLAMETAL 14:BLOODGOLD",
+        "1:BLACKMARBLE 6:FLAMETAL 10:BLOODGOLD",
+        "1:FLAMETAL 6:BLOODGOLD",
+        "1:BLOODGOLD",
+    };
+
+    private static readonly string[] ChartTiers = { "WOOD", "BRONZE", "IRON", "SILVER", "BLACKMETAL", "BLACKMARBLE", "FLAMETAL", "BLOODGOLD" };
+
+    private static int ChartTier(int baseTier, int level)
+    {
+        var tier = -1;
+        foreach (var cell in Chart[baseTier].Split(' '))
+        {
+            var parts = cell.Split(':');
+            if (int.Parse(parts[0]) <= level)
+            {
+                tier = Array.IndexOf(ChartTiers, parts[1]);
+            }
+        }
+        return tier;
+    }
+
+    private static IEnumerator RunTiers()
+    {
+        var c = new Checks(TiersName);
+        var given = new Given();
+        var forge = new Forge();
+        var player = Player.m_localPlayer;
+        var inventory = player.GetInventory();
+        var gui = InventoryGui.instance;
+        string taught = null;
+        Piece.Requirement idolReq = null;
+        ItemDrop ownIdol = null;
+        try
+        {
+            // 1. Rule = the user's chart, levels 1..40, every base tier (default rules). Off = always the base tier.
+            var rules = new ForgeRules();
+            var mismatches = new List<string>();
+            for (var b = 0; b < IdolTierDefaults.Count; b++)
+            {
+                for (var level = 1; level <= 40; level++)
+                {
+                    var got = IdolTierRule.TierFor(rules, b, level);
+                    if (got != ChartTier(b, level))
+                    {
+                        mismatches.Add($"base {b} level {level}: {got} vs chart {ChartTier(b, level)}");
+                    }
+                }
+            }
+            c.Check(mismatches.Count == 0, "rule must match the chart: " + string.Join(", ", mismatches.Take(5).ToArray()));
+            var off = new ForgeRules { TierByLevel = false };
+            c.Check(IdolTierRule.TierFor(off, 0, 40) == 0 && IdolTierRule.TierFor(off, 3, 12) == 3, "rule off: always the base tier");
+            c.Check(IdolTierRule.FirstLevel(rules, 1) == 6 && IdolTierRule.FirstLevel(rules, 2) == 10 && IdolTierRule.FirstLevel(rules, 7) == 30,
+                "tier changes at levels 6, 10 ... 30");
+
+            // 2. Which items the game puts on which idol (vanilla recipe data): notes for the balance review.
+            var byTier = new SortedDictionary<string, List<string>>();
+            foreach (var r in ObjectDB.instance.m_recipes)
+            {
+                var q = r != null && r.m_item != null && r.m_resources != null ? r.m_resources.FirstOrDefault(x => x != null && x.m_upgraderResource && x.m_resItem != null) : null;
+                var own = q != null ? IdolCatalog.IdolOfPrefab(q.m_resItem) : null;
+                if (own == null)
+                {
+                    continue;
+                }
+                var key = $"tier {own.Tier} ({IdolTierRule.TierTitle(own.Tier)}) {(own.Weapon ? "battle" : "protection")}";
+                if (!byTier.TryGetValue(key, out var list))
+                {
+                    byTier[key] = list = new List<string>();
+                }
+                list.Add(r.m_item.name);
+            }
+            foreach (var pair in byTier)
+            {
+                SelfTest.Note(TiersName, $"{pair.Key} idol ({pair.Value.Count}): {string.Join(", ", pair.Value.OrderBy(n => n).ToArray())}");
+            }
+
+            // 3. A wooden-tier one-handed weapon and a wooden-tier armor recipe: family kept, tier raised, capped.
+            var recipe = ObjectDB.instance.m_recipes.FirstOrDefault(r => r != null && r.m_item != null && r.m_enabled
+                && r.m_item.m_itemData.m_shared.m_itemType == ItemDrop.ItemData.ItemType.OneHandedWeapon
+                && r.m_resources.Any(q => q.m_upgraderResource && IdolCatalog.IdolOfPrefab(q.m_resItem) is { Tier: 0, Weapon: true }));
+            var armor = ObjectDB.instance.m_recipes.FirstOrDefault(r => r != null && r.m_item != null && r.m_enabled
+                && r.m_resources.Any(q => q.m_upgraderResource && IdolCatalog.IdolOfPrefab(q.m_resItem) is { Tier: 0, Weapon: false }));
+            if (recipe == null || armor == null)
+            {
+                c.Check(false, $"no wooden-tier {(recipe == null ? "weapon" : "armor")} recipe with an idol in ObjectDB");
+                c.Report();
+                yield break;
+            }
+            idolReq = recipe.m_resources.First(q => q.m_upgraderResource && q.m_resItem != null);
+            ownIdol = idolReq.m_resItem;
+            var armorReq = armor.m_resources.First(q => q.m_upgraderResource && q.m_resItem != null);
+            SelfTest.Note(TiersName, $"weapon {recipe.m_item.name} ({ownIdol.name}), armor {armor.m_item.name} ({armorReq.m_resItem.name})");
+            c.Check(IdolTierRule.Effective(idolReq, 5) == null && IdolTierRule.Effective(idolReq, 6) == null, "levels 4 and 5 refine with the own idol");
+            c.Check(IdolTierRule.Effective(idolReq, 7)?.PrefabName == IdolTierDefaults.WeaponIdol(1), "level 6 needs the Bronze battle idol");
+            c.Check(IdolTierRule.Effective(idolReq, 11)?.PrefabName == IdolTierDefaults.WeaponIdol(2), "level 10 needs the Iron battle idol");
+            c.Check(IdolTierRule.Effective(idolReq, 41)?.PrefabName == IdolTierDefaults.WeaponIdol(7), "level 40 needs the Bloodgold battle idol (cap)");
+            c.Check(IdolTierRule.Effective(armorReq, 7)?.PrefabName == IdolTierDefaults.ArmorIdol(1), "armor level 6 needs the Bronze protection idol");
+
+            // 4. At the Forge: a level 6 weapon with only its own (wooden) idol cannot be refined; the panel asks for
+            // the Bronze idol; with one, the refinement spends it and the recipe keeps its own idol afterwards.
+            var bronze = IdolCatalog.IdolAt(1, true).Prefab;
+            var bronzeName = bronze.m_itemData.m_shared.m_name;
+            var ownName = ownIdol.m_itemData.m_shared.m_name;
+            var itemName = recipe.m_item.m_itemData.m_shared.m_name;
+            if (player.m_knownRecipes.Add(itemName))
+            {
+                taught = itemName;
+            }
+            given.Add(recipe.m_item.gameObject.name, 1, 6);
+            var weapon = inventory.GetAllItems().FirstOrDefault(i => i.m_shared.m_name == itemName && i.m_quality == 6);
+            given.Add(ownIdol.gameObject.name, 1, 1);
+            yield return Forge.Open(forge);
+
+            var row = RowOf(gui, weapon);
+            c.Check(row >= 0, "Upgrade tab at the Forge must list the level 6 weapon");
+            c.Check(row >= 0 && !gui.m_availableRecipes[row].CanCraft, "list row greyed: no Bronze idol carried");
+            gui.SetRecipe(row, false);
+            yield return null;
+            yield return null;
+            c.Check(!gui.m_craftButton.interactable, "only the wooden idol: Refine button off");
+            c.Check(Slot(gui, 0, "res_name") == Localization.instance.Localize(bronzeName), $"requirement slot must name the Bronze idol, is '{Slot(gui, 0, "res_name")}'");
+            c.Check(gui.m_itemCraftType.text.Contains("From level 6 this item needs Bronze idols."), $"panel explains the higher idol, is '{gui.m_itemCraftType.text}'");
+            c.Check(idolReq.m_resItem == ownIdol, "recipe data keeps its own idol outside the checks");
+            SelfTest.Screenshot(TiersName, "level6-needs-bronze");
+            yield return null;
+            yield return null;
+
+            given.Add(bronze.gameObject.name, 1, 1);
+            gui.UpdateCraftingPanel();
+            yield return null;
+            row = RowOf(gui, weapon);
+            gui.SetRecipe(row, false);
+            yield return null;
+            yield return null;
+            c.Check(gui.m_craftButton.interactable, "Bronze idol carried: Refine button on");
+            ForgeRefine.TestRoll = 0f;
+            yield return PressAndFinish(gui);
+            c.Check(inventory.ContainsItem(weapon) && weapon.m_quality == 7, $"success: weapon at level 7, is {weapon.m_quality}");
+            c.Check(inventory.CountItems(bronzeName) == 0, "the Bronze idol was spent");
+            c.Check(inventory.CountItems(ownName) == 1, "the wooden idol was not touched");
+            c.Check(idolReq.m_resItem == ownIdol, "recipe data keeps its own idol after the refinement");
+
+            // Level 4 (workbench maximum): own idol again.
+            weapon.m_quality = 4;
+            gui.UpdateCraftingPanel();
+            yield return null;
+            gui.SetRecipe(RowOf(gui, weapon), false);
+            yield return null;
+            yield return null;
+            c.Check(Slot(gui, 0, "res_name") == Localization.instance.Localize(ownName), $"level 4: requirement slot names the own idol, is '{Slot(gui, 0, "res_name")}'");
+            c.Check(gui.m_craftButton.interactable, "level 4 with the wooden idol: Refine button on");
+            c.Report();
+        }
+        finally
+        {
+            if (idolReq != null && ownIdol != null && idolReq.m_resItem != ownIdol)
+            {
+                idolReq.m_resItem = ownIdol; // never leave the recipe swapped
             }
             ForgeRefine.TestRoll = null;
             IdolChoice.Clear();

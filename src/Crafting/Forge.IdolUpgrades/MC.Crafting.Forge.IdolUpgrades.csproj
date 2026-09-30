@@ -11,10 +11,10 @@
          refuse players without me and send its rules (odds, failure, costs, trophy lists) to everyone. -->
     <ModSide>Both</ModSide>
     <ModMultiplayer>Compatible</ModMultiplayer>
-    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game: the server refuses players without it, and its settings (odds, what a failure does, upgrade costs, trophy lists) apply to everyone. On a server without the mod it turns itself off. Upgraded idols are normal idols with a higher quality: a game without the mod shows them without stars and its Forge cannot spend a starred idol on its own.</ModMultiplayerNotes>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game: the server refuses players without it, and its settings (odds, what a failure does, which idol high levels need, upgrade costs, trophy lists) apply to everyone. On a server without the mod it turns itself off. Upgraded idols are normal idols with a higher quality: a game without the mod shows them without stars and its Forge cannot spend a starred idol on its own.</ModMultiplayerNotes>
     <!-- RPC <guid>.Settings / <guid>.SettingsRequest (ForgeRules layout 1). Bump when names or layout change. -->
-    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModNetworkVersion>2</ModNetworkVersion>
     <ModRequires></ModRequires>
-    <ModDescription>Upgrade Forge of Potential idols up to 3 stars with metal and trophies from their biome. More stars give better refinement odds (35 to 95 percent), and by default a failed refinement costs one level instead of destroying the item.</ModDescription>
+    <ModDescription>Upgrade Forge of Potential idols to 3 stars with metal and trophies of their biome for better odds (35-95%). By default a failed refinement costs a level, not the item, and high-level items need higher-tier idols.</ModDescription>
   </PropertyGroup>
 </Project>

@@ -18,6 +18,9 @@ internal sealed partial class Plugin : ModPlugin
     internal static readonly ConfigEntry<int>[] TrophyCost = new ConfigEntry<int>[IdolLevels.Max + 1];
     internal static ConfigEntry<FailureMode> Failure;
     internal static ConfigEntry<int> LevelsLost;
+    internal static ConfigEntry<bool> TierByLevel;
+    internal static ConfigEntry<int> BaseLevels;
+    internal static ConfigEntry<int> LevelsPerTier;
     internal static ConfigEntry<IdolPick> Pick;
     internal static ConfigEntry<bool> AllowPlayersWithoutMod;
     internal static readonly TierConfig[] Tiers = new TierConfig[IdolTierDefaults.Count];
@@ -37,11 +40,11 @@ internal sealed partial class Plugin : ModPlugin
         IconInlineGuard.Apply();
 
         AllowPlayersWithoutMod = Config.Bind("General", "AllowPlayersWithoutMod", false, new ConfigDescription(
-            "Used only by the server (or the host). Off (default): a player whose game does not have this mod installed "
-            + "is refused about a second after joining, and their game shows \"Incompatible version\", so every player "
-            + "refines with the same rules. The check only looks at whether the mod is installed: a player who turned "
-            + "it off on their own game is not refused. On: players without the mod may play; their Forge works the "
-            + "normal game way and does not accept starred idols on their own.",
+            "Used only by the server (or the host). Off (default): a player whose game does not have this mod, has a "
+            + "version that cannot talk to this one, or has it turned off, is refused about a second after joining or "
+            + "after turning it off (their game shows \"Incompatible version\"), so every player refines with the same "
+            + "rules. On: such players may play; their Forge works the normal game way (no idol levels, the recipe's "
+            + "own idol at every level) and does not accept starred idols on their own.",
             null, new ConfigurationManagerAttributes { Order = 90 }));
 
         int[] chances = { 35, 55, 75, 95 };
@@ -64,6 +67,25 @@ internal sealed partial class Plugin : ModPlugin
             + "level 1)." + ServerWins,
             new AcceptableValueRange<int>(1, ForgeRules.MaxLevelsLost),
             new ConfigurationManagerAttributes { Order = 91 }));
+        TierByLevel = Config.Bind("Refinement", "HigherIdolAtHighLevels", true, new ConfigDescription(
+            "On (default): past a certain level, refining an item needs an idol of a higher tier than the one the game "
+            + "asks for, so an early item cannot climb forever on cheap idols (see LevelsOnOwnIdol and "
+            + "LevelsPerIdolTier). The idol stays of the same kind as the one the game asks for (battle or protection). "
+            + "Off: every level uses the idol the game asks for." + ServerWins,
+            null, new ConfigurationManagerAttributes { Order = 89 }));
+        BaseLevels = Config.Bind("Refinement", "LevelsOnOwnIdol", 5, new ConfigDescription(
+            "With HigherIdolAtHighLevels on: an item is refined with the idol the game asks for (its own tier) while its "
+            + "level is at most this value. Default 5: an item fully upgraded at the workbench (level 4) can take two "
+            + "refinements with its own idol, up to level 6." + ServerWins,
+            new AcceptableValueRange<int>(1, ForgeRules.MaxLevel),
+            new ConfigurationManagerAttributes { Order = 88 }));
+        LevelsPerTier = Config.Bind("Refinement", "LevelsPerIdolTier", 4, new ConfigDescription(
+            "With HigherIdolAtHighLevels on: after LevelsOnOwnIdol, the idol needed goes one tier up every this many "
+            + "levels, up to Bloodgold. Default 4: an item whose own idol is Wooden (e.g. the Stone axe or the Club) needs "
+            + "Bronze idols from level 6, Iron from level 10, Silver from level 14, and so on. An item whose own idol is "
+            + "Bronze (e.g. the Flint axe) starts one tier higher." + ServerWins,
+            new AcceptableValueRange<int>(1, ForgeRules.MaxLevel),
+            new ConfigurationManagerAttributes { Order = 87 }));
         Pick = Config.Bind("Refinement", "IdolChoice", IdolPick.Highest, new ConfigDescription(
             "Which idol the Forge uses when you carry the needed idol at several levels. Highest = the one with the most "
             + "stars (best chance); Lowest = the plain one first (keep your starred idols). You can still pick another "

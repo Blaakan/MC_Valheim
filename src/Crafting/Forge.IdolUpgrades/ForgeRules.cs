@@ -17,10 +17,15 @@ internal sealed class ForgeRules
 {
     internal const int MaxLevelsLost = 100;
     internal const int MaxCost = 100;
+    internal const int MaxLevel = 1000;
 
     internal readonly int[] Chance = new int[IdolLevels.Max + 1];      // percent, level 0..3
     internal FailureMode Failure;
     internal int LevelsLost;                                           // 1..MaxLevelsLost
+    // Idol tier by item level (IdolTierRule). Field defaults = config defaults, so a test snapshot start sane.
+    internal bool TierByLevel = true;
+    internal int BaseLevels = 5;                                       // levels 1..BaseLevels: the recipe's own idol
+    internal int LevelsPerTier = 4;                                    // then one tier up every this many levels
     internal readonly int[] Material = new int[IdolLevels.Max + 1];    // index = target level 1..3
     internal readonly int[] Trophies = new int[IdolLevels.Max + 1];
     internal readonly string[] TierMaterial = new string[IdolTierDefaults.Count];
@@ -38,6 +43,9 @@ internal sealed class ForgeRules
         }
         r.Failure = Plugin.Failure.Value;
         r.LevelsLost = Plugin.LevelsLost.Value;
+        r.TierByLevel = Plugin.TierByLevel.Value;
+        r.BaseLevels = Plugin.BaseLevels.Value;
+        r.LevelsPerTier = Plugin.LevelsPerTier.Value;
         for (var level = 1; level <= IdolLevels.Max; level++)
         {
             r.Material[level] = Plugin.MaterialCost[level].Value;
@@ -54,7 +62,8 @@ internal sealed class ForgeRules
     }
 
     // Wire: version, then every value in fixed order. Version bump = other layout (ModNetworkVersion too).
-    internal const int Layout = 1;
+    // Layout 2: idol tier by level (after LevelsLost).
+    internal const int Layout = 2;
 
     internal void Write(ZPackage pkg)
     {
@@ -65,6 +74,9 @@ internal sealed class ForgeRules
         }
         pkg.Write((int)Failure);
         pkg.Write(LevelsLost);
+        pkg.Write(TierByLevel);
+        pkg.Write(BaseLevels);
+        pkg.Write(LevelsPerTier);
         for (var level = 1; level <= IdolLevels.Max; level++)
         {
             pkg.Write(Material[level]);
@@ -104,6 +116,9 @@ internal sealed class ForgeRules
             }
             r.Failure = (FailureMode)failure;
             r.LevelsLost = Clamp(pkg.ReadInt(), 1, MaxLevelsLost, ref clamped);
+            r.TierByLevel = pkg.ReadBool();
+            r.BaseLevels = Clamp(pkg.ReadInt(), 1, MaxLevel, ref clamped);
+            r.LevelsPerTier = Clamp(pkg.ReadInt(), 1, MaxLevel, ref clamped);
             for (var level = 1; level <= IdolLevels.Max; level++)
             {
                 r.Material[level] = Clamp(pkg.ReadInt(), 0, MaxCost, ref clamped);
@@ -150,6 +165,9 @@ internal sealed class ForgeRules
         sb.Append("chances ").Append(Chance[0]).Append('/').Append(Chance[1]).Append('/').Append(Chance[2]).Append('/')
             .Append(Chance[3]).Append("%, failure ")
             .Append(Failure == FailureMode.Destroy ? "destroys the item" : "loses " + LevelsLost + " level(s)")
+            .Append(TierByLevel
+                ? ", idol one tier higher from level " + (BaseLevels + 1) + ", then every " + LevelsPerTier + " level(s)"
+                : ", idol tier fixed")
             .Append(", costs ").Append(Material[1]).Append('+').Append(Trophies[1]).Append(", ")
             .Append(Material[2]).Append('+').Append(Trophies[2]).Append(", ").Append(Material[3]).Append('+')
             .Append(Trophies[3]);

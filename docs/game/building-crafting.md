@@ -335,7 +335,8 @@ return 0.35**, so a vanilla failure (35%) **always destroys the item** and retur
 downgrade branch is unreachable. Idols: `ItemType.Material`, stack 20, weight 0.5, value 0, `m_maxQuality` 1, one
 icon (packed in the 4096² BC7 icon atlas, not CPU-readable). Every refinable recipe has one idol requirement with
 amount 1 and 0 per level: **one idol per attempt**. The idol tier does not always match the item's craft tier (e.g.
-`SwordWood` uses `Upgrader1Weapon`). Idols come only from location and dungeon chests (no recipe, no creature drop).
+`SwordWood` uses `Upgrader1Weapon`; `AxeFlint` a Bronze idol, `AxeBronze` an Iron one, `AxeIron` a Silver one; the
+full list per tier is in the `forge.tiers` self-test notes). Idols come only from location and dungeon chests (no recipe, no creature drop).
 
 ### Rule (paraphrase of `InventoryGui.DoCrafting`, upgrader branch)
 ```
@@ -524,7 +525,9 @@ Legend: feasibility = trivial / easy / medium / hard / very hard. "Who needs the
   tab** (an IDOLS tab cloned from the hidden Craft tab, not a recipe at a normal station), with metal and trophies of
   the idol's biome in three steps (5 metal + 5 common, 10 + 3 elite, 15 + 1 boss), and odds 35 / 55 / 75 / 95 % by idol
   level; a failure uses up the idol and costs the item one level by default (setting: any number of levels, or
-  destroy it as in vanilla), a success raises the item in place. No higher-tier idol bands and no skill gate. Required
+  destroy it as in vanilla), a success raises the item in place. Higher levels need higher idols (added 2026-09-30,
+  the user's ForgeUpgradeChart): the item's own idol up to level 5, one tier higher from level 6, then one more tier
+  every 4 levels, up to Bloodgold. No skill gate. Required
   on the server and every player; the server's rules apply to everyone. Idol level = item quality as sketched, but shared data is copied per item object, so levels are raised on
   each idol as it is seen. See [docs/design/crafting-forge-idol-upgrades.md](../design/crafting-forge-idol-upgrades.md).
 

@@ -13,6 +13,7 @@ internal static class IdolCatalog
     internal sealed class Idol
     {
         internal int Tier;
+        internal bool Weapon;              // battle idol; false = protection idol (armor)
         internal string PrefabName;
         internal ItemDrop Prefab;
     }
@@ -38,6 +39,7 @@ internal static class IdolCatalog
     // data in recipe panels has no drop prefab).
     private static readonly Dictionary<GameObject, Idol> ByPrefab = new Dictionary<GameObject, Idol>();
     private static readonly Dictionary<string, Idol> ByName = new Dictionary<string, Idol>();
+    private static readonly Idol[,] ByTier = new Idol[IdolTierDefaults.Count, 2]; // [tier, 0 battle / 1 protection]
     private static readonly Tier[] Tiers = new Tier[IdolTierDefaults.Count];
     private static ObjectDB _builtFor;
     private static bool _dirty = true;
@@ -73,6 +75,14 @@ internal static class IdolCatalog
     }
 
     internal static bool IsIdol(ItemDrop.ItemData item) => IdolOf(item) != null;
+
+    // Idol of a recipe requirement's prefab (null = not one of the 16). No healing: prefabs are raised in Build.
+    internal static Idol IdolOfPrefab(ItemDrop drop) =>
+        drop != null && Ensure() && ByPrefab.TryGetValue(drop.gameObject, out var idol) ? idol : null;
+
+    // Idol of a tier and family, null = missing in this game.
+    internal static Idol IdolAt(int tier, bool weapon) =>
+        tier >= 0 && tier < IdolTierDefaults.Count && Ensure() ? ByTier[tier, weapon ? 0 : 1] : null;
 
     internal static Tier TierOf(Idol idol) => idol != null && Ensure() ? Tiers[idol.Tier] : null;
 
@@ -148,6 +158,7 @@ internal static class IdolCatalog
     {
         ByPrefab.Clear();
         ByName.Clear();
+        Array.Clear(ByTier, 0, ByTier.Length);
         var unknown = new List<string>();
         for (var t = 0; t < IdolTierDefaults.Count; t++)
         {
@@ -164,9 +175,11 @@ internal static class IdolCatalog
                 {
                     shared.m_maxQuality = IdolLevels.Max + 1;
                 }
-                var idol = new Idol { Tier = t, PrefabName = name, Prefab = drop };
+                var weapon = name == IdolTierDefaults.WeaponIdol(t);
+                var idol = new Idol { Tier = t, Weapon = weapon, PrefabName = name, Prefab = drop };
                 ByPrefab[drop.gameObject] = idol;
                 ByName[shared.m_name] = idol;
+                ByTier[t, weapon ? 0 : 1] = idol;
             }
 
             var rules = ServerRules.Current;

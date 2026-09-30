@@ -111,6 +111,35 @@ internal static class InventoryGuiPatches
         }
     }
 
+    // Requirement panel at the Forge: show the idol the item level need (IdolTierRule), with vanilla's own count and
+    // red blink. Our slot text (ForgePanel) come after, in the UpdateRecipe postfix.
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.SetupRequirementList))]
+    private static void SetupRequirementList_Prefix(InventoryGui __instance, int quality, Player player, out bool __state)
+    {
+        __state = false;
+        try
+        {
+            __state = IdolSwap.Begin(player, __instance.m_selectedRecipe.Recipe, quality);
+        }
+        catch (Exception e)
+        {
+            IdolSwap.End();
+            __state = false;
+            PatchGuard.Report("InventoryGui.SetupRequirementList prefix", e);
+        }
+    }
+
+    [HarmonyFinalizer]
+    [HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.SetupRequirementList))]
+    private static void SetupRequirementList_Finalizer(bool __state)
+    {
+        if (__state)
+        {
+            IdolSwap.End();
+        }
+    }
+
     // Button press. Idol row: our checks. Refinement: vanilla checks minus the free-slot rule (it kept room for the
     // refund of a broken item; with OnFailure = LoseLevels items never break).
     [HarmonyPrefix]

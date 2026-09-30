@@ -9,8 +9,12 @@
   keep other mods' data.
 - Starred idol icons everywhere the game shows the item; idol tooltips show level, chance and next cost; a dropped
   idol's ground hover shows its stars.
+- Higher levels need higher idols: an item refines with its own idol up to level 5, then needs an idol one tier
+  higher from level 6 and one more tier every 4 levels, up to Bloodgold (settings HigherIdolAtHighLevels,
+  LevelsOnOwnIdol, LevelsPerIdolTier). The Upgrade tab names the idol needed and from which level.
 - Click the idol under the Forge requirements to choose which level to spend (default: most stars).
-- Settings: the four chances, what a failure does, the idol choice, the six upgrade costs, and each tier's metal and
-  trophy lists.
-- Required on the server (or the host) and on every player's game: the server refuses players without it
-  (AllowPlayersWithoutMod) and its settings apply to everyone.
+- Settings: the four chances, what a failure does, which idol high levels need, the idol choice, the six upgrade
+  costs, and each tier's metal and trophy lists.
+- Required on the server (or the host) and on every player's game: the server refuses players without it, with a
+  version that cannot talk to this one, or with it turned off (AllowPlayersWithoutMod), and its settings apply to
+  everyone.

@@ -5,10 +5,10 @@
 | Mod | Forge Idol Upgrades |
 | GUID / project | `MC.Crafting.Forge.IdolUpgrades` (`src/Crafting/Forge.IdolUpgrades/`, root namespace `MC.Crafting.ForgeIdolUpgradesMod`) |
 | Category / scope | Crafting / QoL |
-| Side | Both: the server (or the host) and every player install it (3.8); multiplayer Compatible; network version 1 (RPCs `<guid>.Settings` / `<guid>.SettingsRequest`) |
+| Side | Both: the server (or the host) and every player install it (3.8); multiplayer Compatible; network version 2 (RPCs `<guid>.Settings` / `<guid>.SettingsRequest`; rules layout 2 since the idol tier rule) |
 | Sheet idea | `Forge of potential revamp` (also covers part of `Boss summon revamp`: boss trophies get a lasting use) |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` in `.ref/`; idols, trophies, creatures, recipes, stations, UI layout and English strings dumped at runtime (Unity 6000.0.75f1) on 2026-09-29; other Forge and UI mods' sources read on GitHub (2026-09-29) |
-| Status | Implemented (0.1.0), in-world self-tests pass (`forge.catalog`, `forge.icons`, `forge.tooltip`, `forge.idols`, `forge.refine`); in-game tests pending |
+| Status | Implemented (0.1.0), in-world self-tests pass (`forge.catalog`, `forge.icons`, `forge.tooltip`, `forge.popup`, `forge.idols`, `forge.refine`, `forge.tiers`); in-game tests pending |
 
 ## Goal
 
@@ -35,7 +35,16 @@ Added by the user at the pause (2026-09-29):
 11. Trophy list corrections: Wooden elite = Boar and Neck (not Bear); Bear and Ghost are Bronze elite; Frost Blob is
     Silver common; Kall's step uses the Crown Jewel; Kvastur and Serpent in no list.
 
-Not done from the sheet: higher-tier idols at high levels, a skill gate (non-goals).
+Added by the user on 2026-09-30 (balancing change):
+
+12. **Higher levels need higher idols.** "Someone can craft a flint axe and upgrade it to tens of levels with just
+    Meadows trophies": when an item reaches a certain level, the next idol tier is required. Workbench armor at level 4
+    matches the next tier's level 1, so each tier covers 4 ranks, with some overlap so that a fully upgraded item does
+    not need a new idol at once. The user's ForgeUpgradeChart (idea sheet): an item of base tier T needs a tier-T idol
+    at levels 1-5, T+1 at 6-9, T+2 at 10-13, and so on, capped at Bloodgold. Example: a level 4 flint axe takes two
+    wooden idols to level 6, then Bronze idols up to level 10.
+
+Not done from the sheet: a skill gate (non-goal).
 
 ## 1. Vanilla behaviour (code trace)
 
@@ -201,6 +210,29 @@ menu's ObjectDB is still empty).
   warning, the button reads "Attempt Refinement (N%)". A click on the idol slot (`ForgeUi.SlotClick`,
   added to the 4 slots) cycles through the levels held; the choice lasts until the window closes.
 
+### 3.5b Idol tier by item level (`IdolTierRule`, `IdolSwap`)
+
+- **Rule** (goal 12): base tier = the tier of the idol the recipe itself asks for (decision 12). Tier offset for an
+  item now at level L: 0 while L <= `LevelsOnOwnIdol` (5), else 1 + (L - 6) div `LevelsPerIdolTier` (4), capped at
+  Bloodgold (tier 7). Same family: `Upgrader{tier}Weapon` stays a battle idol, `Upgrader{tier}Armor` a protection
+  idol. Off (`HigherIdolAtHighLevels` = false): offset 0 at every level. The self-test `forge.tiers` compares the rule
+  with the user's chart cell by cell (8 base tiers, levels 1-40).
+- **How vanilla is made to ask for it** (decision 13): `IdolSwap` sets the recipe's idol requirement's `m_resItem` to
+  the needed idol for the length of one vanilla call, then puts the recipe's own idol back (finalizer, also after an
+  exception). Calls: `Player.HaveRequirementItems` (discover = false only; target quality is its `qualityLevel`:
+  list row colour, Refine button, the vanilla `DoCrafting` check), `InventoryGui.SetupRequirementList` (the
+  requirement slot: icon, name, count, red blink), and `Inventory.ItemCheated` in `ForgeRefine.Run`. Only for the
+  local player at an upgrader station, never for our Idols-tab recipes, and a nested call is a no-op (a second swap
+  would add the offset twice). `ForgeRefine.TryPlan` computes the same idol itself (plan: `IdolPrefab`, `BaseTier`,
+  `Tier`), so the chance, the idol choice, the click cycle, the removal and the break refund use it.
+- **Panel**: when the idol is raised, the craft-type line adds "From level 6 this item needs Bronze idols." (the level
+  where that tier starts, also under the Bloodgold cap), or "... You carry none." when none is held. The Info log line
+  names the idol prefab and "(own idol tier N, raised by item level)".
+- **Game data** (`forge.tiers` notes, 1.0.16): the vanilla idol does not follow the biome everywhere. Wooden battle
+  idol: `AxeStone`, `KnifeFlint`, `SpearFlint`, `Club`, `Bow`, tools. Bronze battle idol: `AxeFlint`, `SwordBronze`,
+  the 1.0 wooden weapons (`SwordWood`, `AxeWood`, ...). `AxeBronze` asks for Iron, `AxeIron` for Silver, `AtgeirGold`
+  for Bronze, `AxeGold` for Black Metal. Wooden protection idol: rags, leather, tunics, dresses, hats, `ShieldWood`.
+
 ### 3.6 Icons and tooltip
 
 - `StarIcons` (generated sprites): GPU blit of the icon's atlas square into a temporary RenderTexture (default
@@ -225,7 +257,8 @@ menu's ObjectDB is still empty).
 ### 3.7 Configuration
 
 `General`: `AllowPlayersWithoutMod` (false). `Refinement`: `ChanceLevel0..3` (35/55/75/95), `OnFailure`
-(LoseLevels/Destroy), `LevelsLost` (1, 1..100), `IdolChoice` (Highest/Lowest). `Upgrade costs`: `Level1..3Material`
+(LoseLevels/Destroy), `LevelsLost` (1, 1..100), `HigherIdolAtHighLevels` (true), `LevelsOnOwnIdol` (5, 1..1000),
+`LevelsPerIdolTier` (4, 1..1000), `IdolChoice` (Highest/Lowest). `Upgrade costs`: `Level1..3Material`
 (5/10/15), `Level1..3Trophies` (5/3/1). One section per tier: `Material`, `CommonTrophies`, `EliteTrophies`,
 `BossTrophies` (prefab names). Everything applies live (tier settings rebuild the table). All but `IdolChoice` (personal) and
 `AllowPlayersWithoutMod` (server only) are **rules**: `ForgeRules` snapshots them, and every game reads them only
@@ -235,17 +268,26 @@ through `ServerRules.Current` (the server's in multiplayer, 3.8).
 
 Both side (user rule). Refinement and crafting are local (`InventoryGui` + the local inventory), so technically
 client-side, but the user wants every player of a server on the same rules:
-- **Join check** (`PlayerCheck`, copy of MC Breeding's): the server (dedicated or host) waits 1 s after a player is
-  ready, then refuses a player whose game did not answer the framework handshake (vanilla "Error" RPC with
-  ErrorVersion: their game shows "Incompatible version"; socket closed 4 s later). `AllowPlayersWithoutMod` lets them
-  in (log warning).
+- **Join check** (`PlayerCheck`, same contract as the sibling mods Weapons.Moveset, Sneak.Ambush, Creatures.Morale):
+  the server (dedicated or host) waits 1 s after a player is ready, then refuses a player that is not
+  `NetworkGate.PeerCompatible`: no mod, another network version (the build before the idol tier rule), or the mod
+  turned off on their game; a player who turns it on or off while connected (`NetworkGate.PeerStateChanged`) is
+  checked again after the same grace. Refusal = vanilla "Error" RPC with ErrorVersion (their game shows "Incompatible
+  version"; socket closed 4 s later); the log gives the framework's reason (`PeerProblem`).
+  `AllowPlayersWithoutMod` lets them in (log warning). Until 2026-09-30 the check only asked `PeerHasMod`; with the
+  network version bump that would have let the older build in, whose mod then turns itself off (server mismatch)
+  and refines the vanilla way.
 - **Server rules** (`ServerRules`, same flow as Breeding's ServerSettings): the client asks after the handshake, the
-  server answers with a `ZPackage` of `ForgeRules` (layout 1: chances, failure mode, levels lost, costs, the 32 tier
-  strings) and pushes again when its settings change. The client clamps values to the config ranges, refuses an
+  server answers with a `ZPackage` of `ForgeRules` (layout 2: chances, failure mode, levels lost, the idol tier rule,
+  costs, the 32 tier strings) and pushes again when its settings change. Layout 2 came with the idol tier rule, and the
+  network version went to 2 with it, so a game with the older build is refused by the handshake instead of reading a
+  package it does not understand. The client clamps values to the config ranges, refuses an
   unknown layout, and uses the rules only for that ZNet session; single player, host and server use their own config.
 - Framework gate: on a server without the mod the feature is inactive on the client.
 - Hand-off (AllowPlayersWithoutMod on, or another server): a starred idol keeps its quality but shows plain; their
   Forge counts only plain idols (`HaveRequirementItems` with max quality 1) and their drag merge ignores quality.
+  Their Forge also asks for the recipe's own idol at every level (no tier rule): that is why the server refuses them
+  by default.
 
 ### 3.9 Live toggle
 
@@ -288,8 +330,13 @@ next station does not show both vanilla tabs unselected.
   durability, refiner as crafter) and spends only the 3-star idol; forced success (roll under 35%) raises it back to 3
   with custom data kept; no idol → button off; Destroy rule (test override, never the config file): the weapon is gone,
   the idol used, materials came back.
-- `forge.catalog` also: rules round trip on the wire, clamping, unknown layout refused, single player never takes
-  rules from a peer, join check verdicts.
+- `forge.catalog` also: rules round trip on the wire (the tier rule fields too), clamping, unknown layout refused,
+  single player never takes rules from a peer, join check verdicts.
+- `forge.tiers`: the rule against the user's chart (8 base tiers × levels 1-40), rule off, first levels 6/10/.../30;
+  family kept and Bloodgold cap on real recipes (`AxeStone`, `ArmorLeatherChest`); at the Forge a level 6 Stone axe
+  with only a wooden idol: greyed row, button off, slot names the Bronze idol, panel note; with a Bronze idol: button
+  on, forced success spends the Bronze idol and not the wooden one; level 4 asks for the wooden idol again; the recipe
+  keeps its own idol outside the checks. Notes list every refinable item by its own idol tier.
 
 ## 4. Edge cases
 
@@ -307,6 +354,16 @@ next station does not show both vanilla tabs unselected.
   without any idol rolls with the plain chance.
 - A modded recipe with several upgrader requirements: the first sets the chance; the others are consumed vanilla-style.
 - An idol level above 3 (another mod or console): treated as 3 stars, not listed in the Idols tab.
+- Another Forge mod that takes the roll over (its `DoCrafting` prefix skips vanilla) consumes with its own code and
+  never sees the raised idol; raising only the check would let a player pass it with a higher idol and spend
+  nothing (ReforgedPotential spends `m_craftRecipe.m_resources` through `ConsumeResources`). So while a foreign
+  transpiler or bool prefix sits on `DoCrafting` (`ForgeGuard.ForeignTakeover`, cached, logged once), the tier rule
+  is off on that game.
+- Crafting Search and Sort caches ingredient terms per recipe, outside any swap: at the Forge its search matches the
+  recipe's own idol, not the raised one (documented, test C08).
+- A modded recipe with several idol requirements: every one is raised in the checks, and our refinement spends the
+  raised one of each.
+- An item above the chart (level 30 and up for a wooden-tier item): Bloodgold idols, whatever the level.
 
 ## 5. Decisions and open questions
 
@@ -338,6 +395,15 @@ next station does not show both vanilla tabs unselected.
 9. Idol upgrades take the vanilla Forge duration (8 s + target quality), give no skill and no stats.
 10. English strings (no new `$keys`); vanilla `$msg_upgrader_success`, `$inventory_upgraderbutton`,
     `$msg_missingrequirement`, `$inventory_needspace` reused.
+12. **Base tier = the idol the recipe itself asks for** (vanilla data), not the item's biome. The two differ for some
+    items (3.5b): the Flint axe asks for a Bronze idol, so it needs Bronze idols up to level 5 and Iron from 6, not
+    the Wooden-then-Bronze of the user's example. Vanilla-consistent (the rule never asks for a lower idol than the
+    game does), flagged at the pause; a curated item → tier table would be the alternative.
+13. **The requirement is swapped during vanilla's own calls** instead of giving the recipe list per-level recipe
+    copies: vanilla re-finds the selected row by recipe reference after each refinement (`GetSelectedRecipeIndex`),
+    so a copy that changes at level 6 would lose the selection; the swap keeps every vanilla check, count and colour
+    and other mods' patches on those methods.
+14. **Network version 2** with the rules layout 2 (3.8). The mod is not released yet, so the version stays 0.1.0.
 
 ### Added beyond the request
 
