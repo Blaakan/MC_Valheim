@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Dual Wielding</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>New</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Dual wielding</ModIdea>
+    <!-- Both: user rule (2026-09-29): mod that change combat is required by the server and every player. Server
+         refuse players whose game no run me (PlayerCheck, verdict from NetworkGate.PeerCompatible) and send its
+         combat rules to everyone (ServerRules). Pair itself work from vanilla data on every game. -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. It changes combat, so the server refuses players whose game does not run it (not installed, turned off, or a version that cannot talk to the server's; their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the server's combat settings (off-hand damage, swing stamina, hit pattern, moves, excluded weapons) apply to everyone. Turning it off while you play on such a server disconnects you about a second later. Next to another dual wield mod it does not run, so such a server refuses you too. On a server without the mod it turns itself off, and a saved pair then loads as one weapon. Players without the mod still see your two weapons and your dual moves.</ModMultiplayerNotes>
+    <!-- RPC <guid>.Settings / <guid>.SettingsRequest (DualRules layout 1). No ZDO key. Bump when names or layout
+         change. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Wield a one-handed sword, axe, club or knife in each hand. A second one-handed weapon goes to your off hand, pairs fight with the game's own dual axe and dual knife moves, and every hit is struck by one of your two weapons, or both.</ModDescription>
+  </PropertyGroup>
+</Project>
