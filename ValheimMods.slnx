@@ -3,7 +3,12 @@
     <Project Path="src/Building/Lights.Switchable/MC.Building.Lights.Switchable.csproj" />
   </Folder>
   <Folder Name="/Combat/">
+    <Project Path="src/Combat/Creatures.Morale/MC.Combat.Creatures.Morale.csproj" />
     <Project Path="src/Combat/Crossbow.StaysLoaded/MC.Combat.Crossbow.StaysLoaded.csproj" />
+    <Project Path="src/Combat/Shields.TowerWall/MC.Combat.Shields.TowerWall.csproj" />
+    <Project Path="src/Combat/Sneak.Ambush/MC.Combat.Sneak.Ambush.csproj" />
+    <Project Path="src/Combat/Weapons.DualWield/MC.Combat.Weapons.DualWield.csproj" />
+    <Project Path="src/Combat/Weapons.Moveset/MC.Combat.Weapons.Moveset.csproj" />
   </Folder>
   <Folder Name="/Crafting/">
     <Project Path="src/Crafting/Forge.IdolUpgrades/MC.Crafting.Forge.IdolUpgrades.csproj" />

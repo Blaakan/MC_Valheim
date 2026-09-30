@@ -5,6 +5,11 @@
   "mods": {
     "MC.Building.Lights.Switchable": "",
     "MC.Combat.Crossbow.StaysLoaded": "",
+    "MC.Combat.Creatures.Morale": "",
+    "MC.Combat.Shields.TowerWall": "",
+    "MC.Combat.Weapons.DualWield": "",
+    "MC.Combat.Weapons.Moveset": "",
+    "MC.Combat.Sneak.Ambush": "",
     "MC.Crafting.Repair.OneClickAll": "",
     "MC.Crafting.Stations.BatchFeed": "",
     "MC.Crafting.Forge.IdolUpgrades": "",

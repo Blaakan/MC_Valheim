@@ -29,6 +29,11 @@ clearly who needs to install it and how it behaves in multiplayer. Details: [doc
 | Mod | Category | Scope | Who needs it | Multiplayer | Status |
 |---|---|---|---|---|---|
 | [Crossbow Stays Loaded](src/Combat/Crossbow.StaysLoaded) | Combat | QoL | only you (client-side) | works | in development |
+| [Creature Morale](src/Combat/Creatures.Morale) | Combat | Revamp | server and every player | works | in development |
+| [Tower Shield Wall](src/Combat/Shields.TowerWall) | Combat | Revamp | server and every player | works | in development |
+| [Dual Wielding](src/Combat/Weapons.DualWield) | Combat | New | server and every player | works | in development |
+| [Weapon Moveset](src/Combat/Weapons.Moveset) | Combat | Revamp | server and every player | works | in development |
+| [Sneak Ambush](src/Combat/Sneak.Ambush) | Combat | Revamp | server and every player | works | in development |
 | [Creature Kill and Tame Counts](src/Exploration/Stats.PerCreature) | Exploration | QoL | only you (client-side) | works | in development |
 | [Sleep Through the Day](src/Exploration/Sleep.ThroughDay) | Exploration | QoL | server and every player | works | in development |
 | [Encyclopedia](src/Exploration/Compendium.Encyclopedia) | Exploration | New | only you (client-side) | works | in development |
