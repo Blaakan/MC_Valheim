@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Weapon Moveset</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>Revamp</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). Me do jump attack and roll attack;
+         parry attack and "more dynamic moveset" stay later ideas. -->
+    <ModIdea>Weapon revamp</ModIdea>
+    <!-- Both: user rule (2026-09-29): mod that change combat is required by the server and every player. Every move
+         run on attacker's own game, but server refuse players without me (or other network version, or me turned off
+         on their game) and send its move rules to everyone. -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Required on the server (or the host) and on every player: the server refuses players without it, with another version of it, or with it turned off, unless its AllowPlayersWithoutMod setting is on, and its settings apply to everyone. The moves use the game's own animations, so every player sees them, with or without the mod. On a server without the mod it turns itself off.</ModMultiplayerNotes>
+    <!-- RPC <guid>.Settings / <guid>.SettingsRequest (MoveRules layout 2). Bump when names or layout change.
+         2: roll flow put FlowStart and FlowBlend in the rules (user feedback 2026-09-30). -->
+    <ModNetworkVersion>2</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Adds a jump attack and a roll attack to melee weapons: attack in the air after a jump, or right after a roll, for another vanilla swing with modest damage and stagger bonuses. The combo continues from the move. Tunable, synced by the server.</ModDescription>
+  </PropertyGroup>
+</Project>
