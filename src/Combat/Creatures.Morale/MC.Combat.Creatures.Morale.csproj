@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Creature Morale</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>Revamp</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Mob AI revamp</ModIdea>
+    <!-- Both: user rule, mod that change the game is required by server and every player. Creature brain run on the
+         game that own the creature, and player progress live only on player own game: every game need me, turned on.
+         Server refuse players without me (or me off, or other network version) and send its rules to everyone. -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game, and keep it turned on. Each creature is controlled by one player's game, and each player's boss kills and kill counts are only known to their own game, so the server refuses players who do not have the mod, have it turned off or have a version that cannot talk to the server's (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on. Turning it off while playing on such a server disconnects you. The settings of the server (or host) apply to everyone. Each player is judged by their own progress. On a server without the mod it turns itself off.</ModMultiplayerNotes>
+    <!-- Me bump when any of these change: rpc names and payloads (<guid>.Settings, <guid>.SettingsRequest,
+         <guid>.Rout), creature ZDO keys (Provokers, RoutUntil, RoutFrom), player ZDO key Standing, and the layouts
+         (standing 1, provokers 1, rules 2). Also before release (CLAUDE.md rule): rules layout 1 -> 2 on 2026-09-30
+         (home biome lists, fear range) made version 2, so a game with the first test build is refused, not stuck. -->
+    <ModNetworkVersion>2</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Weak creatures become afraid of the players who outgrew them (two bosses past their biome): they never attack them and run when they come close, unless provoked or cornered. A pack flees when its leader falls. Each player is judged alone.</ModDescription>
+  </PropertyGroup>
+</Project>
