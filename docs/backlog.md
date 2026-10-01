@@ -76,7 +76,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 | Farming | Ashlands trees | Revamp | medium | Both | no | partial | idea |
 | Farming | Cultivator revamp | Revamp | medium | Both | yes | partial | idea |
 | Farming | Hunting | New | easy | Client | no | full | idea |
-| Farming | Better fishing | New | medium | Client | yes | partial | idea |
+| Farming | Better fishing | New | medium | Both | no | partial | [Fishing Fight 0.1.0](../src/Farming/Fishing.Fight) (in development) |
 | Farming | Bring tamed / pets through stone portal | New | medium | Client | no | full | idea |
 | Farming | Sap collector on other trees | New | medium | Both | yes | partial | idea |
 | Farming | Bring tamed / pets on ship | New | hard | Both | no | partial | idea |
@@ -1130,23 +1130,31 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 ### Better fishing
 
-> It suck, pick another minigame
+> Current mechanic is: throw bait, wait for the hook to start reeling (< this is ok) then reel in using stamina, if the fish struggles it's using more stamina (< this is bad gameplay) New mechanic proposal for the reeling in:  When the fish is not struggling, stardew valley like minigame (reel in to go up, release to go down). Keeping the fish in the bar reels it in automatically with no stamina cost. Having the fish outside of the bar does not reel in and consumes stamina.  When the fish is struggling, the stardew like mini game goes away and you need to orient your character so that the fishing rod points at the opposite direction of the fish and reel in. This consumes stamina, but reeling in with the wrong orientation consumes A LOT of stamina.  Example: if the fish is struggling away to my right, I need to orient myself so that the rod points left and start reeling in. If the fish changes direction and now is on my left, I need to re orient to point my rod to the right. Once the fish stops struggling, the mini game is back.
 
-- **Scope:** New · **Feasibility:** medium · **Who needs it:** Client · **Custom assets:** yes · **Status:** idea
-- **Approach:** Keep the vanilla cast, bait and bite logic. Once hooked, show a tension or zone-tracking UI whose difficulty comes from fish quality, bait and skill. A FishingFloat.FixedUpdate prefix skips the block-to-reel branch and drives line length from minigame progress. Success reproduces the vanilla path (Catch, SetCatch(null), OnHooked(null), destroy the float); failure loses the fish.
-- **Hooks:** `FishingFloat.FixedUpdate`, `FishingFloat.TryToHook`, `FishingFloat.RPC_Nibble`, `FishingFloat.Catch`, `FishingFloat.SetCatch`, `Fish.Escape`, `Fish.GetStaminaUse`, `Skills.SkillType.Fishing`
-- **Risks:** Private members need AccessTools. Input must not trigger attack or block, which cancels the float. A prototype can use procedural UGUI, but polish needs sprites. Conflicts with other fishing mods patching the same FixedUpdate.
+- **Scope:** New · **Feasibility:** medium · **Who needs it:** Both · **Custom assets:** no · **Status:** [Fishing Fight 0.1.0](../src/Farming/Fishing.Fight) (in development)
+- **Approach:** Keep the vanilla cast, bait, bite and hook. Once hooked, a FishingFloat.FixedUpdate prefix runs the whole tick: a calm phase with a Stardew Valley-style catch bar (hold Block to raise the zone; fish in the zone = line in with no UseStamina call, out = vanilla reel cost and no line) and struggle phases owned by the mod (not vanilla Fish.Escape), where Fish.SwimDirection is taken over so the hooked fish runs across the line to one side. The rod direction is the body facing (it follows the camera while blocking): at least 30 degrees off the line on the side away from the run brings line in at half speed, the wrong side costs x4 stamina and holds the line, not reeling lets the fish take line. Success and losses call the vanilla paths (Catch, SetCatch(null), OnHooked(null), destroy). Needed everywhere (gameplay rule): server rules and join check as Swim Dive. Built as Fishing Fight.
+- **Hooks:** `FishingFloat.FixedUpdate`, `Fish.CustomFixedUpdate`, `Fish.SwimDirection`, `Fish.RandomizeWaypoint`, `Fish.GetStaminaUse`, `FishingFloat.Catch`, `Hud.Update`, `Skills.SkillType.Fishing`
+- **Risks:** Several mods take over the same FixedUpdate (GrindstoneSkills, Hooked, Trolling Fishing, PeasFishing, ChillHook, ChillFishing): stand aside (LocalBlocker) and stay out when an earlier prefix skipped the tick. Stamina mods (EpicLoot, FeastMaster, Reely Good Rod) only stack when the costs come from the float and fish fields inside the tick. Turning the rod away from the fish turns the camera too, so the struggle angle must keep the float in view. Fish prefab values (turn rate, acceleration) are unknown, so the struggle swim is the mod's own.
 - **Game systems:** [docs/game/farming-cooking.md](game/farming-cooking.md)
 - **Existing mods:** partial
 
   | Mod | Status | Notes |
   |---|---|---|
-  | [PeasFishing (Laki)](https://thunderstore.io/c/valheim/p/Laki/PeasFishing/) | 0.6.2, 2026-09-12, 1.0 tagged, AI-generated | The only minigame replacement: a Stardew-style vertical catch bar (hold or release Shift), a fish-nearby HUD and a clock. Client-only. |
+  | [PeasFishing (Laki)](https://thunderstore.io/c/valheim/p/Laki/PeasFishing/) | 0.6.2, 2026-09-12, 1.0 tagged, AI-generated | A Stardew-style vertical catch bar (hold or release Shift), a fish-nearby HUD and a clock. Client-only, closed source. |
   | [Reely SpecTackleLure (Neobotics)](https://thunderstore.io/c/valheim/p/Neobotics/Reely_SpecTackleLure/) | 1.0.0, 2026-09-11, 1.0 tagged | Gear: craftable and upgradable rods, bait, field skinning, deep-sea danger. No minigame. |
   | [FishTrap (Qmds)](https://thunderstore.io/c/valheim/p/Qmds/FishTrap/) | 1.1.4, 2026-09-27, updated post-1.0 | Passive baited traps in four tiers. |
   | [TheFisher (Marlthon)](https://thunderstore.io/c/valheim/p/Marlthon/TheFisher/) | 0.3.7, 2026-09-12, 1.0 tagged | More than 30 new fish and aquariums (content). |
+  | [Hooked (Azumatt)](https://thunderstore.io/c/valheim/p/Azumatt/Hooked/) | 1.1.1, 2026-09-14, deprecated on Thunderstore | A Stardew clone that owns the hooked fight: bar grows with skill, five fish motion patterns, treasure, perfect catch, trophy baits as tackle. Hold Block. Closed source. |
+  | [GrindstoneSkills (MilkyTeam)](https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/) | 0.12.0, 2026-10-01, 1.0 | Skills overhaul with a line-tension fight: reeling a thrashing fish builds tension, the fish tires after a few thrashes, grace at 0 stamina from skill 75. Patches FixedUpdate, TryToHook, RPC_Nibble and Fish.Escape; config switch [50 - Fishing] Fishing Enabled. Server-synced, open source. |
+  | [ChillHook (Andejx)](https://thunderstore.io/c/valheim/p/Andejx/ChillHook/) | 1.0.3, 2026-09-30, AI-assisted | A circle minigame: steer a net zone onto the fish with the mouse or left stick (a 2D take on steering against the fish). Client-only, closed source. |
+  | [ComfyFishing (Loxley)](https://thunderstore.io/c/valheim/p/Loxley/ComfyFishing/) | 0.1.0, 2026-09-15, needs Jotunn | Auto-reel with no stamina cost and rod tiers; by default only its own better rods get the auto-reel. Open source. |
+  | [ChillFishing (Lenson)](https://thunderstore.io/c/valheim/p/Lenson/ChillFishing/) | 1.2.2, 2026-09-30 | Fake nibbles, real bites pull the float under, a tension penalty for holding too long. Closed source. |
+  | [Angler's Eye (Jumpingmushroom)](https://thunderstore.io/c/valheim/p/Jumpingmushroom/AnglersEye/) | 0.1.0, 2026-09-29 | A helper HUD: REEL or WAIT while the fish is calm or struggling, a bite cue, a catch forecast, opt-in smart reel. Turns its features off next to fight mods. Open source. |
+  | [Trolling Fishing (sighsorry)](https://thunderstore.io/c/valheim/p/sighsorry/Trolling_Fishing/) | 1.1.3, 2026-09-14 | Several floats per player; patches FixedUpdate, SetCatch, UseStamina and RaiseSkill. |
+  | [Reely Good Rod (VentureValheim)](https://thunderstore.io/c/valheim/p/VentureValheim/Reely_Good_Rod/) | 1.0.0, 2026-09-10 | Halves the fish stamina cost (Fish.GetStaminaUse postfix). |
 
-- **Inspiration:** A Stardew clone exists. A Valheim-native minigame does not. Idea: line tension and rod bend. The fish pulls and you steer against it, reeling raises tension, stamina drains, and rod quality and skill widen the safe band. Species get behavior profiles. Keep the vanilla FishingFloat bite phase and replace only the reel phase. Support gamepad and hold/toggle. Pair with passive traps and gear for progression.
+- **Inspiration:** Several fight replacements now exist: Stardew clones (Hooked, PeasFishing), a tension fight (GrindstoneSkills), a 2D steering circle (ChillHook) and auto-reels (ComfyFishing). None makes the player turn the rod against the fish's run in the world: real side pressure (rod low, toward the side opposite the run) is the Valheim-native part. Combine it with a Stardew bar for the calm phases, as the sheet now asks. Pair with passive traps and gear for progression.
 
 ### Bring tamed / pets through stone portal
 

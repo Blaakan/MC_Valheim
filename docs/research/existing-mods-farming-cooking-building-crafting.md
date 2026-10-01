@@ -33,7 +33,7 @@ Research done 2026-09 (2026-09-28), about three weeks after Valheim 1.0 (Deep No
 | 13 | Trophies for mobs without one | Crafting | New | No | none |
 | 14 | Hunting (gatherables + animals on minimap, radius cap 100) | Farming | New | No | **full** (as radar/ESP), partial (as progression) |
 | 15 | Sap collector on other trees | Farming | New | No | partial |
-| 16 | Better fishing (another minigame) | Farming | New | No | partial |
+| 16 | Better fishing (catch bar + rod against the run) | Farming | New | No | partial |
 | 17 | Magic applied to non-combat | Building (cross) | New | No | partial |
 | 18 | Enchanting | Crafting | New | No | **full** |
 | 19 | Cooking equipment | Cooking | New | No | partial |
@@ -429,26 +429,38 @@ The goal is a new cooking or crafting item.
 - Make the tap "drain" the tree (for example, a tapped tree yields less wood, or the tap moves on), so it is not free.
 - This is a cross-category theme: Farming (gather) → Cooking (syrup dishes) → Crafting (pitch, tannin).
 
-## 16. Better fishing (New) — coverage: partial
+## 16. Better fishing (New) â€” coverage: partial
 
-The user's verdict: "It sucks, pick another minigame."
+The sheet now asks for two phases (updated 2026-10-01): a Stardew Valley-like catch bar while the fish is calm (fish
+in the bar = line in for free, outside = stamina), and a struggle where the player turns so the rod points away from
+the fish's run and reels (wrong orientation = a lot of stamina). Implemented as Fishing Fight
+(`src/Farming/Fishing.Fight`).
 
 **Vanilla hooks:** `FishingFloat` (bite detection, reeling and line state) and `Fish` (bait, hook and escape behavior).
 
 | Mod | Status | Notes |
 |-----|--------|-------|
-| [PeasFishing](https://thunderstore.io/c/valheim/p/Laki/PeasFishing/) (Laki) | 0.6.2, 2026-09-12, 1.0 tagged, AI | The only minigame replacement found. **Stardew-style vertical catch bar**: Shift hooks the fish, then hold or release Shift to steer the bar. Adds a nearby-fish counter, a bait-interest indicator (the author notes it shows proximity, not the real AI decision), a custom HUD and a world clock. Client-only. |
+| [PeasFishing](https://thunderstore.io/c/valheim/p/Laki/PeasFishing/) (Laki) | 0.6.2, 2026-09-12, 1.0 tagged, AI | **Stardew-style vertical catch bar**: Shift hooks the fish, then hold or release Shift to steer the bar. Adds a nearby-fish counter, a bait-interest indicator (the author notes it shows proximity, not the real AI decision), a custom HUD and a world clock. Client-only, closed source. |
+| [Hooked](https://thunderstore.io/c/valheim/p/Azumatt/Hooked/) (Azumatt) | 1.1.1, 2026-09-14, deprecated on Thunderstore | A Stardew clone that owns the hooked fight: bar height grows with skill, Mixed/Dart/Smooth/Sinker/Floater fish, treasure, perfect catch (+1 quality), trophy baits as tackle. Hold Block. Closed source; GUID `Azumatt.Hooked`, switch `[2 - Minigame] Enabled`. |
+| [GrindstoneSkills](https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/) (MilkyTeam) | 0.12.0, 2026-10-01, 1.0 | Skills overhaul with a **line-tension fight**: reeling a thrashing fish builds tension (the line snaps at 100%), the fish tires after 4 thrashes, grace at 0 stamina from skill 75. `FishingFloat.FixedUpdate` bool prefix, `TryToHook`, `RPC_Nibble`, `Fish.Escape` postfix. Switch `[50 - Fishing] Fishing Enabled`. Server-synced, open source (GUID `com.GrindstoneSkills`). |
+| [ChillHook](https://thunderstore.io/c/valheim/p/Andejx/ChillHook/) (Andejx) | 1.0.3, 2026-09-30, AI-assisted | A **circle** minigame: steer a net zone onto the fish with the mouse or left stick. The closest thing to "steer against the fish", but in 2D. Client-only, closed source. |
+| [ComfyFishing](https://thunderstore.io/c/valheim/p/Loxley/ComfyFishing/) (Loxley) | 0.1.0, 2026-09-15, needs Jotunn | Auto-reel with no stamina and no escapes, rod tiers; by default only its own better rods get the auto-reel (`VanillaRodVanillaReel`). Open source. |
+| [ChillFishing](https://thunderstore.io/c/valheim/p/Lenson/ChillFishing/) (Lenson) | 1.2.2, 2026-09-30 | Fake nibbles, real bites pull the float under, a tension penalty for holding too long. Closed source. |
+| [Angler's Eye](https://thunderstore.io/c/valheim/p/Jumpingmushroom/AnglersEye/) (Jumpingmushroom) | 0.1.0, 2026-09-29 | Helper HUD: REEL / WAIT from `Fish.IsEscaping`, bite cue, catch forecast, opt-in smart reel. Turns its own features off next to fight mods (`Harmony.GetPatchInfo` owners). Open source. |
+| [Trolling Fishing](https://thunderstore.io/c/valheim/p/sighsorry/Trolling_Fishing/) (sighsorry) | 1.1.3, 2026-09-14 | Up to 10 floats per player; patches `FixedUpdate`, `SetCatch`, `UseStamina`, `RaiseSkill`. |
+| [Reely Good Rod](https://thunderstore.io/c/valheim/p/VentureValheim/Reely_Good_Rod/) (VentureValheim) | 1.0.0, 2026-09-10 | Halves `Fish.GetStaminaUse`. |
 | [Reely SpecTackleLure](https://thunderstore.io/c/valheim/p/Neobotics/Reely_SpecTackleLure/) (Neobotics) | 1.0.0, 2026-09-11, 1.0 tagged | Gear rather than a minigame: craftable and upgradable rods (which need repair), craftable bait, a larger float, field skinning without a cauldron, and optional serpent or leviathan danger on deep water. Server-authoritative config. |
 | [FishTrap](https://thunderstore.io/c/valheim/p/Qmds/FishTrap/) (Qmds) | 1.1.4, 2026-09-27, updated post-1.0 | Passive fishing: baited traps in four tiers that catch fish over time. |
 | [TheFisher](https://thunderstore.io/c/valheim/p/Marlthon/TheFisher/) (Marlthon) | 0.3.7, 2026-09-12, 1.0 tagged | Content: more than 30 new fish species, aquatic creatures and working aquariums. |
 
+Stamina-only tweaks that touch the same fight: EpicLoot's fishing stamina shard (flag in a `FixedUpdate` prefix,
+discount in `Player.UseStamina`), FeastMaster (scales the float's stamina fields for one tick) and ValheimPlus
+(`[StaminaUsage] fishing`, off by default, reads a stack frame named `FixedUpdate`).
+
 **Inspiration**
-- A Stardew clone exists. A **Valheim-native** minigame does not. For example, line tension with rod bend:
-  - the fish pulls in a direction and you steer the camera or rod against it;
-  - reeling raises tension;
-  - stamina drains while you hold;
-  - rod quality and Fishing skill widen the safe band;
-  - species get behavior profiles (sprinters, divers, thrashers).
+- Stardew clones, a tension fight, a 2D steering circle and auto-reels exist now. **None makes the player turn the rod
+  in the world against the fish's run**: real "side pressure" (rod low, toward the side opposite the run, about 60 to
+  120 degrees off the line in real fishing) is the Valheim-native part.
 - Keep vanilla's float and bite phase, and replace only the reel phase inside `FishingFloat`.
 - Must support gamepad and hold/toggle accessibility options.
 - Pair with passive traps (FishTrap-like) and gear (Reely-like) so fishing has a progression.

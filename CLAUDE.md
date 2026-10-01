@@ -207,8 +207,9 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   `ModNetworkVersion` (Both mods: bump when RPC names/payloads or ZDO keys/formats change), `ModDescription`.
 - **Mods that change the experience are required everywhere** (user rule): odds, costs, fuel, combat, balance, world
   rules. `ModSide=Both`, the server refuses players without the mod after a short grace and sends its gameplay
-  settings to every player (copy Breeding's `PlayerCheck` + server settings; `AllowPlayersWithoutMod`, default
-  false). Only pure UI/QoL helpers that change nothing for others stay client-side. Either way the code stays
+  settings to every player (copy Swim Dive's `PlayerCheck`, `ServerRules`, `<X>Rules` and `Patches/ZNetPatches.cs`,
+  which check `NetworkGate.PeerCompatible` and re-check on `PeerStateChanged`; Breeding's older copy only checks
+  `PeerHasMod`; `AllowPlayersWithoutMod`, default false). Only pure UI/QoL helpers that change nothing for others stay client-side. Either way the code stays
   multiplayer-compatible: say in `ModMultiplayerNotes` who needs it and why, and think through hand-offs (an
   item/structure touched by the mod reaching a player without it must behave sanely).
 - Features toggle live: patches are applied only while the feature is Active (enabled + deps active + server ok),

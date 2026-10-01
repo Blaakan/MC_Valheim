@@ -548,6 +548,32 @@ Other clients only see transforms and effects.
 - `Fish.TestBate` / `FindFloat`: bait rules.
 - `Fish.Escape`: difficulty.
 - The Terminal debug path also calls `FishingFloat.Catch`, so reward patches apply there too.
+- Implemented by [Fishing Fight](../../src/Farming/Fishing.Fight) (design:
+  [farming-fishing-fight.md](../design/farming-fishing-fight.md)).
+
+### Facts learned building Fishing Fight (1.0.16)
+- `Fish.OnHooked` always calls `Escape`: every vanilla hook starts with a struggle. `OnHooked(null)` calls it too
+  (harmless: `IsEscaping` needs `IsHooked`).
+- A vanilla struggle has no direction: the escaping fish wiggles (`sin(t*40)*12` degrees) and swims to random
+  waypoints around its spawn point; `SwimDirection` turns at `m_turnRate` degrees per second (code default 10).
+  A calm hooked fish (`m_escapeTime < 0`) drops its waypoint and gets `Stop`: it is only dragged by the line.
+- Vanilla ends an escape with `ZDO.Set(s_escape, 0)`, the **int** overload; ints and floats are separate stores
+  (`ZDOExtraData`), so the float that the splash check reads stays positive and hooked fish keep splashing after
+  their first escape. Write `0f` to stop it.
+- The "waypoint reached" test is `Vector2.Distance(m_waypoint, position)`, which compares x and y, not x and z.
+- Stamina-out (`!owner.HaveStamina()`) calls `SetCatch(null)` but not `fish.OnHooked(null)`: the fish keeps
+  `IsHooked` and its escape cycle until the float dies. A missing rod top destroys the float the same way.
+- Vanilla drains the hooked stamina every tick, so stamina never regenerates during a vanilla fight; any non-zero
+  `UseStamina` resets the 1 s regen delay, and regen is x0.8 while blocking.
+- The catch check (`m_lineLength <= 0.5`) is inside the Block branch: line only shortens (and the fish is only
+  landed) while the player holds Block and has stamina.
+- While `m_blocking` the body turns toward the camera yaw (`Player.AlwaysRotateCamera`) at `m_turnSpeed` (300),
+  so the rod points where the camera looks while reeling.
+- Prefab values measured at runtime (in-world self-test, 1.0.16): `FishingRodFloat` `m_pullLineSpeed` 2,
+  `m_pullLineSpeedMaxSkill` 6, `m_pullStaminaUse` 0, `m_pullStaminaUseMaxSkillMultiplier` 0.2, `m_breakDistance` 10,
+  `m_maxDistance` 30; `Fish1` (Perch) `m_staminaUse` 3, `m_escapeStaminaUse` 10. So vanilla reeling costs only the
+  fish's own stamina value x quality (3/s calm, 10/s fighting for a plain Perch at Fishing 0). A calm hooked fish
+  (`Stop` braking) holds the float back: the line came in at about 0.8 m/s instead of the rod's 2 m/s.
 
 ---
 
@@ -978,7 +1004,7 @@ Summary of the verdicts below. "Needs mod" means who must install it for correct
 | Harpoon works on tamed animals | QoL | easy | client-only (harpooner) | no |
 | Hunting (minimap tracking) | New | easy | client-only | no (optional icons) |
 | Sap collector on other trees | New | medium | everyone | yes (item icons) |
-| Better fishing | New | medium | client-only | yes (UI art, optional) |
+| Better fishing | New | medium | everyone | no (UI drawn in code) |
 | Cooking equipment | New | hard (phase 1 alone: medium) | everyone | yes |
 | Tamed / pets on ships | New | hard | everyone | no |
 | Tamed / pets through stone portal | New | medium | client-only (teleporting player) | no |
@@ -1503,9 +1529,19 @@ Target: the cultivator digs up a wild plant into a transplant item that you plan
 ### Farming — Better fishing (New)
 *"It sucks, pick another minigame."*
 
+- **Status:** implemented as [Fishing Fight](../../src/Farming/Fishing.Fight) (0.1.0). The sheet's description
+  now asks for two phases, and the shipped design follows it rather than the sketch below: a Stardew Valley-style
+  catch bar while the fish is calm (fish in the zone = line in for free, out = vanilla reel cost and no line), and a
+  struggle where the fish runs to one side and the player turns the rod (body facing, at least 30 degrees off the
+  line) to the other side and reels (wrong side = x4 stamina and no line, no reel = the fish takes line). It is
+  needed on the server and every player (gameplay rule), owns the struggle timing instead of vanilla `Fish.Escape`,
+  and steers the hooked fish through `Fish.SwimDirection`. See
+  [farming-fishing-fight.md](../design/farming-fishing-fight.md).
+
 - **Feasibility:** medium.
-- **Who needs the mod:** client-only. The float is owned by the fisher and the fish is claimed on hook, so the
-  whole loop is local (§8).
+- **Who needs the mod:** everyone (server and every player): the fight changes stamina costs and catching, so the
+  gameplay rule applies (design D9). The float is owned by the fisher and the fish is claimed on hook, so the whole
+  loop still runs on the fisher's game (§8).
 - **Hooks:**
   - `FishingFloat.FixedUpdate` (prefix: take over while `GetCatch() != null`).
   - `FishingFloat.TryToHook` / `RPC_Nibble` (bite window, strike input).
@@ -1522,8 +1558,8 @@ Target: the cultivator digs up a wild plant into a transplant item that you plan
     destroy the float). Failure calls `SetCatch(null)` with the "lost" message.
   - Keep stamina drain as the fail pressure.
 - **Risks:**
-  - `SetCatch` and several fields are private: use AccessTools or reflection helpers.
-  - Gamepad and keyboard input (`ZInput`) must not trigger block or attack, which would cancel the float.
+  - `SetCatch` and several fields are private, but reachable directly through the publicized `assembly_valheim`.
+  - Block is the vanilla reel (`IsBlocking`); only attacking or drawing a bow cancels the float.
   - The UI can be built procedurally (no bundle) for a prototype; a polished version wants sprites.
   - Fishing overhaul mods and ValheimPlus-like fishing tweaks patch the same `FixedUpdate`.
 

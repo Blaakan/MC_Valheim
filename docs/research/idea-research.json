@@ -229,7 +229,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "Yes",
                       "userLink":  "",
-                      "status":  "Idea",
+                      "status":  "Implemented",
                       "feasibility":  "easy",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -336,7 +336,7 @@
                       "scope":  "Revamp",
                       "existsPerUser":  "No",
                       "userLink":  "",
-                      "status":  "Idea",
+                      "status":  "Implemented",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -2325,7 +2325,7 @@
                       "scope":  "New",
                       "existsPerUser":  "Partially",
                       "userLink":  "https://www.nexusmods.com/valheim/mods/922",
-                      "status":  "Idea",
+                      "status":  "Implemented",
                       "feasibility":  "medium",
                       "side":  "everyone",
                       "needsAssets":  false,
@@ -2498,7 +2498,7 @@
                       "scope":  "New",
                       "existsPerUser":  "Partially",
                       "userLink":  "",
-                      "status":  "Idea",
+                      "status":  "Implemented",
                       "feasibility":  "hard",
                       "side":  "client-only",
                       "needsAssets":  true,
@@ -3026,26 +3026,26 @@
                   {
                       "category":  "Farming",
                       "name":  "Better fishing",
-                      "description":  "It suck, pick another minigame",
+                      "description":  "Current mechanic is: throw bait, wait for the hook to start reeling (\u003c this is ok) then reel in using stamina, if the fish struggles it\u0027s using more stamina (\u003c this is bad gameplay)\nNew mechanic proposal for the reeling in: \nWhen the fish is not struggling, stardew valley like minigame (reel in to go up, release to go down). Keeping the fish in the bar reels it in automatically with no stamina cost. Having the fish outside of the bar does not reel in and consumes stamina. \nWhen the fish is struggling, the stardew like mini game goes away and you need to orient your character so that the fishing rod points at the opposite direction of the fish and reel in. This consumes stamina, but reeling in with the wrong orientation consumes A LOT of stamina. \nExample: if the fish is struggling away to my right, I need to orient myself so that the rod points left and start reeling in. If the fish changes direction and now is on my left, I need to re orient to point my rod to the right. Once the fish stops struggling, the mini game is back.",
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
                       "status":  "Idea",
                       "feasibility":  "medium",
-                      "side":  "client-only",
-                      "needsAssets":  true,
+                      "side":  "everyone",
+                      "needsAssets":  false,
                       "hooks":  [
                                     "FishingFloat.FixedUpdate",
-                                    "FishingFloat.TryToHook",
-                                    "FishingFloat.RPC_Nibble",
-                                    "FishingFloat.Catch",
-                                    "FishingFloat.SetCatch",
-                                    "Fish.Escape",
+                                    "Fish.CustomFixedUpdate",
+                                    "Fish.SwimDirection",
+                                    "Fish.RandomizeWaypoint",
                                     "Fish.GetStaminaUse",
+                                    "FishingFloat.Catch",
+                                    "Hud.Update",
                                     "Skills.SkillType.Fishing"
                                 ],
-                      "sketch":  "Keep the vanilla cast, bait and bite logic. Once hooked, show a tension or zone-tracking UI whose difficulty comes from fish quality, bait and skill. A FishingFloat.FixedUpdate prefix skips the block-to-reel branch and drives line length from minigame progress. Success reproduces the vanilla path (Catch, SetCatch(null), OnHooked(null), destroy the float); failure loses the fish.",
-                      "risks":  "Private members need AccessTools. Input must not trigger attack or block, which cancels the float. A prototype can use procedural UGUI, but polish needs sprites. Conflicts with other fishing mods patching the same FixedUpdate.",
+                      "sketch":  "Keep the vanilla cast, bait, bite and hook. Once hooked, a FishingFloat.FixedUpdate prefix runs the whole tick: a calm phase with a Stardew Valley-style catch bar (hold Block to raise the zone; fish in the zone = line in with no UseStamina call, out = vanilla reel cost and no line) and struggle phases owned by the mod (not vanilla Fish.Escape), where Fish.SwimDirection is taken over so the hooked fish runs across the line to one side. The rod direction is the body facing (it follows the camera while blocking): at least 30 degrees off the line on the side away from the run brings line in at half speed, the wrong side costs x4 stamina and holds the line, not reeling lets the fish take line. Success and losses call the vanilla paths (Catch, SetCatch(null), OnHooked(null), destroy). Needed everywhere (gameplay rule): server rules and join check as Swim Dive. Built as Fishing Fight.",
+                      "risks":  "Several mods take over the same FixedUpdate (GrindstoneSkills, Hooked, Trolling Fishing, PeasFishing, ChillHook, ChillFishing): stand aside (LocalBlocker) and stay out when an earlier prefix skipped the tick. Stamina mods (EpicLoot, FeastMaster, Reely Good Rod) only stack when the costs come from the float and fish fields inside the tick. Turning the rod away from the fish turns the camera too, so the struggle angle must keep the float in view. Fish prefab values (turn rate, acceleration) are unknown, so the struggle swim is the mod\u0027s own.",
                       "relatedIdeas":  [
 
                                        ],
@@ -3056,7 +3056,7 @@
                                                "name":  "PeasFishing (Laki)",
                                                "url":  "https://thunderstore.io/c/valheim/p/Laki/PeasFishing/",
                                                "status":  "0.6.2, 2026-09-12, 1.0 tagged, AI-generated",
-                                               "notes":  "The only minigame replacement: a Stardew-style vertical catch bar (hold or release Shift), a fish-nearby HUD and a clock. Client-only."
+                                               "notes":  "A Stardew-style vertical catch bar (hold or release Shift), a fish-nearby HUD and a clock. Client-only, closed source."
                                            },
                                            {
                                                "name":  "Reely SpecTackleLure (Neobotics)",
@@ -3075,9 +3075,57 @@
                                                "url":  "https://thunderstore.io/c/valheim/p/Marlthon/TheFisher/",
                                                "status":  "0.3.7, 2026-09-12, 1.0 tagged",
                                                "notes":  "More than 30 new fish and aquariums (content)."
+                                           },
+                                           {
+                                               "name":  "Hooked (Azumatt)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Azumatt/Hooked/",
+                                               "status":  "1.1.1, 2026-09-14, deprecated on Thunderstore",
+                                               "notes":  "A Stardew clone that owns the hooked fight: bar grows with skill, five fish motion patterns, treasure, perfect catch, trophy baits as tackle. Hold Block. Closed source."
+                                           },
+                                           {
+                                               "name":  "GrindstoneSkills (MilkyTeam)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/MilkyTeam/GrindstoneSkills/",
+                                               "status":  "0.12.0, 2026-10-01, 1.0",
+                                               "notes":  "Skills overhaul with a line-tension fight: reeling a thrashing fish builds tension, the fish tires after a few thrashes, grace at 0 stamina from skill 75. Patches FixedUpdate, TryToHook, RPC_Nibble and Fish.Escape; config switch [50 - Fishing] Fishing Enabled. Server-synced, open source."
+                                           },
+                                           {
+                                               "name":  "ChillHook (Andejx)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Andejx/ChillHook/",
+                                               "status":  "1.0.3, 2026-09-30, AI-assisted",
+                                               "notes":  "A circle minigame: steer a net zone onto the fish with the mouse or left stick (a 2D take on steering against the fish). Client-only, closed source."
+                                           },
+                                           {
+                                               "name":  "ComfyFishing (Loxley)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Loxley/ComfyFishing/",
+                                               "status":  "0.1.0, 2026-09-15, needs Jotunn",
+                                               "notes":  "Auto-reel with no stamina cost and rod tiers; by default only its own better rods get the auto-reel. Open source."
+                                           },
+                                           {
+                                               "name":  "ChillFishing (Lenson)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Lenson/ChillFishing/",
+                                               "status":  "1.2.2, 2026-09-30",
+                                               "notes":  "Fake nibbles, real bites pull the float under, a tension penalty for holding too long. Closed source."
+                                           },
+                                           {
+                                               "name":  "Angler\u0027s Eye (Jumpingmushroom)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/Jumpingmushroom/AnglersEye/",
+                                               "status":  "0.1.0, 2026-09-29",
+                                               "notes":  "A helper HUD: REEL or WAIT while the fish is calm or struggling, a bite cue, a catch forecast, opt-in smart reel. Turns its features off next to fight mods. Open source."
+                                           },
+                                           {
+                                               "name":  "Trolling Fishing (sighsorry)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/sighsorry/Trolling_Fishing/",
+                                               "status":  "1.1.3, 2026-09-14",
+                                               "notes":  "Several floats per player; patches FixedUpdate, SetCatch, UseStamina and RaiseSkill."
+                                           },
+                                           {
+                                               "name":  "Reely Good Rod (VentureValheim)",
+                                               "url":  "https://thunderstore.io/c/valheim/p/VentureValheim/Reely_Good_Rod/",
+                                               "status":  "1.0.0, 2026-09-10",
+                                               "notes":  "Halves the fish stamina cost (Fish.GetStaminaUse postfix)."
                                            }
                                        ],
-                      "inspiration":  "A Stardew clone exists. A Valheim-native minigame does not. Idea: line tension and rod bend. The fish pulls and you steer against it, reeling raises tension, stamina drains, and rod quality and skill widen the safe band. Species get behavior profiles. Keep the vanilla FishingFloat bite phase and replace only the reel phase. Support gamepad and hold/toggle. Pair with passive traps and gear for progression."
+                      "inspiration":  "Several fight replacements now exist: Stardew clones (Hooked, PeasFishing), a tension fight (GrindstoneSkills), a 2D steering circle (ChillHook) and auto-reels (ComfyFishing). None makes the player turn the rod against the fish\u0027s run in the world: real side pressure (rod low, toward the side opposite the run) is the Valheim-native part. Combine it with a Stardew bar for the calm phases, as the sheet now asks. Pair with passive traps and gear for progression."
                   },
                   {
                       "category":  "Exploration",
