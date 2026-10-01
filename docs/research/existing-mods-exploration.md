@@ -366,23 +366,23 @@ Ocean *content* mods exist. There is no real underwater biome with seafloor terr
 ## 12. Deep North revamp (New) — coverage: none
 
 **Vanilla hooks and 1.0 facts**
-- The Deep North is now a full biome. According to the wiki, breaking the **Malicious Ice** at the bottom of the Mörkhalla dungeon triggers a **Jotun Invasion** somewhere in the lower biomes. At most 3 run at once; the location prefab is `FimbulLocation01`.
-- This is data-driven: no dedicated C# class was found for it.
+- The Deep North is now a full biome. Breaking the **Malicious Ice** at the bottom of a Mörkhalla dungeon triggers a **Jotun Invasion** somewhere in the lower biomes. At most 3 run at once; the location prefab is `FimbulLocation01`.
+- This is data-driven: no dedicated C# class was found for it. Confirmed in the 1.0.16 asset bundles (2026-10-01): the stone is `BlackIce_Start` (a `TriggerPersistentEventOnDestroy` starting `jotun_invasion`), the only persistent event in the game; the invasion spawns are `_SpawnList_DeepNorth` entries gated by `m_requiredPersistentEvent` (details in [exploration-world.md §6](../game/exploration-world.md)).
 - Spawns and events can be gated by global keys: `SpawnSystem.SpawnData.m_requiredGlobalKey`, `CreatureSpawner.m_requiredGlobalKey`, `RandomEvent.m_requiredGlobalKeys`.
-- `AltBiome` modifiers can swap environments and spawn lists per sector.
+- `AltBiome` modifiers can swap environments and spawn lists per sector, but the Deep North is one single sector, so they apply to all of it at once.
 
-**Question for the user:** does "the first stone is broken" mean the Malicious Ice, or some other stone?
+**Answered by the user (2026-10-01):** the "stone" is the Malicious Ice of a Mörkhalla. Built as [Deep North Awakening](../../src/Exploration/DeepNorth.Awakening).
 
 | Mod | Status | Notes |
 |-----|--------|-------|
 | [MonstrumDeepNorth](https://thunderstore.io/c/valheim/p/Therzie/MonstrumDeepNorth/) (Therzie) | 2.0.6, 2025-03-10, deprecated | Pre-1.0 content for the old placeholder Deep North: arctic creatures, locations, Forsaken bosses. Obsolete. |
-| [Expand World Data](https://thunderstore.io/c/valheim/p/JereKuusela/Expand_World_Data/) (events merged in 1.73) | 1.73.0, 2026-09-23 | Per-biome spawns, events and environments with key conditions in YAML. Can prototype dormant/active phases without code. |
+| [Expand World Data](https://thunderstore.io/c/valheim/p/JereKuusela/Expand_World_Data/) (events merged in 1.73) | 1.74.0, 2026-10-01 | Per-biome spawns, events and environments with key conditions in YAML. Can prototype dormant/active phases without code. 1.74 added `requiredPersistentEvent` to its spawn data. No persistent-event code. |
 | [Spawn That](https://thunderstore.io/c/valheim/p/ASharpPen/Spawn_That/) / [Custom Raids](https://thunderstore.io/c/valheim/p/ASharpPen/Custom_Raids/) (ASharpPen) | 1.2.19, 2026-09-09 / 1.8.2, 2026-09-10, 1.0 tagged | Config-driven spawners and raids with global-key conditions. |
 | [World Advancement Progression](https://thunderstore.io/c/valheim/p/VentureValheim/World_Advancement_Progression/) (VentureValheim) | 1.0.0, 2026-09-10, 1.0 tagged | Gates progression by key. |
 
 **Inspiration**
 
-- **Status:** nobody has done this; it would be a genuinely new idea.
+- **Status:** nobody else has done this (no public mod hooks `PersistentEventSystem` or the Malicious Ice, checked 2026-10-01). Implemented here as Deep North Awakening.
 - **Dormant phase:** calm weather, sparse wildlife, eerie silence.
 - **Trigger:** a world key set the first time the trigger (for example Malicious Ice) is destroyed. Detect it by patching the destructible or hooking the invasion start.
 - **Active phase:**
