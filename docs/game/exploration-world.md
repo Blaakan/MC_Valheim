@@ -458,7 +458,7 @@ The Hildir quest loop, fully data-driven: Hildir dungeons (themes `ForestCryptHi
   North as seeded hidden cells with their own Jotun-army spawns, stage star odds, storms (blizzard + meteors) and nature
   hostile to the Jotun (with nature bands); the third stone starts 3 vanilla invasions; after Kall an area spawns its
   Jotun once each time a player walks into it, then waits (server list) while anyone is near, and is cleared for good
-  once they are all dead (kept on zone-control ZDOs). The areas show as a purple tint on the explored map (the
+  once 8-13 Jotun are killed inside it (counted by the server from the destroyed Jotun ZDOs, kept on zone-control ZDOs). The areas show as a purple tint on the explored map (the
   vanilla map colour texture). No `RandEventSystem` raids, no heavy snow, no new assets.
 - **Feasibility:** medium (dormant → awakened state machine with vanilla data); hard if "very active" means new creatures/events.
 - **Who needs the mod:** everyone (spawning and weather run on clients; the state is a server global key).

@@ -32,13 +32,16 @@ has at least one test (section 8).
 8. **G8 — Storms come and go.** An area storms about a third of the time, 5 to 10 minutes at a time: Deep North
    blizzard weather while you stand in it, and Fimbul meteors like the vanilla invasion's.
 9. **G9 — Nature fights back.** Once the north is awake, Gammeltroll, Barka and the frost Greydwarfs (and their
-   shamans) are hostile to the Jotun army, and the areas sometimes spawn a band of them to fight the invaders: 0-2 big
-   ones (Gammeltroll and Barka, any mix) and 5-10 frost Greydwarfs including shamans (user, round 3).
-10. **G10 — After Kall.** Once Kall Fimbulbringer is defeated, the areas stop spawning new mobs; killing every Jotun of
-    an area clears it for good (no more Jotun, storm or meteors there). Areas outside the loaded range must still have
-    their enemies when visited after Kall (user, round 3). The rule (user, round 3): when an area comes into range, its
-    creatures spawn (if Kall is defeated) and the area is flagged "to be defeated", which stops further spawns while
-    players are in it; cleared = deleted; not cleared = its mobs spawn again the next time it is loaded.
+   shamans) are hostile to the Jotun army, and the areas sometimes spawn a band of them to fight the invaders: 1-3 big
+   ones (Gammeltroll and Barka, any mix) and 10-20 frost Greydwarfs including 2-4 shamans (user, rounds 3 and 5). After
+   Kall they keep coming until the area is cleared (user, round 5).
+10. **G10 — After Kall.** Once Kall Fimbulbringer is defeated, the areas stop spawning Jotun over time. Areas outside
+    the loaded range must still have their enemies when visited after Kall (user, round 3). The rule (user, round 3):
+    when an area comes into range, its Jotun spawn and the area is flagged "to be defeated", which stops further Jotun
+    spawns while players are in it; not cleared = its Jotun spawn again the next time it is loaded. Clearing (user,
+    round 5, replacing "kill every Jotun it spawned", which made runaway Jotun a chore): each area has a kill count to
+    reach, 8-13 Jotun killed inside it; then the area is gone (no purple on the map, no more spawns); creatures left
+    alive stay. Half way, a small "The Jotun army is weakening".
 11. **G11 — Old worlds.** On a world where Mörkhalla stones were broken before the mod was installed, the server counts
     them once (explored Mörkhalla whose Malicious Ice is gone) and starts at that stage, without catch-up invasions.
 12. **G12 — Vanilla messages.** Every stone shows the vanilla "The Jotun Advance" (user, round 3).
@@ -50,8 +53,9 @@ has at least one test (section 8).
 
 - **E1** Admin console command `deepnorth_stones [count]`: shows the stone count, stage and areas, or sets the count
   (no messages, no invasions). For admins fixing a world and for testing.
-- **E2** The vanilla "The Jotun Retreat" (`$fimbulvinterorb_destroyed`, the invasion core's text) when a player clears
-  the area they stand in after Kall.
+- **E2** The vanilla "The Jotun Retreat" (`$fimbulvinterorb_destroyed`, the invasion core's text) when an area is
+  cleared after Kall, for the players in it or near the last kill (round 5 adds the half-way "The Jotun army is
+  weakening" the user asked for).
 - **E3** An admin's `pevents start jotun_invasion` (and any other mod's request) still starts an invasion, 5 seconds
   late (decision D4).
 
@@ -249,59 +253,60 @@ buildings; new music.
   `Greydwarf_Frozen`, `Greydwarf_Shaman_Frozen`), the answer becomes true. It applies to every such creature, not only
   the ones the areas spawn (the user named the species). Players are unaffected (they were already enemies of both).
 - **Bands.** Each zone the runner serves rolls for a band every 20 minutes (`NatureBandChance`, 10 %; the first roll at
-  once since the zone has no timer yet). A band: 5-10 frost Greydwarfs of which 1 (5-7) or 2 (8-10) are shamans, and
-  0-2 big ones, each Gammeltroll or Barka 50/50. Its centre comes from vanilla `FindBaseSpawnPoint` (40-80 m from a
-  player, through the gate: awake cell), each member is placed within 7 m (big ones 10 m) through vanilla
+  once since the zone has no timer yet). A band: 10-20 frost Greydwarfs of which about one in five (2-4) are
+  shamans, and 1-3 big ones, each Gammeltroll or Barka 50/50. Its centre comes from vanilla `FindBaseSpawnPoint` (40-80 m from a
+  player, through the gate: awake cell), each member is placed within 10 m (big ones 13 m) through vanilla
   `IsSpawnPointGood` and `Spawn` (vanilla levels: Greydwarfs up to 2★, Gammeltroll and Barka 0★ as in the vanilla
-  Deep North list). Members carry `<GUID>.Band = 1`; no new band while 3 or more members live within 160 m. Before Kall
-  only.
+  Deep North list). Members carry `<GUID>.Band = 1`; no new band while 3 or more members live within 160 m. Never in a
+  cleared area; after Kall bands keep coming until the area is cleared.
 
 ### 2.6 After Kall (G10)
 
-- Kall defeated = global key `defeated_frozenking_p3`. No timed spawns any more (Jotun entries, bands); meteors keep
-  falling in storming cells that are not cleared.
+- Kall defeated = global key `defeated_frozenking_p3`. No timed Jotun spawns any more; meteors keep falling in storming
+  cells that are not cleared; nature bands keep coming in cells that are not cleared (2.5).
 - **Entered again = burst (user rule).** When the runner serves a zone with a player in the Deep North, the cell under
   that player is **entered** if it is awake, not cleared and not engaged. For each entered cell the runner resets the
   timers of the Jotun entries on that zone control and runs them once: vanilla tries up to each cap at once. During
   that pass the gate lets Jotun spawn only into that cell, and the cap count (`SpawnSystem.GetNrOfZDOInstances`
-  prefix) is the cell's own living Jotun of that kind: the larger of its tagged ones in the 5 × 5 zones and the
-  server's count for the cell (its Jotun that roam far away still count; other areas' Jotun and vanilla ones do not).
-  So a fresh area gets a full set, a half-cleared one is topped up, and entering from another side never adds a
-  second set. Only the cell under a player: the vanilla spawn ring (40-80 m from a player) could not put Jotun in a
-  cell the player only sees from its edge, and such a cell would be flagged without ever getting its Jotun.
-- **Engaged ("to be defeated", server).** The game that bursts tells the server which cells got Jotun or have living
-  ones (full: nothing to top up) with routed `<GUID>.Engage`; a cell where nothing could spawn and none live (no valid
-  spot) is tried again 5 s later. The server keeps a cell engaged until no player is within the release distance of
-  its seed point: every point of the cell (481 m) plus the loaded zones around a player (near simulation distance + 1
-  zones on the diagonal: 754 m at the default distance), so the cell left everybody's loaded range. A player counts by
-  their character and by their reference position (a dead player waiting to respawn has no character; the game puts
-  the reference at the bed). Checked every 2 s. Engaged cells go to every player with the cleared list; a game also
-  holds a cell it just burst for 10 s (network delay). Engagement is not saved: after a restart every cell not cleared
-  bursts again when entered.
+  prefix) is the cell's own Jotun of that kind in the 5 × 5 zones around (other areas' Jotun and vanilla ones do not
+  fill its caps). So a fresh area gets a full set and one with survivors around is topped up. Only the cell under a
+  player: the vanilla spawn ring (40-80 m from a player) could not put Jotun in a cell the player only sees from its
+  edge, and such a cell would be flagged without ever getting its Jotun.
+- **Engaged ("to be defeated", server).** The game that bursts tells the server which cells got Jotun or have some
+  loaded there (routed `<GUID>.Engage`); a cell where nothing could spawn (no valid spot) is tried again 5 s later. The
+  server keeps a cell engaged until no player is within the release distance of its seed point: every point of the
+  cell (481 m) plus the loaded zones around a player (near simulation distance + 1 zones on the diagonal: 754 m at the
+  default distance), so the cell left everybody's loaded range. A player counts by their character and by their
+  reference position (a dead player waiting to respawn has no character; the game puts the reference at the bed).
+  Checked every 2 s. Engaged cells go to every player with the cleared list; a game also holds a cell it just burst
+  for 10 s (network delay). Engagement is not saved: after a restart every cell not cleared bursts again when entered.
 - **Kall killed in the session.** When Kall falls while players are in the world, the server engages at once the cell
-  under each player in the Deep North and the cells around them (the zone samples the runner uses) that still have
-  living area Jotun: no refill in the area of the fight. A cell nearby that nobody entered and that has no Jotun is
-  left alone: it bursts when entered. At world load with Kall already dead nothing is engaged.
-- **Living and cleared (server).** When the key appears (or at world load when it is already there, or the mod is
-  turned back on), the server scans the ZDOs of the four Jotun-army prefabs (`ZDOMan.GetAllZDOsWithPrefabIterative`)
-  and groups the tagged ones by cell and kind, with rescans 5, 15 and 30 s later (a client may still spawn tagged
-  creatures in the moment before the Kall key reaches it). After that it follows deaths through `m_onZDODestroyed`:
-  each death of a tagged Jotun (after 1 s) and each engage (after 4 s, never sooner because of a death) recounts that
-  cell's tagged Jotun in the 19 × 19 zones around its seed point (`ZDOMan.FindSectorObjects`), so Jotun of later
-  bursts are counted too. A cell whose death recount finds no living Jotun **died out**; once settled (last rescan
-  done, so also in the first 30 s after a load) it is **cleared** for good: no burst, no storm, no meteors. Cells with
-  no living Jotun at Kall (never visited, or emptied before Kall) are not cleared: they burst when entered.
+  under each player in the Deep North and the cells of the area Jotun loaded around them (5 × 5 zones): no refill in
+  the area of the fight. A cell nearby that nobody entered and that has no Jotun is left alone: it bursts when entered.
+  At world load with Kall already dead nothing is engaged.
+- **Kill count (user, round 5).** Each awake cell has a fixed kill target, seeded from the world and the cell, between
+  `ClearKillsMin` and `ClearKillsMax` (8-13). After Kall the server counts every Jotun-army ZDO destroyed
+  (`ZDOMan.m_onZDODestroyed`; Jotun are saved creatures, so a destroy is a death, never an unload) at a position inside
+  the Deep North line, for the awake, not cleared cell at that position, whichever area the Jotun came from (vanilla
+  Jotun too). Nature kills do not count, nor event or day creatures (raid Jotun walk away and vanish when their raid
+  ends, `BaseAI.MoveAwayAndDespawn`); each ZDOID counts once (a stale update can bring a dead ZDO back on the server
+  and destroy it again). When the count reaches half the target (rounded up), players there get
+  "The Jotun army is weakening" (top left); at the target the cell is **cleared** for good: no burst, no band, no storm,
+  no meteors, gone from the map. Creatures still alive there stay.
 - **Remembered in the world.** The server writes each cleared cell into one of 8 int slots (`<GUID>.Cleared0..7`,
-  value = cell id) of a zone control that no player owns (or the server owns), so no owner's next write replaces it; at
-  load it reads every `_ZoneCtrl` ZDO for those slots. Zone controls are persistent vanilla objects, so nothing new is
-  saved and nothing breaks if the mod is removed. The server sends cleared cells, engaged cells and living counts per
-  cell and kind to every player (routed `<GUID>.Cleared`) on change (a death never delays a send already waiting),
-  and to a player in answer to each rules request (join, turned back on). A game forgets them when it sees no Kall key,
-  so a new Kall waits for the server's new lists.
-- A player standing in a cell that becomes cleared (inside the Deep North line) gets the vanilla centre message "The
-  Jotun Retreat".
-- `deepnorth_stones` after Kall also shows, from the lists the game has, the area the player stands in: its living
-  Jotun per kind and whether it waits to be defeated, spawns when entered, or is cleared.
+  value = cell id) and each kill count into one of 8 long slots (`<GUID>.Kills0..7`, value = cell << 32 | count) of a
+  zone control that no player owns (or the server owns), so no owner's next write replaces it. At load it reads every
+  `_ZoneCtrl` ZDO for those slots (the highest count of a cell wins; a cleared mark wins over a count). A slot whose
+  zone control a player took meanwhile is never written again: the next count goes to a free slot (counts only grow).
+  Zone controls are persistent vanilla objects, so nothing new is saved and nothing breaks if the mod is removed. The
+  server sends the cleared cells, the engaged cells and the kill counts to every player (routed `<GUID>.Cleared`) on
+  change (a kill never delays a send already waiting), and to a player in answer to each rules request (join, turned
+  back on). A game forgets them when it sees no Kall key, so a new Kall waits for the server's new lists.
+- **News.** Routed `<GUID>.News` (kind, cell, kill position) to everybody: each game shows it when its player stands in
+  that cell or within 100 m of the kill. Half way: top-left "The Jotun army is weakening" (user wording; no vanilla
+  text fits). Cleared: the vanilla centre message "The Jotun Retreat".
+- `deepnorth_stones` after Kall also shows, from the lists the game has, the area the player stands in: its kills and
+  target, and whether it waits to be defeated, spawns when entered, or is cleared.
 
 ### 2.7 Admin command (E1)
 
@@ -365,16 +370,19 @@ server's console and log).
   of our own.
 - **D13 — Gammeltroll spawns directly** (`TrollFrost`), not through vanilla's `Spawner_TrollFrost` object.
 - **D17 — Nature as bands** (G9): one band at one spot (the members fight the Jotun together), at most one band around
-  a player (no new band while 3 members live within 160 m), 10 % per zone check every 20 minutes. Members are tagged, not
-  counted for G10.
+  a player (no new band while 3 members live within 160 m), 10 % per zone check every 20 minutes. Members are tagged;
+  their kills never count toward clearing (G10: the Jotun army only).
 - **D18 — After Kall, "entering" an area = standing in its cell** (Deep North line, awake, not cleared, not engaged),
   not just loading a zone near it: only then can the vanilla spawn ring place its Jotun. "Left the range" = no player
   (character or reference position) within the cell's reach plus the loaded zones (754 m from its seed at the default
-  simulation distance). Engagement is decided by the server (one list for everybody), and a burst's caps count the
-  area's own Jotun wherever they are, so two players entering one area from two sides get one set of Jotun, not two.
-  Kall killed in the session engages the cell under each player and the nearby cells that still have Jotun (no refill
-  in the area of the fight).
-- **D19 — Cleared areas are kept on zone controls** (vanilla persistent ZDOs, written by the server on ones no
+  simulation distance). Engagement is decided by the server (one list for everybody), so two players entering one area
+  a moment apart get one set of Jotun. Kall killed in the session engages the cell under each player and the nearby
+  cells whose Jotun are loaded (no refill in the area of the fight).
+- **D21 — Clearing by kill count** (G10, round 5): the Jotun army killed inside an area, by where they die, not "every
+  Jotun the area spawned" (the first build followed each tagged Jotun wherever it walked; one that ran off kept an area
+  from clearing). No creature is followed any more; caps count the area's own Jotun around the burst only, so an area
+  entered from a far side may get a second set (more to kill, never fewer).
+- **D19 — Cleared areas and kill counts are kept on zone controls** (vanilla persistent ZDOs, written by the server on ones no
   player owns), not in a global key (a key's value string is copied into every player's profile at each change) nor in a file next to the world (lost
   with cloud saves and world copies).
 - **D20 — The map overlay tints the vanilla map texture** (G13) instead of pins or an extra image. Vanilla event
@@ -396,7 +404,7 @@ server's console and log).
 
 | Piece | Runs on |
 |---|---|
-| Stone count, stage key, messages, vanilla invasions, living, engaged and cleared areas, cleared-area slots, old-world detection, deferred requests | server (dedicated or host; single player = local) |
+| Stone count, stage key, messages, vanilla invasions, kill counts, engaged and cleared areas, area slots, news, old-world detection, deferred requests | server (dedicated or host; single player = local) |
 | Skipping the vanilla trigger | the stone's owner (with the mod and the server's rules) |
 | Area spawns, bands, meteors, tags, after-Kall bursts (then it tells the server) | the zone-control owner |
 | Nature hostility | each creature's AI owner |
@@ -405,16 +413,18 @@ server's console and log).
 
 ### 4.2 RPCs, ZDO keys, network version
 
-- `<GUID>.Settings` (server → client, ZPackage `AwakeningRules` layout 1) and `<GUID>.SettingsRequest` (client → server,
+- `<GUID>.Settings` (server → client, ZPackage `AwakeningRules` layout 2) and `<GUID>.SettingsRequest` (client → server,
   int layout): the Swim Dive pattern.
-- Routed `<GUID>.Cleared` (server → everybody on change, or one peer after its rules request): int layout 1; int count
-  and the cleared cell ids; int count and the engaged cell ids; int count and, per cell, the cell id and 4 living tagged Jotun counts (Krigen, dual-axe Krigen, Hexen, Elaking).
-- Routed `<GUID>.Engage` (a game that burst → server): int layout 1, int count, then the cell ids.
+- Routed `<GUID>.Cleared` (server → everybody on change, or one peer after its rules request): int layout 2; int count
+  and the cleared cell ids; int count and the engaged cell ids; int count and, per cell, the cell id and its Jotun kills.
+- Routed `<GUID>.Engage` (a game that burst → server): int layout 2, int count, then the cell ids.
+- Routed `<GUID>.News` (server → everybody): int layout 2, int kind (1 weakening, 2 cleared), int cell, float x, float z
+  (the kill position).
 - ZDO int `<GUID>.Cell` on Jotun-army creatures spawned by an area, `<GUID>.Band` (1) on nature band members,
-  `<GUID>.Cleared0..7` (cell ids) on zone controls; zone-control longs for the entry timers (`mcdn<i>_<prefab>1`,
+  `<GUID>.Cleared0..7` (int cell ids) and `<GUID>.Kills0..7` (long cell << 32 | count) on zone controls; zone-control longs for the entry timers (`mcdn<i>_<prefab>1`,
   `mcdnBand_NatureBand1`).
 - Global key `mc_dn_stones <n>`.
-- Network version 1. Bump on any change to the above.
+- Network version 2 (1 = the first build, which followed each area Jotun). Bump on any change to the above.
 
 ### 4.3 Server settings and join check
 
@@ -450,6 +460,7 @@ spawns, which every client runs with the server's rules.
 | Awakening | JotunDensity | 100 | 25-400 % | yes |
 | Awakening | NatureFightsBack | true | | yes |
 | Awakening | NatureBandChance | 10 | 0-100 % per zone check (20 min) | yes |
+| Awakening | ClearKillsMin / ClearKillsMax | 8 / 13 | 1-100 Jotun kills per area (after Kall) | yes |
 | Storms | StormShare | 33 | 0-100 % | yes |
 | Storms | StormMinMinutes / StormMaxMinutes | 5 / 10 | 1-60 | yes |
 | Storms | Meteors | true | | yes |
@@ -507,7 +518,7 @@ RPC, client receive and message), `AreaSpawns.cs` (entries, runner, tag context)
 | `ZNet.OnNewConnection`, `ZNet.RPC_PeerInfo`, `ZNet.Update`, `ZNet.OnDestroy` | postfix | rules (the rules request is answered with the area lists after Kall), join check, timers, world end |
 | `SpawnSystem.UpdateSpawning` | postfix | area spawn runner |
 | `SpawnSystem.IsSpawnPointGood` | prefix | area gate for our entries |
-| `SpawnSystem.GetNrOfZDOInstances` | prefix | only during an after-Kall burst: the cap count is the burst cell's own living Jotun of that kind |
+| `SpawnSystem.GetNrOfZDOInstances` | prefix | only during an after-Kall burst: the cap count is the burst cell's own Jotun of that kind around |
 | `Minimap.Update` | postfix | map overlay: scan a slice, or repaint when the areas changed |
 | `Minimap.GenerateWorldMap`, `Minimap.TryLoadMinimapTextureData` | postfix | the map colours were made again: scan again |
 | `Character.Awake` | postfix | cell tag while a Jotun entry spawns |
@@ -515,38 +526,40 @@ RPC, client receive and message), `AreaSpawns.cs` (entries, runner, tag context)
 | `EnvMan.GetEnvironmentOverride` | postfix | blizzard |
 | `PersistentEventSystem.RPC_RequestStartEvent` | prefix | hold foreign `jotun_invasion` requests |
 | `TriggerPersistentEventOnDestroy.OnDestroyed` | prefix | skip the vanilla stone trigger |
-| `ZDOMan.m_onZDODestroyed` | delegate (server) | count stones, track tagged Jotun |
+| `ZDOMan.m_onZDODestroyed` | delegate (server) | count stones, count Jotun killed in the areas |
 | `Terminal.ConsoleCommand` | registered in `OnActivated` | `deepnorth_stones` |
 
 ### 7.3 State and lifetime
 
-World state (stone cache, cleared and engaged areas, living counts, map scan, counted ZDOIDs, held-back requests, detection done, scan done) is cleared on
+World state (stone cache, cleared and engaged areas, kill counts, map scan, counted ZDOIDs, held-back requests, detection done, scan done) is cleared on
 `ZNet.OnDestroy` and on deactivate. The ZDO delegate is added once per `ZDOMan` instance and removed on deactivate.
 
 ### 7.4 Live toggle
 
 Off: patches gone, delegate removed, held-back requests that no stone break claimed run at once (vanilla), command
 removed, weather back to vanilla within a few seconds, map colours back at once. On again inside a world: delegate added, rules asked (the
-server answers with the area lists after Kall); on the server, living area Jotun recounted after Kall (no area engaged
-until a player enters one).
+server answers with the area lists after Kall); on the server, cleared areas and kill counts read back from the world
+(no area engaged until a player enters one).
 
 ### 7.5 Debug in-world self-tests
 
-`dn.logic` (cell lookup vs brute force, map grid lookup = cell lookup on 20 000 points, coverage over 20 seeds, nesting and cumulative coverage, storm uptime and
-lengths, parsing, invasions per stone, request claim window, broken-Morkhalla count, army vs nature, nature band rolls, area lists wire, vanilla texts, no
+`dn.logic` (cell lookup vs brute force, map grid lookup = cell lookup on 20 000 points, kill targets (fixed, in range, both ends), kill slot packing, news wire, coverage over 20 seeds, nesting and cumulative coverage, storm uptime and
+lengths, parsing, invasions per stone, request claim window, broken-Morkhalla count, army vs nature, nature band rolls (10-20 with 2-4 shamans, 1-3 big), area lists wire, vanilla texts, no
 blizzard past the Deep North line, spawn gate by stage, Kall, storm and pending rules), `dn.network` (rules wire,
 clamp, select, join verdict), `dn.vanilla` (game data the mod relies on: event, stone trigger, prefabs, factions, Kall
 key, blizzard env, Mörkhalla location; notes the vanilla invasion spawn entries), `dn.hostility` (IsEnemy matrix, live
 fight), `dn.stones` (stone breaks 1-4: key, no invasion at 1-2, a game waiting for rules runs vanilla and its request
 is dropped, invasions at 3, vanilla cap at 4, admin request runs after the hold), `dn.detect` (old-world count),
-`dn.kall` (world loaded with Kall: tagged Jotun counted per kind, no spawn outside a burst, server engagement kept while a player
-is near and released when far, an empty burst retried, clearing after the last death, cleared area written on a zone
-control and read back by a new scan), `dn.area` (Deep North at stage 3 with storms forced: tagged area Jotun inside
+`dn.kall` (world loaded with Kall: no spawn outside a burst, server engagement kept while a player is near and released
+when far; with a target of 6 and deaths made without creatures: 2 kills counted and written, 3 = "weakening" news not
+shown to a player far away, nature and outside kills not counted, progress read back by a new scan, 6 = cleared,
+"The Jotun Retreat" news, mark written, count slot freed, later kills ignored, read back cleared), `dn.area` (Deep North at stage 3 with storms forced: tagged area Jotun inside
 awake cells, star override, blizzard, meteors, a forced nature band, the area purple on the map (large map shot);
 then Kall killed there: the area engaged at once and no refill; entered again: one burst, then engaged; a few killed
 and the player stays past the 10 s local hold: no refill, still engaged; all its Krigen killed and 3 other Krigen
-placed nearby, entered again: its own Krigen come back; all its Jotun killed: cleared, written, no storm, no spawn, gone
-from the map), `dn.map` (map scanned for Deep North land; at stage 3 an awake area is purple and a sleeping one is
+placed nearby, entered again: its own Krigen come back; the kills there counted; a nature band still spawns after Kall;
+two more kills reach the target: cleared, written, "The Jotun Retreat" shown to the player there, no band, no storm,
+no new Jotun (the ones left stay), gone from the map), `dn.map` (map scanned for Deep North land; at stage 3 an awake area is purple and a sleeping one is
 not; own colours back with ShowAreas off, at stage 0 and while waiting for the server's rules), `dn.morkhalla` (Malicious Ice per Mörkhalla, placed flag, detection on
 an intact one). Tests force rules from the design defaults, never the player's config.
 
@@ -572,7 +585,7 @@ who joins after Kall; two players entering one area after Kall get one set of Jo
 - The Deep North sector has no level-up multiplier: with default world modifiers the effective star chance of the
   area Jotun is the setting (45 % at stage 3, `dn.area`).
 - The four Jotun-army prefabs have a persistent `ZNetView` (`dn.vanilla`): unloading keeps their ZDO (`ZNetScene.RemoveObjects`
-  destroys only ZDOs that are not persistent), so an unloaded area Jotun stays counted and is never taken for a death.
+  destroys only ZDOs that are not persistent), so unloading a Jotun is never taken for a kill.
 - Map (`dn.map`, `dn.area`): 2048 × 2048 pixels of 12 m, Deep North map colour white (as the sea), about 109 000
   pixels of Deep North land in the probe world; the tint shows on land only, merged, under the fog (large map shot).
 - `MorkBorg`: 40 per world; the vanilla invasion spawn entries match section 1.2 (`dn.vanilla`).
