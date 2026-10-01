@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Trinkets on Demand</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>Revamp</ModScope>
+    <!-- Ideas from the sheet this mod implement (tools/Update-Backlog.ps1 link them). Two ideas, split by ";": me do
+         all of Trinket revamp, and part of Adrenaline revamp (income in fight, no drain, ranged catch-up). -->
+    <ModIdea>Trinket revamp;Adrenaline revamp</ModIdea>
+    <!-- Both: user rule (gameplay mod = required everywhere). Bar, pop, key, income all run on wearer's own game, but
+         they change fight balance for everyone. Server refuse players without me, with me off, or other network
+         version (PlayerCheck), and send its rules (ServerRules). -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. It changes combat for everyone, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. Trinkets themselves are not changed: a trinket that reaches a player without the mod works as in the normal game.</ModMultiplayerNotes>
+    <!-- Wire and world format of me: RPC <guid>.Settings / <guid>.SettingsRequest (TrinketRules layout 1). No ZDO key,
+         no prefab, no item data. Bump when any of them change. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Adrenaline builds while you fight and no longer drains away. A full bar waits for you: press a key to fire your trinkets when you choose. Bows and crossbows earn more adrenaline to make up for their slower attacks.</ModDescription>
+  </PropertyGroup>
+</Project>
