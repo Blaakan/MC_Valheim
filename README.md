@@ -34,9 +34,12 @@ clearly who needs to install it and how it behaves in multiplayer. Details: [doc
 | [Dual Wielding](src/Combat/Weapons.DualWield) | Combat | New | server and every player | works | in development |
 | [Weapon Moveset](src/Combat/Weapons.Moveset) | Combat | Revamp | server and every player | works | in development |
 | [Sneak Ambush](src/Combat/Sneak.Ambush) | Combat | Revamp | server and every player | works | in development |
+| [Trinkets on Demand](src/Combat/Trinkets.OnDemand) | Combat | Revamp | server and every player | works | in development |
 | [Creature Kill and Tame Counts](src/Exploration/Stats.PerCreature) | Exploration | QoL | only you (client-side) | works | in development |
 | [Sleep Through the Day](src/Exploration/Sleep.ThroughDay) | Exploration | QoL | server and every player | works | in development |
 | [Encyclopedia](src/Exploration/Compendium.Encyclopedia) | Exploration | New | only you (client-side) | works | in development |
+| [Sailing Skill](src/Exploration/Sailing.Skill) | Exploration | New | server and every player | works | in development |
+| [Swim Dive](src/Exploration/Swimming.Dive) | Exploration | New | server and every player | works | in development |
 | [Switchable Lights](src/Building/Lights.Switchable) | Building | QoL | server and every player | works | in development |
 | [One Click Repair All](src/Crafting/Repair.OneClickAll) | Crafting | QoL | only you (client-side) | works | in development |
 | [Batch Station Feeding](src/Crafting/Stations.BatchFeed) | Crafting | QoL | only you (client-side) | works | in development |

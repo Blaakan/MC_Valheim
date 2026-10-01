@@ -130,7 +130,7 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
    request" at the pause). Ask only when blocked. If a behaviour conflicts with a vanilla rule, pick the
    vanilla-consistent option, write it under Decisions in the design doc, and flag it at the pause.
 2. **Scaffold.** Pick `<System>.<Feature>` (the GUID is permanent), run `./tools/New-Mod.ps1`, add `<ModIdea>` with
-   the exact sheet idea name to the csproj.
+   the exact sheet idea name to the csproj (several ideas `;`-separated).
 3. **Implement** per "Mod code conventions". Prefer calling the vanilla method in a loop or wrapper over copying its
    logic: other mods' patches on it keep working. `dotnet build ValheimMods.slnx`, then
    `./tools/Test-Smoke.ps1 -Mod <Feature>` (one word of `<System>.<Feature>`, e.g. `Repair`: `-Mod` matches the
@@ -200,7 +200,7 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   `BepInPlugin` / `BepInProcess` (Client mods) / soft `BepInDependency` attributes from the csproj. Never
   hardcode GUID/name/version.
 - csproj metadata (single source of truth, validated by the build): `ModName`, `Version`, `ModScope`, `ModIdea`
-  (sheet idea name; NOT checked by the build: `./tools/Update-Backlog.ps1` warns when it matches no sheet idea, and the
+  (sheet idea name, several ideas `;`-separated; NOT checked by the build: `./tools/Update-Backlog.ps1` warns when it matches no sheet idea, and the
   backlog row then shows the sheet Status instead of the mod), `ModSide` (`Client` | `Server` | `Both`), `ModMultiplayer` (`Compatible` | `Limited` |
   `SinglePlayer`), `ModMultiplayerNotes` (player-facing; required unless Client + Compatible), `ModRequires`
   (GUIDs of MC mods needed at runtime, `;`-separated, no cycles), `ModDependencies` (external Thunderstore strings),

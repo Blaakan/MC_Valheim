@@ -10,8 +10,9 @@ Game version: 1.0.16 (network 40). Source: decompiled assembly_valheim.
 > decompiled code only shows as C# defaults; verify them at runtime (e.g. dump `ObjectDB.instance` /
 > `ZNetScene.instance.GetPrefab(...)`) before relying on them. Values marked *dump* come from MC's runtime dump of
 > 1.0.16 (items, creatures, status effects, the player Animator; 2026-09-29), *self-test* from the in-world self-tests
-> of the Combat mods (`./tools/Test-InWorld.ps1`, 2026-09-30), and *asset read* from the game bundles (not yet
-> confirmed at runtime).
+> of the Combat mods (`./tools/Test-InWorld.ps1`, 2026-09-30), *runtime dump, 1.0.16* from the in-world self-tests of
+> Trinkets on Demand and Sailing Skill (adrenaline, trinkets, ranged weapons, skills; 2026-10-01), and *asset read*
+> from the game bundles (not yet confirmed at runtime).
 
 ---
 
@@ -251,6 +252,8 @@ ZDO: `IsBlocking`, `dodgeinv`, `stamina`, `eitr`, `adrenaline` (all written by t
 | AI usage (monsters) | `m_aiTargetType` (Enemy/FriendHurt/Friend), `m_aiAttackInterval`, `m_aiAttackRange(Min)`, `m_aiAttackMaxAngle`, `m_aiPrioritized`, `m_aiWhenFlying/Walking/Swiming`, `m_aiInDungeonOnly`, `m_aiInMistOnly`, `m_aiMin/MaxHealthPercentage` |
 | Durability | `m_useDurability`, `m_maxDurability`, `m_durabilityPerLevel`, `m_useDurabilityDrain`, `m_durabilityDrain` (per second while equipped) |
 
+Draw and reload times (runtime dump, 1.0.16): every player bow has `m_drawDurationMin` 2.5 s (the creature bows `charred_bow` and `charred_bow_Fader` 1 s), cut to 20% at Bows 100, so 0.5 s (`Humanoid.GetAttackDrawPercentage`); every player crossbow (Arbalest, Ripper and Gold families) has `m_reloadTime` 3.5 s, halved at Crossbows 100 (`ItemData.GetWeaponLoadingTime`). Every bow and crossbow fires 1 projectile in 1 burst. The Dverger arbalests are 4 s and do not use `m_requiresReload`.
+
 Backstab bonus (dump): knives ×6 (Flint to Skoll and Hati), swords, axes, spears, bows and crossbows ×3, `SpearChitin` and the tower shields ×1 (the Serpent Scale 4; code default 4). Attack noise (start / hit, dump): knives 1 / 5, `SwordIron` 10 / 40, `SpearFlint` 10 / 30, bows and the Arbalest 15 / 8, `BowHuntsman` 4 / 4; ammo adds 0.
 
 Stances and back slots (dump): swords, axes, maces and spears use `m_animationState` `OneHanded`; single knives use `Unarmed` and `m_attachOverride` `Tool` (back tool slot). Crossbows, `AxeBerzerkr*` and `GrapplingHook` use `m_attachOverride` `Shield` for the back slot; the blood staffs `StaffSkeleton`, `StaffFrostOrbs` and `StaffSpiritCaller` are `TwoHandedWeaponLeft`. One-handed swords, axes, maces and knives have `m_equipDuration` 0.2 s (equips are queued, `Player.QueueEquipAction`; a second press on a queued item cancels it; `ToggleEquipped` does nothing while `InAttack()`). **Nothing scales `m_equipDuration`** in 1.0.16 (no equip speed modifier): `QueueEquipAction` / `QueueUnequipAction` copy it into the queued action, and `Player.UpdateActionQueue` counts plain physics time against it, with no skill, status effect or equipment factor (code default 1 s; an action of 1 s or more also plays `m_equipStartEffects`). While it runs the synced bool `equipping` is set, so every player sees the equip animation (Dual Wielding self-test `dual.equip`: 0.20 s from the key to the hands changing).
@@ -332,10 +335,10 @@ What unloads the crossbow today (all funnel into `Player.ResetLoadedWeapon` / `S
 ## 6. Skills
 
 - `Skills` component on the Player; `Skills.SkillType` combat values: Swords 1, Knives 2, Clubs 3, Polearms 4, Spears 5, Blocking 6, Axes 7, Bows 8, ElementalMagic 9, BloodMagic 10, Unarmed 11, Pickaxes 12, WoodCutting 13, Crossbows 14; movement: Jump 100, Sneak 101, Run 102, Swim 103, Dodge 108, Ride 110; `All` 999 (used by SEs).
-- `Skills.Skill.Raise`: `accumulator += m_increseStep × factor × Game.m_skillGainRate`; level up when accumulator ≥ `floor(level+1)^1.5 × 0.5 + 0.5`; cap 100. `Skills.RaiseSkill` → message + `Player.OnSkillLevelup`. Optional total cap (`m_useSkillCap`, `m_totalSkillCap` 600, `RebalanceSkills`).
+- `Skills.Skill.Raise`: `accumulator += m_increseStep × factor × Game.m_skillGainRate`; level up when accumulator ≥ `floor(level+1)^1.5 × 0.5 + 0.5`; cap 100. `Skills.RaiseSkill` → message + `Player.OnSkillLevelup`. Optional total cap (`m_useSkillCap`, `m_totalSkillCap` 600, `RebalanceSkills`); on the Player prefab the cap is off (total 500; runtime dump, 1.0.16). Raise steps per skill: [exploration-player.md §7](exploration-player.md).
 - `Player.RaiseSkill` multiplies by `SEMan.ModifyRaiseSkill` (e.g. SE_Stats `m_raiseSkill/m_raiseSkillModifier`). `Character.RaiseSkill` on a *tamed* creature forwards to the follow-target player's `Tameable.m_levelUpOwnerSkill` × `m_levelUpFactor` (how summons train Blood Magic).
 - Skill level read: `Skills.GetSkillLevel` applies `SEMan.ModifySkillLevel`, floors. `GetSkillFactor = level/100`.
-- Death: `Skills.OnDeath` → `LowerAllSkills(m_DeathLowerFactor (0.25) × Game.m_skillReductionRate)`. 0.25 is the C# initialiser; the wiki gives a 5 % loss per hard death on the Normal preset, so the Player prefab probably sets a lower value *(prefab)*: log it at runtime.
+- Death: `Skills.OnDeath` → `LowerAllSkills(m_DeathLowerFactor × Game.m_skillReductionRate)`. `m_DeathLowerFactor` is 0.25 in C# but 0.05 on the Player prefab (runtime dump, 1.0.16): the wiki's 5 % loss per hard death on the Normal preset.
 - Combat sources of skill XP: melee hits (`Attack.DoMeleeAttack`, ×1.5 when a character was hit), area attacks, projectile hits on characters (`Projectile.OnHit`), AoE first character hit (`Aoe.OnHit`, once per AoE), blocking (1 / parry 2), dodge (0.1 per dodge, 1 per perfect dodge), sneak (1/s in stealth range else 0.1/s), run (1/s), jump, archery targets (`ArcheryTarget.OnProjectileHit` scaled by accuracy), `SE_Shield` break (`m_levelUpSkillOnBreak`).
 - Persistence: `Skills.Save/Load` inside the player profile (`Player.Save`).
 - Multiplayer: skills are purely local to the owning client; other machines only see derived values (`HitData.m_skillLevel` for SE scaling, ZDO `RandomSkillFactor` on summons). Client-only skill mods are safe.
@@ -388,19 +391,34 @@ ZDO: `Stealth`, `noise` (player owner → read by AI owners), `alert`, `haveTarg
 ## 8. Adrenaline & trinkets (1.0)
 
 ### Key classes / data
-- `Player`: `m_adrenaline` (not saved – resets on load; synced to ZDO `adrenaline` each stats tick), `m_maxAdrenaline` (code default 100, but 0 on the Player prefab: a self-test player with no trinket reads `GetMaxAdrenaline()` 0, as Surge's README says, so only trinkets grant capacity), `m_attackMissAdrenaline` (code default −5, **0 on the Player prefab**, Dual Wielding self-test), `m_adrenalineDegen` / `m_adrenalineDegenDelay` / `m_adrenalineGainMultiplier` (AnimationCurves over fill fraction *(prefab)*), `m_adrenalineEffects : List<StatusEffectLevel{m_rate, m_se}>` (tiered SEs – assets `AdrenalineRush`, `AdrenalineRush2..4` exist), `m_adrenalinePopEffects`, `m_lastMaxAdrenaline`, private `m_adrenalineGuardianPower` (10).
-- `Character.GetMaxAdrenaline()` = `GetEquipmentMaxAdrenaline()` (sum of `SharedData.m_maxAdrenaline` of equipped items); `Player.GetMaxAdrenaline` adds `m_maxAdrenaline`.
-- Trinkets: `ItemType.Trinket`, slot `Humanoid.m_trinketItem` (ZDO `TrinketItem` via `VisEquipment.SetTrinketItem`). Vanilla trinkets (15 item prefabs in 1.0.16, runtime item dump of 2026-09-29): `TrinketBronzeHealth/Stamina`, `TrinketIronHealth/Stamina`, `TrinketSilverDamage/Resist`, `TrinketBlackDamageHealth`, `TrinketBlackStamina`, `TrinketCarapaceEitr`, `TrinketChitinSwim`, `TrinketScaleStaminaDamage`, `TrinketBloodGoldHealth/Stamina` (Neckstabber, Witch Crown), `TrinketFlametalEitr/StaminaHealth` (each has a same-named SE asset in the SoftRef `manifest_extended`, i.e. its `m_fullAdrenalineSE`). `TrinketDNGold` and `TrinketDNNornThread` (SoftRef names in building-crafting.md §13) are only models and icons in `manifest_extended`, with no item prefab. Equipping trinkets requires matching world level in NG+ (`Humanoid.EquipItem`).
+- `Player`: `m_adrenaline` (not saved – resets on load; synced to ZDO `adrenaline` each stats tick), `m_maxAdrenaline` (code default 100, but 0 on the Player prefab: a self-test player with no trinket reads `GetMaxAdrenaline()` 0, as Surge's README says, so only trinkets grant capacity), `m_attackMissAdrenaline` (code default −5, **0 on the Player prefab**, Dual Wielding self-test), `m_adrenalineDegen` / `m_adrenalineDegenDelay` / `m_adrenalineGainMultiplier` (AnimationCurves over the fill fraction; on the Player prefab the drain goes from 1 per second just above empty to 4 per second at full, the delay from 10 s at empty to 6 s at full, and the gain multiplier is a flat 1; runtime dump, 1.0.16), `m_adrenalineEffects : List<StatusEffectLevel{m_rate, m_se}>` (tiered SEs; the assets `AdrenalineRush`, `AdrenalineRush2..4` exist, but the Player prefab's list is **empty**, runtime dump, 1.0.16: vanilla has no tier effects), `m_adrenalinePopEffects` (`fx_Adrenaline1`, a networked prefab, so other players see the pop; runtime dump, 1.0.16), `m_lastMaxAdrenaline`, private `m_adrenalineGuardianPower` (10).
+- Other Player prefab amounts (runtime dump, 1.0.16): `m_perfectDodgeAdrenaline` 5 (code 10), `m_staggerEnemyAdrenaline` 3 (code 5), `m_nonBlockDamageAdrenaline` 0 (code −5). `Player.m_dodgeAdrenaline` (10) is a dead field: nothing reads it, and `Player.RPC_HitWhileDodging` pays `m_perfectDodgeAdrenaline`.
+- `Character.GetMaxAdrenaline()` = `GetEquipmentMaxAdrenaline()` (sum of `SharedData.m_maxAdrenaline` of equipped items); `Player.GetMaxAdrenaline` adds `m_maxAdrenaline`. For the player, `Player.GetEquipmentMaxAdrenaline` reads the sum that `Player.UpdateModifiers` caches at the top of every `UpdateStats(float)` tick, over only the 8 slot references (right, left, chest, legs, helmet, shoulder, utility, trinket). So ammo does not count, the max is one FixedUpdate late after an equip change, and items in another mod's extra slots count only if that mod patches `Player.UpdateModifiers` or `Player.GetEquipmentMaxAdrenaline`.
+- Trinkets: `ItemType.Trinket`, slot `Humanoid.m_trinketItem` (ZDO `TrinketItem` via `VisEquipment.SetTrinketItem`). Vanilla trinkets (15 item prefabs in 1.0.16, runtime item dump of 2026-09-29): `TrinketBronzeHealth/Stamina`, `TrinketIronHealth/Stamina`, `TrinketSilverDamage/Resist`, `TrinketBlackDamageHealth`, `TrinketBlackStamina`, `TrinketCarapaceEitr`, `TrinketChitinSwim`, `TrinketScaleStaminaDamage`, `TrinketBloodGoldHealth/Stamina` (Neckstabber, Witch Crown), `TrinketFlametalEitr/StaminaHealth`. `TrinketDNGold` and `TrinketDNNornThread` (SoftRef names in building-crafting.md §13) are only models and icons in `manifest_extended`, with no item prefab. Equipping trinkets requires matching world level in NG+ (`Humanoid.EquipItem`).
+- Trinket costs and effects (runtime dump, 1.0.16): each trinket's `m_fullAdrenalineSE` is an `SE_Stats` named like the item, with `m_adrenalineUpFront` 0 and `m_adrenalineModifier` 0, and no trinket has an equip effect.
+
+  | Trinket | Cost (`m_maxAdrenaline`) | Effect time (`m_ttl`) |
+  |---|---|---|
+  | `TrinketChitinSwim` | 10 | 120 s |
+  | `TrinketBronzeHealth` / `TrinketBronzeStamina` | 50 / 50 | 60 s / 60 s |
+  | `TrinketIronHealth` / `TrinketIronStamina` | 65 / 60 | 30 s / 30 s |
+  | `TrinketSilverDamage` / `TrinketSilverResist` | 55 / 80 | 30 s / 50 s |
+  | `TrinketBlackDamageHealth` / `TrinketBlackStamina` | 85 / 60 | 60 s / 120 s |
+  | `TrinketCarapaceEitr` | 65 | 60 s |
+  | `TrinketScaleStaminaDamage` | 75 | 60 s |
+  | `TrinketBloodGoldHealth` / `TrinketBloodGoldStamina` | 65 / 60 | 30 s / 30 s |
+  | `TrinketFlametalEitr` / `TrinketFlametalStaminaHealth` | 70 / 100 | 60 s / 1 s |
 - Rate knob: `Game.m_adrenalineRate` (world modifier `GlobalKeys.AdrenalineRate`).
-- HUD: `Hud.UpdateAdrenaline` (bar hidden at 0; width `max/25×64`), `Hud.AdrenalineBarFlash`.
+- HUD: `Hud.UpdateAdrenaline` (bar hidden at 0; width `max/25×64`), `Hud.AdrenalineBarFlash` (the bar's animator has a `Flash` trigger; runtime dump, 1.0.16).
 
 ### Flow
 `Player.AddAdrenaline(v)` (owner):
 1. Gains (`v > 0`, max > 0): set degen delay `m_adrenalineDegenDelay.Evaluate(fill)`, × `Game.m_adrenalineRate` × `m_adrenalineGainMultiplier.Evaluate(fill)` → `SEMan.ModifyAdrenaline` (SE_Stats `m_adrenalineModifier`).
 2. Add (losses always, gains only below max).
-3. **At max**: for every equipped item with `m_fullAdrenalineSE` → add or refresh that SE; if any existed, adrenaline resets to 0 and plays `m_adrenalinePopEffects` ("pop"), else stays at max.
-4. Choose the highest `m_adrenalineEffects` tier with `adrenaline ≥ m_rate`, swap tier SEs, flash bar.
-Degeneration in `Player.UpdateStats`: after the delay timer, `m_adrenalineDegen.Evaluate(fill) × dt` is removed.
+3. **At max** (tested after every call, losses and 0 calls included): for every inventory item with `m_equipped` and an `m_fullAdrenalineSE` → refresh that SE if it runs (`StatusEffect.ResetTime`; `SE_Stats.ResetTime` also re-runs its up-front gain), else add it; if any existed, adrenaline resets to 0 and plays `m_adrenalinePopEffects` ("pop"), else it is set to the max (and the drain lowers it again after the delay). Vanilla melee misses call `AddAdrenaline(m_attackMissAdrenaline)`, which is `AddAdrenaline(0)` on the Player prefab (`Attack.DoMeleeAttack`), so any call can pop a full bar: a mod that triggers the pop itself must tell its own call apart by a scope flag, not by the amount.
+4. Choose the highest `m_adrenalineEffects` tier with `adrenaline ≥ m_rate`, swap tier SEs, and flash the bar only when a new tier SE is added. `Player.AddAdrenaline` is the only caller of `Hud.AdrenalineBarFlash`, so with the Player prefab's empty tier list vanilla never flashes the bar.
+
+Degeneration in `Player.UpdateStats(float)` (overloaded: `UpdateStats()` is the profile-statistics method, so a patch must name `typeof(float)`): after the delay timer, `m_adrenalineDegen.Evaluate(adrenaline / m_lastMaxAdrenaline) × dt` is removed through `AddAdrenaline`, so the full-bar test runs for the drain too. With the prefab curves the drain starts 6 to 10 s after the last gain and removes 1 to 4 per second.
 
 Sources (all call `AddAdrenaline` on the local owner except stagger):
 | Event | Amount | Where |
@@ -408,12 +426,12 @@ Sources (all call `AddAdrenaline` on the local owner except stagger):
 | Melee hit on character | `m_attackAdrenaline (1) × target.m_enemyAdrenalineMultiplier` per character | `Attack.DoMeleeAttack` |
 | Melee swing hitting no character | `Player.m_attackMissAdrenaline` (code −5; 0 on the Player prefab), per `DoMeleeAttack` call | `Attack.DoMeleeAttack` |
 | Area attack | `m_attackAdrenaline × max multiplier` | `Attack.DoAreaAttack` |
-| Projectile hitting a character (even for 0 damage) | `Projectile.m_adrenaline` (2) | `Projectile.OnHit` |
+| Projectile hitting a character (even for 0 damage) | `Projectile.m_adrenaline` (2 on every vanilla arrow and bolt; runtime dump, 1.0.16), once per projectile that hits a valid character, with no enemy multiplier; a miss costs nothing. It is the projectile instance's own field: `Projectile.Setup` does not touch it and `Attack` never writes it | `Projectile.OnHit` |
 | Attack trigger | `Attack.m_attackUseAdrenaline` | `Attack.OnAttackTrigger`, per burst |
 | Block / parry | `m_blockAdrenaline` (2) / `m_perfectBlockAdrenaline` (5) | `Humanoid.BlockAttack` |
-| Taking unblocked damage | `m_nonBlockDamageAdrenaline` (−5) | `Character.RPC_Damage` |
-| Staggering an enemy | `m_staggerEnemyAdrenaline` (5) × enemy mult (RPC if remote) | `Character.AddStaggerDamage` |
-| Perfect dodge | `m_perfectDodgeAdrenaline` (10) | `Player.RPC_HitWhileDodging` |
+| Taking unblocked damage (drowning ticks included: `HitData.m_blockable` defaults to false) | `m_nonBlockDamageAdrenaline` (code −5; **0 on the Player prefab**, runtime dump, 1.0.16) | `Character.RPC_Damage` |
+| Staggering an enemy | the attacking player's `m_staggerEnemyAdrenaline` (code 5; 3 on the Player prefab) × enemy mult (RPC if remote) | `Character.AddStaggerDamage` |
+| Perfect dodge | `m_perfectDodgeAdrenaline` (code 10; 5 on the Player prefab) | `Player.RPC_HitWhileDodging` |
 | Guardian power activation | 10 | `Player.ActivateGuardianPower` |
 | SE up-front | `SE_Stats.m_adrenalineUpFront` | `SE_Stats.StartupEffects` |
 
@@ -421,7 +439,13 @@ Sources (all call `AddAdrenaline` on the local owner except stagger):
 Entirely owned by the local player; only the float is mirrored to ZDO. Client-only mods are possible.
 
 ### Patch points
-`Player.AddAdrenaline` (single funnel for gain/loss/pop/tiers), `Player.UpdateStats(float)` (private; degen), `Player.GetMaxAdrenaline`, `Humanoid.UpdateEquipmentStatusEffects` (private; trinket equip SEs), `Hud.UpdateAdrenaline` (UI), `ItemData.GetTooltip` (`$item_fulladrenaline` line).
+`Player.AddAdrenaline` (single funnel for gain/loss/pop/tiers; the `SEMan.ModifyAdrenaline` fan-out, the tier SE swap, the HUD flash and other mods' patches all run inside the call, but in vanilla only this method and the tooltip read `m_fullAdrenalineSE`), `Player.UpdateStats(float)` (private; degen), `Player.GetMaxAdrenaline`, `Humanoid.UpdateEquipmentStatusEffects` (private; trinket equip SEs), `Hud.UpdateAdrenaline` (UI), `ItemData.GetTooltip` (`$item_fulladrenaline` line), `Projectile.Setup` (a postfix can scale the new instance's `m_adrenaline`).
+
+### Keys and gamepad buttons (`ZInput`, assembly_utils)
+For a mod that adds a key (a trinket trigger, for example):
+- `ZInput.AddButton` adds a layout-specific action only for the active gamepad layout (`ShouldAddActiveButton`). `ZInput.m_buttons` therefore holds the generic physical names that `AddGenericGamepadButtons` registers in every layout (`JoyLTrigger`, `JoyRStick`, `JoyDPadUp`, `JoyButtonA`, `JoyBack`, ...) plus the active layout's actions. Reading the generic names works in every layout.
+- The actions on one physical button are found by comparing the first binding's `effectivePath`. In the Default layout (runtime dump, 1.0.16) the right-stick press carries `JoyHide`, `JoyNextSnap`, `JoyRStick` and `JoyRadial`, and the left trigger `JoyAltKeys`, `JoyBlock`, `JoyLTrigger`, `JoyMapZoomIn`, `JoyRadialBack` and `JoyRotate`.
+- The SwapTriggers and SwapFaceButtons settings override every `Joy*` action alike. `ZInput.ResetButtonStatus` (`ButtonDef.ResetState`) swallows a press, so the other actions on that button do not see it.
 
 ---
 
@@ -684,6 +708,7 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   - `Player.OnDeath` clears all status effects (`SEMan.RemoveAllStatusEffects`); the stillness check re-adds the SE on its own.
 
 ### Trinket revamp (Revamp) — vanilla trinkets and costs; the bar fills while fighting and never drains, and the player triggers the trinket with a key
+- **Status:** implemented as [Trinkets on Demand](../../src/Combat/Trinkets.OnDemand) (in development); design: [docs/design/combat-trinkets-on-demand.md](../design/combat-trinkets-on-demand.md). It ships in one mod with the income and no-decay parts of the Adrenaline revamp, as point 1 below suggests. Differences from the sketch: the default key is Y, not H (H is Dual Wielding's swap-hands key); the gamepad default is LT + right-stick press read through the generic `ZInput` names, and after a trigger every action on that physical button is reset (§8, Keys); the trigger scope ends at the first `AddAdrenaline` call, and every counted call that can reach the max hides the effects (restored at depth 0), so a nested up-front gain cannot pop in a loop; the full-bar feedback is a flash plus a message at most every 20 s; `RefuseWhileActive` is an option, off by default; the mod stands aside when BetterTrinkets, Passive_Trinket_Modifiers or Balrond Battle Flow is loaded.
 - **Feasibility:** easy on its own: one prefix and finalizer pair, a key and a HUD cue. The build-up it relies on (income while fighting, no decay) is the Adrenaline revamp's work (medium), and the two are tuned together.
 - **Who needs the mod:** technically client-only; ships as Both (the server refuses players without the mod and sends its settings to everyone), because it changes combat balance.
   - Adrenaline lives on the owning player: `Player.AddAdrenaline`, the pop and the key all run on the wearer's own client, and only the value is mirrored to the player's ZDO `adrenaline` key.
@@ -700,9 +725,9 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   - From the Adrenaline revamp: its `Player.UpdateStats(float)` prefix (no decay) and its income while fighting.
 - **Sketch:**
   - Vanilla today:
-    - A trinket adds adrenaline capacity (`SharedData.m_maxAdrenaline`, 10 to 100 for the 15 vanilla trinkets). Its effect (`m_fullAdrenalineSE`, 30 to 120 s per the wiki) only exists after a full bar.
-    - The pop is automatic. After every call, `Player.AddAdrenaline` tests for a full bar. A gain is only added below the max, but the full-bar test also runs for a call that adds nothing, so any gain at a full bar pops. The pop adds, or refreshes with `ResetTime`, the effect of every equipped item that has one, empties the bar and plays `m_adrenalinePopEffects`. With no such item, vanilla sets the bar to the max and keeps it there.
-    - `Player.UpdateStats(float)` drains the bar once the private `m_adrenalineDegenTimer` runs out (6 to 10 s after the last gain, per the wiki).
+    - A trinket adds adrenaline capacity (`SharedData.m_maxAdrenaline`, 10 to 100 for the 15 vanilla trinkets). Its effect (`m_fullAdrenalineSE`, 30 to 120 s, and 1 s for `TrinketFlametalStaminaHealth`; runtime dump, §8) only exists after a full bar.
+    - The pop is automatic. After every call, `Player.AddAdrenaline` tests for a full bar. A gain is only added below the max, but the full-bar test also runs for a call that adds nothing (a 0 call, a loss, a vanilla melee miss), so any call at a full bar pops. The pop adds, or refreshes with `ResetTime`, the effect of every equipped item that has one, empties the bar and plays `m_adrenalinePopEffects`. With no such item, vanilla sets the bar to the max, and the drain lowers it again after the delay.
+    - `Player.UpdateStats(float)` drains the bar once the private `m_adrenalineDegenTimer` runs out (6 to 10 s after the last gain, then 1 to 4 per second; runtime dump, §8).
     - The bar is not saved. `Player.Save` does not write it, and nothing reads the ZDO `adrenaline` key. Death and logout spawn a new `Player` (`Game.SpawnPlayer`), so the bar starts empty.
     - The Forsaken power is the vanilla model of a power on a key: `Player.StartGuardianPower` answers "not ready" (`$hud_powernotready`) while it cools down.
   1. **Tied to the Adrenaline revamp.** The build-up the sheet asks for (passive income while fighting, on top of the existing sources, and no decay over time) is the Adrenaline revamp's point 2 and its no-decay rule (point 4). Ship this idea as a second feature of the same mod, or as its own mod with `ModRequires` on the adrenaline mod. The framework then turns it off, and says why, when the adrenaline mod is missing or disabled.
@@ -710,9 +735,9 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   3. **No automatic pop; a full bar stays full.**
      - A `Player.AddAdrenaline` prefix (local player, feature active, outside our trigger) sets the `m_fullAdrenalineSE` of every equipped item to null for that call, and a finalizer puts the effects back, also after an exception. Vanilla then takes its own "no effect" branch: no pop, and the bar is set to exactly the max. Later gains are ignored, as vanilla does at the max.
      - No transpiler is needed: the gain scaling (`Game.m_adrenalineRate`, the `m_adrenalineGainMultiplier` curve, `SEMan.ModifyAdrenaline`) and the tier effects run unchanged, and so do other mods' patches on the method.
-     - Why it is safe: `m_fullAdrenalineSE` is read only by this method and the tooltip, and nothing else runs during the call. Only the outermost call hides and restores (a depth counter), because a status effect added during the call can call `AddAdrenaline` again (`SE_Stats.StartupEffects`).
+     - Why it is safe: `m_fullAdrenalineSE` is read only by this method and the tooltip. Other code does run during the call (the `SEMan.ModifyAdrenaline` fan-out, the tier SE swap, the HUD flash, other mods' patches), but none of it reads the field in vanilla. Only the outermost call hides and restores (a depth counter), because a status effect added during the call can call `AddAdrenaline` again (`SE_Stats.StartupEffects`).
      - Other characters, and the local player while the feature is inactive, keep vanilla behaviour.
-     - Losses still count: the unblocked-hit penalty lowers a full bar, and so would the melee-miss penalty, which is 0 on the Player prefab (§8) (the Adrenaline revamp turns both off by default). Only the drain over time is gone.
+     - Losses still count, but both vanilla penalties (unblocked hit and melee miss) are 0 on the Player prefab (§8), so in vanilla only the drain over time lowers the bar, and that is gone.
   4. **Trigger.**
      - The input, read in the `Player.Update` postfix:
        - Keyboard: a configurable key, by default one that vanilla leaves free, for example H. Vanilla's default bindings (the `ZInput` defaults, in assembly_utils) put the Forsaken power (`GP`) on F, the radial menu on G, emotes on T, auto-pickup on V, sit on X, walk on C, hide on R, auto-run on Q and use on E, and debug mode reads Z, B, K and L in `Player.Update`.
@@ -724,7 +749,7 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
      - A trigger while the effect still runs refreshes it and costs the full bar, as the vanilla pop does (`SE_Stats.ResetTime` restarts the time and re-runs the one-shot gains). An option can refuse the trigger instead while an equipped trinket's effect runs (`SEMan.GetStatusEffect`).
   5. **Feedback.**
      - When the bar becomes full: `Hud.AdrenalineBarFlash` and a message naming the key. While it stays full, the flash repeats every few seconds (config). An optional short vanilla sound, prefab picked at runtime *(unverified)*.
-     - The trigger plays the vanilla pop effect (`Player.m_adrenalinePopEffects`; the SoftRef `manifest_extended` lists `fx_Adrenaline1`, unverified that it is this one).
+     - The trigger plays the vanilla pop effect (`Player.m_adrenalinePopEffects` = `fx_Adrenaline1`, networked; runtime dump, §8).
      - Tooltip: an `ItemDrop.ItemData.GetTooltip` postfix adds the key after the `$item_fulladrenaline` line.
      - `Hud.UpdateAdrenaline` shows the bar whenever it is above 0. With no drain, a partly filled bar stays on screen between fights: it now reads as a stored resource.
   6. **Edge cases.**
@@ -736,14 +761,17 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   - Hiding `m_fullAdrenalineSE` changes shared item data for the length of one call. Restore it in a finalizer, only in the outermost call. Another mod that reads the field inside `Player.AddAdrenaline` (its own prefix or postfix) sees no effect while it is hidden: cross-test MultiTrinket (no public source).
   - Fallback, if hiding proves fragile with another mod: a transpiler that adds one test to the full-bar branch, matched by its field and local loads, not by offsets, logging once and leaving the feature inactive with a reason when it does not match. KeepAdrenalineLonger also transpiles this method (the decay delay, a different instruction).
   - Other `Player.AddAdrenaline` patches (the Adrenaline revamp, GrindstoneSkills, AdrenalineModifier) see the trigger as a call with 0 and pass it through. The Weapon revamp's parry detector only listens inside `Humanoid.BlockAttack`.
-  - Tier effects: if the player prefab lists any in `m_adrenalineEffects` (`AdrenalineRush` to `AdrenalineRush4` exist in the SoftRef `manifest_extended`; prefab data, unverified), a bar held at one level keeps that effect between fights. Check at runtime.
+  - Tier effects: the Player prefab's `m_adrenalineEffects` is empty (runtime dump, §8; the `AdrenalineRush` to `AdrenalineRush4` assets are unused), so a held bar keeps no tier effect. A mod that adds tiers would keep its effect between fights.
   - Balance: a bar that never drains means most fights start with a trigger ready. It can also be filled on training dummies (weapon hits on a dummy still pay) or weak mobs before a hard fight. Tune with the Adrenaline revamp; the server's settings apply to everyone.
   - Keys: RageNAdrenaline defaults to F and G (and D-pad up and left), and SpecialAttack, WeaponArts and other mods add their own keys. Keep ours configurable, per gamepad layout too.
   - Conflicts: mods that change what trinkets give or when they fire rely on the vanilla full-bar moment: BetterTrinkets and its 1.0 patch, Passive_Trinket_Modifiers, and Balrond Battle Flow (its Surge holds a full bar, then its Overcharge drains it). Detect them and step aside, or document it. MultiTrinket fires several trinkets together: cross-test. Surge only edits costs, and the bar follows the current max.
-  - The Blood trinket ignores a refresh (its `ResetTime` does nothing), so a trigger during its window spends the bar for nothing unless the refuse option is on.
+  - The planned Blood trinket (MC idea below, not vanilla: in vanilla only `SE_Stats` and `SE_Rested` override `ResetTime`) ignores a refresh (its `ResetTime` does nothing), so a trigger during its window spends the bar for nothing unless the refuse option is on.
   - The NG+ world-level rule for equipping trinkets (`Humanoid.EquipItem`) still applies.
 
 ### Adrenaline revamp (Revamp) — faster build-up that is fair across weapons, income while fighting, no decay, a full bar every fight
+- **Status:** partly implemented in [Trinkets on Demand](../../src/Combat/Trinkets.OnDemand) (in development); design: [docs/design/combat-trinkets-on-demand.md](../design/combat-trinkets-on-demand.md).
+  - Done: income while fighting (1 per second through `AddAdrenaline`, while a hit was given to or taken from a real foe in the last 6 s, or an alerted monster targets the player up to 20 s after the last hit; a real foe is `BaseAI.IsEnemy` and not a player, a tame, dead or `m_aiSkipTarget`, instead of the sketch's `Faction.TrainingDummy` test); no decay (the drain timer held at 1 s or more while the max is above 0); a ranged catch-up that multiplies each new arrow's or bolt's `m_adrenaline` in `Projectile.Setup` by the shot's cycle time (draw or reload + 0.5 s) over 1.5 s (about the same adrenaline per second as melee), at least ×1 and capped at ×4, instead of learned attack times.
+  - Not done: the per-source rebalance, turning the miss and unblocked-hit penalties off (both are 0 on the Player prefab anyway, §8), learned attack times, the kill bonus, per-enemy income and the debug readout.
 - **Feasibility:** medium. Each part is a small patch on the local player, and the work is in the tuning. The decay and gain curves and the per-weapon and per-creature values are prefab data, so dump them at runtime first. Then every weapon family needs a test fight.
 - **Who needs the mod:** technically client-only; ships as Both (the server refuses players without the mod and sends its settings to everyone), because it changes combat balance. Adrenaline lives on the owning player (`Player.AddAdrenaline`, mirrored to ZDO `adrenaline`), and the remote signals already reach that client:
   - stagger adrenaline, through `Character.RPC_AddAdrenaline` when another client owns the staggered creature;
@@ -777,9 +805,9 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   - Kills: `Game.RPC_RegisterKill`. UI: `Hud.UpdateAdrenaline` (private).
 - **Sketch:**
   - Vanilla today:
-    - With no trinket the player's own max adrenaline is 0 (Surge's README, read from the game; the code default of `Player.m_maxAdrenaline` is 100), so nothing is gained. Vanilla trinkets cost 10 to 100.
-    - The wiki lists +1 per hit for one-handed weapons and +2 for two-handed weapons, polearms, bows and crossbows. It also gives parry +5, perfect dodge +5, block +1 or +2, stagger +3 and Forsaken power +10. The code defaults differ (perfect dodge 10, stagger 5).
-    - Per the wiki, the bar starts to drain after 6 to 10 s without a gain, then loses 1 to 4 per second.
+    - With no trinket the player's own max adrenaline is 0 (runtime dump, §8; the code default of `Player.m_maxAdrenaline` is 100), so nothing is gained. Vanilla trinkets cost 10 to 100.
+    - The wiki lists +1 per hit for one-handed weapons and +2 for two-handed weapons, polearms, bows and crossbows. It also gives parry +5, perfect dodge +5, block +1 or +2, stagger +3 and Forsaken power +10. The Player prefab confirms perfect dodge 5 and stagger 3 (the code defaults are 10 and 5), and every vanilla arrow and bolt pays 2 (runtime dump, §8).
+    - The bar starts to drain 6 to 10 s after the last gain, then loses 1 to 4 per second (the wiki's numbers, confirmed by the Player prefab's curves; runtime dump, §8).
     - Melee pays per character hit in a swing. An arrow pays once, for the one character it hits. A full-power bow shot needs the full draw, which is longest at low skill, so bows fall furthest behind.
     - Short fights rarely fill the bar, and the next fight starts from zero.
   - The plan, per line of the sheet:
@@ -810,7 +838,7 @@ Legend: **Who needs the mod** — *client-only* works if only the user installs 
   5. Small extra: a debug readout (log line or overlay) of the gains per source per fight, for tuning.
   - The bar only feeds the trinket, which the player triggers (Trinket revamp): Weapon revamp moves cost no adrenaline (point 3), and boss powers keep their own cooldown (the Boss power revamp is a separate small boost; activation still gives +10).
 - **Risks:**
-  - Prefab data: the curves `m_adrenalineDegen`, `m_adrenalineDegenDelay` and `m_adrenalineGainMultiplier`, every weapon's `m_attackAdrenaline` and `m_attackUseAdrenaline`, each projectile's `m_adrenaline` and each creature's `m_enemyAdrenalineMultiplier`. Dump them before choosing numbers; the wiki values above are not checked in code.
+  - Prefab data: the curves and every arrow's and bolt's `m_adrenaline` are now dumped (§8). Every weapon's `m_attackAdrenaline` and `m_attackUseAdrenaline` and each creature's `m_enemyAdrenalineMultiplier` still need a dump before choosing numbers.
   - Without a trinket (max 0) nothing changes: `AddAdrenaline` ignores gains when the max is 0.
   - Farming: training dummies are excluded by faction (point 2). A trapped mob is a real enemy, so require recent damage dealt or taken, and cap the income per fight. With no decay, a bar filled anywhere is kept, so weapon hits on a dummy (or on weak mobs) can fill it before a hard fight. Keep the vanilla dummy pay (to try a trinket out) or pay nothing for dummy hits: a decision to tune.
   - Context tagging misses `AddAdrenaline` calls from other mods; they pass through unchanged. Animation-speed mods change the measured attack time, which is correct because they also change the hit rate.

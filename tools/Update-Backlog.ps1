@@ -2,7 +2,8 @@
 .SYNOPSIS
     Regenerate docs/backlog.md from the idea sheet (Google Sheets CSV export) merged with the research data in
     docs/research/idea-research.json (feasibility, who needs it, hooks, existing mods). Ideas added to the sheet
-    after the research show up as "not researched yet". Mods in src/ link themselves to an idea with <ModIdea>.
+    after the research show up as "not researched yet". Mods in src/ link themselves to an idea with <ModIdea>
+    (a mod that implements several ideas lists them ';'-separated: <ModIdea>Idea A;Idea B</ModIdea>).
 .DESCRIPTION
     The sheet's Status column (Idea, Implemented, Cancelled: the 'data' tab of the sheet) is shown for ideas no mod
     implements yet; a mod in src/ overrides it with a link to the mod (Status 'Implemented' in the sheet). The script
@@ -73,16 +74,21 @@ $modsByIdea = @{}
 foreach ($p in Get-ModProjects) {
     $x = [xml](Get-Content $p.FullName -Raw)
     $pg = $x.Project.PropertyGroup | Select-Object -First 1
-    $idea = $x.Project.PropertyGroup | ForEach-Object { $_.ModIdea } | Where-Object { $_ } | Select-Object -First 1
-    if ($idea) {
+    $ideaText = $x.Project.PropertyGroup | ForEach-Object { $_.ModIdea } | Where-Object { $_ } | Select-Object -First 1
+    # Me take one or more ideas: <ModIdea>A;B</ModIdea> = one mod build two sheet ideas. Each idea get link + Status fix.
+    $ideas = @(Split-ModIdea $ideaText)
+    if ($ideas.Count -gt 0) {
         $rel = ($p.DirectoryName.Substring($root.Length + 1)) -replace '\\', '/'
         $guid = $p.BaseName
         $released = @($tags | Where-Object { $_ -like "nexus/$guid/v*" }).Count -gt 0
         $current = $tags -contains "nexus/$guid/v$($pg.Version)"
         $text = if ($current) { 'released' } elseif ($released) { 'new version in development' } else { 'in development' }
-        $modsByIdea[(Norm $idea)] = [pscustomobject]@{
-            Link = "[$($pg.ModName) $($pg.Version)](../$rel) ($text)"
-            SheetStatus = 'Implemented'
+        foreach ($idea in $ideas) {
+            $modsByIdea[(Norm $idea)] = [pscustomobject]@{
+                Link = "[$($pg.ModName) $($pg.Version)](../$rel) ($text)"
+                SheetStatus = 'Implemented'
+                Idea = $idea
+            }
         }
     }
 }
@@ -159,7 +165,7 @@ if ($statusSync) {
     }
 }
 foreach ($k in $modsByIdea.Keys) {
-    if (-not $sheetNames[$k]) { Write-Warn2 "a mod's ModIdea matches no sheet idea: $($modsByIdea[$k].Link)" }
+    if (-not $sheetNames[$k]) { Write-Warn2 "a mod's ModIdea matches no sheet idea: '$($modsByIdea[$k].Idea)' in $($modsByIdea[$k].Link)" }
 }
 
 $sb = New-Object System.Text.StringBuilder

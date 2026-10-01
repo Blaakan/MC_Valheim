@@ -177,6 +177,11 @@ function Get-CsprojProp([string]$Path, [string]$Name) {
     if ($n) { $n.InnerText.Trim() } else { '' }
 }
 
+# Me split <ModIdea> text: one mod can build many sheet ideas, 'A;B'. Me trim each, drop empty. Empty text = no idea.
+function Split-ModIdea([string]$Text) {
+    @("$Text" -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
 # Me check ModRequires graph over ALL mods. Cycle = BepInEx load NO plugin at all (topological sort throw).
 function Assert-ModRequiresAcyclic {
     $graph = @{}

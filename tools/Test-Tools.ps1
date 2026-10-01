@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Regression tests for the tooling itself (no game needed): every script parses and is ASCII, the Markdown ->
-    Nexus BBCode converter handles known edge cases, the TESTING.md parser, changelog formatting.
+    Nexus BBCode converter handles known edge cases, the TESTING.md parser, changelog formatting, the ModIdea split.
     Run after changing anything in tools/. Exit code 0 = pass.
 #>
 [CmdletBinding()]
@@ -62,6 +62,15 @@ try {
     Check 'uppercase X counts as pass' (($items | Where-Object Id -eq 'T06').Mark -eq 'x')
     Check 'wrapped line joined' (($items | Where-Object Id -eq 'T02').Text -match 'wrapped$')
 } finally { Remove-Item $tmp -Force }
+
+Write-Step 'ModIdea'
+Same 'several ideas split and trimmed' ((Split-ModIdea ' Trinket revamp ; Adrenaline revamp;') -join '|') 'Trinket revamp|Adrenaline revamp'
+Check 'several ideas give an array' (@(Split-ModIdea 'A;B').Count -eq 2)
+Same 'single idea kept whole' ((Split-ModIdea 'Sneak revamp') -join '|') 'Sneak revamp'
+Check 'single idea gives one item' (@(Split-ModIdea 'Sneak revamp').Count -eq 1)
+Check 'empty text gives no idea' (@(Split-ModIdea '').Count -eq 0)
+Check 'blank text gives no idea' (@(Split-ModIdea ' ; ').Count -eq 0)
+Check 'null gives no idea' (@(Split-ModIdea $null).Count -eq 0)
 
 Write-Host ''
 if ($fails -eq 0) { Write-Host 'TOOL TESTS PASSED' -ForegroundColor Green; exit 0 }

@@ -7,6 +7,7 @@
     <Project Path="src/Combat/Crossbow.StaysLoaded/MC.Combat.Crossbow.StaysLoaded.csproj" />
     <Project Path="src/Combat/Shields.TowerWall/MC.Combat.Shields.TowerWall.csproj" />
     <Project Path="src/Combat/Sneak.Ambush/MC.Combat.Sneak.Ambush.csproj" />
+    <Project Path="src/Combat/Trinkets.OnDemand/MC.Combat.Trinkets.OnDemand.csproj" />
     <Project Path="src/Combat/Weapons.DualWield/MC.Combat.Weapons.DualWield.csproj" />
     <Project Path="src/Combat/Weapons.Moveset/MC.Combat.Weapons.Moveset.csproj" />
   </Folder>
@@ -17,8 +18,10 @@
   </Folder>
   <Folder Name="/Exploration/">
     <Project Path="src/Exploration/Compendium.Encyclopedia/MC.Exploration.Compendium.Encyclopedia.csproj" />
+    <Project Path="src/Exploration/Sailing.Skill/MC.Exploration.Sailing.Skill.csproj" />
     <Project Path="src/Exploration/Sleep.ThroughDay/MC.Exploration.Sleep.ThroughDay.csproj" />
     <Project Path="src/Exploration/Stats.PerCreature/MC.Exploration.Stats.PerCreature.csproj" />
+    <Project Path="src/Exploration/Swimming.Dive/MC.Exploration.Swimming.Dive.csproj" />
   </Folder>
   <Folder Name="/Farming/">
     <Project Path="src/Farming/Breeding.StarInheritance/MC.Farming.Breeding.StarInheritance.csproj" />
