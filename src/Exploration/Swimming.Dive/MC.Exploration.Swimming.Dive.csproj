@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Swim Dive</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>New</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Swim dive</ModIdea>
+    <!-- Both: user rule (gameplay mod = required everywhere). Diving change what player can do in water (escape
+         serpent, reach sea floor, stamina under water). Local player's own game run all of it (owner of own body);
+         camera, fog and surface view are local only. Server refuse players without me, with me off, or other network
+         version (PlayerCheck), and send its rules (ServerRules). -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. Diving changes what players can do in water, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. Other players see a diver move up and down in the normal swimming pose. Nothing is saved on items, creatures or buildings.</ModMultiplayerNotes>
+    <!-- Wire format of me: RPC <guid>.Settings / <guid>.SettingsRequest (DiveRules layout 1). No other RPC, no ZDO
+         key, no prefab. Bump when any of them change. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Hold Crouch while swimming to dive straight down and hold Jump to rise. Under water you only move up or down, and stamina drains as when swimming, even while you hold still. The camera follows you under the surface.</ModDescription>
+  </PropertyGroup>
+</Project>
