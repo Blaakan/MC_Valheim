@@ -422,7 +422,7 @@ Postfix `Terminal.InitTerminal` and `new Terminal.ConsoleCommand("vm_<mod>_<cmd>
 ## 13. Asset loading: AssetBundles, SoftReferenceableAssets, prefab cloning
 
 ### Key classes (SoftReferenceableAssets assembly, 1.0)
-- **`Runtime`** (static). Lazily creates the `IAssetLoader` (`AssetBundleLoader`) on first use from `valheim_Data/StreamingAssets/SoftRef/manifest` (+ `manifest_extended` if `MakeAllAssetsLoadable()`), plus any **`Runtime.AddManifest(path)`** registered **before first use** (an official extension point, but it needs a manifest in IronGate's SoftRef format, `"SoftRef manifest"` v2, built by their tooling).
+- **`Runtime`** (static). Lazily creates the `IAssetLoader` (`AssetBundleLoader`) on first use from `valheim_Data/StreamingAssets/SoftRef/manifest` (+ `manifest_extended` if `MakeAllAssetsLoadable()`), plus any **`Runtime.AddManifest(path)`** registered **before first use** (an official extension point; it needs a manifest in IronGate's SoftRef format, `"SoftRef manifest"` v2, which the public `AssetBundleManifest.SerializeToDisk` writes). **Order trap:** the first SoftRef getter or load creates the loader; after that, `AddManifest` and `MakeAllAssetsLoadable` only log an error and do nothing. A mod that touches SoftRef too early silently breaks other mods' manifests (e.g. More World Locations AIO adds its own from an `EntryPointSceneLoader.Start` prefix).
 - **`AssetID`** (128-bit GUID as four uint). **`SoftReference<T>`** (serializable struct): `m_assetID`, `Asset` (sync get), `Load()`, `LoadAsync(callback)`, `IsValid`, `IsLoaded`, `HoldReference()/Release()` (ref-counted), `Name`.
 - **`AssetBundleLoader`** (internal): `m_bundleLoaders`, `m_assetLoaders`, `m_assetIDToLoaderIndex`. Bundles in `StreamingAssets/SoftRef/Bundles`. Scenes are also SoftRef assets (`SoftReferenceableAssets.SceneManagement.SceneManager`, used by `SystemResourceManager.FastLoadScene`).
 - Where the game uses soft references: **`ZoneSystem.ZoneLocation.m_prefab`** (all locations), **`DungeonDB.RoomData.m_prefab`** (dungeon rooms; `RoomData.Hash` = `m_prefab.Name` hash), `Player.m_valkyrie`, graphics configs, `SoftReferencePrefabSpawner`. `ZNetView.HoldReferenceTo` keeps location assets alive while instances exist.
@@ -430,7 +430,7 @@ Postfix `Terminal.InitTerminal` and `new Terminal.ConsoleCommand("vm_<mod>_<cmd>
 
 ### Impact on modding
 - **Adding or cloning items, pieces or creatures**: unaffected by SoftRef. Load our own AssetBundle with `AssetBundle.LoadFromFile`/`LoadFromMemory` (bundles must be built with **Unity 6000.0.x**; shaders must be the game's, or the materials need re-linking to vanilla shaders at runtime), or clone vanilla prefabs.
-- **Adding locations or dungeon rooms** needs an `AssetID` the loader knows. The options are: (a) `Runtime.AddManifest` with a SoftRef manifest (tooling not public); (b) inject into the internal `AssetBundleLoader` arrays via reflection (Jotunn's approach for custom locations); (c) bypass SoftRef by placing hard-referenced objects ourselves (post-generation spawning). Treat this as **hard** and centralize it in the core library if the Exploration work needs it.
+- **Adding locations or dungeon rooms** needs an `AssetID` the loader knows. The options are: (a) `Runtime.AddManifest` with a SoftRef manifest (written with the public `AssetBundleManifest.SerializeToDisk`; must run before the loader exists); (b) inject into the internal `AssetBundleLoader` arrays via reflection (Jotunn's approach for custom locations); (c) bypass SoftRef by placing hard-referenced objects ourselves (post-generation spawning). Treat this as **hard** and centralize it in the core library if the Exploration work needs it.
 - Location prefabs are only loaded around generation and placement (`ZoneSystem.m_locationPrefabs` with lifetimes, `UpdatePrefabLifetimes`). **Do not cache `SoftReference.Asset` beyond a `HoldReference/Release` pair.**
 
 ### Cloning prefabs safely (rules)
@@ -513,7 +513,7 @@ The dedicated server is a **separate build** (`valheim_server.exe`, `valheim_ser
   3. **`Achievements.IsCheatedAtAll()` returns true when `Game.isModded`**, so `Achievements.CanGetAchievements()` is false unless the player has the `bypasscheatchecks 1` unique key. **Setting it disables achievement unlocks and the achievement-bucket stat tracking** (`PlayerProfile.IncrementStat*` only fill bucket 0). It also skips the `confirmcheats` prompt.
   4. It is **not** sent over the network and not shown in server lists.
   - No other mod API, modded-flag handshake or plugin loader exists. `grep -i modded` finds only these uses.
-- `SoftReferenceableAssets.Runtime.AddManifest` / `MakeAllAssetsLoadable` (§13), with non-public tooling.
+- `SoftReferenceableAssets.Runtime.AddManifest` / `MakeAllAssetsLoadable` (§13); the manifest writer `AssetBundleManifest.SerializeToDisk` is public. Both only work before the first SoftRef use.
 
 **Built-in extension points (no or minimal Harmony):**
 

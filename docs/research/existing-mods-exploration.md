@@ -220,8 +220,8 @@ Extra procedural dungeons exist. Nothing adds one handcrafted, unique, endgame-d
 |-----|--------|-------|
 | [More World Locations AIO](https://thunderstore.io/c/valheim/p/warpalicious/More_World_Locations_AIO/) (warpalicious) | 5.1.4, 2026-09-25, 1.0 tagged | 190 POIs, including 2 procedural dungeons. High quality and very popular. |
 | [Forbidden Catacombs](https://thunderstore.io/c/valheim/p/warpalicious/Forbidden_Catacombs/) / [Underground Ruins](https://thunderstore.io/c/valheim/p/warpalicious/Underground_Ruins/) (warpalicious) | 1.0.2, 2025-06-14 / 1.0.8, 2025-04-21, pre-1.0 | Procedural Swamp dungeon (21 rooms) and Black Forest dungeon (24 rooms, puzzles) with vanilla-friendly progression. |
-| [Expand World Data](https://thunderstore.io/c/valheim/p/JereKuusela/Expand_World_Data/) (JereKuusela) | 1.73.0, 2026-09-23, updated post-1.0 | YAML for biomes, locations, dungeon generators and rooms (`expand_dungeons.yaml`) and, since 1.73, events. Companion mod [Dungeon Splitter](https://thunderstore.io/c/valheim/p/JereKuusela/Dungeon_Splitter/) moves dungeons into a separate instance. |
-| [Dungeon Creation Kit](https://thunderstore.io/c/valheim/p/MoonTower/Dungeon_Creation_Kit/) (MoonTower) | 3.1.2, 2026-09-27, updated post-1.0, AI | Build your own multi-level dungeons and instanced areas out of pieces. |
+| [Expand World Data](https://thunderstore.io/c/valheim/p/JereKuusela/Expand_World_Data/) (JereKuusela) | 1.73.0, 2026-09-23, updated post-1.0 | YAML for biomes, locations, dungeon generators and rooms (`expand_dungeons.yaml`) and, since 1.73, events. Companion mod [Dungeon Splitter](https://thunderstore.io/c/valheim/p/JereKuusela/Dungeon_Splitter/) (deprecated) splits network sync into a ground layer and a dungeon layer by height (1500 m): players above one spot still share one dungeon, so it is a performance filter, not instancing. |
+| [Dungeon Creation Kit](https://thunderstore.io/c/valheim/p/MoonTower/Dungeon_Creation_Kit/) (MoonTower) | 3.1.2, 2026-09-27, updated post-1.0, AI | Build your own multi-level dungeons out of pieces, in a cave placed "way up in the sky" above an entrance (its README). Shared and persistent, not instanced; no bosses. |
 
 Also:
 - [Dungeonheim](https://www.nexusmods.com/valheim/mods/1997) (Nexus): a handcrafted world seed with 7 dungeons, in German. It is a world, not a plugin.
@@ -235,7 +235,7 @@ Also:
   - endgame difficulty that ignores the biome's normal tier;
   - unique loot tied to our Crafting ideas;
   - optional weekly reset, like Venture Location Reset.
-- **Borrow:** warpalicious' room-authoring pipeline (Unity asset bundles plus Jotunn), EWD's dungeon YAML, and Dungeon Splitter's instancing for performance.
+- **Borrow:** warpalicious' room-authoring pipeline (Unity asset bundles plus Jotunn), EWD's dungeon YAML, and Dungeon Splitter's height-layer sync filter for performance (it does not instance anything). A full investigation for hand-crafted instanced dungeons with scripted bosses is in [docs/design/exploration-dungeon-instances.md](../design/exploration-dungeon-instances.md).
 - **Avoid:** procedural sameness. The value is in handcrafted layouts.
 - **Cost:** this needs a real Unity asset pipeline (asset bundles or ThunderKit). It is the most art-heavy idea in the list.
 

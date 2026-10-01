@@ -177,6 +177,14 @@ Server: location generation, registry, global keys, ghost-zone generation. Clien
 
 ### Flow
 - Interiors live 5000 m above the location (`Location.Awake` instantiates `m_interiorPrefab` scaled to 64×500×64 at the zone center, with `EnvZone.m_environment = m_interiorEnvironment`). `Character.InInterior(pos)` is simply `pos.y > 3000` (disables weather, random-event areas, some building rules).
+- **Interior rules worth knowing (1.0.16, checked 2026-10-02 for the dungeon-instances investigation, [exploration-dungeon-instances.md](../design/exploration-dungeon-instances.md) §2.3):**
+  - The AI navmesh only exists between y -500 and 5500 (`Pathfinding` tiles are centred at y 2500 and 6000 m tall, `Pathfinding.BuildTile`), so walking AI cannot path above 5500.
+  - Loading, ownership and natural spawning ignore height (`ZNetScene.PointInsideActiveArea`, `ZDOMan.ReleaseNearbyZDOS` and `SpawnSystem` work on XZ zones): a player inside an interior can own creatures and trigger biome spawns on the ground below, and a surface player can own creatures inside.
+  - World level still enlarges non-player characters indoors (`Character.Awake`: scale × (1 + world level × `m_worldLevelEnemyMoveSpeedMultiplier`), no `InInterior` check); only the enemy speed/size world modifier is skipped inside.
+  - A dungeon `Teleport` never checks `Humanoid.IsTeleportable` (ore goes in) and uses `distantTeleport: false`; the teleport then waits for `ZNetScene.IsAreaReady` with no timeout (`Player.UpdateTeleport`), so a zone left in the loading state (`ZoneSystem.SetLoadingInZone` never released) hangs the arrival.
+  - `Player.m_interactMask` has no `character_trigger` (layer 14): a collider on that layer alone can never be hovered or used, which is why vanilla gateways pair a trigger box with a non-trigger collider.
+  - Code defaults that bite when components are added at runtime: `EnvZone.m_force = true`, `RandomEvent.m_random = true` and `m_nearBaseOnly = true` (an event added with defaults becomes a random raid).
+  - `GlobalKeys.activeBosses` goes up once per boss in `BaseAI.SetAlerted` and down only in `Character.OnDeath`; any other removal of an alerted boss leaks it (with `NoBossPortals`, every portal stays blocked until `removekey activeBosses`).
 - `DungeonGenerator.Generate(seed, mode)` (server, Full/Ghost): `SetupAvailableRooms` (theme match + enabled) → `GenerateRooms` (Dungeon: `PlaceStartRoom`, `PlaceRooms` until `m_maxRooms` or required rooms + `m_minRooms`, `PlaceEndCaps`, `PlaceDoors`) → `Save`. Each candidate is rejected by `TestCollision` if it leaves the `m_zoneSize` box centred on the zone (`IsInsideDungeon`) or overlaps another room.
 - Seed: `DungeonGenerator.GetSeed` = world seed + zone and position hash (or `m_forceSeed`).
 - Clients: `DungeonGenerator.Awake` → `Load` (reads room list) → `LoadRoomPrefabsAsync` → `Spawn` → `PlaceRoom(..., Client)` rebuilds non-networked geometry. Networked children of rooms (spawners, chests, doors) are independent ZDOs.
@@ -428,6 +436,7 @@ The Hildir quest loop, fully data-driven: Hildir dungeons (themes `ForestCryptHi
 - **Risks:** `Character.SetLevel` also multiplies `m_levelMultiplier` drops by 2^(level−1) (trophies/materials explode) - scale via custom multipliers or strip the level factor for bosses. Conflicts with CLLC boss affixes, Drop That/Spawn That, EpicLoot (its loot tables key on creature level and it patches death/drop generation). `GlobalKeys.activeBosses`/`NoBossPortals` bookkeeping must stay intact. World level (`Game.m_worldLevel`) already scales bosses and requires world-level summon items. Ownership can migrate mid-fight (store everything in the ZDO, apply idempotently).
 
 ### Big unique dungeon (New, exists: no)
+- **Status:** investigated 2026-10-02 as part of "Dungeon Instances" (hand-crafted instanced dungeons with scripted multi-boss encounters, placed by admin command): [docs/design/exploration-dungeon-instances.md](../design/exploration-dungeon-instances.md). It recommends a data-driven engine mod with entrance ZDOs and locally built geometry instead of the location + `DungeonGenerator` sketch below.
 - **Feasibility:** hard (framework) → very hard (one handcrafted end-game dungeon per biome).
 - **Who needs the mod:** everyone. Server generates the location/dungeon; clients need all location and room prefabs to rebuild from `LocationProxy` and `s_roomData`.
 - **Assets:** yes (rooms with `Room`/`RoomConnection`, props, spawners, loot, music, likely a custom boss).
