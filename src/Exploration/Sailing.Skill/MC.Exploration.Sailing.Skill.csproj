@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Sailing Skill</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>New</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Sailing revamp</ModIdea>
+    <!-- Both: user rule (gameplay mod = required everywhere). Ship physics and ship damage run on the ship owner (maybe a
+         passenger, not the helmsman), so every game that can own a ship need me and same rules. Server refuse players
+         without me, with me off, or other network version (PlayerCheck), and send its rules (ServerRules). -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. It changes how ships sail for everyone on board, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. The helmsman's Sailing level applies to the whole ship, and the best sailor aboard protects it from damage. With AllowPlayersWithoutMod on, a ship simulated by the game of a player without the mod sails and takes damage like in the normal game (only the rudder of a helmsman who has the mod still swings faster). Removing the mod removes the Sailing skill from your character at its next save.</ModMultiplayerNotes>
+    <!-- Wire and world format of me: RPC <guid>.Settings / <guid>.SettingsRequest (SailingRules layout 1), ZDO key
+         <guid>.Level (float on each player's own player ZDO: effective Sailing level 0-100, -1 = mod off). Bump when any
+         of them change. NEVER change skill id 697262889 (= Math.Abs(GetStableHashCode of the GUID)): it is written into
+         character saves, other id = every player lose their Sailing level. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Adds a Sailing skill, earned at the helm. The higher it is, the better your ship catches the wind at poor angles, turns, stops and speeds up, the wider you reveal the map at sea, and the less damage your ship takes.</ModDescription>
+  </PropertyGroup>
+</Project>
