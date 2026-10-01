@@ -25,6 +25,7 @@
   </Folder>
   <Folder Name="/Farming/">
     <Project Path="src/Farming/Breeding.StarInheritance/MC.Farming.Breeding.StarInheritance.csproj" />
+    <Project Path="src/Farming/Fishing.Fight/MC.Farming.Fishing.Fight.csproj" />
     <Project Path="src/Farming/Harpoon.HooksTames/MC.Farming.Harpoon.HooksTames.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Fishing Fight</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>New</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Better fishing</ModIdea>
+    <!-- Both: user rule (gameplay mod = required everywhere). Fight change stamina costs and how fish are caught.
+         Fisher's own game run all of it (float owner, claim fish on hook); other games only see the fish move and
+         splash. Server refuse players without me, with me off, or other network version (PlayerCheck), and send its
+         rules (ServerRules). -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. The fishing fight changes stamina costs and how fish are caught, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. The fight runs on the fisher's game; other players see the hooked fish run and splash. Nothing is saved on items, creatures or buildings.</ModMultiplayerNotes>
+    <!-- Wire format of me: RPC <guid>.Settings / <guid>.SettingsRequest (FightRules layout 1). Fish ZDO s_escape and
+         s_hooked are vanilla's keys with vanilla's meaning (both on = splash). No other RPC, no own ZDO key, no prefab. Bump when
+         any of them change. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Once a fish is hooked, keep it inside the catch zone (hold Block to raise it) to reel it in for free. When it fights, it runs to one side: turn so your rod points the other way and reel, or it takes line.</ModDescription>
+  </PropertyGroup>
+</Project>
