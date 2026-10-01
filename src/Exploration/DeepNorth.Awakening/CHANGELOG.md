@@ -10,10 +10,12 @@
   time with the Deep North blizzard and Fimbul meteors.
 - Every Malicious Ice shows the normal "The Jotun Advance".
 - Once the north is awake, Gammeltroll, Barka and frost Greydwarfs fight the Jotun army, and now and then a band of
-  them (5-10 frost Greydwarfs with 1-2 shamans, up to 2 Gammeltroll or Barka) appears in an invaded area.
-- After Kall Fimbulbringer is defeated, the areas stop spawning over time. An area that is not cleared spawns its Jotun
-  at once each time players walk into it, then waits to be defeated while anyone is near; killing every Jotun it
-  spawned clears it for good ("The Jotun Retreat"), remembered in the world.
+  them (10-20 frost Greydwarfs with 2-4 shamans, 1-3 Gammeltroll or Barka) appears in an invaded area, also after Kall
+  until the area is cleared.
+- After Kall Fimbulbringer is defeated, the areas stop spawning Jotun over time. An area that is not cleared spawns its
+  Jotun at once each time players walk into it, then waits to be defeated while anyone is near. Killing 8 to 13 Jotun
+  inside it (its own fixed number) clears it for good ("The Jotun Retreat"; "The Jotun army is weakening" half way),
+  remembered in the world.
 - The invaded areas show on the map and minimap as one merged purple region, only where explored; cleared areas
   disappear from it (setting ShowAreas).
 - Worlds that already broke Malicious Ice start at the matching stage. Admin console command `deepnorth_stones`.

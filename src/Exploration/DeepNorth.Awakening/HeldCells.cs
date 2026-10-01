@@ -5,45 +5,47 @@ using UnityEngine;
 
 namespace MC.Exploration.DeepNorthAwakeningMod;
 
-// Me = the areas after Kall (design 2.6, user rule). Before Kall nothing here matter: every awake cell spawn and storm.
-// After Kall an area that is not cleared spawn its Jotun each time a player enter it again, then is engaged ("to be
-// defeated"): no more spawns while players are near it. Kill every Jotun it spawned = cleared for good (no spawn, no
-// storm). Leave without clearing = next time a player enter it, its Jotun spawn again.
-//   Tag:      area Jotun carry their cell in ZDO int TagKey (Character.Awake postfix while a Jotun entry spawn).
-//   Burst:    AreaSpawns, for the cell under a player in the zone (never a cell the spawn ring cannot reach), each
-//             Jotun kind topped up to its cap counting the cell's own living Jotun (LivingOf, wherever they roam).
-//             Engaged when it got Jotun or has living ones; nothing spawned and none living = try again RetrySeconds
-//             later.
+// Me = the areas after Kall (design 2.6, user rules rounds 3 and 5). Before Kall nothing here matter: every awake cell
+// spawn and storm. After Kall an area that is not cleared spawn its Jotun each time a player enter it again, then is
+// engaged ("to be defeated"): no more Jotun while players are near it. Jotun army killed inside it count; at its target
+// (seeded, ClearKillsMin..Max) it is cleared for good: no spawn, no storm, off the map. Creatures left alive stay.
+//   Tag:      area Jotun carry their cell in ZDO int TagKey (burst caps count only the area's own, AreaSpawns).
+//   Burst:    AreaSpawns, for the cell under a player in the zone. Engaged when it got Jotun or has some loaded there;
+//             nothing spawned = try again RetrySeconds later.
 //   Engaged:  server-authoritative: a game that burst send routed "<guid>.Engage"(cells); the server keep the cell until
 //             no player (character or reference position) is within ReleaseDistance of its seed point: every point of
 //             the cell (CellReach) plus the loaded zones around a player, so the cell left everybody's loaded range.
 //             The game itself hold the cell LocalHoldSeconds meanwhile (network delay). Kall killed during the session:
-//             the server engage at once the cell under every player and the cells around them that still have Jotun
+//             the server engage at once the cell under every player and the cells of the area Jotun loaded around them
 //             (no refill in the area of the fight; a cell nobody entered and with no Jotun still burst when entered).
-//   Living:   server track tagged army ZDOs (cell and kind): full scan at Kall or at load with Kall, rescans RescanAt s
-//             after (a client that spawned in the moment before the Kall key reached it); then every death of a tagged
-//             one and every engage recount the cell around its seed point (RecountZones), so Jotun of later bursts
-//             count too. A cell whose death recount find no living Jotun died out; once settled (last rescan) it is
-//             cleared.
-//   Cleared:  the server write it into ClearedSlots of a zone control nobody owns (or the server owns): persistent
-//             vanilla ZDOs, read back from every _ZoneCtrl at load. Sent with the engaged cells and living counts per
-//             kind to everybody on change ("<guid>.Cleared") and to a player after each rules request. A cell that
-//             become cleared while the local player stand in it = vanilla "The Jotun Retreat".
+//   Kills:    server: each Jotun-army ZDO destroyed (a death) at a Deep North position after Kall count for the awake,
+//             not cleared cell there, whichever area it came from. Kept in the world in KillSlots (long: cell << 32 |
+//             count) of a zone control nobody owns (or the server owns); at load the highest count of a cell win (a
+//             slot whose zone control a player took is never written again: me take a new one, counts only grow).
+//             Half the target = news "weakening"; target = cleared.
+//   Cleared:  ClearedSlots (cell id) of such a zone control, read back at load; the cell's kill slot freed.
+//   Lists:    cleared, engaged and kills per cell to everybody on change ("<guid>.Cleared") and to a player after each
+//             rules request.
+//   News:     routed "<guid>.News" (kind, cell, x, z) to everybody: half way = top-left "The Jotun army is weakening",
+//             cleared = vanilla centre "The Jotun Retreat", shown by a game whose player stand in the cell or within
+//             NewsRange of the kill.
 // Routed rpcs have no unregister: handlers check _active. Vanilla peers ignore unknown routed rpcs.
 internal static class HeldCells
 {
     internal const string ClearedRpc = ModInfo.Guid + ".Cleared";
     internal const string EngageRpc = ModInfo.Guid + ".Engage";
-    internal const int Layout = 1;
+    internal const string NewsRpc = ModInfo.Guid + ".News";
+    internal const int Layout = 2;
     internal const int MaxCells = 100000;
     internal const float SendDelay = 1f;
-    internal const float RecountDelay = 1f;
-    internal const float EngageRecountDelay = 4f;
     internal const float ReleaseCheckSeconds = 2f;
     internal const float LocalHoldSeconds = 10f;
     internal const float RetrySeconds = 5f;
-    internal const int RecountZones = 9;
+    internal const float NewsRange = 100f;
+    internal const int NewsWeakening = 1;
+    internal const int NewsCleared = 2;
     internal const string ClearedText = "$fimbulvinterorb_destroyed";
+    internal const string WeakeningText = "The Jotun army is weakening";
 
     // From the cell's seed point every point of the cell is within sqrt(2) x 340 m = 481 m (400 m squares, seed moved
     // up to 35 %, nearest seed wins). A player inside a cell never release it.
@@ -52,9 +54,10 @@ internal static class HeldCells
     internal static readonly int TagKey = (ModInfo.Guid + ".Cell").GetStableHashCode();
     internal const int NoTag = int.MinValue;
 
-    // Zone-control slots holding cleared cells (any zone control: the cell id is the value).
-    internal const int ClearedSlotCount = 8;
-    internal static readonly int[] ClearedSlots = MakeSlots();
+    // Zone-control slots: cleared cells (int cell id) and kill progress (long cell << 32 | count; 0 = free).
+    internal const int SlotCount = 8;
+    internal static readonly int[] ClearedSlots = MakeSlots(".Cleared");
+    internal static readonly int[] KillSlots = MakeSlots(".Kills");
 
     private static bool _active;
     private static ZRoutedRpc _registeredOn;
@@ -62,54 +65,51 @@ internal static class HeldCells
     // What this game was told / did.
     private static HashSet<int> _cleared = new HashSet<int>();
     private static HashSet<int> _engaged = new HashSet<int>();
-    private static Dictionary<int, int[]> _living = new Dictionary<int, int[]>();
+    private static Dictionary<int, int> _kills = new Dictionary<int, int>();
     private static bool _known;
     private static ZNet _session;
     private static readonly Dictionary<int, float> LocalHold = new Dictionary<int, float>();
 
-    // Server tracking.
-    private static readonly Dictionary<int, HashSet<ZDOID>> ByCell = new Dictionary<int, HashSet<ZDOID>>();
-    private static readonly Dictionary<ZDOID, int> CellOf = new Dictionary<ZDOID, int>();
-    private static readonly Dictionary<ZDOID, int> KindOf = new Dictionary<ZDOID, int>();
-    private static readonly List<Vector3> TempPlaces = new List<Vector3>();
-    private static readonly HashSet<ZDOID> Dead = new HashSet<ZDOID>();
-    private static readonly HashSet<int> DiedOut = new HashSet<int>();
+    // Server.
     private static readonly HashSet<int> ServerCleared = new HashSet<int>();
     private static readonly Dictionary<int, Vector2> ServerEngaged = new Dictionary<int, Vector2>();
-    private static readonly HashSet<int> DeathRecount = new HashSet<int>();
-    private static readonly HashSet<int> TrackRecount = new HashSet<int>();
+    private static readonly Dictionary<int, int> Kills = new Dictionary<int, int>();
+    private static readonly Dictionary<int, KillSlot> KillSlotOf = new Dictionary<int, KillSlot>();
+    private static readonly HashSet<ZDOID> CountedKills = new HashSet<ZDOID>();
+    private static readonly List<Vector3> TempPlaces = new List<Vector3>();
     private static readonly List<ZDO> TempZdos = new List<ZDO>();
     private static bool _scanned;
     private static bool _sawNoKall;
     private static bool _dirty;
+    private static bool _slotWarned;
     private static float _sendAt;
-    private static float _scannedAt;
-    private static float _recountAt;
     private static float _nextRelease;
-    private static int _rescans;
 
-    // Late-spawn rescans, seconds after the first scan. Clears wait for the last one.
-    private static readonly float[] RescanAt = { 5f, 15f, 30f };
+    // Where a cell's kill count was written last. Id kept: the ZDO object may be pooled and reused by another ZDO.
+    private struct KillSlot
+    {
+        internal ZDO Zdo;
+        internal ZDOID Id;
+        internal int Slot;
+    }
 
     internal static bool Scanned => _scanned;
-
-    internal static int TrackedCreatures => CellOf.Count;
-
-    internal static int HeldCount => ByCell.Count;
 
     internal static int ClearedCount => ServerCleared.Count;
 
     internal static int EngagedCount => ServerEngaged.Count;
 
+    internal static int CountingCount => Kills.Count;
+
     // Bump each time the cleared list this game knows change (map overlay repaint).
     internal static int ClearedVersion { get; private set; }
 
-    private static int[] MakeSlots()
+    private static int[] MakeSlots(string name)
     {
-        var slots = new int[ClearedSlotCount];
+        var slots = new int[SlotCount];
         for (var i = 0; i < slots.Length; i++)
         {
-            slots[i] = (ModInfo.Guid + ".Cleared" + i).GetStableHashCode();
+            slots[i] = (ModInfo.Guid + name + i).GetStableHashCode();
         }
         return slots;
     }
@@ -137,11 +137,12 @@ internal static class HeldCells
         _registeredOn = routed;
         routed.Register<ZPackage>(ClearedRpc, OnCleared);
         routed.Register<ZPackage>(EngageRpc, OnEngage);
+        routed.Register<ZPackage>(NewsRpc, OnNews);
     }
 
     private static bool KnownHere => _known && ReferenceEquals(_session, ZNet.instance);
 
-    // Storms, meteors, spawns (hot path). Before Kall never; after Kall the cells the server said.
+    // Storms, meteors, spawns, map (hot path). Before Kall never; after Kall the cells the server said.
     internal static bool IsCleared(int cell)
     {
         return WorldState.KallDefeated && KnownHere && _cleared.Contains(cell);
@@ -152,27 +153,10 @@ internal static class HeldCells
         return KnownHere && _engaged.Contains(cell) || Holding(cell);
     }
 
-    // Living area Jotun of a cell the server counted (0 when unknown).
-    internal static int Living(int cell)
+    // Jotun killed in a cell toward its clearing, as the server said (0 when unknown).
+    internal static int KillsIn(int cell)
     {
-        if (!KnownHere || !_living.TryGetValue(cell, out var kinds))
-        {
-            return 0;
-        }
-        var n = 0;
-        foreach (var k in kinds)
-        {
-            n += k;
-        }
-        return n;
-    }
-
-    // Living area Jotun of one kind (Hostility.Army index) in a cell (0 when unknown).
-    internal static int LivingOf(int cell, int kind)
-    {
-        return KnownHere && kind >= 0 && kind < Hostility.Army.Length && _living.TryGetValue(cell, out var kinds)
-            ? kinds[kind]
-            : 0;
+        return KnownHere && _kills.TryGetValue(cell, out var n) ? n : 0;
     }
 
     private static bool Holding(int cell)
@@ -187,7 +171,7 @@ internal static class HeldCells
         return KnownHere && !_cleared.Contains(cell) && !_engaged.Contains(cell) && !Holding(cell);
     }
 
-    // AreaSpawns after a burst: engage the cells that got Jotun or already have some (full: nothing to top up); others
+    // AreaSpawns after a burst: engage the cells that got Jotun or have some loaded (full: nothing to top up); others
     // try again RetrySeconds later.
     internal static void AfterBurst(List<int> cells, HashSet<int> spawnedInto)
     {
@@ -195,7 +179,7 @@ internal static class HeldCells
         var now = Time.unscaledTime;
         foreach (var cell in cells)
         {
-            if (spawnedInto.Contains(cell) || Living(cell) > 0 || TaggedNear(cell))
+            if (spawnedInto.Contains(cell) || TaggedNear(cell))
             {
                 engage.Add(cell);
                 LocalHold[cell] = now + LocalHoldSeconds;
@@ -254,48 +238,20 @@ internal static class HeldCells
         var now = Time.unscaledTime;
         if (!_scanned)
         {
-            ScanLiving();
             ScanMarks();
             _scanned = true;
-            _scannedAt = now;
-            _rescans = 0;
             _dirty = true;
             _sendAt = 0f;
             var around = 0;
             if (_sawNoKall)
             {
-                // Kall fell during this session: the areas around the players are in the fight, not loaded again.
+                // Kall fell during this session: the areas around the players are in the fight, not entered again.
                 around = EngageAroundPlayers();
             }
-            Log.Info($"Kall is defeated: {CellOf.Count} Jotun spawned by the Deep North areas still hold {ByCell.Count} "
-                     + $"area(s); {ServerCleared.Count} area(s) are cleared"
-                     + (around > 0 ? $"; {around} area(s) around the players wait to be defeated" : "")
+            Log.Info($"Kall is defeated: {ServerCleared.Count} Deep North area(s) are cleared, {Kills.Count} have Jotun "
+                     + "defeated toward their clearing"
+                     + (around > 0 ? $", {around} around the players wait to be defeated" : "")
                      + ". The others spawn their Jotun again each time a player enters them, until cleared.");
-        }
-        else if (_rescans < RescanAt.Length && now - _scannedAt >= RescanAt[_rescans])
-        {
-            _rescans++;
-            ScanLiving();
-            _dirty = true;
-        }
-        if ((DeathRecount.Count > 0 || TrackRecount.Count > 0) && now >= _recountAt)
-        {
-            Recount();
-        }
-        if (Settled && DiedOut.Count > 0)
-        {
-            foreach (var cell in DiedOut)
-            {
-                if (!ByCell.ContainsKey(cell) && ServerCleared.Add(cell))
-                {
-                    WriteMark(cell);
-                    ServerEngaged.Remove(cell);
-                    Cells.FromId(cell, out var i, out var j);
-                    Log.Info($"The last Jotun of Deep North area {i},{j} died: the area is cleared for good.");
-                    _dirty = true;
-                }
-            }
-            DiedOut.Clear();
         }
         if (now >= _nextRelease)
         {
@@ -309,45 +265,51 @@ internal static class HeldCells
         }
     }
 
-    private static bool Settled => _rescans >= RescanAt.Length;
-
-    // Kall fell now: engage the cell under every player in the Deep North (the burst rule) and the cells around them
-    // (zone samples like the spawn runner's) that still have Jotun: the area of the fight. A cell nearby that nobody
-    // entered and that has no Jotun is left alone: it burst when entered.
+    // Kall fell now: engage the cell under every player in the Deep North (the burst rule) and the cells of the area
+    // Jotun loaded around them (5 x 5 zones): the area of the fight. A cell nearby that nobody entered and that has no
+    // Jotun is left alone: it burst when entered.
     private static int EngageAroundPlayers()
     {
         var rules = ServerRules.Current;
-        if (rules == null || rules.IsPending)
+        var zdos = ZDOMan.instance;
+        if (rules == null || rules.IsPending || zdos == null)
         {
             return 0;
         }
         var seed = WorldState.Seed;
         var coverage = rules.Coverage(WorldState.Stage);
+        var area = new SimulationDistance(SimulationDistance.OriginalNear, 0, true);
         var n = 0;
-        foreach (var zdo in ZNet.instance.GetAllCharacterZDOS())
+        foreach (var player in ZNet.instance.GetAllCharacterZDOS())
         {
-            var p = zdo.GetPosition();
-            for (var dx = -1; dx <= 1; dx++)
+            var p = player.GetPosition();
+            if (WorldGenerator.IsDeepnorth(p.x, p.z) && Engage(Cells.At(seed, p.x, p.z), seed, coverage))
             {
-                for (var dz = -1; dz <= 1; dz++)
+                n++;
+            }
+            TempZdos.Clear();
+            zdos.FindSectorObjects(ZoneSystem.GetZone(p), area, TempZdos);
+            foreach (var zdo in TempZdos)
+            {
+                var tag = Hostility.IsArmy(zdo.GetPrefab()) ? zdo.GetInt(TagKey, NoTag) : NoTag;
+                if (tag != NoTag && Engage(tag, seed, coverage))
                 {
-                    var under = dx == 0 && dz == 0;
-                    if (under && !WorldGenerator.IsDeepnorth(p.x, p.z))
-                    {
-                        continue;
-                    }
-                    var cell = Cells.At(seed, p.x + dx * AreaSpawns.ZoneReach, p.z + dz * AreaSpawns.ZoneReach);
-                    if ((under || ByCell.ContainsKey(cell)) && !ServerCleared.Contains(cell)
-                                                              && !ServerEngaged.ContainsKey(cell)
-                                                              && Cells.IsAwake(seed, cell, coverage))
-                    {
-                        ServerEngaged[cell] = SeedOf(cell);
-                        n++;
-                    }
+                    n++;
                 }
             }
         }
+        TempZdos.Clear();
         return n;
+    }
+
+    private static bool Engage(int cell, int seed, float coverage)
+    {
+        if (ServerCleared.Contains(cell) || ServerEngaged.ContainsKey(cell) || !Cells.IsAwake(seed, cell, coverage))
+        {
+            return false;
+        }
+        ServerEngaged[cell] = SeedOf(cell);
+        return true;
     }
 
     // Seed distance at which a cell left every player's loaded range: the cell's reach plus the loaded zones around a
@@ -428,75 +390,7 @@ internal static class HeldCells
         _dirty = true;
     }
 
-    // Track every tagged army ZDO not tracked yet (union: never forget one already seen die). Returns how many new.
-    private static int ScanLiving()
-    {
-        var added = 0;
-        foreach (var prefab in Hostility.Army)
-        {
-            foreach (var zdo in Stones.AllZdos(prefab))
-            {
-                if (TrackIfNew(zdo))
-                {
-                    added++;
-                }
-            }
-        }
-        return added;
-    }
-
-    private static bool TrackIfNew(ZDO zdo)
-    {
-        var tag = zdo.GetInt(TagKey, NoTag);
-        if (tag == NoTag || CellOf.ContainsKey(zdo.m_uid) || Dead.Contains(zdo.m_uid))
-        {
-            return false;
-        }
-        Track(zdo.m_uid, tag, Hostility.ArmyIndex(zdo.GetPrefab()));
-        DiedOut.Remove(tag);
-        _dirty = true;
-        return true;
-    }
-
-    // Cells whose Jotun died or were just spawned: count their living tagged Jotun around their seed point (19 x 19
-    // zones: the cell and where its Jotun roam). A death cell with none left died out.
-    private static void Recount()
-    {
-        var zdos = ZDOMan.instance;
-        if (zdos == null)
-        {
-            return;
-        }
-        var area = new SimulationDistance(RecountZones, 0, true);
-        var cells = new HashSet<int>(DeathRecount);
-        cells.UnionWith(TrackRecount);
-        foreach (var cell in cells)
-        {
-            var seed = SeedOf(cell);
-            TempZdos.Clear();
-            zdos.FindSectorObjects(ZoneSystem.GetZone(new Vector3(seed.x, 0f, seed.y)), area, TempZdos);
-            foreach (var zdo in TempZdos)
-            {
-                if (Hostility.IsArmy(zdo.GetPrefab()) && zdo.GetInt(TagKey, NoTag) == cell)
-                {
-                    TrackIfNew(zdo);
-                }
-            }
-        }
-        TempZdos.Clear();
-        foreach (var cell in DeathRecount)
-        {
-            if (!ByCell.ContainsKey(cell))
-            {
-                DiedOut.Add(cell);
-            }
-        }
-        DeathRecount.Clear();
-        TrackRecount.Clear();
-        _dirty = true;
-    }
-
-    // Cleared cells remembered on every zone control the server hold.
+    // Cleared cells and kill progress remembered on every zone control the server hold.
     private static void ScanMarks()
     {
         foreach (var zdo in Stones.AllZdos(ZoneCtrlName))
@@ -509,6 +403,25 @@ internal static class HeldCells
                     ServerCleared.Add(cell);
                 }
             }
+            for (var i = 0; i < KillSlots.Length; i++)
+            {
+                var v = zdo.GetLong(KillSlots[i], 0L);
+                if (v == 0L)
+                {
+                    continue;
+                }
+                Unpack(v, out var cell, out var count);
+                if (!Kills.TryGetValue(cell, out var have) || count > have)
+                {
+                    Kills[cell] = count;
+                    KillSlotOf[cell] = new KillSlot { Zdo = zdo, Id = zdo.m_uid, Slot = i };
+                }
+            }
+        }
+        foreach (var cell in ServerCleared)
+        {
+            Kills.Remove(cell);
+            KillSlotOf.Remove(cell);
         }
     }
 
@@ -521,13 +434,25 @@ internal static class HeldCells
         }
     }
 
-    // Server: keep a cleared cell in the world, on a zone control nobody owns (or the server owns) with a free slot.
-    // Nobody else write that ZDO meanwhile; a game that load its zone later get it from the server.
+    // Nobody else write a zone control nobody owns (or the server owns); a game that load its zone later get it from
+    // the server. One a player own: its next write would replace mine.
+    private static bool Writable(ZDO zdo) => !zdo.HasOwner() || zdo.IsOwner();
+
+    // Pure (self test): kill slot value.
+    internal static long Pack(int cell, int count) => ((long)cell << 32) | (uint)count;
+
+    internal static void Unpack(long value, out int cell, out int count)
+    {
+        cell = (int)(value >> 32);
+        count = (int)(value & 0xFFFFFFFFL);
+    }
+
+    // Server: keep a cleared cell in the world, on a writable zone control with a free slot.
     private static void WriteMark(int cell)
     {
         foreach (var zdo in Stones.AllZdos(ZoneCtrlName))
         {
-            if (zdo.HasOwner() && !zdo.IsOwner())
+            if (!Writable(zdo))
             {
                 continue;
             }
@@ -553,48 +478,116 @@ internal static class HeldCells
         Log.Warning("Found no free zone control to remember a cleared Deep North area; it is cleared until the server restarts.");
     }
 
-    private static void Track(ZDOID id, int cell, int kind)
+    // Server: keep a cell's kill count in the world: its slot again when still writable, else a free one.
+    private static void WriteKills(int cell, int count)
     {
-        CellOf[id] = cell;
-        KindOf[id] = kind;
-        if (!ByCell.TryGetValue(cell, out var set))
+        var value = Pack(cell, count);
+        if (KillSlotOf.TryGetValue(cell, out var at) && SlotUsable(at))
         {
-            set = new HashSet<ZDOID>();
-            ByCell[cell] = set;
+            at.Zdo.Set(KillSlots[at.Slot], value);
+            return;
         }
-        set.Add(id);
+        foreach (var zdo in Stones.AllZdos(ZoneCtrlName))
+        {
+            if (!Writable(zdo))
+            {
+                continue;
+            }
+            for (var i = 0; i < KillSlots.Length; i++)
+            {
+                if (zdo.GetLong(KillSlots[i], 0L) == 0L)
+                {
+                    zdo.Set(KillSlots[i], value);
+                    KillSlotOf[cell] = new KillSlot { Zdo = zdo, Id = zdo.m_uid, Slot = i };
+                    return;
+                }
+            }
+        }
+        if (!_slotWarned)
+        {
+            _slotWarned = true;
+            Log.Warning("Found no free zone control to remember Jotun kills in a Deep North area; they count until the server restarts.");
+        }
     }
 
-    // ServerWorld destroy delegate (server). Cheap: prefab compare first; a tagged army ZDO queue its cell's recount.
+    // The zone control me wrote may be gone (admin forcedelete, world tools) and its object reused by the pool for
+    // another ZDO: same id, same live object, still a zone control, still writable.
+    private static bool SlotUsable(KillSlot at)
+    {
+        var zdos = ZDOMan.instance;
+        var zdo = at.Zdo;
+        return zdo != null && zdos != null && zdo.m_uid == at.Id && ReferenceEquals(zdos.GetZDO(at.Id), zdo)
+               && zdo.GetPrefab() == ZoneCtrlName.GetStableHashCode() && Writable(zdo);
+    }
+
+    // Cleared: its kill slot is free again (when still writable; a stale one lose to the cleared mark at load).
+    private static void DropKills(int cell)
+    {
+        if (KillSlotOf.TryGetValue(cell, out var at) && SlotUsable(at) && at.Zdo.GetLong(KillSlots[at.Slot], 0L) != 0L)
+        {
+            Unpack(at.Zdo.GetLong(KillSlots[at.Slot], 0L), out var c, out _);
+            if (c == cell)
+            {
+                at.Zdo.Set(KillSlots[at.Slot], 0L);
+            }
+        }
+        KillSlotOf.Remove(cell);
+    }
+
+    // ServerWorld destroy delegate (server). Cheap: prefab compare first. A Jotun-army ZDO destroyed = a death (they
+    // are saved creatures: unloading never destroy them), except event and day creatures (raid Jotun walk away and
+    // vanish when their raid ends: BaseAI.MoveAwayAndDespawn). Each ZDOID once: a stale update can bring a dead ZDO back
+    // on the server and destroy it again (ZDOMan.RPC_ZDOData).
     internal static void OnDestroyed(ZDO zdo)
     {
         if (!_scanned || !Hostility.IsArmy(zdo.GetPrefab()))
         {
             return;
         }
-        var tag = zdo.GetInt(TagKey, NoTag);
-        if (tag == NoTag)
+        if (zdo.GetBool(ZDOVars.s_eventCreature) || zdo.GetBool(ZDOVars.s_despawnInDay) || !CountedKills.Add(zdo.m_uid))
         {
             return;
         }
-        // A stale ZDO update can bring a dead ZDOID back for a moment: a scan must not count it again.
-        Dead.Add(zdo.m_uid);
-        if (CellOf.TryGetValue(zdo.m_uid, out var cell))
+        var rules = ServerRules.Current;
+        if (!WorldState.Awake(rules))
         {
-            CellOf.Remove(zdo.m_uid);
-            KindOf.Remove(zdo.m_uid);
-            if (ByCell.TryGetValue(cell, out var set))
+            return;
+        }
+        var p = zdo.GetPosition();
+        if (!WorldGenerator.IsDeepnorth(p.x, p.z))
+        {
+            return;
+        }
+        var cell = WorldState.CellAt(p);
+        if (ServerCleared.Contains(cell) || !WorldState.IsAwakeCell(cell, rules))
+        {
+            return;
+        }
+        Kills.TryGetValue(cell, out var before);
+        var now = before + 1;
+        var target = rules.KillTarget(WorldState.Seed, cell);
+        var half = (target + 1) / 2;
+        Cells.FromId(cell, out var i, out var j);
+        if (now >= target)
+        {
+            ServerCleared.Add(cell);
+            ServerEngaged.Remove(cell);
+            Kills.Remove(cell);
+            WriteMark(cell);
+            DropKills(cell);
+            Log.Info($"{now} Jotun defeated in Deep North area {i},{j}: the area is cleared for good.");
+            News(NewsCleared, cell, p);
+        }
+        else
+        {
+            Kills[cell] = now;
+            WriteKills(cell, now);
+            if (before < half && now >= half)
             {
-                set.Remove(zdo.m_uid);
-                if (set.Count == 0)
-                {
-                    ByCell.Remove(cell);
-                }
+                Log.Info($"{now} of {target} Jotun defeated in Deep North area {i},{j}: the Jotun army there is weakening.");
+                News(NewsWeakening, cell, p);
             }
         }
-        DeathRecount.Add(tag);
-        // Never sooner than an engage recount already waiting (its new ZDOs may still be on the way).
-        _recountAt = Mathf.Max(_recountAt, Time.unscaledTime + RecountDelay);
         // A send already waiting (an engage: at once) is never pushed back.
         if (!_dirty)
         {
@@ -603,7 +596,7 @@ internal static class HeldCells
         _dirty = true;
     }
 
-    // Server: a game burst these cells (or found them full). Engaged until no player is near; count their Jotun soon.
+    // Server: a game burst these cells (or found them full). Engaged until no player is near.
     private static void OnEngage(long sender, ZPackage pkg)
     {
         try
@@ -618,10 +611,8 @@ internal static class HeldCells
                 if (!ServerCleared.Contains(cell))
                 {
                     ServerEngaged[cell] = SeedOf(cell);
-                    TrackRecount.Add(cell);
                 }
             }
-            _recountAt = Mathf.Max(_recountAt, Time.unscaledTime + EngageRecountDelay);
             _dirty = true;
             _sendAt = 0f;
         }
@@ -649,6 +640,11 @@ internal static class HeldCells
         cleared.Sort();
         var engaged = new List<int>(ServerEngaged.Keys);
         engaged.Sort();
+        return Package(cleared, engaged, Kills);
+    }
+
+    private static ZPackage Package(ICollection<int> cleared, ICollection<int> engaged, IDictionary<int, int> kills)
+    {
         var pkg = new ZPackage();
         pkg.Write(Layout);
         pkg.Write(cleared.Count);
@@ -661,24 +657,11 @@ internal static class HeldCells
         {
             pkg.Write(c);
         }
-        // Living per cell, one count per army kind (Hostility.Army order).
-        var kinds = new int[Hostility.Army.Length];
-        pkg.Write(ByCell.Count);
-        foreach (var pair in ByCell)
+        pkg.Write(kills.Count);
+        foreach (var pair in kills)
         {
-            Array.Clear(kinds, 0, kinds.Length);
-            foreach (var id in pair.Value)
-            {
-                if (KindOf.TryGetValue(id, out var k) && k >= 0 && k < kinds.Length)
-                {
-                    kinds[k]++;
-                }
-            }
             pkg.Write(pair.Key);
-            foreach (var n in kinds)
-            {
-                pkg.Write(n);
-            }
+            pkg.Write(pair.Value);
         }
         return pkg;
     }
@@ -714,26 +697,20 @@ internal static class HeldCells
             {
                 return;
             }
-            if (!TryRead(pkg, out var cleared, out var engaged, out var living))
+            if (!TryRead(pkg, out var cleared, out var engaged, out var kills))
             {
                 Log.Warning("The server sent Deep North area lists this version cannot read; they are ignored.");
                 return;
             }
-            var first = !KnownHere;
-            var old = _cleared;
-            if (first || !old.SetEquals(cleared))
+            if (!KnownHere || !_cleared.SetEquals(cleared))
             {
                 ClearedVersion++;
             }
             _cleared = cleared;
             _engaged = engaged;
-            _living = living;
+            _kills = kills;
             _known = true;
             _session = ZNet.instance;
-            if (!first)
-            {
-                AnnounceCleared(old, cleared);
-            }
         }
         catch (Exception e)
         {
@@ -743,11 +720,11 @@ internal static class HeldCells
 
     // Pure-ish (self test): read the lists. Unknown layout or junk = false.
     internal static bool TryRead(ZPackage pkg, out HashSet<int> cleared, out HashSet<int> engaged,
-        out Dictionary<int, int[]> living)
+        out Dictionary<int, int> kills)
     {
         cleared = null;
         engaged = null;
-        living = null;
+        kills = null;
         try
         {
             if (pkg == null || pkg.ReadInt() != Layout || !ReadSet(pkg, out var c) || !ReadSet(pkg, out var e))
@@ -759,20 +736,15 @@ internal static class HeldCells
             {
                 return false;
             }
-            var l = new Dictionary<int, int[]>();
+            var k = new Dictionary<int, int>();
             for (var i = 0; i < count; i++)
             {
                 var cell = pkg.ReadInt();
-                var kinds = new int[Hostility.Army.Length];
-                for (var k = 0; k < kinds.Length; k++)
-                {
-                    kinds[k] = Math.Max(0, pkg.ReadInt());
-                }
-                l[cell] = kinds;
+                k[cell] = Math.Max(0, pkg.ReadInt());
             }
             cleared = c;
             engaged = e;
-            living = l;
+            kills = k;
             return true;
         }
         catch (Exception)
@@ -811,42 +783,105 @@ internal static class HeldCells
         return true;
     }
 
-    // Local player stand in a cell that just became cleared = vanilla "The Jotun Retreat".
-    private static void AnnounceCleared(HashSet<int> old, HashSet<int> now)
+    // Server: tell everybody (each game decide if its player is there).
+    private static void News(int kind, int cell, Vector3 at)
     {
-        var player = Player.m_localPlayer;
-        var hud = MessageHud.instance;
-        if (player == null || hud == null || player.InInterior())
+        var routed = ZRoutedRpc.instance;
+        if (routed == null)
         {
             return;
         }
-        var rules = ServerRules.Current;
-        var pos = player.transform.position;
-        if (!WorldState.Awake(rules) || !WorldGenerator.IsDeepnorth(pos.x, pos.z))
+        EnsureRegistered();
+        routed.InvokeRoutedRPC(ZRoutedRpc.Everybody, NewsRpc, NewsPackage(kind, cell, at));
+    }
+
+    internal static ZPackage NewsPackage(int kind, int cell, Vector3 at)
+    {
+        var pkg = new ZPackage();
+        pkg.Write(Layout);
+        pkg.Write(kind);
+        pkg.Write(cell);
+        pkg.Write(at.x);
+        pkg.Write(at.z);
+        return pkg;
+    }
+
+    // Pure-ish (self test).
+    internal static bool TryReadNews(ZPackage pkg, out int kind, out int cell, out Vector3 at)
+    {
+        kind = 0;
+        cell = NoTag;
+        at = Vector3.zero;
+        try
         {
-            return;
+            if (pkg == null || pkg.ReadInt() != Layout)
+            {
+                return false;
+            }
+            kind = pkg.ReadInt();
+            cell = pkg.ReadInt();
+            var x = pkg.ReadSingle();
+            var z = pkg.ReadSingle();
+            at = new Vector3(x, 0f, z);
+            return kind == NewsWeakening || kind == NewsCleared;
         }
-        var cell = WorldState.CellAt(pos);
-        if (now.Contains(cell) && !old.Contains(cell) && WorldState.IsAwakeCell(cell, rules))
+        catch (Exception)
         {
-            hud.ShowMessage(MessageHud.MessageType.Center, ClearedText);
+            return false;
+        }
+    }
+
+    // The local player stand in the cell, or near the kill: weakening top left, cleared = vanilla "The Jotun Retreat".
+    private static void OnNews(long sender, ZPackage pkg)
+    {
+        try
+        {
+            if (!_active || !TryReadNews(pkg, out var kind, out var cell, out var at))
+            {
+                return;
+            }
+            var shown = false;
+            var player = Player.m_localPlayer;
+            var hud = MessageHud.instance;
+            if (player != null && hud != null)
+            {
+                var pos = player.transform.position;
+                var dx = pos.x - at.x;
+                var dz = pos.z - at.z;
+                if (WorldState.CellAt(pos) == cell || dx * dx + dz * dz <= NewsRange * NewsRange)
+                {
+                    shown = true;
+                    if (kind == NewsCleared)
+                    {
+                        hud.ShowMessage(MessageHud.MessageType.Center, ClearedText);
+                    }
+                    else
+                    {
+                        hud.ShowMessage(MessageHud.MessageType.TopLeft, WeakeningText);
+                    }
+                }
+            }
+#if DEBUG
+            _lastNewsKind = kind;
+            _lastNewsCell = cell;
+            _lastNewsShown = shown;
+#endif
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("HeldCells.OnNews", e);
         }
     }
 
     private static void ResetServer()
     {
-        ByCell.Clear();
-        CellOf.Clear();
-        KindOf.Clear();
-        Dead.Clear();
-        DiedOut.Clear();
         ServerCleared.Clear();
         ServerEngaged.Clear();
-        DeathRecount.Clear();
-        TrackRecount.Clear();
+        Kills.Clear();
+        KillSlotOf.Clear();
+        CountedKills.Clear();
         _scanned = false;
         _dirty = false;
-        _rescans = 0;
     }
 
     // Admin command: what this game knows of the area at a position (after Kall).
@@ -870,12 +905,7 @@ internal static class HeldCells
         {
             return $"; area {i},{j} here is cleared";
         }
-        var kinds = new List<string>();
-        for (var k = 0; k < Hostility.Army.Length; k++)
-        {
-            kinds.Add($"{LivingOf(cell, k)} {Hostility.Army[k]}");
-        }
-        return $"; area {i},{j} here: {Living(cell)} of its Jotun alive ({string.Join(", ", kinds.ToArray())}), "
+        return $"; area {i},{j} here: {KillsIn(cell)} of {rules.KillTarget(WorldState.Seed, cell)} Jotun defeated, "
                + (IsEngaged(cell) ? "waits to be defeated" : "spawns its Jotun when entered");
     }
 
@@ -885,14 +915,19 @@ internal static class HeldCells
     {
         if (_known && !WorldState.KallDefeated)
         {
-            ClearedVersion++;
-            _cleared = new HashSet<int>();
-            _engaged = new HashSet<int>();
-            _living = new Dictionary<int, int[]>();
-            _known = false;
-            _session = null;
-            LocalHold.Clear();
+            ForgetLists();
         }
+    }
+
+    private static void ForgetLists()
+    {
+        ClearedVersion++;
+        _cleared = new HashSet<int>();
+        _engaged = new HashSet<int>();
+        _kills = new Dictionary<int, int>();
+        _known = false;
+        _session = null;
+        LocalHold.Clear();
     }
 
     // World end, feature off.
@@ -900,28 +935,35 @@ internal static class HeldCells
     {
         ResetServer();
         _sawNoKall = false;
-        ClearedVersion++;
-        _cleared = new HashSet<int>();
-        _engaged = new HashSet<int>();
-        _living = new Dictionary<int, int[]>();
-        _known = false;
-        _session = null;
-        LocalHold.Clear();
+        _slotWarned = false;
+        ForgetLists();
     }
 
 #if DEBUG
+    private static int _lastNewsKind;
+    private static int _lastNewsCell;
+    private static bool _lastNewsShown;
+
     internal static void TestRescan() => ResetServer();
 
-    // Self test: skip the late-spawn rescans so a clear is decided at once.
-    internal static void TestSettle()
+    internal static bool TestServerEngaged(int cell) => ServerEngaged.ContainsKey(cell);
+
+    internal static int TestKills(int cell) => Kills.TryGetValue(cell, out var n) ? n : 0;
+
+    // Self test: last news this game got (kind 0 = none since the reset), and whether its player saw it.
+    internal static void TestLastNews(out int kind, out int cell, out bool shown)
     {
-        _rescans = RescanAt.Length;
-        _dirty = true;
+        kind = _lastNewsKind;
+        cell = _lastNewsCell;
+        shown = _lastNewsShown;
     }
 
-    internal static bool TestTracks(ZDOID id) => CellOf.ContainsKey(id);
-
-    internal static bool TestServerEngaged(int cell) => ServerEngaged.ContainsKey(cell);
+    internal static void TestResetNews()
+    {
+        _lastNewsKind = 0;
+        _lastNewsCell = NoTag;
+        _lastNewsShown = false;
+    }
 
     // Self test: forget every engagement (as if every player had left), server and here.
     internal static void TestClearEngaged()
@@ -936,31 +978,44 @@ internal static class HeldCells
     // Self test: Kall seen at load (no engage around the players), or seen fall during the session.
     internal static void TestSawNoKall(bool value) => _sawNoKall = value;
 
-    internal static bool TestMarked(ZDO zdo, int cell)
-    {
-        foreach (var slot in ClearedSlots)
-        {
-            if (zdo.GetInt(slot, NoTag) == cell)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     internal static bool TestMarkedAnywhere(int cell)
     {
         foreach (var zdo in Stones.AllZdos(ZoneCtrlName))
         {
-            if (TestMarked(zdo, cell))
+            foreach (var slot in ClearedSlots)
             {
-                return true;
+                if (zdo.GetInt(slot, NoTag) == cell)
+                {
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    // Self test: remove a cell from every zone control (world as before the test).
+    // Self test: kill slots of a cell anywhere in the world.
+    internal static int TestKillSlots(int cell)
+    {
+        var n = 0;
+        foreach (var zdo in Stones.AllZdos(ZoneCtrlName))
+        {
+            foreach (var slot in KillSlots)
+            {
+                var v = zdo.GetLong(slot, 0L);
+                if (v != 0L)
+                {
+                    Unpack(v, out var c, out _);
+                    if (c == cell)
+                    {
+                        n++;
+                    }
+                }
+            }
+        }
+        return n;
+    }
+
+    // Self test: remove a cell from every zone control, cleared and kill slots (world as before the test).
     internal static void TestUnmarkEverywhere(int cell)
     {
         foreach (var zdo in Stones.AllZdos(ZoneCtrlName))
@@ -972,36 +1027,22 @@ internal static class HeldCells
                     zdo.Set(slot, NoTag);
                 }
             }
+            foreach (var slot in KillSlots)
+            {
+                var v = zdo.GetLong(slot, 0L);
+                if (v != 0L)
+                {
+                    Unpack(v, out var c, out _);
+                    if (c == cell)
+                    {
+                        zdo.Set(slot, 0L);
+                    }
+                }
+            }
         }
     }
 
-    internal static ZPackage TestPackage(IEnumerable<int> cleared, IEnumerable<int> engaged,
-        IDictionary<int, int[]> living)
-    {
-        var c = new List<int>(cleared);
-        var e = new List<int>(engaged);
-        var pkg = new ZPackage();
-        pkg.Write(Layout);
-        pkg.Write(c.Count);
-        foreach (var x in c)
-        {
-            pkg.Write(x);
-        }
-        pkg.Write(e.Count);
-        foreach (var x in e)
-        {
-            pkg.Write(x);
-        }
-        pkg.Write(living.Count);
-        foreach (var pair in living)
-        {
-            pkg.Write(pair.Key);
-            foreach (var n in pair.Value)
-            {
-                pkg.Write(n);
-            }
-        }
-        return pkg;
-    }
+    internal static ZPackage TestPackage(ICollection<int> cleared, ICollection<int> engaged, IDictionary<int, int> kills)
+        => Package(cleared, engaged, kills);
 #endif
 }

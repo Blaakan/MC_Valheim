@@ -8,11 +8,12 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 test (`./tools/Test-Smoke.ps1`) passed 2026-10-01 (loads, patches cleanly, JitCheck clean). In-world self-tests
 (`./tools/Test-InWorld.ps1 -Mod DeepNorth.Awakening -Only dn.`) passed 2026-10-01 on the final code: `dn.logic`,
 `dn.network`, `dn.vanilla`, `dn.hostility` (a Krigen and a Gammeltroll target each other), `dn.stones` (stones 1-4,
-held-back requests), `dn.detect`, `dn.kall` (server engagement kept near a player and released far, clearing after
-the last death, cleared area written and read back), `dn.area` (stage 3 in the Deep North: 10-12 tagged area Jotun
-with stars, blizzard, meteors, a nature band; then Kall killed there: no refill; entered again: one burst, no refill
-past the local hold, its own Krigen back despite 3 other Krigen near; all killed: cleared, no storm, gone from the
-map), `dn.map` (map scanned; awake area purple, sleeping one not; own colours back with ShowAreas off, at stage 0 and
+held-back requests), `dn.detect`, `dn.kall` (server engagement kept near a player and released far; kill count with
+deaths made without creatures: half = weakening news, target = cleared and written, nature and outside kills not
+counted, progress and cleared read back), `dn.area` (stage 3 in the Deep North: 10-12 tagged area Jotun with stars,
+blizzard, meteors, a nature band; then Kall killed there: no refill; entered again: one burst, no refill past the local
+hold, its own Krigen back despite 3 other Krigen near; kills there counted; a band after Kall; the target reached:
+cleared, "The Jotun Retreat" shown, no storm, no new Jotun, gone from the map), `dn.map` (map scanned; awake area purple, sleeping one not; own colours back with ShowAreas off, at stage 0 and
 while waiting for the server's rules) and `dn.morkhalla`. No hands-on in-game test yet.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
@@ -72,25 +73,33 @@ changed one back afterwards. Use a new world for T01-T05 (or `deepnorth_stones 0
   well away): they ignore each other. At stage 1 or more (`deepnorth_stones 1`): they fight. A `Moose` stays out of it.
   NatureFightsBack = false: they ignore each other again.
 - [ ] **T11 Nature bands (G9):** set NatureBandChance = 100 and walk into invaded areas you have not visited. Expected:
-  a band appears 40-80 m away: 5 to 10 frost Greydwarfs (1 or 2 shamans) and 0 to 2 Gammeltroll or Barka, together;
-  they attack the Jotun. Never a second band while one is still around you. Default (10): now and then only.
-- [ ] **T12 After Kall, cleared areas (G10):** stage 3, `goto` to an invaded area you have not visited, wait for its
-  Jotun without walking around (Jotun of the area left in unloaded places must die too), `setkey defeated_frozenking_p3`. Expected: log "Kall is defeated: ... area(s) around the players wait to be
-  defeated ..."; while you stay, no new Jotun appear (wait a few minutes); wait 30 s, then kill every Jotun around (`killall` works): "The Jotun Retreat", log "... the area is
-  cleared for good", and with StormShare = 100 the blizzard stops there. Leave (`goto` far away), come back, and save,
-  quit and load the world again: no Jotun, no blizzard there. `deepnorth_stones` there says the area is cleared.
+  a band appears 40-80 m away: 10 to 20 frost Greydwarfs (2 to 4 shamans) and 1 to 3 Gammeltroll or Barka, together;
+  they attack the Jotun. Never a second band while one is still around you. Default (10): now and then only. After Kall
+  (`setkey defeated_frozenking_p3`), bands still come in areas that are not cleared, never in a cleared one.
+- [ ] **T12 After Kall, cleared areas (G10):** stage 3, stand in an invaded area with Jotun around,
+  `setkey defeated_frozenking_p3`. Expected: log "Kall is defeated: ... around the players wait to be defeated ...";
+  while you stay, no new Jotun appear (wait a few minutes). `deepnorth_stones` shows "0 of N Jotun defeated" (N between
+  8 and 13). Kill Jotun inside the area (sword, or `killall` for the ones near): `deepnorth_stones` counts them; at half
+  of N a small "The Jotun army is weakening" top left; at N "The Jotun Retreat", log "... the area is cleared for good".
+  Jotun still alive stay; nothing new appears; with StormShare = 100 the blizzard stops there; Gammeltroll, Barka and
+  Greydwarf kills never count. Leave (`goto` far away), come back, and save,
+  quit and load the world again: no new Jotun, no blizzard, no purple on the map there. `deepnorth_stones` there says
+  the area is cleared.
   `removekey defeated_frozenking_p3` undoes Kall (test world only): the area spawns and storms again as before Kall;
   its cleared mark stays in the world and applies again if Kall is defeated again.
-- [ ] **T20 After Kall, areas not cleared (G10):** after Kall, kill only some Jotun of an invaded area, then go more
-  than 800 m away (`goto`), wait a few seconds and walk back into the area from another side. Expected: as you step
-  into it, its Jotun are back up to their usual numbers (the survivors count, even far ones: never a second set;
-  `deepnorth_stones` shows its living Jotun per kind), and nothing more appears while you stay. Walk out to its edge
+- [ ] **T20 After Kall, areas not cleared (G10):** after Kall, kill fewer Jotun of an invaded area than it needs, then
+  go more than 800 m away (`goto`), wait a few seconds and walk back into the area. Expected: as you step into it, its
+  Jotun are back up to their usual numbers (the survivors around count), nothing more appears while you stay, and
+  `deepnorth_stones` still shows the kills made before. Walk out to its edge
   and back in without going far: nothing new. Die there with your bed inside the area and respawn: nothing new. An
   invaded area nobody visited before Kall has its Jotun as soon as you walk into it, also one right next to where you
   stood when Kall fell.
 - [ ] **T21 After Kall, restart (G10):** after Kall, kill some Jotun of an area that is not cleared, save and quit while
   standing in it, load the world again. Expected: its Jotun are topped up right after you arrive (the "waiting to be
-  defeated" list is not saved); a cleared area stays cleared.
+  defeated" list is not saved), `deepnorth_stones` still shows the kills made before; a cleared area stays cleared.
+- [ ] **T23 Kills from elsewhere (G10):** after Kall, lure Jotun of one area into a neighbouring invaded area and kill
+  them there. Expected: `deepnorth_stones` in the neighbouring area counts them (kills count where they happen), the
+  first area's count does not move.
 - [ ] **T13 Old world (G11):** a world (copy) where Malicious Ice were broken before installing the mod. Expected: log
   "Counted the broken Malicious Ice of this world: N explored Morkhalla, K with its Malicious Ice already broken. Deep
   North stage S."; no centre message, no new invasion; `deepnorth_stones` shows K.
@@ -145,6 +154,8 @@ changed one back afterwards. Use a new world for T01-T05 (or `deepnorth_stones 0
   into the same invaded area that is not cleared, from two sides, a few seconds apart. Expected: one set of Jotun (about
   a dozen at most), not two. Player A stays in the area while player B goes more than 800 m away and comes back: no new
   Jotun (the area waits to be defeated while A is near). Both leave more than 800 m, then come back: it is topped up.
+  Both kill Jotun there: every kill counts on both players' `deepnorth_stones`; both see "The Jotun army is weakening"
+  and "The Jotun Retreat" when they stand in the area.
 - [ ] **M09 Map setting from the server:** dedicated server with ShowAreas = false, a player with ShowAreas = true in
   their own config. Expected: no purple on their map. Server ShowAreas = true: purple appears on every player's map
   where they explored, the same areas for both players.

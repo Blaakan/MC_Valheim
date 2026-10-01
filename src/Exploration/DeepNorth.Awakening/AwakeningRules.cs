@@ -17,6 +17,8 @@ internal sealed class AwakeningRules
     internal const int DensityMax = 400;
     internal const float StormMinutesMin = 1f;
     internal const float StormMinutesMax = 60f;
+    internal const int KillsMin = 1;
+    internal const int KillsMax = 100;
 
     // Share of Deep North cells awake at stage 1, 2, 3 (percent).
     internal int CoverageStage1 = 20;
@@ -36,6 +38,10 @@ internal sealed class AwakeningRules
 
     // Chance (percent) of a nature band each time a zone's band check comes up (AreaSpawns.BandInterval).
     internal int NatureBandChance = 10;
+
+    // After Kall: Jotun army kills inside an area that clear it (each area its own fixed number in this range).
+    internal int ClearKillsMin = 8;
+    internal int ClearKillsMax = 13;
 
     // Share of time an area storms (percent), storm length range (minutes), meteors during storms.
     internal int StormShare = 33;
@@ -86,6 +92,9 @@ internal sealed class AwakeningRules
         }
     }
 
+    // Kills that clear this cell after Kall.
+    internal int KillTarget(int seed, int cell) => Cells.KillTarget(seed, cell, ClearKillsMin, ClearKillsMax);
+
     // Storm length range in seconds, low end first (config may hold them swapped).
     internal void StormSeconds(out float min, out float max)
     {
@@ -108,6 +117,8 @@ internal sealed class AwakeningRules
             JotunDensity = V(Plugin.JotunDensity, d.JotunDensity),
             NatureFightsBack = V(Plugin.NatureFightsBack, d.NatureFightsBack),
             NatureBandChance = V(Plugin.NatureBandChance, d.NatureBandChance),
+            ClearKillsMin = V(Plugin.ClearKillsMin, d.ClearKillsMin),
+            ClearKillsMax = V(Plugin.ClearKillsMax, d.ClearKillsMax),
             StormShare = V(Plugin.StormShare, d.StormShare),
             StormMinMinutes = V(Plugin.StormMinMinutes, d.StormMinMinutes),
             StormMaxMinutes = V(Plugin.StormMaxMinutes, d.StormMaxMinutes),
@@ -117,7 +128,7 @@ internal sealed class AwakeningRules
     }
 
     // Wire: layout, then every value in fixed order. Layout bump = other order (ModNetworkVersion too).
-    internal const int Layout = 1;
+    internal const int Layout = 2;
 
     internal void Write(ZPackage pkg)
     {
@@ -131,6 +142,8 @@ internal sealed class AwakeningRules
         pkg.Write(JotunDensity);
         pkg.Write(NatureFightsBack);
         pkg.Write(NatureBandChance);
+        pkg.Write(ClearKillsMin);
+        pkg.Write(ClearKillsMax);
         pkg.Write(StormShare);
         pkg.Write(StormMinMinutes);
         pkg.Write(StormMaxMinutes);
@@ -161,6 +174,8 @@ internal sealed class AwakeningRules
             r.JotunDensity = Clamp(pkg.ReadInt(), DensityMin, DensityMax, ref clamped);
             r.NatureFightsBack = pkg.ReadBool();
             r.NatureBandChance = Clamp(pkg.ReadInt(), 0, PercentMax, ref clamped);
+            r.ClearKillsMin = Clamp(pkg.ReadInt(), KillsMin, KillsMax, ref clamped);
+            r.ClearKillsMax = Clamp(pkg.ReadInt(), KillsMin, KillsMax, ref clamped);
             r.StormShare = Clamp(pkg.ReadInt(), 0, PercentMax, ref clamped);
             r.StormMinMinutes = Clamp(pkg.ReadSingle(), StormMinutesMin, StormMinutesMax, d.StormMinMinutes, ref clamped);
             r.StormMaxMinutes = Clamp(pkg.ReadSingle(), StormMinutesMin, StormMinutesMax, d.StormMaxMinutes, ref clamped);
@@ -184,7 +199,8 @@ internal sealed class AwakeningRules
         }
         return $"areas {CoverageStage1}/{CoverageStage2}/{CoverageStage3} %, star chance {F(StarChanceStage1)}/"
                + $"{F(StarChanceStage2)}/{F(StarChanceStage3)} %, Jotun density {JotunDensity} %, nature fights back "
-               + (NatureFightsBack ? $"on (band chance {NatureBandChance} %)" : "off") + $", storms {StormShare} % of the time for {F(StormMinMinutes)}-"
+               + (NatureFightsBack ? $"on (band chance {NatureBandChance} %)" : "off")
+               + $", areas cleared by {Math.Min(ClearKillsMin, ClearKillsMax)}-{Math.Max(ClearKillsMin, ClearKillsMax)} Jotun kills after Kall, storms {StormShare} % of the time for {F(StormMinMinutes)}-"
                + $"{F(StormMaxMinutes)} min, meteors " + (Meteors ? "on" : "off") + ", areas on the map "
                + (MapAreas ? "on" : "off");
     }

@@ -7,18 +7,18 @@
     <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
     <ModIdea>Deep North revamp</ModIdea>
     <!-- Both: user rule (gameplay mod = required everywhere). Server count broken Malicious Ice, write stage key, start
-         vanilla invasions, after Kall keep living/engaged/cleared areas. Zone owner client spawn area creatures and meteors, creature
+         vanilla invasions, after Kall count Jotun kills per area, keep engaged/cleared areas. Zone owner client spawn area creatures and meteors, creature
          owner decide nature vs Jotun fight, every player make own blizzard. Server refuse players without me, with me
          off, or other network version (PlayerCheck), and send its rules (ServerRules). -->
     <ModSide>Both</ModSide>
     <ModMultiplayer>Compatible</ModMultiplayer>
     <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. The awakening changes creature spawns, weather, creature fights and the Jotun invasions for the whole world, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. The world remembers how many Malicious Ice were broken in the global key mc_dn_stones.</ModMultiplayerNotes>
-    <!-- Wire format of me: RPC <guid>.Settings / <guid>.SettingsRequest (AwakeningRules layout 1), routed RPC
-         <guid>.Cleared (layout 1: cleared cell ids, engaged cell ids, per cell: id + living count per Jotun kind), routed RPC
-         <guid>.Engage (layout 1: cell ids), ZDO int <guid>.Cell on area Jotun, <guid>.Band on band members,
-         <guid>.Cleared0..7 on zone controls, global key mc_dn_stones, cell pattern (Cells: size, jitter, hash salts).
-         Bump when any of them change. -->
-    <ModNetworkVersion>1</ModNetworkVersion>
+    <!-- Wire format of me: RPC <guid>.Settings / <guid>.SettingsRequest (AwakeningRules layout 2), routed RPC
+         <guid>.Cleared (layout 2: cleared cell ids, engaged cell ids, per cell: id + Jotun kills), routed RPC <guid>.Engage
+         (layout 2: cell ids), routed RPC <guid>.News (layout 2: kind, cell, x, z), ZDO int <guid>.Cell on area Jotun,
+         <guid>.Band on band members, <guid>.Cleared0..7 (int) and <guid>.Kills0..7 (long) on zone controls, global key
+         mc_dn_stones, cell pattern (Cells: size, jitter, hash salts). Bump when any of them change. -->
+    <ModNetworkVersion>2</ModNetworkVersion>
     <ModRequires></ModRequires>
     <ModDescription>The Deep North stays quiet until the first Malicious Ice of a Morkhalla breaks. Then the Jotun army invades the north itself: hidden invaded areas grow with each stone, with storms, meteors, stronger Jotun and nature fighting back.</ModDescription>
   </PropertyGroup>

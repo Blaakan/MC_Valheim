@@ -24,7 +24,9 @@ namespace MC.Exploration.DeepNorthAwakeningMod;
 //   dn.stones     breaks of spawned BlackIce_Start: 1-2 no invasion, game waiting for rules = vanilla request held and
 //                 dropped, 3 = 3 invasions, 4 = vanilla cap, admin request runs after the hold; world put back
 //   dn.detect     old-world detection writes the count from the world's Morkhalla
-//   dn.kall       after Kall: tagged Jotun hold its cell, dead = cleared, no new Jotun from the gate
+//   dn.kall       after Kall: engagement kept near, released far, empty burst retried; kill count per area (fake
+//                 deaths): half = weakening news, target = cleared and written, nature / outside / cleared kills
+//                 not counted, progress read back from the world
 //   dn.area       live in the Deep North at stage 3 (storms forced on): area Jotun spawn tagged in awake cells with
 //                 stage stars, blizzard weather, meteors; screenshots; travel back
 //   dn.map        map overlay: Deep North land scanned, awake cells tinted, sleeping ones not, off with the rule, the
@@ -469,17 +471,50 @@ internal static class SelfTests
             // Nature band composition over many rolls.
             var rng = new System.Random(11);
             var bandOk = true;
-            var sawBig = new bool[3];
+            var sawBig = new bool[4];
+            var sawShamans = new bool[5];
             for (var k = 0; k < 2000; k++)
             {
                 var b = AreaSpawns.RollBand((min, max) => rng.Next(min, max));
                 var gd = b.Greydwarfs + b.Shamans;
                 var big = b.Gammeltrolls + b.Barkas;
-                bandOk &= gd >= 5 && gd <= 10 && b.Shamans >= 1 && b.Shamans <= 2 && big >= 0 && big <= 2;
-                sawBig[big] = true;
+                bandOk &= gd >= 10 && gd <= 20 && b.Shamans >= 2 && b.Shamans <= 4 && big >= 1 && big <= 3;
+                if (big >= 0 && big <= 3)
+                {
+                    sawBig[big] = true;
+                }
+                if (b.Shamans >= 0 && b.Shamans <= 4)
+                {
+                    sawShamans[b.Shamans] = true;
+                }
             }
-            c.Check(bandOk && sawBig[0] && sawBig[1] && sawBig[2],
-                "nature bands: 5-10 frost Greydwarfs with 1-2 shamans, 0-2 Gammeltroll or Barka (each seen)");
+            c.Check(bandOk && sawBig[1] && sawBig[2] && sawBig[3] && sawShamans[2] && sawShamans[4],
+                "nature bands: 10-20 frost Greydwarfs with 2-4 shamans, 1-3 Gammeltroll or Barka (each seen)");
+
+            // Kill targets: fixed per cell, inside the range (either order), both ends reached.
+            var targetsOk = true;
+            var sawLow = false;
+            var sawHigh = false;
+            for (var k = 0; k < 2000; k++)
+            {
+                var id = Cells.Id(k % 50 - 25, k / 50 - 20);
+                var kt = Cells.KillTarget(777, id, 8, 13);
+                targetsOk &= kt >= 8 && kt <= 13 && kt == Cells.KillTarget(777, id, 13, 8) && kt == Cells.KillTarget(777, id, 8, 13);
+                sawLow |= kt == 8;
+                sawHigh |= kt == 13;
+            }
+            c.Check(targetsOk && sawLow && sawHigh && Cells.KillTarget(1, 5, 4, 4) == 4,
+                "kill targets: fixed per area, 8-13 with both ends reached, a single value when min = max");
+            HeldCells.Unpack(HeldCells.Pack(Cells.Id(-3, 25), 12), out var upCell, out var upCount);
+            HeldCells.Unpack(HeldCells.Pack(Cells.Id(4, -7), 1), out var upCell2, out var upCount2);
+            c.Check(upCell == Cells.Id(-3, 25) && upCount == 12 && upCell2 == Cells.Id(4, -7) && upCount2 == 1
+                    && HeldCells.Pack(0, 1) != 0L,
+                "kill slot packing round trip (negative squares too), never the free value");
+            var news = HeldCells.NewsPackage(HeldCells.NewsWeakening, -99, new Vector3(12.5f, 3f, -40f));
+            news.SetPos(0);
+            c.Check(HeldCells.TryReadNews(news, out var nk, out var nc, out var na) && nk == HeldCells.NewsWeakening
+                    && nc == -99 && Mathf.Approximately(na.x, 12.5f) && Mathf.Approximately(na.z, -40f),
+                "news wire read back");
             c.Check(Stones.ClaimsRequest(10f, 10f) && Stones.ClaimsRequest(14.9f, 10f) && !Stones.ClaimsRequest(9f, 10f)
                     && !Stones.ClaimsRequest(15.5f, 10f),
                 "a held request is claimed only by a break 0-5 s after it");
@@ -510,13 +545,12 @@ internal static class SelfTests
 
             // Area lists wire.
             var pkg = HeldCells.TestPackage(new List<int> { 5, -7, int.MaxValue }, new List<int> { 9 },
-                new Dictionary<int, int[]> { { 9, new[] { 1, 0, 2, 1 } }, { -7, new[] { 0, 0, 0, 0 } } });
+                new Dictionary<int, int> { { 9, 4 }, { 11, 1 } });
             pkg.SetPos(0);
-            c.Check(HeldCells.TryRead(pkg, out var cleared, out var engaged, out var living) && cleared.Count == 3
+            c.Check(HeldCells.TryRead(pkg, out var cleared, out var engaged, out var kills) && cleared.Count == 3
                     && cleared.Contains(-7) && engaged.Count == 1 && engaged.Contains(9)
-                    && living.TryGetValue(9, out var living9) && living9.Length == 4 && living9[0] == 1 && living9[2] == 2
-                    && living9[3] == 1 && living.Count == 2,
-                "area lists read back (cleared, engaged, living counts per Jotun kind)");
+                    && kills.TryGetValue(9, out var kills9) && kills9 == 4 && kills.Count == 2,
+                "area lists read back (cleared, engaged, kills per area)");
             var bad = new ZPackage();
             bad.Write(HeldCells.Layout + 1);
             bad.SetPos(0);
@@ -577,8 +611,8 @@ internal static class SelfTests
                 ServerRules.TestRules = Rules(r => r.StormShare = 0);
                 c.Check(!AreaSpawns.Gate(EntryKind.Meteor, land), "gate: no meteors without storms");
                 WorldState.TestKall = true;
-                c.Check(!AreaSpawns.Gate(EntryKind.Jotun, land) && !AreaSpawns.Gate(EntryKind.Nature, land),
-                    "gate: after Kall no area Jotun outside a burst, no nature band");
+                c.Check(!AreaSpawns.Gate(EntryKind.Jotun, land) && AreaSpawns.Gate(EntryKind.Nature, land),
+                    "gate: after Kall no area Jotun outside a burst; nature bands still in an area not cleared");
                 ServerRules.TestPending = true;
                 WorldState.TestKall = null;
                 c.Check(!AreaSpawns.Gate(EntryKind.Jotun, land), "gate: game waiting for the server's rules = vanilla");
@@ -616,6 +650,8 @@ internal static class SelfTests
             r.StormMaxMinutes = 7f;
             r.Meteors = false;
             r.MapAreas = false;
+            r.ClearKillsMin = 3;
+            r.ClearKillsMax = 30;
         });
         var pkg = new ZPackage();
         src.Write(pkg);
@@ -634,6 +670,8 @@ internal static class SelfTests
         wild.Write(5);
         wild.Write(true);
         wild.Write(-20);
+        wild.Write(0);
+        wild.Write(500);
         wild.Write(101);
         wild.Write(0f);
         wild.Write(1000f);
@@ -643,7 +681,7 @@ internal static class SelfTests
         c.Check(AwakeningRules.TryRead(wild, out var w, out var wc) && wc && w.CoverageStage1 == 0
                 && w.CoverageStage2 == 100 && w.StarChanceStage1 == AwakeningRules.Default.StarChanceStage1
                 && w.StarChanceStage2 == 100f && w.JotunDensity == AwakeningRules.DensityMin && w.NatureBandChance == 0
-                && w.StormShare == 100
+                && w.StormShare == 100 && w.ClearKillsMin == AwakeningRules.KillsMin && w.ClearKillsMax == AwakeningRules.KillsMax
                 && w.StormMinMinutes == AwakeningRules.StormMinutesMin && w.StormMaxMinutes == AwakeningRules.StormMinutesMax,
             "wild rules clamped into range: " + (w != null ? w.Describe() : "unreadable"));
 
@@ -1059,38 +1097,31 @@ internal static class SelfTests
     {
         var c = new Checks(KallName);
         var player = Player.m_localPlayer;
-        GameObject krigen = null;
+        var landCell = HeldCells.NoTag;
         try
         {
             const int cell = 0x7FFE0001;
-            ServerRules.TestRules = Rules(null);
-            WorldState.TestStones = 3;
-            var hasLand = FindAwakeLand(ServerRules.Current.Coverage(3), out var land, out _);
-            c.Check(hasLand && AreaSpawns.Gate(EntryKind.Jotun, land), "before Kall the gate allows area Jotun in an awake cell");
-            krigen = Spawn(Hostility.Krigen, player.transform.position + Vector3.forward * 40f);
-            yield return null;
-            var nview = krigen != null ? krigen.GetComponent<ZNetView>() : null;
-            if (!c.Check(nview != null && nview.GetZDO() != null, "spawned a Krigen"))
+            // Fixed target 6 (half 3) for every area.
+            ServerRules.TestRules = Rules(r =>
             {
-                c.Report();
-                yield break;
-            }
-            var id = nview.GetZDO().m_uid;
-            nview.GetZDO().Set(HeldCells.TagKey, cell);
-            c.Check(!HeldCells.IsCleared(cell), "before Kall no cell is cleared");
+                r.ClearKillsMin = 6;
+                r.ClearKillsMax = 6;
+            });
+            WorldState.TestStones = 3;
+            var hasLand = FindAwakeLand(ServerRules.Current.Coverage(3), out var land, out landCell);
+            c.Check(hasLand && AreaSpawns.Gate(EntryKind.Jotun, land), "before Kall the gate allows area Jotun in an awake cell");
+            c.Check(!HeldCells.IsCleared(landCell), "before Kall no cell is cleared");
 
             // World loaded with Kall already dead (no engage around the players).
             HeldCells.TestSawNoKall(false);
             WorldState.TestKall = true;
             var until = Time.time + 5f;
-            while (Time.time < until && !(HeldCells.Scanned && HeldCells.MayBurst(cell) && HeldCells.Living(cell) == 1))
+            while (Time.time < until && !(HeldCells.Scanned && HeldCells.MayBurst(cell)))
             {
                 yield return null;
             }
-            c.Check(HeldCells.Scanned && HeldCells.TestTracks(id) && !HeldCells.IsCleared(cell) && HeldCells.MayBurst(cell)
-                    && HeldCells.Living(cell) == 1 && HeldCells.LivingOf(cell, 0) == 1 && HeldCells.LivingOf(cell, 3) == 0,
-                $"after Kall the tagged Krigen is counted and its area spawns again when entered (tracked "
-                + $"{HeldCells.TrackedCreatures}, areas with Jotun {HeldCells.HeldCount}, living here {HeldCells.Living(cell)})");
+            c.Check(HeldCells.Scanned && !HeldCells.IsCleared(landCell) && HeldCells.MayBurst(cell),
+                "after Kall the server lists arrived; an area not cleared spawns again when entered");
             c.Check(hasLand && !AreaSpawns.Gate(EntryKind.Jotun, land), "after Kall no area Jotun outside a burst");
 
             // Engaged = no second burst while a player is near; a burst that got nothing tries again later.
@@ -1105,26 +1136,65 @@ internal static class SelfTests
             c.Check(HeldCells.TestServerEngaged(here) && HeldCells.IsEngaged(here) && !HeldCells.TestServerEngaged(cell)
                     && !HeldCells.TestServerEngaged(empty),
                 "the server keeps an area engaged while a player is near it, releases the far one, never engaged the empty one");
-            // The game's own hold (network delay) runs out too.
-            yield return new WaitForSeconds(Mathf.Max(0f, burstAt + HeldCells.LocalHoldSeconds + 0.5f - Time.time));
-            c.Check(HeldCells.MayBurst(empty) && HeldCells.MayBurst(cell) && !HeldCells.MayBurst(here),
-                "the released and the empty areas may spawn again; the area here may not");
 
-            // Real servers wait for late-spawn rescans (30 s) before clearing: skip that here.
-            HeldCells.TestSettle();
-            ZNetScene.instance.Destroy(krigen);
-            krigen = null;
+            // Kill count: the Jotun army killed inside the area.
+            c.Check(ServerRules.Current.KillTarget(WorldState.Seed, landCell) == 6, "the area needs 6 kills (test rules)");
+            HeldCells.TestResetNews();
+            FakeKill(Hostility.Krigen, land);
+            FakeKill(Hostility.KrigenDual, land);
+            yield return WaitKills(landCell, 2);
+            HeldCells.TestLastNews(out var kind, out _, out _);
+            c.Check(HeldCells.TestKills(landCell) == 2 && HeldCells.TestKillSlots(landCell) == 1 && kind == 0,
+                $"2 kills counted and written on a zone control, no news yet ({HeldCells.TestKills(landCell)} counted)");
+            FakeKill(Hostility.Hexen, land);
+            yield return WaitKills(landCell, 3);
+            yield return null;
+            HeldCells.TestLastNews(out kind, out var newsCell, out var shown);
+            c.Check(HeldCells.TestKills(landCell) == 3 && kind == HeldCells.NewsWeakening && newsCell == landCell && !shown,
+                $"half way (3 of 6): news \"The Jotun army is weakening\", not shown to a player far away (news {kind}, shown {shown})");
+
+            // Not counted: nature, a Jotun outside the Deep North.
+            FakeKill(Hostility.Gammeltroll, land);
+            FakeKill(Hostility.Krigen, new Vector3(0f, 0f, -8000f));
+            yield return new WaitForSeconds(1f);
+            c.Check(HeldCells.TestKills(landCell) == 3 && HeldCells.TestKills(WorldState.CellAt(new Vector3(0f, 0f, -8000f))) == 0,
+                "a nature kill and a Jotun kill outside the Deep North do not count");
+
+            // Kept in the world: a new scan reads the progress back.
+            HeldCells.TestRescan();
             until = Time.time + 5f;
-            while (Time.time < until && !HeldCells.IsCleared(cell))
+            while (Time.time < until && !(HeldCells.Scanned && HeldCells.KillsIn(landCell) == 3))
             {
                 yield return null;
             }
-            c.Check(HeldCells.IsCleared(cell) && !HeldCells.TestTracks(id) && !HeldCells.MayBurst(cell)
-                    && HeldCells.Living(cell) == 0,
-                "killing its last Jotun cleared the area for good");
-            c.Check(HeldCells.TestMarkedAnywhere(cell), "the server wrote the cleared area on a zone control (kept in the world)");
+            c.Check(HeldCells.TestKills(landCell) == 3 && HeldCells.KillsIn(landCell) == 3,
+                $"after a new scan the 3 kills are read back from the world and sent to the players ({HeldCells.TestKills(landCell)})");
 
-            // Read back from the world: a fresh server scan finds it again.
+            // The target clears it for good.
+            HeldCells.TestResetNews();
+            FakeKill(Hostility.Elaking, land);
+            FakeKill(Hostility.Elaking, land);
+            FakeKill(Hostility.Krigen, land);
+            until = Time.time + 5f;
+            while (Time.time < until && !HeldCells.IsCleared(landCell))
+            {
+                yield return null;
+            }
+            HeldCells.TestLastNews(out kind, out newsCell, out _);
+            c.Check(HeldCells.IsCleared(landCell) && !HeldCells.MayBurst(landCell) && HeldCells.TestKills(landCell) == 0
+                    && kind == HeldCells.NewsCleared && newsCell == landCell,
+                $"6 kills cleared the area for good, news \"The Jotun Retreat\" (news {kind})");
+            c.Check(HeldCells.TestMarkedAnywhere(landCell) && HeldCells.TestKillSlots(landCell) == 0,
+                "the cleared area is written on a zone control, its kill count slot freed");
+
+            // Kills in a cleared area count for nothing.
+            HeldCells.TestResetNews();
+            FakeKill(Hostility.Krigen, land);
+            yield return new WaitForSeconds(1f);
+            HeldCells.TestLastNews(out kind, out _, out _);
+            c.Check(HeldCells.TestKills(landCell) == 0 && kind == 0, "a kill in a cleared area counts for nothing");
+
+            // Read back from the world: a fresh server scan finds it cleared again.
             HeldCells.TestRescan();
             until = Time.time + 5f;
             while (Time.time < until && !(HeldCells.Scanned && HeldCells.ClearedCount > 0))
@@ -1132,13 +1202,15 @@ internal static class SelfTests
                 yield return null;
             }
             yield return null;
-            c.Check(HeldCells.IsCleared(cell), $"after a new scan the area is still cleared ({HeldCells.ClearedCount} cleared)");
+            c.Check(HeldCells.IsCleared(landCell), $"after a new scan the area is still cleared ({HeldCells.ClearedCount} cleared)");
         }
         finally
         {
-            Kill(krigen);
             // Leave no test area in the world.
-            HeldCells.TestUnmarkEverywhere(0x7FFE0001);
+            if (landCell != HeldCells.NoTag)
+            {
+                HeldCells.TestUnmarkEverywhere(landCell);
+            }
             ClearOverrides();
             HeldCells.TestRescan();
             HeldCells.TestClearEngaged();
@@ -1146,20 +1218,13 @@ internal static class SelfTests
         c.Report();
     }
 
-    // Zone-control ZDOs this game owns now.
-    private static List<ZDO> OwnedZoneCtrls()
+    private static IEnumerator WaitKills(int cell, int count)
     {
-        var list = new List<ZDO>();
-        foreach (var ss in SpawnSystem.m_instances)
+        var until = Time.time + 3f;
+        while (Time.time < until && HeldCells.TestKills(cell) < count)
         {
-            var nview = ss != null ? ss.m_nview : null;
-            var zdo = nview != null && nview.IsValid() && nview.IsOwner() ? nview.GetZDO() : null;
-            if (zdo != null)
-            {
-                list.Add(zdo);
-            }
+            yield return null;
         }
-        return list;
     }
 
     private static SpawnSystem OwnedSpawner(Vector3 position)
@@ -1260,6 +1325,9 @@ internal static class SelfTests
             {
                 r.StormShare = 100;
                 r.NatureBandChance = 0;
+                // No clearing by the kills of the burst checks; the end lowers it.
+                r.ClearKillsMin = 60;
+                r.ClearKillsMax = 60;
             });
             WorldState.TestStones = 3;
             WorldState.Refresh();
@@ -1419,8 +1487,8 @@ internal static class SelfTests
                         big++;
                     }
                 }
-                c.Check(gd >= 3 && gd <= 10 && big <= 2,
-                    $"a nature band spawned together: {gd} frost Greydwarfs (5-10 rolled, some spots may be refused), {big} big");
+                c.Check(gd >= 6 && gd <= 20 && big <= 3,
+                    $"a nature band spawned together: {gd} frost Greydwarfs (10-20 rolled, some spots may be refused), {big} big");
                 c.Note("band: " + string.Join(", ", band.ConvertAll(b => b.name.Replace("(Clone)", "") + " lvl " + b.GetLevel()).ToArray()));
             }
             foreach (var ch in band)
@@ -1501,7 +1569,7 @@ internal static class SelfTests
             {
                 decoys.Add(Spawn(Hostility.Krigen, player.transform.position + new Vector3(30f + 4f * k, 0f, 30f), Vector3.back));
             }
-            yield return new WaitForSeconds(HeldCells.RecountDelay + 1f);
+            yield return new WaitForSeconds(2f);
             var hasOthers = CountTagged(hereCell) > 0;
             HeldCells.TestClearEngaged();
             var krigenBack = 0;
@@ -1520,9 +1588,32 @@ internal static class SelfTests
                 $"entered again with none of its Krigen left and 3 other Krigen near: {krigenBack} of the area's own Krigen "
                 + $"came back ({killedKrigen} more killed just before)" + (hasOthers ? "" : " (skipped: the burst had only Krigen)"));
 
-            // Kill them all: cleared for good (no spawn, no storm, kept in the world).
-            HeldCells.TestSettle();
-            var killed = KillArea(hereCell);
+            // Kills here count toward the clearing (any Jotun killed inside the area).
+            yield return new WaitForSeconds(0.5f);
+            var counted = HeldCells.TestKills(hereCell);
+            c.Check(counted >= killedFew, $"Jotun killed in the area count toward its clearing ({counted} counted)");
+
+            // After Kall nature bands keep coming while the area is not cleared.
+            var bandSpawner = OwnedSpawner(player.transform.position);
+            var bandAfter = bandSpawner != null ? AreaSpawns.TrySpawnBand(bandSpawner, new List<Player> { player }) : 0;
+            c.Check(bandAfter > 0, $"after Kall a nature band still spawns in the area ({bandAfter} members)");
+            KillBand();
+            yield return null;
+
+            // Target = what is counted + 2: two more kills clear it for good (no spawn, no storm, off the map, kept in
+            // the world); the creatures left stay.
+            var targetNow = HeldCells.TestKills(hereCell) + 2;
+            ServerRules.TestRules = Rules(r =>
+            {
+                r.StormShare = 100;
+                r.NatureBandChance = 0;
+                r.ClearKillsMin = targetNow;
+                r.ClearKillsMax = targetNow;
+            });
+            var leftAlive = CountTagged(hereCell);
+            HeldCells.TestResetNews();
+            FakeKill(Hostility.Hexen, player.transform.position + new Vector3(3f, 0f, 3f));
+            FakeKill(Hostility.Elaking, player.transform.position + new Vector3(-3f, 0f, 3f));
             until2 = Time.time + 6f;
             while (Time.time < until2 && !HeldCells.IsCleared(hereCell))
             {
@@ -1532,17 +1623,49 @@ internal static class SelfTests
             {
                 _areaCleared = hereCell;
             }
+            HeldCells.TestLastNews(out var newsKind, out var newsCell, out var newsShown);
             c.Check(HeldCells.IsCleared(hereCell) && !HeldCells.MayBurst(hereCell) && HeldCells.TestMarkedAnywhere(hereCell),
-                $"killing the area's {killed} Jotun cleared it for good (written on a zone control)");
+                $"{targetNow} Jotun killed in the area cleared it for good (written on a zone control)");
+            c.Check(newsKind == HeldCells.NewsCleared && newsCell == hereCell && newsShown,
+                $"\"The Jotun Retreat\" shown to the player in the area (news {newsKind}, shown {newsShown})");
+            c.Check(!AreaSpawns.Gate(EntryKind.Nature, player.transform.position), "no nature band in a cleared area");
             c.Check(!Storms.StormAt(player.transform.position, ServerRules.Current),
                 "no storm in a cleared area (storm share 100 %)");
             yield return null;
             yield return null;
             c.Check(MapOverlay.TestPixel(player.transform.position) == 1,
                 $"the cleared area left the map (pixel state {MapOverlay.TestPixel(player.transform.position)})");
+            // Engagement and the game's own hold gone: only the cleared mark can stop a burst now.
+            HeldCells.TestClearEngaged();
             yield return new WaitForSeconds(4f);
             var after = CountTagged(hereCell);
-            c.Check(after == 0, $"a cleared area spawns nothing ({after})");
+            c.Check(after <= leftAlive, $"a cleared area spawns nothing; its {leftAlive} Jotun left alive stay ({after} now)");
+        }
+    }
+
+    // A death without a creature: a ZDO of that prefab made and destroyed at a position (the server see the destroy
+    // like a death). Far from the player no creature is ever made for it.
+    private static void FakeKill(string prefab, Vector3 at)
+    {
+        var zdos = ZDOMan.instance;
+        var hash = prefab.GetStableHashCode();
+        // CreateNewZDO keep the prefab only for portals; ZNetView.Awake set it on real objects.
+        var zdo = zdos.CreateNewZDO(at, hash);
+        zdo.SetPrefab(hash);
+        zdos.DestroyZDO(zdo);
+    }
+
+    // Every loaded nature band member.
+    private static void KillBand()
+    {
+        foreach (var ch in Character.GetAllCharacters().ToArray())
+        {
+            var nv = ch != null ? ch.m_nview : null;
+            var z = nv != null ? nv.GetZDO() : null;
+            if (z != null && z.GetInt(AreaSpawns.BandKey, 0) != 0)
+            {
+                ZNetScene.instance.Destroy(ch.gameObject);
+            }
         }
     }
 
@@ -1590,34 +1713,6 @@ internal static class SelfTests
                 ZNetScene.instance.Destroy(ch.gameObject);
             }
         }
-    }
-
-    // Every Jotun of an area, loaded or not (test world): returns how many.
-    private static int KillArea(int cell)
-    {
-        var n = 0;
-        foreach (var prefab in Hostility.Army)
-        {
-            foreach (var zdo in Stones.AllZdos(prefab))
-            {
-                if (zdo.GetInt(HeldCells.TagKey, HeldCells.NoTag) != cell)
-                {
-                    continue;
-                }
-                var go = ZNetScene.instance.FindInstance(zdo);
-                if (go != null)
-                {
-                    ZNetScene.instance.Destroy(go.gameObject);
-                }
-                else
-                {
-                    zdo.SetOwner(ZDOMan.GetSessionID());
-                    ZDOMan.instance.DestroyZDO(zdo);
-                }
-                n++;
-            }
-        }
-        return n;
     }
 
     // ---------- dn.morkhalla ----------

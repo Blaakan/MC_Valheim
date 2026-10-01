@@ -21,13 +21,13 @@ internal enum EntryKind : byte
 // cleared).
 // After Kall (design 2.6): no timed spawns. The cell under a player in the zone, not cleared and not engaged = entered
 // again: one burst per cell (Jotun entries with their timers reset, so vanilla tries up to each cap; the gate only allow
-// that cell; the cap count = the cell's own living Jotun of that kind, BurstCount), then the cells that got Jotun or
-// have some are engaged (to be defeated) until no player is near (HeldCells).
+// that cell; the cap count = the cell's own Jotun of that kind in the zones around, BurstCount), then the cells that got
+// Jotun or have some are engaged (to be defeated) until no player is near (HeldCells).
 // Tag = while Jotun entries run, Character.Awake postfix write the cell on each new Jotun (HeldCells.TagKey) and note
 // it (SpawnedInto).
-// Nature band (design 2.5): every BandInterval s per zone, BandChance: 5-10 frost Greydwarfs (1-2 of them shamans) and
-// 0-2 big ones (Gammeltroll or Barka) together at one spot, vanilla spawn point rules for each; none while BandCap
-// band members already live near; before Kall only.
+// Nature band (design 2.5): every BandInterval s per zone, BandChance: 10-20 frost Greydwarfs (2-4 of them shamans) and
+// 1-3 big ones (Gammeltroll or Barka) together at one spot, vanilla spawn point rules for each; none while BandCap
+// band members already live near; never in a cleared area (after Kall they keep coming until the area is cleared).
 // Entries rebuilt when rules, stage or the prefab table change.
 internal static class AreaSpawns
 {
@@ -75,13 +75,16 @@ internal static class AreaSpawns
     internal const float ZoneReach = 112f;
 
     internal const float BandInterval = 1200f;
-    internal const int BandGreydwarfMin = 5;
-    internal const int BandGreydwarfMax = 10;
-    internal const int BandBigMax = 2;
+    internal const int BandGreydwarfMin = 10;
+    internal const int BandGreydwarfMax = 20;
+    internal const int BandShamanMin = 2;
+    internal const int BandShamanMax = 4;
+    internal const int BandBigMin = 1;
+    internal const int BandBigMax = 3;
     internal const int BandCap = 3;
     internal const float BandCapRadius = 160f;
-    private const float BandRadius = 7f;
-    private const float BandBigRadius = 10f;
+    private const float BandRadius = 10f;
+    private const float BandBigRadius = 13f;
     private static readonly int BandTimerKey = (SaltPrefix + "Band_NatureBand1").GetStableHashCode();
     internal static readonly int BandKey = (ModInfo.Guid + ".Band").GetStableHashCode();
 
@@ -140,7 +143,7 @@ internal static class AreaSpawns
             return;
         }
         var kall = WorldState.KallDefeated;
-        Look(ss.transform.position, rules, out var anyAwake, out var anyStorm);
+        Look(ss.transform.position, rules, out var anyAwake, out var anyStorm, out var anyOpen);
         if (!anyAwake)
         {
             return;
@@ -162,7 +165,7 @@ internal static class AreaSpawns
         if (kall)
         {
             PickBurstCells(players, rules);
-            if (BurstCells.Count == 0 && !anyStorm)
+            if (BurstCells.Count == 0 && !anyStorm && !anyOpen)
             {
                 return;
             }
@@ -214,7 +217,7 @@ internal static class AreaSpawns
             BurstCells.Clear();
             SpawnedInto.Clear();
         }
-        if (!kall && rules.NatureFightsBack && rules.NatureBandChance > 0 && Due(zdo, BandTimerKey, BandInterval, now))
+        if (anyOpen && rules.NatureFightsBack && rules.NatureBandChance > 0 && Due(zdo, BandTimerKey, BandInterval, now))
         {
             zdo.Set(BandTimerKey, now.Ticks);
             if (UnityEngine.Random.Range(0f, 100f) < rules.NatureBandChance)
@@ -263,10 +266,9 @@ internal static class AreaSpawns
         }
     }
 
-    // GetNrOfZDOInstances prefix while Bursting: the burst cell's own living Jotun of that kind, not every one of that
-    // prefab in the 5 x 5 zones (other areas' Jotun must not fill its caps; its own that roam far still count). Max of
-    // the tagged ones in the zones and the server count (new ones not counted there yet, far ones not loaded here).
-    // -1 = not one of ours: vanilla count.
+    // GetNrOfZDOInstances prefix while Bursting: the burst cell's own Jotun of that kind in the 5 x 5 zones, not every
+    // one of that prefab (other areas' Jotun and vanilla ones must not fill its caps). -1 = not one of ours: vanilla
+    // count.
     internal static int BurstCount(GameObject prefab, List<ZDO> zdos)
     {
         if (prefab == null || _burstCell == NoCell)
@@ -287,17 +289,19 @@ internal static class AreaSpawns
                 local++;
             }
         }
-        return Math.Max(local, HeldCells.LivingOf(_burstCell, kind));
+        return local;
     }
 
     // Character.Awake postfix while Tagging: cells that got Jotun in this pass.
     internal static void NoteTagged(int cell) => SpawnedInto.Add(cell);
 
-    // Any awake cell within ZoneReach of the zone centre (3 x 3 samples); any storming one that is not cleared.
-    private static void Look(Vector3 center, AwakeningRules rules, out bool anyAwake, out bool anyStorm)
+    // Any awake cell within ZoneReach of the zone centre (3 x 3 samples); any of them not cleared; any storming one that
+    // is not cleared.
+    private static void Look(Vector3 center, AwakeningRules rules, out bool anyAwake, out bool anyStorm, out bool anyOpen)
     {
         anyAwake = false;
         anyStorm = false;
+        anyOpen = false;
         var seed = WorldState.Seed;
         var coverage = rules.Coverage(WorldState.Stage);
         var last = int.MinValue;
@@ -316,7 +320,12 @@ internal static class AreaSpawns
                     continue;
                 }
                 anyAwake = true;
-                if (!anyStorm && rules.Meteors && !HeldCells.IsCleared(cell) && WorldState.IsStormingCell(cell, rules))
+                if (HeldCells.IsCleared(cell))
+                {
+                    continue;
+                }
+                anyOpen = true;
+                if (!anyStorm && rules.Meteors && WorldState.IsStormingCell(cell, rules))
                 {
                     anyStorm = true;
                 }
@@ -354,7 +363,7 @@ internal static class AreaSpawns
                 // After Kall only during a burst, only into its cells.
                 return !WorldState.KallDefeated || (Bursting && cell == _burstCell);
             case EntryKind.Nature:
-                return !WorldState.KallDefeated;
+                return !HeldCells.IsCleared(cell);
             default:
                 return rules.Meteors && !HeldCells.IsCleared(cell) && WorldState.IsStormingCell(cell, rules);
         }
@@ -372,9 +381,10 @@ internal static class AreaSpawns
     internal static BandRoll RollBand(Func<int, int, int> range)
     {
         var total = range(BandGreydwarfMin, BandGreydwarfMax + 1);
-        var shamans = total >= 8 ? 2 : 1;
+        // About one shaman in five: 10 = 2, 20 = 4.
+        var shamans = Mathf.Clamp(Mathf.RoundToInt(total / 5f), BandShamanMin, BandShamanMax);
         var roll = new BandRoll { Greydwarfs = total - shamans, Shamans = shamans };
-        var big = range(0, BandBigMax + 1);
+        var big = range(BandBigMin, BandBigMax + 1);
         for (var i = 0; i < big; i++)
         {
             if (range(0, 2) == 0)

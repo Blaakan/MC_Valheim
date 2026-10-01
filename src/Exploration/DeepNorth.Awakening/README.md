@@ -60,20 +60,25 @@ the edge of the Deep North: the land and sea beyond it keep their own weather.
 ### Nature fights back
 
 Once the north is awake, Gammeltroll, Barka and frost Greydwarfs (and their shamans) are enemies of the Jotun army,
-wherever they meet. Now and then a band of them appears in an invaded area to fight the Jotun: 5 to 10 frost
-Greydwarfs (1 or 2 of them shamans) and up to 2 big ones (Gammeltroll or Barka, in any mix). There is never more than
-one band around you at a time. They still attack players too.
+wherever they meet. Now and then a band of them appears in an invaded area to fight the Jotun: 10 to 20 frost
+Greydwarfs (2 to 4 of them shamans) and 1 to 3 big ones (Gammeltroll or Barka, in any mix). There is never more than
+one band around you at a time. Bands keep coming after Kall, until the area is cleared. They still attack players too.
 
 ### After Kall Fimbulbringer
 
-Once Kall is defeated, the invaded areas stop spawning over time. The area you stand in when Kall falls (and the areas
-next to you that still have Jotun) keep the Jotun they have: nothing new appears there while you stay around. After
-that, each time you walk into an area that is not cleared, its Jotun appear at once, up to its usual numbers (all of
-its Jotun still alive count, wherever they are), and then it waits to be defeated: nothing more appears until every
-player has gone far enough for it to unload (about 750 m from its centre). Leave without clearing it and its Jotun
-come back the next time you walk in. Kill every Jotun of an area and it is cleared for good: no more Jotun, storms or
-meteors there, ever. If you stand in it when that happens: "The Jotun Retreat". Areas nobody visited yet still have
-their Jotun the first time you walk into them.
+Once Kall is defeated, the invaded areas stop spawning Jotun over time, and you can clear them:
+
+- **Kill the Jotun army inside an area.** Each area needs its own number of kills, between 8 and 13: Krigen, Hexen and
+  Elaking killed inside it, wherever they came from. Half way, players there see "The Jotun army is weakening". At the
+  number, the area is cleared for good: "The Jotun Retreat", no more Jotun, nature bands, storms or meteors there, and
+  its purple leaves the map. Creatures still alive there stay.
+- **Walking into an area that is not cleared** makes its Jotun appear at once, up to its usual numbers (the ones still
+  around count), and then it waits to be defeated: no more Jotun until every player has gone far enough for it to
+  unload (about 750 m from its centre). Leave without clearing it and its Jotun come back the next time you walk in;
+  the kills you made there stay counted.
+- **The area you stand in when Kall falls** (and the areas next to you whose Jotun are around) keep the Jotun they
+  have: nothing new appears there while you stay around. Areas nobody visited yet still have their Jotun the first time
+  you walk into them.
 
 ### Worlds that already broke Malicious Ice
 
@@ -116,7 +121,9 @@ each player's own; AllowPlayersWithoutMod and the Invasions section are read onl
 | Awakening | StarChanceStage3 | `45` | Chance per star roll at stage 3 and later. |
 | Awakening | JotunDensity | `100` | How many Jotun an area holds, in percent of the normal amount (25 to 400). |
 | Awakening | NatureFightsBack | `true` | Gammeltroll, Barka and frost Greydwarfs fight the Jotun once the north is awake, and the areas spawn bands of them. |
-| Awakening | NatureBandChance | `10` | Chance, in percent, of a nature band each time a place in an invaded area checks (every 20 minutes per place, at once on the first visit). 0 = no bands. |
+| Awakening | NatureBandChance | `10` | Chance, in percent, of a nature band (10-20 frost Greydwarfs, 1-3 Gammeltroll or Barka) each time a place in an invaded area checks (every 20 minutes per place, at once on the first visit). Never in a cleared area. 0 = no bands. |
+| Awakening | ClearKillsMin | `8` | After Kall: fewest Jotun kills inside an area that clear it. Each area needs its own fixed number between ClearKillsMin and ClearKillsMax. |
+| Awakening | ClearKillsMax | `13` | After Kall: most Jotun kills an area can need. |
 | Storms | StormShare | `33` | Share of the time an area storms, in percent. 0 = never. |
 | Storms | StormMinMinutes | `5` | Shortest storm, in real minutes (1 to 60). |
 | Storms | StormMaxMinutes | `10` | Longest storm, in real minutes (1 to 60). |
@@ -148,9 +155,11 @@ how many Malicious Ice were broken in the global key mc_dn_stones.
 - **A player let in without the mod** (AllowPlayersWithoutMod on) sees the normal weather and causes no area spawns
   where only they are. If they break a Malicious Ice, every player gets "The Jotun Advance" (twice: from their game and
   from the server), the server counts the stage as usual, and no extra invasion starts.
-- **After Kall, the server keeps one list for everybody**: which areas are cleared and which wait to be defeated. Two
-  players walking into the same area from two sides get one set of Jotun, not two, and an area stays waiting while any
-  player is near it. A player who joins later (or turns the mod back on) gets the lists at once.
+- **After Kall, the server keeps one list for everybody**: which areas are cleared, which wait to be defeated, and the
+  kills in each. Two players walking into the same area a moment apart get one set of Jotun, and an area stays waiting
+  while any player is near it. Every player's kills count. "The Jotun army is weakening" and "The Jotun Retreat" show to
+  the players in that area (or near the kill). A player who joins later (or turns the mod back on) gets the lists at
+  once.
 - **Dedicated servers:** install BepInEx on the server and put the mod in its `BepInEx/plugins` folder; the server's
   config file decides the settings for everyone.
 
@@ -162,9 +171,13 @@ how many Malicious Ice were broken in the global key mc_dn_stones.
 - **Raids and boss fights win over the storms**: during a Jotun raid, a boss fight or near a normal Jotun invasion,
   you get their weather, not the area blizzard.
 - **Server log.** The server logs each Malicious Ice ("A Malicious Ice was broken at ..."), the invasions it starts and,
-  after Kall, every area that becomes cleared.
-- **Cleared areas are remembered in the world**, on the game's own zone data, so they stay cleared after a restart and
-  for every player.
+  after Kall, every area that is half way and every area that becomes cleared.
+- **Cleared areas and kill counts are remembered in the world**, on the game's own zone data, so they stay after a
+  restart and are the same for every player. `deepnorth_stones` in an area shows its kills so far and the number it
+  needs.
+- **Any Jotun killed inside an area counts for that area**: one that followed you in from next door, or a normal Jotun
+  patrol. Gammeltroll, Barka and Greydwarfs do not count, nor raid Jotun that leave when their raid ends. A Jotun of an area killed elsewhere counts for the area where it
+  died.
 - **The map tint is never saved.** The map files on disk keep their normal colours; turning the mod off gives the map
   its normal colours back at once. Right after a world loads, the tint appears within about a second.
 - **The count is a global key** (`listkeys` shows `mc_dn_stones`). Removing it (`removekey mc_dn_stones`) makes the
@@ -172,14 +185,11 @@ how many Malicious Ice were broken in the global key mc_dn_stones.
 - **Another mod or an admin starting a Jotun invasion** (`pevents start jotun_invasion`) still works, about 5 seconds
   later. Only a Malicious Ice broken in the 5 seconds after such a request can cancel it (it is then taken for that
   stone's own request).
-- **Right after Kall** (and in the first 30 seconds after the world loads or the mod is turned back on) an area whose
-  last Jotun dies is cleared only once those 30 seconds are over: the server first makes sure no player's game spawned
-  a Jotun there just as Kall fell.
 - **After a server restart** (after Kall), every area that is not cleared spawns its Jotun again when you walk into it,
-  even one you left a moment before the restart (the "waiting to be defeated" list is not saved; the cleared list is).
-- **An area counts the Jotun it spawned**, wherever they wander, loaded or not. A Jotun of an area that follows you far
-  out and is left behind when you go (it stays where it was until that place loads again, then walks back toward its
-  area) still has to die for that area to be cleared, and counts toward its numbers when you walk in again.
+  even one you left a moment before the restart (the "waiting to be defeated" list is not saved; kills and cleared
+  areas are).
+- **Walking into an area from a far side** can bring a new set of its Jotun while the first set is still around
+  elsewhere in the area: more to kill toward its number, never fewer.
 - **Dying in an area** does not make it spawn again when you come back to a bed inside it: while you wait to respawn,
   the server counts you where you will respawn.
 

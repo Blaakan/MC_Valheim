@@ -13,7 +13,7 @@ namespace MC.Exploration.DeepNorthAwakeningMod.Patches;
 //                             at once): point must be in an awake cell (meteors: storming, held). Run for each centre
 //                             try and each group member.
 //   GetNrOfZDOInstances prefix: only while an after-Kall burst run one of our Jotun entries (one bool read otherwise):
-//                             the cap count = the burst cell's own living Jotun of that kind (AreaSpawns.BurstCount).
+//                             the cap count = the burst cell's own Jotun of that kind around (AreaSpawns.BurstCount).
 [HarmonyPatch(typeof(SpawnSystem))]
 internal static class SpawnSystemPatches
 {

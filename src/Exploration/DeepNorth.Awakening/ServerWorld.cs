@@ -4,7 +4,7 @@ using MC.Shared;
 namespace MC.Exploration.DeepNorthAwakeningMod;
 
 // Me = server heart beat (design 2.1, 2.6). ZNet.Update postfix call me every frame on every game; only the server
-// (single player, host, dedicated) do work: destroy delegate on ZDOMan (stones, dead area Jotun), stone effects,
+// (single player, host, dedicated) do work: destroy delegate on ZDOMan (stones, Jotun killed in the areas), stone effects,
 // held-back invasion requests, old-world detection, held areas after Kall.
 // Delegate added once per ZDOMan (new world = new ZDOMan), removed when off or not server.
 internal static class ServerWorld

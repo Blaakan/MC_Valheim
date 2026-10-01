@@ -35,6 +35,8 @@ internal sealed partial class Plugin : ModPlugin
     internal static ConfigEntry<int> JotunDensity;
     internal static ConfigEntry<bool> NatureFightsBack;
     internal static ConfigEntry<int> NatureBandChance;
+    internal static ConfigEntry<int> ClearKillsMin;
+    internal static ConfigEntry<int> ClearKillsMax;
 
     // Storms (rules, server wins).
     internal static ConfigEntry<int> StormShare;
@@ -103,11 +105,22 @@ internal sealed partial class Plugin : ModPlugin
             null, new ConfigurationManagerAttributes { Order = 85 }));
         NatureBandChance = Config.Bind(AwakeningSection, "NatureBandChance", d.NatureBandChance, new ConfigDescription(
             "Chance, in percent, that a band of nature appears when a place in an invaded area checks for one (once "
-            + "every 20 minutes per place, at once on the first visit): 5 to 10 frost Greydwarfs, 1 or 2 of them "
-            + "shamans, and up to 2 Gammeltroll or Barka. Never while a band is already near, never after Kall is "
-            + "defeated. 0 = no bands." + ServerWins,
+            + "every 20 minutes per place, at once on the first visit): 10 to 20 frost Greydwarfs, 2 to 4 of them "
+            + "shamans, and 1 to 3 Gammeltroll or Barka. Never while a band is already near, never in a cleared area "
+            + "(bands keep coming after Kall until the area is cleared). 0 = no bands." + ServerWins,
             new AcceptableValueRange<int>(0, AwakeningRules.PercentMax),
             new ConfigurationManagerAttributes { Order = 84 }));
+        ClearKillsMin = Config.Bind(AwakeningSection, "ClearKillsMin", d.ClearKillsMin, new ConfigDescription(
+            "After Kall Fimbulbringer is defeated, an invaded area is cleared for good once enough Jotun (Krigen, "
+            + "Hexen, Elaking, from any area) have been killed inside it: each area needs its own fixed number "
+            + "between ClearKillsMin and ClearKillsMax. Half way, players there see \"The Jotun army is weakening\"."
+            + ServerWins,
+            new AcceptableValueRange<int>(AwakeningRules.KillsMin, AwakeningRules.KillsMax),
+            new ConfigurationManagerAttributes { Order = 80 }));
+        ClearKillsMax = Config.Bind(AwakeningSection, "ClearKillsMax", d.ClearKillsMax, new ConfigDescription(
+            "Most Jotun kills an area can need to be cleared (see ClearKillsMin)." + ServerWins,
+            new AcceptableValueRange<int>(AwakeningRules.KillsMin, AwakeningRules.KillsMax),
+            new ConfigurationManagerAttributes { Order = 79 }));
 
         StormShare = Config.Bind(StormsSection, "StormShare", d.StormShare, new ConfigDescription(
             "Share of the time an invaded area storms (Deep North blizzard and Fimbul meteors), in percent. Each area "

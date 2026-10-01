@@ -7,8 +7,8 @@ namespace MC.Exploration.DeepNorthAwakeningMod.Patches;
 // Me = tag what the areas spawn (design 2.3, 2.5, 2.6). Awake run inside Instantiate, inside vanilla Spawn, inside the
 // spawn calls AreaSpawns make (Tagging: Jotun entries; BandTagging: a nature band). ZNetView.Awake run before (vanilla
 // Character.Awake already read the ZDO), so the new creature has its ZDO.
-//   Jotun: cell in HeldCells.TagKey (the server count the living ones of each area after Kall), noted for the
-//          after-Kall burst (AreaSpawns.SpawnedInto).
+//   Jotun: cell in HeldCells.TagKey (after Kall: burst caps count only the area's own, engage see the area's Jotun
+//          around), noted for the after-Kall burst (AreaSpawns.SpawnedInto).
 //   Band:  AreaSpawns.BandKey = 1 (band cap counts them).
 // Every other Awake: two bool reads.
 [HarmonyPatch(typeof(Character))]

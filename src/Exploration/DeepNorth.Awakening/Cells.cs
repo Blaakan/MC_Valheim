@@ -22,6 +22,7 @@ internal static class Cells
     private const uint SaltPhase = 0x7FEB352Du;
     private const uint SaltLength = 0x846CA68Bu;
     private const uint SaltStart = 0x2C1B3C6Du;
+    private const uint SaltKills = 0x5BD1E995u;
 
     // Grid square index of a coordinate.
     internal static int Square(float v) => (int)Math.Floor(v / Size);
@@ -176,6 +177,15 @@ internal static class Cells
 
     // Fixed value of a cell: awake while it is below the coverage.
     internal static float AwakeValue(int seed, int i, int j) => Unit(Hash(seed, i, j, SaltAwake));
+
+    // Fixed Jotun kill target of a cell in min..max (order free, both ends included).
+    internal static int KillTarget(int seed, int id, int min, int max)
+    {
+        var lo = Math.Min(min, max);
+        var hi = Math.Max(min, max);
+        FromId(id, out var i, out var j);
+        return lo + (int)(Hash(seed, i, j, SaltKills) % (uint)(hi - lo + 1));
+    }
 
     // coverage 0..1. Coverage 0 = none (value 0 must not count).
     internal static bool IsAwake(int seed, int i, int j, float coverage)

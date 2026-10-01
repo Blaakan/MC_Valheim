@@ -82,8 +82,8 @@ internal static class AdminCommand
             return " (cleared areas are counted on the server)";
         }
         return HeldCells.Scanned
-            ? $", {HeldCells.ClearedCount} area(s) cleared, {HeldCells.TrackedCreatures} area Jotun alive in "
-              + $"{HeldCells.HeldCount} area(s)"
+            ? $", {HeldCells.ClearedCount} area(s) cleared, {HeldCells.CountingCount} with Jotun defeated toward their "
+              + $"clearing, {HeldCells.EngagedCount} waiting to be defeated"
             : ", areas not counted yet";
     }
 
