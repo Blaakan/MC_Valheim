@@ -12,7 +12,8 @@ namespace MC.Combat.WeaponsDualWieldMod;
 // plus LocalBlocker (other dual wield mod = me stand aside, framework show why and tell server).
 // Me let player hold a one-handed sword, axe, club or knife in each hand: second weapon go to off hand (vanilla
 // m_leftItem), pair swing with vanilla dual moves (Berserkir axes, Skoll and Hati), each hit struck by one weapon or
-// both. Both side: server refuse players whose game no run me (PlayerCheck) and send its combat rules to everyone
+// both. Two knives also block together like Skoll and Hati (KnifeBlock); every other pair block with the off-hand
+// weapon, as vanilla. Both side: server refuse players whose game no run me (PlayerCheck) and send its combat rules to everyone
 // (ServerRules). Game code read rules only through ServerRules.Current.
 // Smoothbrain DualWield (known GUID): BepInEx no load me next to it. Soft dependency on same GUID = it always
 // processed first, so incompatibility seen whatever list BepInEx check (design 6.3, R22).
@@ -28,6 +29,7 @@ internal sealed partial class Plugin : ModPlugin
     internal static ConfigEntry<int> BothHandsDamage;
     internal static ConfigEntry<int> SwingStamina;
     internal static ConfigEntry<SecondaryMovesMode> SecondaryMoves;
+    internal static ConfigEntry<int> KnifePairBlock;
     internal static ConfigEntry<string> ExcludedWeapons;
     internal static ConfigEntry<string> PairMoves;
     internal static ConfigEntry<string> KnifePairMoves;
@@ -101,6 +103,15 @@ internal sealed partial class Plugin : ModPlugin
             + "special attack of your main-hand weapon, struck by that weapon only. A pair has no special attack when "
             + "its main-hand weapon has none (the wooden club)." + ServerWins,
             null, new ConfigurationManagerAttributes { Order = 60 }));
+        KnifePairBlock = Config.Bind(CombatSection, "KnifePairBlock", DualRules.DefaultKnifePairBlock, new ConfigDescription(
+            "Block power of a pair of two knives, in percent of the block power of the item whose moves two knives use "
+            + "(KnifePairMoves, Skoll and Hati by default), scaled to the knives' slash, pierce and blunt damage: two "
+            + "knives that hit half as hard as Skoll and Hati block half as well. The pair parries with that item's "
+            + "parry bonus, and never blocks worse than its off-hand knife alone. 0 = the off-hand knife blocks on its "
+            + "own, as in the game. A knife paired with another kind of weapon blocks with the off-hand weapon, as in "
+            + "the game." + ServerWins,
+            new AcceptableValueRange<int>(DualRules.MinKnifePairBlock, DualRules.MaxKnifePairBlock),
+            new ConfigurationManagerAttributes { Order = 55 }));
         ExcludedWeapons = Config.Bind(CombatSection, "ExcludedWeapons", DualRules.DefaultExcludedWeapons, new ConfigDescription(
             "One-handed weapons that can never be dual wielded, as prefab names (as used by the spawn command), "
             + "comma-separated, for example modded weapons that look wrong in the dual moves. Spears, the butcher "
@@ -215,10 +226,12 @@ internal sealed partial class Plugin : ModPlugin
         // Always: no state or cache survive the toggle (intents, restore candidate, eat return, queued swap, recorded
         // swing, templates, exclusions, trail caches; left trails still on turned off; placed sheathed pairs drawn
         // again by vanilla next frame, patch gone). A swing in progress finish with the main weapon only
-        // (DoMeleeAttack patch gone). Nothing in ObjectDB, prefabs or SharedData was ever changed.
+        // (DoMeleeAttack patch gone). Nothing in ObjectDB or prefabs was ever changed; a knife's SharedData only inside
+        // one BlockAttack call (its finalizer put it back; me check anyway).
         Hands.ResetSeen();
         Hands.ResetState();
         DualSwing.Clear();
+        KnifeBlock.Restore();
         MoveTemplates.Clear();
         Eligibility.Clear();
         try

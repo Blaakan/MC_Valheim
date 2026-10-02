@@ -38,6 +38,9 @@ namespace MC.Combat.WeaponsDualWieldMod;
 //                 own side of the pelvis and of the body and outside its own thigh, idle and while walking, jogging
 //                 and sprinting in place), knife + sword in either hand each at the game's own spot; setting off =
 //                 game's own pose, one sheathed weapon untouched (R26), screenshots from behind and from the side
+//   dual.block    knife pair block (G12): formula (pure), then real BlockAttack calls on the local player: two knives
+//                 (same and mixed) block and parry like Skoll and Hati scaled to their damage, KnifePairBlock 0 and
+//                 200, knife + sword in either hand and a lone knife as vanilla, durability drain, knife values back
 // Me force rules only through ServerRules.TestRules, keys only through Controls.TestMainHandHeld, trails through
 // LeftTrails.TestLeftHandTrails, crossed pair through BackCross.TestEnabled: never the config. Every test give its own items, spawn its own Troll, and take all
 // back in finally (drags leave clones: me remove every item that was not there before), skills and food put back.
@@ -50,6 +53,7 @@ internal static class SelfTests
     private const string DamageName = "dual.damage";
     private const string FieldsName = "dual.fields";
     private const string VisualsName = "dual.visuals";
+    private const string BlockName = "dual.block";
 
     [Conditional("DEBUG")]
     internal static void Register()
@@ -62,6 +66,7 @@ internal static class SelfTests
         SelfTest.Register(DamageName, RunDamage);
         SelfTest.Register(FieldsName, RunFields);
         SelfTest.Register(VisualsName, RunVisuals);
+        SelfTest.Register(BlockName, RunBlock);
 #endif
     }
 
@@ -76,6 +81,7 @@ internal static class SelfTests
         SelfTest.Unregister(DamageName);
         SelfTest.Unregister(FieldsName);
         SelfTest.Unregister(VisualsName);
+        SelfTest.Unregister(BlockName);
 #endif
     }
 
@@ -103,7 +109,7 @@ internal static class SelfTests
         DualRules.DefaultPairMoves, DualRules.DefaultKnifePairMoves, Sword, Axe, Mace, ClubName, KnifeBlack,
         KnifeFlintName, Butcher, Spear, Buckler, TorchName, HammerName, "BombSmoke", Berry, "SwordMistwalker",
         "AxeJotunBane", Niedhogg, NiedhoggBlood, NiedhoggLightning, "AxeBronze", "FW_AxeBronze", "CrossbowArbalest",
-        "ShieldIronTower",
+        "ShieldIronTower", "MeatPlatter", "SerpentStew", "HoneyGlazedChicken",
     };
 
     private static readonly string[] CreatureNames = { TrollName, "Greyling" };
@@ -157,9 +163,10 @@ internal static class SelfTests
     private static DualRules Rules(int offHand = DualRules.DefaultOffHandDamage, int swing = DualRules.DefaultSwingStamina,
         SecondaryMovesMode secondary = SecondaryMovesMode.PairMoves, HitPatternMode pattern = HitPatternMode.Alternate,
         int both = DualRules.DefaultBothHandsDamage, string pair = DualRules.DefaultPairMoves,
-        string knife = DualRules.DefaultKnifePairMoves, string excluded = "")
+        string knife = DualRules.DefaultKnifePairMoves, string excluded = "",
+        int knifeBlock = DualRules.DefaultKnifePairBlock)
     {
-        return new DualRules(offHand, swing, secondary, pattern, both, pair, knife, excluded);
+        return new DualRules(offHand, swing, secondary, pattern, both, knifeBlock, pair, knife, excluded);
     }
 
     private static ItemDrop.ItemData PrefabItem(string name)
@@ -1183,6 +1190,13 @@ internal static class SelfTests
             $"two knives use the KnifeSkollAndHati moves (stance Knives, special ratio 3), got {(knifePair != null ? knifePair.Summary : "none")}");
         c.Check(ReferenceEquals(MoveTemplates.For(knifeBlack, sword, rules, player), pair),
             "a knife next to a sword uses the pair moves");
+        // Knife pairs block like Skoll and Hati (G12): its block 24, parry x4, physical damage 45 + 45 (1.0.16 data).
+        if (knifePair != null)
+        {
+            c.Check(Approx(knifePair.BlockPower, 24f) && Approx(knifePair.ParryBonus, 4f) && Approx(knifePair.PhysicalDamage, 90f),
+                $"Skoll and Hati template: block 24, parry x4, physical damage 90 (got {F2(knifePair.BlockPower)}, "
+                + $"x{F2(knifePair.ParryBonus)}, {F2(knifePair.PhysicalDamage)})");
+        }
         if (pair != null && knifePair != null)
         {
             c.Check(Approx(MoveTemplates.Stamina(sword, axe, pair, false, rules), 10f)
@@ -1446,12 +1460,12 @@ internal static class SelfTests
     private static void CheckRules(Checks c)
     {
         var d = DualRules.Defaults;
-        c.Check(d.OffHandDamage == 100 && d.SwingStamina == 100 && d.BothHandsDamage == 50
+        c.Check(d.OffHandDamage == 100 && d.SwingStamina == 100 && d.BothHandsDamage == 50 && d.KnifePairBlock == 100
                 && d.HitPattern == HitPatternMode.Alternate && d.SecondaryMoves == SecondaryMovesMode.PairMoves
                 && d.PairMoves == "AxeBerzerkr" && d.KnifePairMoves == "KnifeSkollAndHati" && d.ExcludedWeapons == "",
             "built-in defaults match the config defaults");
 
-        var odd = new DualRules(55, 150, SecondaryMovesMode.MainWeapon, HitPatternMode.BothHands, 70, "SwordIron",
+        var odd = new DualRules(55, 150, SecondaryMovesMode.MainWeapon, HitPatternMode.BothHands, 70, 35, "SwordIron",
             "KnifeFlint", "AxeBronze, SwordWood");
         var pkg = new ZPackage();
         odd.Write(pkg);
@@ -1460,15 +1474,21 @@ internal static class SelfTests
                 && back.Describe() == odd.Describe(),
             "rules survive the wire unchanged (every field)");
 
-        var wild = new DualRules(500, 5, SecondaryMovesMode.PairMoves, HitPatternMode.Alternate, 0,
+        var wild = new DualRules(500, 5, SecondaryMovesMode.PairMoves, HitPatternMode.Alternate, 0, -5,
             new string('x', 1500), "", "");
         pkg = new ZPackage();
         wild.Write(pkg);
         pkg.SetPos(0);
         c.Check(DualRules.TryRead(pkg, out back, out clamped) && clamped && back.OffHandDamage == DualRules.MaxOffHandDamage
                 && back.SwingStamina == DualRules.MinSwingStamina && back.BothHandsDamage == DualRules.MinBothHandsDamage
-                && back.PairMoves.Length == DualRules.MaxStringLength,
+                && back.KnifePairBlock == DualRules.MinKnifePairBlock && back.PairMoves.Length == DualRules.MaxStringLength,
             "out-of-range rules from the wire are clamped, long strings cut");
+        var strong = new DualRules(100, 100, SecondaryMovesMode.PairMoves, HitPatternMode.Alternate, 50, 900, "", "", "");
+        pkg = new ZPackage();
+        strong.Write(pkg);
+        pkg.SetPos(0);
+        c.Check(DualRules.TryRead(pkg, out back, out clamped) && clamped && back.KnifePairBlock == DualRules.MaxKnifePairBlock,
+            "KnifePairBlock above the range from the wire is brought down to 200");
 
         pkg = new ZPackage();
         pkg.Write(DualRules.Layout);
@@ -1477,6 +1497,7 @@ internal static class SelfTests
         pkg.Write(7);   // unknown SecondaryMoves
         pkg.Write(-1);  // unknown HitPattern
         pkg.Write(50);
+        pkg.Write(100); // KnifePairBlock
         pkg.Write("AxeBerzerkr");
         pkg.Write("KnifeSkollAndHati");
         pkg.Write("");
@@ -1504,7 +1525,7 @@ internal static class SelfTests
 
         c.Check(ServerRules.Receive(new ZPackage()) == false, "single player never takes rules from a peer");
 
-        var own = new DualRules(20, 30, SecondaryMovesMode.MainWeapon, HitPatternMode.BothHands, 90, "A", "B", "C");
+        var own = new DualRules(20, 30, SecondaryMovesMode.MainWeapon, HitPatternMode.BothHands, 90, 0, "A", "B", "C");
         c.Check(ReferenceEquals(ServerRules.Pick(true, null, own), DualRules.Defaults),
             "client waiting for the server's rules uses the built-in defaults, never its own");
         c.Check(ReferenceEquals(ServerRules.Pick(true, odd, own), odd), "client with the server's rules uses them");
@@ -3890,6 +3911,216 @@ internal static class SelfTests
                 .Append(string.Join(", ", pair.Value.ToArray())).Append("); ");
         }
         SelfTest.Note(VisualsName, sb.ToString());
+    }
+
+    // ---------- dual.block ----------
+
+    // Fire hit for real block calls: blockable, no stagger damage (player never stagger, block hold).
+    private const float BlockHitFire = 40f;
+
+    // Knife pair block (design 2.6, G12, D29). Formula (pure), then real Humanoid.BlockAttack calls on local player,
+    // no attacker (no push back, no parry stagger, no adrenaline): me check what get through, blocker durability
+    // drain, knife own values back after each call.
+    private static IEnumerator RunBlock()
+    {
+        var c = new Checks(BlockName);
+        var player = Player.m_localPlayer;
+        if (player == null)
+        {
+            SelfTest.Fail(BlockName, "no local player");
+            yield break;
+        }
+        yield return WaitIdle(player);
+        Bench bench = null;
+        SkillSave skills = null;
+        try
+        {
+            CheckBlockFormula(c);
+            bench = new Bench(player);
+            skills = new SkillSave(player, Skills.SkillType.Blocking);
+            var template = PrefabItem(DualRules.DefaultKnifePairMoves);
+            var black = bench.Give(KnifeBlack);
+            var black2 = bench.Give(KnifeBlack);
+            var flint = bench.Give(KnifeFlintName);
+            var sword = bench.Give(Sword);
+            if (template == null || black == null || black2 == null || flint == null || sword == null)
+            {
+                c.Check(false, "dual.block needs KnifeSkollAndHati, two KnifeBlackMetal, KnifeFlint and SwordIron");
+                c.Report();
+                yield break;
+            }
+            NoteKnifeBlocks(template);
+            var t = template.m_shared;
+            var phys = KnifeBlock.PhysicalDamage(black.m_shared);
+
+            // Two knives same kind: Skoll and Hati block scaled to their damage, its parry bonus.
+            bench.Pair(black, black2);
+            yield return null;
+            c.Check(Holds(player, black, black2), $"two Black Metal knives paired ({HandsText(player)})");
+            var expected = t.m_blockPower * phys / KnifeBlock.PhysicalDamage(t);
+            c.Check(Mathf.Abs(expected - 24f * 68f / 90f) < 0.01f,
+                $"two Black Metal knives block {F2(24f * 68f / 90f)} in the 1.0.16 data (24 x 68 / 90), got {F2(expected)}");
+            CheckBlock(c, player, expected, t.m_timedBlockBonus, false, "two Black Metal knives, block");
+            CheckBlock(c, player, expected, t.m_timedBlockBonus, true, "two Black Metal knives, parry");
+
+            // Mixed knives: mean damage, whatever hand hold which.
+            var mixed = t.m_blockPower * (phys + KnifeBlock.PhysicalDamage(flint.m_shared)) * 0.5f
+                        / KnifeBlock.PhysicalDamage(t);
+            bench.Pair(black, flint);
+            yield return null;
+            c.Check(Holds(player, black, flint), $"Black Metal + Flint knives paired ({HandsText(player)})");
+            CheckBlock(c, player, mixed, t.m_timedBlockBonus, false, "Black Metal (main) + Flint (off) knives");
+            bench.Pair(flint, black);
+            yield return null;
+            c.Check(Holds(player, flint, black), $"Flint + Black Metal knives paired ({HandsText(player)})");
+            CheckBlock(c, player, mixed, t.m_timedBlockBonus, false, "Flint (main) + Black Metal (off) knives");
+
+            // Setting: 0 = off-hand knife alone (vanilla), 200 = twice.
+            bench.Pair(black, black2);
+            yield return null;
+            ServerRules.TestRules = Rules(knifeBlock: 0);
+            CheckBlock(c, player, black2.GetBaseBlockPower(), black2.m_shared.m_timedBlockBonus, false,
+                "KnifePairBlock 0, block");
+            CheckBlock(c, player, black2.GetBaseBlockPower(), black2.m_shared.m_timedBlockBonus, true,
+                "KnifePairBlock 0, parry");
+            ServerRules.TestRules = Rules(knifeBlock: 200);
+            CheckBlock(c, player, expected * 2f, t.m_timedBlockBonus, false, "KnifePairBlock 200");
+            ServerRules.TestRules = DualRules.Defaults;
+
+            // Knife next to other weapon, lone knife: as game (off-hand weapon, or knife, block alone).
+            bench.Pair(black, sword);
+            yield return null;
+            c.Check(Holds(player, black, sword), $"knife + sword paired ({HandsText(player)})");
+            CheckBlock(c, player, sword.GetBaseBlockPower(), sword.m_shared.m_timedBlockBonus, true,
+                "knife (main) + sword (off): the sword parries");
+            bench.Pair(sword, black);
+            yield return null;
+            c.Check(Holds(player, sword, black), $"sword + knife paired ({HandsText(player)})");
+            CheckBlock(c, player, black.GetBaseBlockPower(), black.m_shared.m_timedBlockBonus, false,
+                "sword (main) + knife (off): the knife blocks alone");
+            bench.Empty();
+            player.EquipItem(black);
+            yield return null;
+            c.Check(Holds(player, black, null), $"lone knife in hand ({HandsText(player)})");
+            CheckBlock(c, player, black.GetBaseBlockPower(), black.m_shared.m_timedBlockBonus, false,
+                "lone knife blocks alone");
+            c.Report();
+        }
+        finally
+        {
+            if (bench != null)
+            {
+                bench.TakeBack();
+            }
+            if (skills != null)
+            {
+                skills.Restore();
+            }
+            Bench.ClearOverrides();
+            Hands.ResetState();
+        }
+    }
+
+    // Pure formula of KnifeBlock (literal Skoll and Hati values: block 24, parry x4, physical damage 90).
+    private static void CheckBlockFormula(Checks c)
+    {
+        c.Check(Approx(KnifeBlock.PairBlockPower(24f, 90f, 68f, 68f, 2f, 100), 24f * 68f / 90f),
+            "two knives of 68 physical damage block 24 x 68 / 90");
+        c.Check(Approx(KnifeBlock.PairBlockPower(24f, 90f, 68f, 10f, 2f, 100), 10.4f),
+            "two different knives: mean damage (68 + 10) / 2 = 39, block 10.4");
+        c.Check(Approx(KnifeBlock.PairBlockPower(24f, 90f, 90f, 90f, 2f, 100), 24f),
+            "knives as strong as Skoll and Hati block 24");
+        c.Check(Approx(KnifeBlock.PairBlockPower(24f, 90f, 2f, 2f, 12f, 100), 12f),
+            "never below the off-hand knife's own block (wooden knife 12)");
+        c.Check(Approx(KnifeBlock.PairBlockPower(24f, 90f, 68f, 68f, 2f, 0), 2f),
+            "KnifePairBlock 0: the off-hand knife's own block");
+        c.Check(Approx(KnifeBlock.PairBlockPower(24f, 90f, 68f, 68f, 2f, 200), 2f * 24f * 68f / 90f),
+            "KnifePairBlock 200 doubles it");
+        c.Check(Approx(KnifeBlock.PairBlockPower(24f, 0f, 68f, 68f, 2f, 100), 24f),
+            "moves item without physical damage: its block, not scaled");
+        c.Check(Approx(KnifeBlock.PairParryBonus(4f, 4f, 100), 4f) && Approx(KnifeBlock.PairParryBonus(4f, 2f, 100), 4f)
+                && Approx(KnifeBlock.PairParryBonus(2f, 4f, 100), 4f) && Approx(KnifeBlock.PairParryBonus(4f, 2f, 0), 2f),
+            "parry bonus: the moves item's, never below the knife's own; KnifePairBlock 0: the knife's own");
+    }
+
+    // One real BlockAttack call: 40 fire from straight ahead, normal block (block timer 1 s) or parry (0.1 s, inside
+    // vanilla 0.25 s window). basePower = before Blocking skill (x 1 + skill x 0.5) and parry bonus.
+    private static void CheckBlock(Checks c, Player p, float basePower, float parryBonus, bool parry, string what)
+    {
+        var blocker = p.GetCurrentBlocker();
+        if (blocker == null)
+        {
+            c.Check(false, $"{what}: something blocks");
+            return;
+        }
+        var own = blocker.m_shared;
+        var ownBlock = own.m_blockPower;
+        var ownPerLevel = own.m_blockPowerPerLevel;
+        var ownParry = own.m_timedBlockBonus;
+        var power = basePower * (1f + p.GetSkillFactor(Skills.SkillType.Blocking) * 0.5f) * (parry ? parryBonus : 1f);
+        var through = HitData.DamageTypes.ApplyArmor(BlockHitFire, power);
+        var drainExpected = own.m_useDurability
+            ? own.m_useDurabilityDrain * BlockHitFire / power * Game.m_durabilityRate
+            : 0f;
+        var hit = new HitData();
+        hit.m_damage.m_fire = BlockHitFire;
+        hit.m_dir = -p.transform.forward;
+        hit.m_point = p.GetCenterPoint();
+        p.AddStamina(p.GetMaxStamina());
+        var durability = blocker.m_durability;
+        var timer = p.m_blockTimer;
+        bool blocked;
+        p.m_blockTimer = parry ? 0.1f : 1f;
+        try
+        {
+            blocked = p.BlockAttack(hit, null);
+        }
+        finally
+        {
+            p.m_blockTimer = timer;
+        }
+        var drain = durability - blocker.m_durability;
+        c.Check(blocked && Mathf.Abs(hit.m_damage.m_fire - through) < 0.01f,
+            $"{what}: {F2(BlockHitFire)} fire against power {F2(power)} leaves {F2(through)}, got {F2(hit.m_damage.m_fire)}"
+            + (blocked ? "" : " (not blocked: hit from behind?)"));
+        c.Check(Mathf.Abs(drain - drainExpected) < 0.01f,
+            $"{what}: {Name(blocker)} loses {F2(drainExpected)} durability, got {F2(drain)}");
+        c.Check(Approx(own.m_blockPower, ownBlock) && Approx(own.m_blockPowerPerLevel, ownPerLevel)
+                && Approx(own.m_timedBlockBonus, ownParry),
+            $"{what}: {Name(blocker)} has its own block values again after the call (block {F2(own.m_blockPower)}, "
+            + $"per level {F2(own.m_blockPowerPerLevel)}, parry x{F2(own.m_timedBlockBonus)})");
+    }
+
+    // Two of each player knife (README table), default 100%, Blocking skill 0.
+    private static void NoteKnifeBlocks(ItemDrop.ItemData template)
+    {
+        var db = ObjectDB.instance;
+        if (db == null)
+        {
+            return;
+        }
+        var t = template.m_shared;
+        var parts = new List<string>();
+        foreach (var go in db.m_items)
+        {
+            var drop = go != null ? go.GetComponent<ItemDrop>() : null;
+            var item = drop != null ? drop.m_itemData : null;
+            if (item == null || item.m_shared == null || item.m_shared.m_skillType != Skills.SkillType.Knives
+                || item.m_shared.m_name == null || !item.m_shared.m_name.StartsWith("$item_", StringComparison.Ordinal)
+                || !Eligibility.IsEligible(item))
+            {
+                continue;
+            }
+            var phys = KnifeBlock.PhysicalDamage(item.m_shared);
+            var block = KnifeBlock.PairBlockPower(t.m_blockPower, KnifeBlock.PhysicalDamage(t), phys, phys,
+                item.GetBaseBlockPower(1), DualRules.DefaultKnifePairBlock);
+            var parry = KnifeBlock.PairParryBonus(t.m_timedBlockBonus, item.m_shared.m_timedBlockBonus,
+                DualRules.DefaultKnifePairBlock);
+            parts.Add($"{go.name} {F2(phys)} damage: block {F2(block)}, parry {F2(block * parry)}");
+        }
+        SelfTest.Note(BlockName, $"two of a knife at KnifePairBlock 100, Blocking 0 ({DualRules.DefaultKnifePairMoves} "
+                                 + $"blocks {F2(t.m_blockPower)}, parry x{F2(t.m_timedBlockBonus)}, physical damage "
+                                 + $"{F2(KnifeBlock.PhysicalDamage(t))}): {string.Join("; ", parts.ToArray())}");
     }
 #endif
 }

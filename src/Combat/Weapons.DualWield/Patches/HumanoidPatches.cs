@@ -16,6 +16,8 @@ namespace MC.Combat.WeaponsDualWieldMod.Patches;
 //   SetupAnimationState postfix: pair stance (template's DualAxes / Knives)
 //   StartAttack        prefix (First) + finalizer: "special asked", lone off hand settled, refuse in eat window and
 //                      while a swap is queued
+//   BlockAttack        prefix (First) + finalizer: two knives block like Skoll and Hati (pair values in the off-hand
+//                      knife for this one call, put back after)
 [HarmonyPatch(typeof(Humanoid))]
 internal static class HumanoidPatches
 {
@@ -245,6 +247,47 @@ internal static class HumanoidPatches
         catch (Exception e)
         {
             PatchGuard.Report("Humanoid.StartAttack finalizer", e);
+        }
+    }
+
+    // Every blocked hit on any humanoid of this game (victim's owner run it): one reference compare. Local player
+    // with two knives: pair block values in the off-hand knife for this call (design 2.6, G12). First: other mods'
+    // block prefixes already see them. __state = me changed them (finalizer put back, also after exception).
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    [HarmonyPatch(nameof(Humanoid.BlockAttack))]
+    private static void BlockAttack_Prefix(Humanoid __instance, out bool __state)
+    {
+        __state = false;
+        if (!ReferenceEquals(__instance, Player.m_localPlayer))
+        {
+            return;
+        }
+        try
+        {
+            __state = KnifeBlock.Apply((Player)__instance);
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("Humanoid.BlockAttack prefix", e);
+        }
+    }
+
+    [HarmonyFinalizer]
+    [HarmonyPatch(nameof(Humanoid.BlockAttack))]
+    private static void BlockAttack_Finalizer(bool __state)
+    {
+        if (!__state)
+        {
+            return;
+        }
+        try
+        {
+            KnifeBlock.Restore();
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("Humanoid.BlockAttack finalizer", e);
         }
     }
 }

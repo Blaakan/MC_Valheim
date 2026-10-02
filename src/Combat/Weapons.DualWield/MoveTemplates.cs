@@ -6,8 +6,8 @@ using UnityEngine;
 
 namespace MC.Combat.WeaponsDualWieldMod;
 
-// One vanilla item whose moves a pair borrow (design 2.5): primary attack (combo), special (or null), stance.
-// Me hold the prefab's own Attack objects (read only, never changed).
+// One vanilla item whose moves a pair borrow (design 2.5): primary attack (combo), special (or null), stance, and its
+// block (knife pairs block like it, KnifeBlock). Me hold the prefab's own Attack objects (read only, never changed).
 internal sealed class MoveTemplate
 {
     internal readonly string PrefabName;
@@ -17,11 +17,16 @@ internal sealed class MoveTemplate
     internal readonly ItemDrop.ItemData.AnimationState Stance;
     // Special stamina / primary stamina of the item (Berserkir 32 / 16 = 2, Skoll and Hati 42 / 14 = 3).
     internal readonly float SpecialRatio;
+    // Item's base block power, parry bonus and physical damage (Skoll and Hati 24, x4, 45 + 45 = 90).
+    internal readonly float BlockPower;
+    internal readonly float ParryBonus;
+    internal readonly float PhysicalDamage;
     // Log text: "AxeBerzerkr (dualaxes0-3, special dualaxes_secondary)".
     internal readonly string Summary;
 
     internal MoveTemplate(string prefabName, Attack primary, Attack secondary,
-        ItemDrop.ItemData.AnimationState stance, string summary)
+        ItemDrop.ItemData.AnimationState stance, float blockPower, float parryBonus, float physicalDamage,
+        string summary)
     {
         PrefabName = prefabName;
         Primary = primary;
@@ -30,6 +35,9 @@ internal sealed class MoveTemplate
         SpecialRatio = secondary != null && primary.m_attackStamina > 0f
             ? secondary.m_attackStamina / primary.m_attackStamina
             : 1f;
+        BlockPower = blockPower;
+        ParryBonus = parryBonus;
+        PhysicalDamage = physicalDamage;
         Summary = summary;
     }
 }
@@ -277,7 +285,8 @@ internal static class MoveTemplates
             : null;
         var summary = new StringBuilder(name).Append(" (").Append(Triggers(shared.m_attack)).Append(", special ")
             .Append(secondary != null ? Triggers(secondary) : "the main weapon's own").Append(')').ToString();
-        return new MoveTemplate(name, shared.m_attack, secondary, shared.m_animationState, summary);
+        return new MoveTemplate(name, shared.m_attack, secondary, shared.m_animationState, shared.m_blockPower,
+            shared.m_timedBlockBonus, KnifeBlock.PhysicalDamage(shared), summary);
     }
 
     private static bool IsMelee(Attack a) =>

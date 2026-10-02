@@ -33,6 +33,9 @@ internal sealed class DualRules
     internal const int DefaultBothHandsDamage = 50;
     internal const int MinBothHandsDamage = 10;
     internal const int MaxBothHandsDamage = 100;
+    internal const int DefaultKnifePairBlock = 100;
+    internal const int MinKnifePairBlock = 0;
+    internal const int MaxKnifePairBlock = 200;
     internal const string DefaultPairMoves = "AxeBerzerkr";
     internal const string DefaultKnifePairMoves = "KnifeSkollAndHati";
     internal const string DefaultExcludedWeapons = "";
@@ -44,6 +47,7 @@ internal sealed class DualRules
     internal readonly SecondaryMovesMode SecondaryMoves;
     internal readonly HitPatternMode HitPattern;
     internal readonly int BothHandsDamage;            // percent MinBothHandsDamage..MaxBothHandsDamage
+    internal readonly int KnifePairBlock;             // percent MinKnifePairBlock..MaxKnifePairBlock (0 = vanilla)
     internal readonly string PairMoves;               // item prefab name, never null
     internal readonly string KnifePairMoves;          // item prefab name, never null
     internal readonly string ExcludedWeapons;         // comma-separated prefab names, never null
@@ -51,17 +55,18 @@ internal sealed class DualRules
     // Built-in defaults (design section 5, Default column). Client of a server with me use these while server
     // rules not come yet (design 4.3, D25): never own config there, and not vanilla (saved pair must load).
     internal static readonly DualRules Defaults = new DualRules(DefaultOffHandDamage, DefaultSwingStamina,
-        SecondaryMovesMode.PairMoves, HitPatternMode.Alternate, DefaultBothHandsDamage, DefaultPairMoves,
-        DefaultKnifePairMoves, DefaultExcludedWeapons);
+        SecondaryMovesMode.PairMoves, HitPatternMode.Alternate, DefaultBothHandsDamage, DefaultKnifePairBlock,
+        DefaultPairMoves, DefaultKnifePairMoves, DefaultExcludedWeapons);
 
     internal DualRules(int offHandDamage, int swingStamina, SecondaryMovesMode secondaryMoves, HitPatternMode hitPattern,
-        int bothHandsDamage, string pairMoves, string knifePairMoves, string excludedWeapons)
+        int bothHandsDamage, int knifePairBlock, string pairMoves, string knifePairMoves, string excludedWeapons)
     {
         OffHandDamage = offHandDamage;
         SwingStamina = swingStamina;
         SecondaryMoves = secondaryMoves;
         HitPattern = hitPattern;
         BothHandsDamage = bothHandsDamage;
+        KnifePairBlock = knifePairBlock;
         PairMoves = (pairMoves ?? "").Trim();
         KnifePairMoves = (knifePairMoves ?? "").Trim();
         ExcludedWeapons = (excludedWeapons ?? "").Trim();
@@ -78,6 +83,7 @@ internal sealed class DualRules
             Plugin.SecondaryMoves.Value,
             Plugin.HitPattern.Value,
             Clamp(Plugin.BothHandsDamage.Value, MinBothHandsDamage, MaxBothHandsDamage, ref ignored),
+            Clamp(Plugin.KnifePairBlock.Value, MinKnifePairBlock, MaxKnifePairBlock, ref ignored),
             Plugin.PairMoves.Value,
             Plugin.KnifePairMoves.Value,
             Plugin.ExcludedWeapons.Value);
@@ -85,8 +91,9 @@ internal sealed class DualRules
 
     // Wire: layout, then every value in fixed order. Layout bump = other format (ModNetworkVersion too).
     //   int layout, int OffHandDamage, int SwingStamina, int SecondaryMoves, int HitPattern, int BothHandsDamage,
-    //   string PairMoves, string KnifePairMoves, string ExcludedWeapons
-    internal const int Layout = 1;
+    //   int KnifePairBlock, string PairMoves, string KnifePairMoves, string ExcludedWeapons
+    // Layout 2 (network version 2): KnifePairBlock came.
+    internal const int Layout = 2;
 
     internal void Write(ZPackage pkg)
     {
@@ -96,6 +103,7 @@ internal sealed class DualRules
         pkg.Write((int)SecondaryMoves);
         pkg.Write((int)HitPattern);
         pkg.Write(BothHandsDamage);
+        pkg.Write(KnifePairBlock);
         pkg.Write(PairMoves);
         pkg.Write(KnifePairMoves);
         pkg.Write(ExcludedWeapons);
@@ -128,16 +136,17 @@ internal sealed class DualRules
                 pattern = (int)HitPatternMode.Alternate;
             }
             var both = Clamp(pkg.ReadInt(), MinBothHandsDamage, MaxBothHandsDamage, ref clamped);
+            var knifeBlock = Clamp(pkg.ReadInt(), MinKnifePairBlock, MaxKnifePairBlock, ref clamped);
             var pair = Cap(pkg.ReadString(), ref clamped);
             var knife = Cap(pkg.ReadString(), ref clamped);
             var excluded = Cap(pkg.ReadString(), ref clamped);
-            // Field more than layout 1 know = other format with same layout number: refuse, no guess.
+            // Field more than this layout know = other format with same layout number: refuse, no guess.
             if (pkg.GetPos() != pkg.Size())
             {
                 return false;
             }
-            rules = new DualRules(offHand, swing, (SecondaryMovesMode)secondary, (HitPatternMode)pattern, both, pair,
-                knife, excluded);
+            rules = new DualRules(offHand, swing, (SecondaryMovesMode)secondary, (HitPatternMode)pattern, both,
+                knifeBlock, pair, knife, excluded);
             return true;
         }
         catch (Exception)
@@ -155,6 +164,7 @@ internal sealed class DualRules
                && SecondaryMoves == other.SecondaryMoves
                && HitPattern == other.HitPattern
                && BothHandsDamage == other.BothHandsDamage
+               && KnifePairBlock == other.KnifePairBlock
                && PairMoves == other.PairMoves
                && KnifePairMoves == other.KnifePairMoves
                && ExcludedWeapons == other.ExcludedWeapons;
@@ -168,6 +178,7 @@ internal sealed class DualRules
             .Append("%, hit pattern ").Append(HitPattern == HitPatternMode.BothHands
                 ? "both hands (" + BothHandsDamage + "% each)"
                 : "alternate (both hands " + BothHandsDamage + "% each)")
+            .Append(", knife pair block ").Append(KnifePairBlock).Append('%')
             .Append(", moves ").Append(PairMoves.Length > 0 ? PairMoves : "(none)")
             .Append(" / knives ").Append(KnifePairMoves.Length > 0 ? KnifePairMoves : "(none)")
             .Append(", special ").Append(SecondaryMoves == SecondaryMovesMode.MainWeapon ? "main weapon's own" : "pair moves")

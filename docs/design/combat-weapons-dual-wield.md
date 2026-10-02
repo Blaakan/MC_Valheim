@@ -5,10 +5,10 @@
 | Mod | Dual Wielding |
 | GUID / project | `MC.Combat.Weapons.DualWield` (`src/Combat/Weapons.DualWield/`, root namespace `MC.Combat.WeaponsDualWieldMod`, package `WeaponsDualWield`) |
 | Category / scope | Combat / New |
-| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1 (RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, no ZDO key). Technically everything runs on the attacking player's own game and other games only need vanilla data (4.1), but the mod changes combat, so under the house rule the server refuses players whose game does not run it (`AllowPlayersWithoutMod`) and sends its combat settings to everyone (4.3, 4.4). |
+| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 2 (RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, no ZDO key; 2 since the knife pair block added a rules field, 2026-10-02). Technically everything runs on the attacking player's own game and other games only need vanilla data (4.1), but the mod changes combat, so under the house rule the server refuses players whose game does not run it (`AllowPlayersWithoutMod`) and sends its combat settings to everyone (4.3, 4.4). |
 | Sheet idea | `Dual wielding` ("Make so that one handed weapons can be dual wielded") |
-| Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`; `.ref/game-version.json` is missing), decompiled `assembly_valheim` in `.ref/`. Every weapon, shield, tool and torch (SharedData scalars, damages, both `Attack` objects' scalars, the equip status effect name), the Player animator (layers, parameters with types, every clip with its length and animation events) and every creature prefab dumped at runtime from a Debug self-test on 2026-09-29 (`Weapons.Moveset/DataDump.cs`, temporary). Food prefab names from the installed game's SoftRef `manifest_extended`. Smoothbrain DualWield and RustyMods DualWielder sources and the Goo's Combat Overhaul README read on 2026-09-29 (research briefs). BepInEx 5 `BepInIncompatibility` from the installed `BepInEx.xml`. Revised on 2026-09-30 after three adversarial reviews (vanilla rules, multiplayer and robustness, player experience); every finding was checked against `.ref` and the dump. Aligned on 2026-09-30 with the framework's new join-check support (`NetworkGate.PeerCompatible`, `PeerProblem`, `PeerStateChanged`, the `HelloState` RPC; `src/Shared/Framework`) and with the four sibling Combat designs (integration review). Revised again on 2026-09-30 after the user's first in-game test (build `3cda33b+dirty`): the swap key plays the equip and draw animations and takes a vanilla equip's time (G4, 2.3, D22, D26), and a sheathed pair is shown crossed in an X (G11, 2.7, D27); the equip queue, `VisEquipment.AttachBackItem` and the back joints were read in `.ref` for it (1.7, 1.8). After the in-world run of that build (2026-09-30), the crossed pair is kept level every frame (2.7, D27), and the cross-mod texts follow the siblings' second round (6.1). Revised once more on 2026-09-30 for the user's holster rule (swords, maces and axes on the back, daggers and knives on the side hip): two knives hang one per hip and a knife with a back weapon keeps vanilla's spots (G11, 2.7, D27); `AttachBackItem`'s joint choice and the body mesh's bind pose were read for it (1.7). |
-| Status | Implemented (v0.1.0 code), in-game testing; user feedback of the first in-game test implemented, not run in game yet (section 10: implementation notes and deviations; their short list closes the section) |
+| Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`; `.ref/game-version.json` is missing), decompiled `assembly_valheim` in `.ref/`. Every weapon, shield, tool and torch (SharedData scalars, damages, both `Attack` objects' scalars, the equip status effect name), the Player animator (layers, parameters with types, every clip with its length and animation events) and every creature prefab dumped at runtime from a Debug self-test on 2026-09-29 (`Weapons.Moveset/DataDump.cs`, temporary). Food prefab names from the installed game's SoftRef `manifest_extended`. Smoothbrain DualWield and RustyMods DualWielder sources and the Goo's Combat Overhaul README read on 2026-09-29 (research briefs). BepInEx 5 `BepInIncompatibility` from the installed `BepInEx.xml`. Revised on 2026-09-30 after three adversarial reviews (vanilla rules, multiplayer and robustness, player experience); every finding was checked against `.ref` and the dump. Aligned on 2026-09-30 with the framework's new join-check support (`NetworkGate.PeerCompatible`, `PeerProblem`, `PeerStateChanged`, the `HelloState` RPC; `src/Shared/Framework`) and with the four sibling Combat designs (integration review). Revised again on 2026-09-30 after the user's first in-game test (build `3cda33b+dirty`): the swap key plays the equip and draw animations and takes a vanilla equip's time (G4, 2.3, D22, D26), and a sheathed pair is shown crossed in an X (G11, 2.7, D27); the equip queue, `VisEquipment.AttachBackItem` and the back joints were read in `.ref` for it (1.7, 1.8). After the in-world run of that build (2026-09-30), the crossed pair is kept level every frame (2.7, D27), and the cross-mod texts follow the siblings' second round (6.1). Revised once more on 2026-09-30 for the user's holster rule (swords, maces and axes on the back, daggers and knives on the side hip): two knives hang one per hip and a knife with a back weapon keeps vanilla's spots (G11, 2.7, D27); `AttachBackItem`'s joint choice and the body mesh's bind pose were read for it (1.7). Revised on 2026-10-02 for the user's request that two knives play like Skoll and Hati, block included (G12): `Humanoid.BlockAttack`, `GetCurrentBlocker`, `ItemData.GetBlockPower` and every reader of block values were read in `.ref`, and the stats of every knife, shield and vanilla dual item (Early Axes and the fist weapons included) were read from the installed game's asset bundles (offline, AssetsTools.NET; they match the 2026-09-29 runtime dump where both have them). |
+| Status | Implemented (v0.1.0 code), in-game testing; user feedback of the first in-game test implemented, not run in game yet; knife pair block (G12, 2026-10-02) implemented, its in-world self-test passed, not tested by hand yet (section 10: implementation notes and deviations; their short list closes the section) |
 
 `Weapons` is the system and `DualWield` the feature, so other weapon mods (for example `Weapons.Moveset`, built in the
 same run) sit next to it under their own GUIDs. The GUID and the display name are permanent after release.
@@ -65,6 +65,11 @@ the first in-game test (2026-09-30: G4's animation and timing, G11) and the user
     2026-09-30: "They are holstered side by side on the back instead of being crossed like an X." Then the user's
     rule, 2026-09-30: "When dual wielding, where the weapon is holstered depends on the weapon: swords, maces and axes
     go on the back, daggers and knives go on the side hip.")
+12. **G12 Knife pairs block like Skoll and Hati.** Two knives already fight with Skoll and Hati's moves (G6); they
+    also block and parry as one, like Skoll and Hati: its block power, scaled to the knives' strength, and its parry
+    bonus (D29). A knife paired with any other weapon keeps the vanilla rule: the off-hand weapon blocks alone. (User
+    request after the balance analysis of 2026-10-02: "make the double knife gameplay similar to skoll and hati (with
+    the block bonus). Having a knife and a different weapon works as it is today.")
 
 ### Added beyond the request
 
@@ -81,6 +86,9 @@ Small, each with a setting and a test:
   hands on every hit): `HitPattern = BothHands` makes both weapons strike on every hit event, each at `BothHandsDamage`
   percent. It reuses the both-hands blow that the default pattern already needs for the specials (2.6), so it costs one
   setting. Default `Alternate` (decision D7, flagged).
+- **E6 Knife pair block setting** (with G12, 2026-10-02): `KnifePairBlock`, a server rule in percent (0-200, default
+  100) that scales the knife pair's block power; 0 gives the vanilla rule back (the off-hand knife blocks alone). One
+  rules field (wire layout 2, network version 2).
 
 ### Non-goals
 
@@ -179,7 +187,12 @@ Only what the design relies on. Line numbers refer to `.ref/decompiled/assembly_
 - `Humanoid.GetCurrentBlocker()` (492-499, private): **the left item if there is one**, else the current weapon.
   `BlockAttack` (1751+) and `UpdateBlock` (1891+) use it: block power, parry bonus (`m_timedBlockBonus > 1` within
   0.25 s), damage modifiers and block durability come from the left item. A player with a left weapon already blocks
-  and parries with it.
+  and parries with it. `BlockAttack` reads the block values only through `GetBlockPower(skillFactor)` (→
+  `GetBaseBlockPower(quality)` = `m_blockPower` + `m_blockPowerPerLevel` × (quality − 1), then × (1 + 0.5 × Blocking
+  skill)) and the field `m_timedBlockBonus`; no other game code reads them except the item tooltip. The blocker loses
+  `m_useDurabilityDrain` × blockable damage / block power of durability per block (a knife, block 2, loses 30 to a
+  60-damage hit; a shield of 78, under 1), and a parry staggers the attacker only when the block held (stamina left,
+  and the damage that got through did not stagger the player).
 - `Humanoid.SetupAnimationState()` (1449-1470, private): a left torch gives `LeftTorch`; any other left item gives **the
   left item's** `m_animationState`; else the right item's. `SetAnimationState` (1472) writes animator `statef` (float)
   and `statei` (int) through `ZSyncAnimation`, which the owner stores in the ZDO for every other game. Vanilla relies on
@@ -250,8 +263,14 @@ Per-weapon attack values (runtime dump, primary attack; the secondary has the sa
 
 ### 1.5 The vanilla dual weapons and the animator (runtime dump)
 
-The two vanilla dual weapons are **one `TwoHandedWeapon` item each** (the second blade is part of the item's model);
-every hit uses that one item's damage.
+The two vanilla dual weapons whose moves pairs borrow are **one `TwoHandedWeapon` item each** (the second blade is part
+of the item's model); every hit uses that one item's damage. (Vanilla has more dual items, never used as templates:
+`AxeEarly`, "Early Axes", workbench level 1 with two axe heads (`AxeHead1`, `AxeHead2`; no creature drops them, their
+source is unverified), the same `dualaxes` moves and `DualAxes` stance:
+slash 30, chop 35, stamina 6, block 4, parry ×2; and six fist weapons, `TwoHandedWeapon` with the Unarmed skill, the
+two-punch `unarmed_attack` combo and the `unarmed_kick` special, block 5 (+1 per level), parry ×6: `FistBjornClaw`,
+`FistFenrirClaw`, `FistBjornUndeadClaw`, `FistGold` and its two variants. Read from the 1.0.16 asset bundles,
+2026-10-02.)
 
 | | `AxeBerzerkr` (+ `Blood`, `Lightning`, `Nature`) | `KnifeSkollAndHati` |
 |---|---|---|
@@ -805,7 +824,9 @@ Specials (stamina in the same S; one special each):
 
 So a pair of same-tier weapons plays like the vanilla dual weapons of that tier: about +50% damage per stamina on the
 combo over one weapon, similar damage per second by clip time (chains cut clips at their Chain event, so the real timing
-is unmeasured, R13), the same specials, no shield (block and parry with the off-hand weapon). A sword or mace in the
+is unmeasured, R13; calculated from the animator data on 2026-10-02 it is about 33% more per second than one sword,
+like the Berserkir axes against Nidhögg, section 10), the same specials, no shield (block and parry with the off-hand
+weapon; two knives block like Skoll and Hati, G12). A sword or mace in the
 main hand trades its own strong single-target special for the crowd cleave (`SecondaryMoves = MainWeapon` gives it
 back). A pair's extras over the vanilla dual items: two weapons' damage types, status effects and attack effects, and
 two weapons' durability. `OffHandDamage`, `BothHandsDamage` and `SwingStamina` are the levers, server-synced.
@@ -816,8 +837,26 @@ No new skill (decision D12, flagged). The stamina discount uses the main weapon'
 
 **Blocking and parry.** Vanilla: the off-hand weapon blocks and parries (`GetCurrentBlocker` returns the left item),
 with its block power, parry bonus, damage modifiers and block durability; the dual stance has its own block poses. A
-knife in the off hand blocks badly (block power 2), like a single knife. The swap key picks which weapon blocks
-(decision D11).
+knife next to a sword, axe or mace in the off hand blocks badly (block power 2), like a single knife. The swap key
+picks which weapon blocks (decision D11).
+
+**Two knives block as one** (G12, D29), like the item whose moves they use (`KnifePairMoves`, Skoll and Hati: block 24,
+parry ×4, physical damage 45 + 45). `KnifeBlock`: block power = the template's × (the mean physical damage of the two
+knives / the template's) × `KnifePairBlock` / 100, where physical damage is slash + pierce + blunt of `m_damages`
+(base quality, no world level); parry bonus = the template's; neither below the off-hand knife's own
+(`KnifePairBlock` 0 = vanilla). Which knife is in which hand does not change it. The only gameplay reader of block
+values is `Humanoid.BlockAttack` (1.3), and the getters behind it are tiny (inlining risk, D10), so `BlockAttack` gets
+a prefix (`Priority.First`, local player with two eligible knives and a valid knife template) that writes the pair's
+values into the off-hand knife's `SharedData` (block power, 0 per level, parry bonus) and a finalizer that writes the
+knife's own back, also after an exception (`__state` = this call wrote them; a nested call writes nothing). Inside the
+call vanilla does the rest: the Blocking skill, the parry window, the attacker's stagger, the block's stamina and the
+durability drain (now hit / pair power: a knife pair wears like Skoll and Hati, not like a lone knife). The item
+tooltip keeps each knife's own values. Values with the 1.0.16 data, two of a kind, Blocking 0, block / parry power:
+Flint 2.7 / 10.7, Copper 6.4 / 25.6, Abyssal Razor 10.7 / 42.7, Silver 13.3 / 53.3, Black Metal 18.1 / 72.5, Nord 40 /
+160, Frostfire 33.1 / 132.3, Thunderblood 42.7 / 170.7 (one knife 2 / 8, Skoll and Hati 24 / 96; `dual.block` NOTE).
+Knife pairs still fight exactly like one knife: the Skoll and Hati combo has a single knife's multipliers (1, 1, 2),
+cost and speed (about 1.4 s per combo, 1.9 s with the hit pauses, by the animator data), so the block is what the
+pair adds.
 
 ### 2.7 Cosmetics (E1, G11)
 
@@ -1062,7 +1101,7 @@ vanilla-consistent option over the literal request; they are listed at the pause
   includes the special; reason: vanilla-consistent, avoids patching a tiny method that the JIT may inline (Later L8).
 - **D11 Blocker.** Options: vanilla (the off-hand weapon); the main-hand weapon; the better of the two. Choice: vanilla,
   with the swap key to choose. Reason: no patch, the player controls it, matches vanilla for any left item. Better-of-two
-  is Later L2.
+  is Later L2. Exception since 2026-10-02: two knives block as one, like Skoll and Hati (G12, D29).
 - **D12 Skills.** Options: each hit trains its weapon's skill; a custom off-hand skill (Smoothbrain, balrond, GCO).
   Choice: each weapon's own skill, vanilla amounts (half each in a both-hands event). Reason: no skill registration,
   nothing lost if the mod is removed, mixed pairs train both skills naturally. **Flag:** GCO, the mod the user named,
@@ -1209,6 +1248,19 @@ vanilla-consistent option over the literal request; they are listed at the pause
   to be there by then: vanilla equip rules would collapse every saved pair at join. The defaults exclude nothing, so the
   pair loads, and the server's rules replace them the frame they arrive. **Flag:** differs from the three siblings that
   fall back to vanilla.
+- **D29 Knife pair block** (2026-10-02, G12). Options: (a) Skoll and Hati's values as they are (block 24, parry ×4) for
+  every knife pair; (b) scaled to the knives' damage, all damage types; (c) scaled to their physical damage (slash,
+  pierce, blunt). Choice: (c), times `KnifePairBlock` (E6), never below the off-hand knife alone, the mean of the two
+  knives (the pair blocks as one, like Skoll and Hati, so the swap key does not change it), at base quality (weapon
+  block does not grow with upgrades, Skoll and Hati's neither). Reason: vanilla block grows by tier, and (a) would make
+  two Flint knives, made at the start, parry at 96, ten times a Wood Shield and more than any round shield before the
+  Plains. Skoll and Hati blocks with half a Mistlands one-hander's block (24 of 48) and parries with two thirds of the
+  Mistlands round shield's parry (96 of 144); (c) keeps about that relation at every tier (Black Metal knives 72.5
+  against the Black Metal Shield's 117, Nord daggers 160 against the Nord Shield's 198), while (b) lets the elemental
+  Deep North daggers out-parry the Nord Shield and Buckler (a Frostfire pair 237 against 198 and 220).
+  Mechanism: a write of the off-hand knife's block values for the length of one `BlockAttack` call, not a patch on
+  `GetBlockPower` (D10's inlining risk). **Flag:** with (c) a Frostfire Dagger pair (124 physical damage) blocks a
+  little less than a Nord Dagger pair (150), since it trades slash and pierce for frost and fire; the README says so.
 
 ---
 
@@ -1222,6 +1274,7 @@ vanilla-consistent option over the literal request; they are listed at the pause
 | Stance | the owner (`SetupAnimationState` runs on the owner) | `statef` / `statei` animator values synced through the ZDO, like every vanilla stance. |
 | Moves | the owner (`Attack.Start`) | Triggers are `ZSyncAnimation.SetTrigger` RPCs to everyone: every game, with or without the mod, plays the dual clips. |
 | Hits | the owner (`Humanoid.OnAttackTrigger` is owner-only) | Each hit is a normal vanilla `HitData` of the striking weapon; the victim's owner (a creature's owner, the other player) applies it with vanilla rules, blocks included. |
+| Knife pair block (G12) | the blocking player's own game (the victim's owner runs `BlockAttack`) | Local values for one call, with the server's `KnifePairBlock`; the attacker's game only sees the hit's result, as for any block. |
 | Swap animation | the owner (vanilla's equip queue) | The draw trigger `equip_hip` is an RPC to everyone; the `equipping` bool is in the player's `ZSyncAnimation` sync list (1.7, `tower.data` NOTE), so other games play the equip animation too, as for any vanilla equip. The new hands reach everyone through the ZDO like any equip. |
 | Off-hand trails | every game with the mod | Local cosmetic from the synced left item hash. |
 | Sheathed pair placement | every game with the mod, for every player it draws | Local cosmetic from the synced back item hashes (`LeftBackItem`, `RightBackItem`); games without the mod show vanilla's placement (a pair of one kind overlapping). |
@@ -1239,8 +1292,9 @@ own game. Hooks on the victim's side see a normal `HitData` and never the weapon
     with the mod when the server's settings change or its copy turns on; both only to players whose hello carries the
     server's network version (another version cannot read the layout and its copy never runs there; review fix,
     section 10).
-  - Payload layout 1: `int layout`, `int OffHandDamage`, `int SwingStamina`, `int SecondaryMoves`, `int HitPattern`,
-    `int BothHandsDamage`, `string PairMoves`, `string KnifePairMoves`, `string ExcludedWeapons`. The client refuses an
+  - Payload layout 2 (layout 1 until 2026-10-02, without `KnifePairBlock`): `int layout`, `int OffHandDamage`,
+    `int SwingStamina`, `int SecondaryMoves`, `int HitPattern`, `int BothHandsDamage`, `int KnifePairBlock`,
+    `string PairMoves`, `string KnifePairMoves`, `string ExcludedWeapons`. The client refuses an
     unknown layout or wrong field count (warning once; the last readable rules from this server stay, else the
     built-in defaults of 4.3), clamps numbers to the config ranges (warning), and caps each string at 1000 characters.
   - The framework's own RPCs (`src/Shared/Framework/NetworkGate.cs`, not this mod's code):
@@ -1252,10 +1306,13 @@ own game. Hooks on the victim's side see a normal `HitData` and never the weapon
     - client → server `<GUID>.HelloState` `"on"` / `"off"`, when the client's copy turns on or off while connected.
       The server then raises `NetworkGate.PeerStateChanged`, which the join check listens to (4.4).
 - **ZDO keys: none new.** Vanilla keys carry everything (left item, back items, stance, triggers). The swap and the
-  sheathed pair placement add nothing to the wire: the rules payload and `ModNetworkVersion` stay as they are.
+  sheathed pair placement add nothing to the wire. The knife pair block (G12) adds one rules field, `KnifePairBlock`
+  (layout 2, `ModNetworkVersion` 2); the block itself is worked out on the blocking player's own game (the victim's
+  owner runs `BlockAttack`), so nothing else travels.
 - **Item data:** `m_customData["MC.Combat.Weapons.DualWield.OffHand"] = "1"` on the off-hand weapon (saved in the
   player's inventory, a chest or a dropped item's ZDO like any custom data; vanilla keeps and ignores it).
-- `ModNetworkVersion` = 1. Bump when the RPC names or the payload layout change.
+- `ModNetworkVersion` = 2 (1 until the knife pair block, 2026-10-02). Bump when the RPC names or the payload layout
+  change.
 
 ### 4.3 Server settings
 
@@ -1344,15 +1401,15 @@ keeps the server's rules for the moment it turns back on.
 | Player with another dual wield mod found by name (DualWielder, DualWieldCore, DualMastery) | Their copy is inactive with a status naming that mod (6.3) and reports "off" to the server: refused like a player who turned the mod off (through the framework hook of 7.6, in place). |
 | The server turns the mod off (or back on) live | Every client's copy follows (framework): off puts each player's off-hand weapon away; on allows pairs again and resends the settings. |
 | The server changes a rule live | Every client revalidates on the next frame: an excluded off-hand weapon is put away, the stance follows the moves settings. |
-| PvP | Off-hand hits are normal hits of that weapon; the other player blocks or parries them with their own blocker; both games use the server's settings. A both-hands event is two blocked hits: the per-block rewards count twice (2.6). |
+| PvP | Off-hand hits are normal hits of that weapon; the other player blocks or parries them with their own blocker (with two knives, the knife pair's block of G12, worked out on that player's game); both games use the server's settings. A both-hands event is two blocked hits: the per-block rewards count twice (2.6). |
 | Dedicated server | Loads the mod (`Both` has no `BepInProcess`): join check and settings only. It has no local player, so every gameplay patch exits at its first check; the trail and back-item postfixes exit on the no-graphics check. |
 | Two players with different own settings | Both use the server's rules; own files untouched. |
 
 `ModMultiplayerNotes` (player-facing, csproj): "Install it on the server (or the host) and on every player's game. It
 changes combat, so the server refuses players whose game does not run it (not installed, turned off, or a version that
 cannot talk to the server's; their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on,
-and the server's combat settings (off-hand damage, swing stamina, hit pattern, moves, excluded weapons) apply to
-everyone. Turning it off while you play on such a server disconnects you about a second later. Next to another dual
+and the server's combat settings (off-hand damage, swing stamina, hit pattern, knife pair block, moves, excluded
+weapons) apply to everyone. Turning it off while you play on such a server disconnects you about a second later. Next to another dual
 wield mod it does not run, so such a server refuses you too. On a server without the mod it turns itself off, and a
 saved pair then loads as one weapon. Players without the mod still see your two weapons and your dual moves."
 (The framework hook of 7.6 is in place, so this text ships as is; the fallback wording of 6.3 is not needed.)
@@ -1376,14 +1433,15 @@ value is used for everyone. Every setting applies live.
 | Combat | BothHandsDamage | `50` | 10-100 | yes | When both weapons strike the same hit, the damage of each, in percent of its normal damage. 50 = together they deal about one weapon's hit, like the game's own dual weapons. Higher values make pairs much stronger. The off-hand weapon's share is also scaled by OffHandDamage. |
 | Combat | SwingStamina | `100` | 25-300 | yes | Stamina of a dual wield attack, in percent of the higher normal attack cost of your two weapons. The special attack costs as many times more as the game's dual weapon it copies (2 times for the axe moves, 3 times for the knife moves). Your skill and equipment still reduce it as usual. |
 | Combat | SecondaryMoves | `PairMoves` | PairMoves, MainWeapon | yes | Special attack of a pair. PairMoves: the special attack of the dual weapon whose moves the pair uses (the Berserkir axes' cleave, or Skoll and Hati's leap), struck by both weapons. MainWeapon: the normal special attack of your main-hand weapon, struck by that weapon only. A pair has no special attack when its main-hand weapon has none (the wooden club). |
+| Combat | KnifePairBlock | `100` | 0-200 | yes | Block power of a pair of two knives, in percent of the block power of the item whose moves two knives use (KnifePairMoves, Skoll and Hati by default), scaled to the knives' slash, pierce and blunt damage: two knives that hit half as hard as Skoll and Hati block half as well. The pair parries with that item's parry bonus, and never blocks worse than its off-hand knife alone. 0 = the off-hand knife blocks on its own, as in the game. A knife paired with another kind of weapon blocks with the off-hand weapon, as in the game. |
 | Combat | ExcludedWeapons | `` (empty) | prefab names, comma-separated | yes | One-handed weapons that can never be dual wielded, as prefab names (as used by the spawn command), for example modded weapons that look wrong in the dual moves. Spears, the butcher knife, tankards and bombs are never paired anyway. A weapon you hold in your off hand when it becomes excluded is put away. |
 | Moves | PairMoves | `AxeBerzerkr` | an item prefab name | yes | The game item whose moves (stance, attack combo, special attack, reach and damage multipliers) a pair uses, unless both weapons are knives. Default: the Berserkir axes. If the item does not exist or its animations are missing, the default is used and the log says why. With an item that is not a dual weapon (a sword, an axe), the swings of its combo alternate between your weapons (main hand first) and its special attack strikes with both. |
 | Moves | KnifePairMoves | `KnifeSkollAndHati` | an item prefab name | yes | The game item whose moves a pair of two knives uses. Default: Skoll and Hati. Same checks as PairMoves. |
 | Visuals | LeftHandTrails | `true` | | personal | Show the swing trail on off-hand weapons too, for every player you see dual wielding. |
 | Visuals | CrossSheathedPair | `true` | | personal | Place a sheathed pair (weapons put away with the hide key, at a crafting station, in water...) by weapon kind, for every player you see with one: two swords, axes or maces crossed in an X on the back, two knives one on each hip. A knife with a sword, axe or mace hangs where the game puts each (the knife at the hip, the other weapon on the back) either way. Off: two weapons of the same kind sit on the same spot and overlap, as the game places them. Only what you see changes. |
 
-Values that need in-game tuning (`OffHandDamage`, `BothHandsDamage`, `HitPattern`, `SwingStamina`, the moves) are server
-settings. `MainHandKey` and `SwapHandsKey` are validated once when set (a key the game cannot read turns that key off
+Values that need in-game tuning (`OffHandDamage`, `BothHandsDamage`, `HitPattern`, `SwingStamina`, `KnifePairBlock`, the
+moves) are server settings. `MainHandKey` and `SwapHandsKey` are validated once when set (a key the game cannot read turns that key off
 with a warning).
 
 ---
@@ -1439,7 +1497,10 @@ with a warning).
   tower shields stay `Shield` type, G5 applies (the tower shield replaces the off-hand weapon). `ItemKinds` now keeps a
   tower shield in the Shield kind after it becomes `TwoHandedWeaponLeft` (shield pose + Blocking skill; already in
   `src/Shared/ItemKinds.cs`, from Tower Shield Wall's run); this mod does not use `ItemKinds` (eligibility has its own
-  rules, 2.1), so that change does not affect it.
+  rules, 2.1), so that change does not affect it. Its `TowerGuard` warns about prefixes and transpilers on
+  `Humanoid.BlockAttack` from owners whose Harmony id does not start with `MC.`: this mod's knife pair prefix (G12) is
+  an `MC.` patch and is never named. A tower shield never sits next to a knife pair (two-handed), so their blocks never
+  meet.
 - **Sneak Ambush** (`MC.Combat.Sneak.Ambush`):
   - Where a hook runs matters. On the attacker's game, code may read `Attack.m_weapon` during `DoMeleeAttack` (the
     striking weapon; `GetCurrentWeapon()` returns the main weapon). On the victim's side (the creature's owner, often
@@ -1470,8 +1531,9 @@ with a warning).
 - **Crossbow Stays Loaded**: patches `Humanoid.UnequipItem` (prefix), `Humanoid.BlockAttack` (postfix),
   `Attack.OnAttackTrigger` (postfix, reads `m_weapon`, acts only for reload weapons). Crossbows are `Bow` (two-handed),
   never paired. Our `m_weapon` swap and the both-hands second call happen inside `DoMeleeAttack`, so its
-  `OnAttackTrigger` postfix always sees the main weapon, once per event. We no longer patch `UnequipItem`. Cross test
-  X01.
+  `OnAttackTrigger` postfix always sees the main weapon, once per event. We no longer patch `UnequipItem`. Its
+  `BlockAttack` postfix (re-stamps a held crossbow) runs between our knife pair prefix and finalizer (G12) and reads
+  only `m_weaponLoaded`, never block values; a crossbow and a knife pair are never held together. Cross test X01.
 - **Forge Idol Upgrades**: `ForgeRefine` calls `UnequipItem` before remaking an item: refining the off-hand weapon puts
   it away; refining the main weapon leaves a lone off-hand weapon, which moves to the main hand at the end of the frame
   (2.4). Its `ItemData.GetTooltip` postfix is unaffected (this mod adds no tooltip). Cross test X05.
@@ -1539,6 +1601,10 @@ with a warning).
   follow our rules; unequips in any order are safe (2.4, mechanism 3); mods that write `m_rightItem` / `m_leftItem`
   directly bypass the rules, and a lone left weapon they leave is still moved to the main hand (unverified per mod).
 - **Keys:** mods binding Left Alt or H (unverified): both keys are settings.
+- **Block and parry mods** (patching `Humanoid.BlockAttack`; unverified per mod): for the length of a knife pair's block
+  the off-hand knife carries the pair's values (G12; our prefix runs first), so such mods see them. A mod that also
+  writes the blocker's block values for one call and puts back what it saved in its own postfix or finalizer could
+  leave the pair's values on the knife if it puts them back after us; none is known.
 
 ---
 
@@ -1549,17 +1615,18 @@ with a warning).
 | File | Content |
 |---|---|
 | `Plugin.cs` | Config binding, `OnActivated` / `OnDeactivated`, and the `LocalBlocker` override (6.3; the only override beyond `BindConfig`, `OnActivated`, `OnDeactivated`; the framework hook of 7.6 exists); the `BepInIncompatibility` and soft `BepInDependency` attributes for Smoothbrain DualWield on the partial class. |
-| `DualRules.cs` | The server-rules snapshot (`Own()`, `Defaults` for the pending state, `Write`, `TryRead` with clamping, `Describe`), layout 1. |
+| `DualRules.cs` | The server-rules snapshot (`Own()`, `Defaults` for the pending state, `Write`, `TryRead` with clamping, `Describe`), layout 2 (`KnifePairBlock` since 2026-10-02). |
 | `ServerRules.cs` | Copy of Forge Idol Upgrades' `ServerRules` (RPC names from `ModInfo.Guid`, `Current` accessor, Debug `TestRules`), plus the pending state: `Current` goes through the pure `Pick(clientOfServer, serverRules, own)`, which gives `DualRules.Defaults` to a client that has no server rules yet (4.3); the "cannot read" warning names the defaults instead of the own settings. |
 | `PlayerCheck.cs` | Copy of Forge Idol Upgrades' `PlayerCheck`, with the verdict from `NetworkGate.PeerCompatible`, `NetworkGate.PeerProblem` in the log lines, and the `NetworkGate.PeerStateChanged` subscription in `Start` / `Stop` (4.4). |
 | `Eligibility.cs` | `IsEligible(ItemData)`, the exclusion set of prefabs (each with its own `SharedData`; lazy, keyed to the rules object and the `ObjectDB` instance). |
 | `Hands.cs` | Pair state: `IsPaired`, the route decision (`Route`, a pure function the self-tests hammer), `Apply` with its re-sync `finally`, `SettleLoneOffHand`, `Revalidate`, `ClearStaleMarkers`, the swap (`TrySwap` queues it, `CompleteSwap` ends it, `CancelSwap`, the pending swap and the combo restart flag), `ReleaseOffHand`, restore candidate, main-hand intents and windows, eat-return state, the first-pairing message, the marker key. |
 | `BackCross.cs` | The sheathed pair placement (2.7): the pair-weapon check per back hash, `Measure` (shape of a back instance from its biggest mesh), `Apply` (picks the layout from the joints vanilla used: `Cross` for two back weapons, with reference, plane, angle, mirror, lift, registering the pair for levelling; `SplitHips` for two knives; nothing for a knife with a back weapon), `HipsPlane` (the body's centre plane in the hips bone's frame, from the bind pose), `Level` (keeps a crossed pair's middle line on the body's up every frame), `Retry`, `RebuildAll` (marks every player's back visuals as changed); Debug-only record of the last pair's layout, crossing and levelling, and the in-memory setting override. |
-| `MoveTemplates.cs` | Reads and validates `PairMoves` / `KnifePairMoves` (triggers checked at rebuild), caches the templates and stance, the template-owned field copy (`Shape`: locals first, then one assignment block), the stamina formula. |
+| `MoveTemplates.cs` | Reads and validates `PairMoves` / `KnifePairMoves` (triggers checked at rebuild), caches the templates and stance (and each template item's block power, parry bonus and physical damage, for G12), the template-owned field copy (`Shape`: locals first, then one assignment block), the stamina formula. |
+| `KnifeBlock.cs` | The knife pair block (G12, D29): the pure formulas (`PairBlockPower`, `PairParryBonus`, `PhysicalDamage`), the pair's values for the local player's hands (`TryValues`), and the one-call write of those values into the off-hand knife's `SharedData` with its put-back (`Apply`, `Restore`). |
 | `DualSwing.cs` | The fixed hand table (static patterns keyed by `dualaxes` / `dual_knives` and their one-off names; any other trigger takes the fallback rule of 2.6), the recorded swing (clone, main, off, pattern, chain step, event index), the weapon-owned field save/swap/restore in a static struct guarded by the re-entry flag, the both-hands second call; Debug-only record of each hit (hand, trigger, event, clone field values; for each damage also vanilla's random skill factor and the objects the sweep touched) for the self-tests. |
 | `Controls.cs` | Key parsing and validation (copy of MC Loot Pickup Filter's `IsUsableKey`), `MainHandHeld()` with a Debug override, swap polling. |
 | `ForeignMods.cs` | Name-based detection of the other dual wield mods (`Find()` over `Chainloader.PluginInfos`, a pure name match behind it for the self-test, the blocker text read by `LocalBlocker`). With the fallback of 6.3 instead: the lazy check, the `StandDown` flag and the one-time message. |
-| `Patches/HumanoidPatches.cs` | `EquipItem`, `HideHandItems`, `ShowHandItems`, `SetupAnimationState`, `StartAttack`. |
+| `Patches/HumanoidPatches.cs` | `EquipItem`, `HideHandItems`, `ShowHandItems`, `SetupAnimationState`, `StartAttack`, `BlockAttack`. |
 | `Patches/PlayerPatches.cs` | `ToggleEquipped`, `UpdateActionQueue`, `Update`; Debug-only `GetRandomSkillFactor` (self-test record). |
 | `Patches/AttackPatches.cs` | `Start`, `DoMeleeAttack`; Debug-only `AddHitPoint` (self-test record). |
 | `Patches/VisEquipmentPatches.cs` | `SetWeaponTrails`, `SetBackEquipped`. |
@@ -1582,6 +1649,7 @@ prefabs; the settings RPCs are registered per connection, and vanilla keeps the 
 | `Humanoid.ShowHandItems(bool, bool)` (protected) | Prefix | Eat return: wait while attacking, dodging or swimming; draw both when the off-hand weapon was hidden too. | Per show. |
 | `Humanoid.SetupAnimationState()` (private) | Postfix | Dual stance while paired (2.5). | Per equip change. |
 | `Humanoid.StartAttack(Character, bool)` | Prefix (First) + Finalizer | Record "secondary requested"; settle a lone off-hand weapon; refuse during a pair's eat window and while a swap is queued. | Per attack. |
+| `Humanoid.BlockAttack(HitData, Character)` (protected) | Prefix (First) + Finalizer | Two knives (G12): write the pair's block power (0 per level) and parry bonus into the off-hand knife's `SharedData` for this call; the finalizer writes the knife's own back (`__state`: only the call that wrote them). | Per blocked hit of any humanoid on this game: one reference compare; for the local player's knife pair, a few reference compares and float operations. |
 | `Attack.Start(Humanoid, Rigidbody, ZSyncAnimation, CharacterAnimEvent, VisEquipment, ItemDrop.ItemData, Attack, float, float)` | Prefix (High), Postfix | Prefix: copy the template move and the stamina into the clone (locals, then one block; no allocation); `previousAttack = null` after a swap. Postfix (on success): read the fired trigger, record the swing and its hand pattern. | Per swing. |
 | `Attack.DoMeleeAttack()` (private) | Prefix (First), Postfix, Finalizer | Pick the hand; for an off-hand hit swap the weapon-owned fields (static saved struct); for a both-hands event scale the main hand, then in the postfix swap to the off hand and call `DoMeleeAttack` once more (re-entry flag); the finalizer restores everything. | Per hit event of any melee attacker on this game: one reference compare when it is not our swing. |
 | `Player.ToggleEquipped(ItemDrop.ItemData)` | Prefix + Postfix | Main-hand intent per item, toggle window. | Per equip request. |
@@ -1601,7 +1669,8 @@ No transpiler. No `HaveSecondaryAttack` patch (tiny, inlining risk; D10). No `Un
 fields `m_rightItem`, `m_leftItem`, `m_hiddenRightItem`, `m_hiddenLeftItem`, `m_visEquipment`, `m_zanim`,
 `Player.m_attackMissAdrenaline`, `Player.m_actionQueue` (the swap's `m_doneAnimation`), and on `VisEquipment`
 `m_leftBackItemInstance`, `m_rightBackItemInstance`, `m_currentLeftBackItemHash`, `m_currentRightBackItemHash`,
-`m_currentRightBackItemQuality`, `m_backMelee`, `m_backTool`, `m_isArmorStand`.
+`m_currentRightBackItemQuality`, `m_backMelee`, `m_backTool`, `m_isArmorStand`. The `dual.block` self-test also calls
+the private `Humanoid.GetCurrentBlocker` and the protected `BlockAttack`, and sets the private `m_blockTimer`.
 
 ### 7.3 State and lifetime
 
@@ -1623,11 +1692,15 @@ fields `m_rightItem`, `m_leftItem`, `m_hiddenRightItem`, `m_hiddenLeftItem`, `m_
 | Crossed pairs kept level (2.7) | static list (player's `VisEquipment`, the two instances, their joint, the two long axes, the normal and crossing point in the joint's space) | From the crossing until vanilla rebuilds that player's back items (removed at the start of `Apply`, before the setting check, so turning the setting off stops it), an instance is gone or no longer on the joint (removed by `Level`), or the player object is gone (dropped at the next crossing of any player); cleared in `OnDeactivated`. |
 | Last moves Info line | static string | Reset when the `ObjectDB` instance changes (a new world) and in `OnDeactivated`, so each world entry and each activation logs it once. |
 | Server rules | `ServerRules` | Per `ZNet` session (copy of Forge's); `DualRules.Defaults` while a client waits for them. |
+| Knife pair block in force (G12) | static (the off-hand knife's `SharedData` and its three own values) | Within one `BlockAttack` call: written by the prefix, put back by the finalizer; `OnDeactivated` also puts back anything left (never expected). |
 | Join check queue, `PeerStateChanged` subscription | `PlayerCheck` (server) | Queue: until each peer's deadline. Subscription: from `PlayerCheck.Start` to `PlayerCheck.Stop`. |
 
-Nothing in `ObjectDB`, prefabs or `SharedData` is ever modified (the per-hit swaps touch only the per-swing clone and,
-for one call, the player's `m_attackMissAdrenaline`; the sheathed pair placement and its levelling touch only back
-instances vanilla made and will make again), so there is nothing to revert in live items.
+Nothing in `ObjectDB` or prefabs is ever modified, and `SharedData` only for the length of one `BlockAttack` call of the
+local player's knife pair (G12: the off-hand knife's block values, put back by the finalizer; that object may be a
+prefab's own when the knife came from a chest's first loot, which changes nothing outside the call). The per-hit swaps
+touch only the per-swing clone and, for one call, the player's `m_attackMissAdrenaline`; the sheathed pair placement
+and its levelling touch only back instances vanilla made and will make again. So there is nothing to revert in live
+items.
 
 ### 7.4 Live toggle
 
@@ -1646,7 +1719,8 @@ instances vanilla made and will make again), so there is nothing to revert in li
   (`triggerEquipEffects: false`; it stays in the inventory) and clear its marker, which runs `SetupEquipment` so the
   stance becomes vanilla again; a hidden off-hand weapon (`m_hiddenLeftItem`, one-handed) is forgotten the same way, so
   the next draw shows only the main weapon. Always: clear the intents, candidate, pending eat return, pending swap,
-  recorded swing and caches, and `BackCross.RebuildAll()` (every player's sheathed pair is rebuilt by vanilla on the
+  recorded swing and caches, put back a knife pair block still in force (`KnifeBlock.Restore()`, never expected: it
+  lives within one `BlockAttack` call), and `BackCross.RebuildAll()` (every player's sheathed pair is rebuilt by vanilla on the
   next frame, once the patch is gone: vanilla's placement again, the knife on the left hip destroyed with the old
   instances). A swing in progress finishes with the main weapon only
   (our `DoMeleeAttack` patch is gone). At quit the
@@ -1682,7 +1756,8 @@ a `ConfigEntry`. Every step waits a frame and checks the invariant of 2.4.
   items and for items made the way `Inventory.AddItem(name)` makes them (own `SharedData` copy; NOTE whether the copy
   shares the prefab's object); NOTE, for every `Feast` prefab, whether eating at it hides the main weapon (a
   `Consumable` `ItemDrop` piece, 1.2); `DualRules` round trip
-  (every field, including `HitPattern` and `BothHandsDamage`), clamping, unknown layout refused, single player never
+  (every field, including `HitPattern`, `BothHandsDamage` and `KnifePairBlock`), clamping (`KnifePairBlock` −5 → 0,
+  900 → 200), unknown layout refused, single player never
   takes rules from a peer; `ServerRules.Pick`: a client of a server with no server rules yet → `DualRules.Defaults`
   (never the own rules, also when the own rules differ from the defaults), with the server's rules → those, not a
   client → own; `PlayerCheck.Decide` verdicts: compatible → Compatible; not compatible (no mod, turned off, other
@@ -1690,7 +1765,20 @@ a `ConfigEntry`. Every step waits a frame and checks the invariant of 2.4.
   Allowed; not the server, gone, not ready or already being kicked → Skip (the framework's side, `PeerCompatible`
   and `HelloState`, is covered by its own tests N07 and N08 in `src/Shared/TESTING.md`); `ForeignMods.Find()` in the
   test game → none (NOTE the plugin names scanned); the pure name match behind it → a match for "DualWielder",
-  "DualWieldCore" and "balrond DualMastery", none for "Dual Wielding" (our own name).
+  "DualWieldCore" and "balrond DualMastery", none for "Dual Wielding" (our own name); the knife template carries
+  Skoll and Hati's block 24, parry ×4 and physical damage 90 (G12).
+- **`dual.block`** (G12, D29): the pure formula with literal Skoll and Hati values (two knives of 68 → 24 × 68 / 90;
+  mixed knives → their mean; the floor at the off-hand knife's own block, a wooden knife's 12; `KnifePairBlock` 0 → the
+  knife's own, 200 → twice; a template without physical damage → its block unscaled; the parry bonus never below the
+  knife's own); then real `BlockAttack` calls on the local player with no attacker (no push, no parry stagger, no
+  adrenaline): a 40-fire hit (blockable, no stagger damage) from straight ahead with the block timer set for a normal
+  block (1 s) or a parry (0.1 s, inside 0.25 s). For two `KnifeBlackMetal` (block and parry; also checked to be
+  24 × 68 / 90 in the 1.0.16 data), `KnifeBlackMetal` + `KnifeFlint` in both hand orders (the mean), `KnifePairBlock`
+  0 (the knife's own, block and parry) and 200, and as the game: `KnifeBlackMetal` + `SwordIron` (the sword parries),
+  `SwordIron` + `KnifeBlackMetal` (the knife blocks alone), a lone knife. Each call: what gets through =
+  vanilla's armor formula against the expected power (× the Blocking skill as read before the call, × the parry
+  bonus), the blocker's durability drain = 40 / that power, and the knife's own block values back after the call.
+  NOTE the pair block and parry of two of each player knife (the README table).
 - **`dual.equip`**: `SwordIron` then `AxeIron` → right/left, marker on the axe only, `statei` = 15; `MaceIron` →
   replaces the axe; `KnifeBlackMetal` with the main-hand override → knife alone, others unequipped; intent windows:
   an intent stored for an item is not used by a `ShowHandItems` or a drag of that item; pair + `ShieldBronzeBuckler` →
@@ -1834,7 +1922,8 @@ of 6.3 is not used.
 
 ### 7.7 csproj metadata
 
-`ModIdea` = `Dual wielding`; `ModNetworkVersion` = 1; `ModSide` = Both, `ModMultiplayer` = Compatible (already);
+`ModIdea` = `Dual wielding`; `ModNetworkVersion` = 2 (1 until the knife pair block, 2026-10-02); `ModSide` = Both,
+`ModMultiplayer` = Compatible (already);
 `ModMultiplayerNotes` as in 4.5 (replacing the scaffold's shorter text); `ModDescription`: "Wield a one-handed
 sword, axe, club or knife in each hand. A second one-handed weapon goes to your off hand, pairs fight with the game's
 own dual axe and dual knife moves, and every hit is struck by one of your two weapons, or both."
@@ -1896,7 +1985,7 @@ hand unless said otherwise.
   (axe moves) or three times (knife moves) that.
 - **T13 Club (D10):** club in the main hand: no special attack; after a swap (club in the off hand) the cleave works.
 - **T14 Block and parry (D11):** the off-hand weapon blocks (its block value) and parries a `Greyling` or `Troll`; a
-  knife in the off hand blocks badly.
+  knife in the off hand of a sword blocks badly. (Two knives: T34.)
 - **T15 Trees (D21):** axe + axe on a tree: every swing is the first move of the combo, struck by the main-hand axe,
   which chops; Wood Cutting rises. Sword + axe (sword in the main hand): the sword hits the tree, no chopping; press H:
   the axe now chops. Two knives: no restart, no chopping.
@@ -1961,6 +2050,15 @@ hand unless said otherwise.
   with a back pair and with a knife pair sheathed and set `CrossSheathedPair` false, then true (a rebuild while
   lying): after standing up the back pair is crossed within a moment, the knives one per hip. Note what looks wrong
   (clipping into the body or the legs, the crossing point, the knives' angle, a knife off the hip).
+- **T34 Knife pair block (G12, D29, E6):** Blocking skill at 0 (`resetskill Blocking`); three 80-health foods eaten
+  (`MeatPlatter`, `SerpentStew`, `HoneyGlazedChicken`: a block fails when the damage that gets through staggers the
+  player, 40% of max health). Two `KnifeBlackMetal` block a
+  `Troll`'s hits (held block, no parry): the blocked number on each big hit is about 18 (a hit more than twice the
+  block power shows the power itself); one `KnifeBlackMetal` alone, or in the off hand of `SwordIron`: 2. A parry
+  blocks most of the hit and the Troll staggers (one knife alone parries only 8). `KnifeFlint` + `KnifeBlackMetal`,
+  either hand order: about 10. `KnifePairBlock = 0`: two knives block 2 and parry 8, like one knife; 200: about 36;
+  back to 100. `KnifeBlackMetal` (main) + `SwordIron` (off): the sword blocks (21), as before. Block a few hits with
+  two knives: the off-hand knife loses little durability (one knife alone loses about the hit's damage / 2 per block).
 
 ### Multiplayer
 
@@ -1977,7 +2075,8 @@ hand unless said otherwise.
   off"). Untick and tick again quickly (within the second): they stay. With `AllowPlayersWithoutMod = true`: they stay
   and the server log warns.
 - **M02 Server settings (G9):** server `OffHandDamage = 50`, client 100: the client uses 50 (Info line); back in single
-  player the client uses its own.
+  player the client uses its own. Server `KnifePairBlock = 0`, client 100: the client's two knives block 2, like one
+  knife (T34; its log line says "knife pair block 0%").
 - **M02b Live rule change (G9):** while a client holds sword + axe, the server sets `ExcludedWeapons = AxeIron`: the
   client's axe is put away; the server sets `PairMoves = KnifeSkollAndHati`: the client's pairs switch to the knife
   moves and stance at once.
@@ -2064,7 +2163,7 @@ hand unless said otherwise.
 | R8 | Player prefab `m_attackMissAdrenaline` (C# default −5): a pair's 6 events cost more on misses than a sword's 3. | `dual.visuals` NOTE. |
 | R10 | Idle, walk, run and block poses of `DualAxes` / `Knives` with separate weapons. | `dual.visuals` screenshot, T26. |
 | R11 | Sheathed pair overlapping on `m_backMelee` / `m_backTool`. | Answered by the first in-world run's screenshots and the user's test: the two weapons overlap (1.7); now placed by weapon kind (G11, R26). |
-| R13 | Real combo timing with chaining (clip lengths are an upper bound), hence the true damage per second. | `dual.attack` NOTE times; T08 with a stopwatch against a sword. |
+| R13 | Real combo timing with chaining (clip lengths are an upper bound), hence the true damage per second. | `dual.attack` NOTE times; T08 with a stopwatch against a sword. Calculated from the animator data on 2026-10-02 (section 10, knife pair block notes): sword combo about 2.2 s, dual axe combo about 3.0 s, plus 0.15 s per landed hit; not yet measured in game. |
 | R15 | Another trigger (the main weapon's own special, `SecondaryMoves = MainWeapon`) playing from the dual stance. | T25. |
 | R17 | Plugin GUIDs (and names) of RustyMods DualWielder, Ketanol DualWieldCore, balrond DualMastery, Valheim Ascended, GCO; EpicLoot's `randyknapp.mods.epicloot`. Until then the three dual wield mods are found by name (6.3). | Read each mod's `BepInPlugin` attribute (dnSpy on the downloaded DLLs, or DualWielder's GitHub source) or the BepInEx log with the mod installed; X08. |
 | R18 | Left Alt and H free in popular mods. | README note; both are settings. |
@@ -2566,6 +2665,33 @@ Causes and fixes (not run in game yet):
   postfixes), 7.5 (B and the knife pairs), the stage 3 notes, `TESTING.md` (build-under-test line; T33: the knives
   turn with the hips, never both on one side, never between the legs).
 
+**Knife pair block (2026-10-02, G12, D29, E6), done.** Context: a balance analysis compared pairs with every vanilla
+dual item (stats read offline from the 1.0.16 asset bundles, combo times worked out from the player animator's state
+speeds, `Speed` and `Chain` events and exit transitions, plus vanilla's 0.15 s `FreezeFrame` per landed hit event). Its
+findings that bear on this mod: the Berserkir axes hit about as hard as an Ashlands one-hander and a pair of those
+matches them (4% below); vanilla's other dual items are not tuned that way (Early Axes hit 1.5 times a Flint Axe, Skoll
+and Hati about 0.75 times a Mistlands one-hander, the fist weapons 0.6-0.8 times their tier's), so a same-tier pair
+beats Skoll and Hati and the fist weapons; and two knives under the Skoll and Hati moves fight exactly like one knife
+(same multipliers, cost and speed: about 1.4 s per combo either way, 1.9 s with the hit pauses; a sword's about 2.2 s,
+the dual axe combo about 3.0 s, 2.6 and 3.9 s with the pauses, which also answers R13 by calculation: a pair deals about
+33% more per second than one sword, not "similar"; against several enemies it reverses, since a sword's own swing
+hits each enemy at full damage, `m_lowerDamagePerHit` false, while the dual axe moves split it, so from two enemies in
+the arc one sword deals more per second than a sword pair), while blocking at 2 / 8 against Skoll and Hati's 24 / 96. The user
+then asked for two knives to play like Skoll and Hati, block included, and for a knife with any other weapon to stay as
+it is.
+
+- Code: `KnifeBlock.cs` (new), the `BlockAttack` prefix and finalizer in `Patches/HumanoidPatches.cs`, the template's
+  block values in `MoveTemplates.cs`, `KnifePairBlock` in `DualRules.cs` (layout 2) and `Plugin.cs` (Combat section,
+  order 55, between `SecondaryMoves` and `ExcludedWeapons`), `KnifeBlock.Restore()` in `OnDeactivated`,
+  `ModNetworkVersion` 2 and the multiplayer notes in the csproj.
+- Verified: Debug and Release builds clean; `./tools/Test-InWorld.ps1 -Mod Weapons.DualWield -Only dual.data,dual.block`
+  passed (2026-10-02: `dual.data` 79 checks, `dual.block` 45 checks; the NOTE lists the README table's values);
+  `./tools/Test-Smoke.ps1 -Mod Weapons.DualWield` passed (JitCheck: 698 methods, 0 failures). Not run: the other
+  `dual.*` tests (no code they use changed beyond the rules constructor), and nothing by hand (T34, M02).
+- Texts: G12, E6, 1.3 (who reads block values, block wear, when a parry staggers), 1.5 (the other vanilla dual items),
+  2.6 (blocking), D11, D29, 4.1, 4.2, 4.5, section 5, 6.1, 6.2, 6.3, 7.1-7.5, 7.7, T14, T34, M02; README, CHANGELOG,
+  `TESTING.md` (build-under-test line, T14, T34, M03's network version, M06).
+
 ### Deviations from the design, in short
 
 The details are in the stage notes above; each is small and has its reason there.
@@ -2623,3 +2749,6 @@ The details are in the stage notes above; each is small and has its reason there
   multi-object split (both recorded per hit by two Debug-only postfixes); the knife pair follows the pelvis and is
   checked against it (own side of the pelvis and of the body, outside its own thigh, idle and walking, jogging and
   sprinting), its symmetry about the body only NOTEd (7.5 B, 7.5 `dual.visuals`, D27).
+- User request (2026-10-02): two knives block as one, like Skoll and Hati scaled to their physical damage, with a
+  server setting; the off-hand knife carries the pair's block values for the length of one `BlockAttack` call (G12, D29,
+  E6). The first exception to D11 and to "`SharedData` is never modified" (7.3).

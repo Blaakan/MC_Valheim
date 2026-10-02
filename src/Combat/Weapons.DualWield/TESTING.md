@@ -23,12 +23,15 @@ the objects a swing touches) with a main-hand hit that it had not, and `dual.vis
 mirror images about the body while the hips stood turned 31-43° in the idle stance (the knives follow the hips, like
 knives on a belt). The damage test now leaves the game's random roll and split out of its ratios, and the knife test
 checks that each knife stays on its own side and outside its own leg, standing and while walking, jogging and
-sprinting; those test changes have not run yet. Every item below is still to test.
+sprinting; those test changes have not run yet. On 2026-10-02 two knives started to block like Skoll and Hati (T34,
+setting `KnifePairBlock`, network version 2): smoke test passed, and the in-world `dual.data` and the new `dual.block`
+passed (`./tools/Test-InWorld.ps1 -Mod Weapons.DualWield -Only dual.data,dual.block`). Every item below is still to
+test.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (it does not change stamina costs), `ghost` makes creatures ignore you, `heal` refills health and
 stamina, `killall` removes nearby creatures, `puke` empties your stomach so you can eat again, `raiseskill Swords 100`
-raises a skill. Give yourself items with `spawn <name> [amount]` (Tab autocompletes; add `p` to put them straight into
+raises a skill, `resetskill Blocking` sets a skill back to 0. Give yourself items with `spawn <name> [amount]` (Tab autocompletes; add `p` to put them straight into
 your inventory: `spawn SwordIron 2 p`). Names checked in the 1.0.16 game data:
 
 - weapons: `SwordIron` (two), `AxeIron` (two), `MaceIron`, `Club`, `KnifeBlackMetal` (two), `KnifeFlint`, `KnifeButcher`,
@@ -36,7 +39,7 @@ your inventory: `spawn SwordIron 2 p`). Names checked in the 1.0.16 game data:
   `SwordNiedhoggLightning`; for comparison the game's own dual weapons `AxeBerzerkr` (Berserkir axes) and
   `KnifeSkollAndHati` (Skoll and Hati);
 - other items: `ShieldBronzeBuckler`, `Torch`, `Hammer`, `BombSmoke`, `CrossbowArbalest`, `ShieldIronTower` (with
-  Tower Shield Wall);
+  Tower Shield Wall); the foods `MeatPlatter`, `SerpentStew` and `HoneyGlazedChicken` (T34);
 - targets: `Greyling`, `Troll` (spawn them a few metres away, with `god` on).
 
 Checked in the game's asset list instead (not in the dumped data): the food `Raspberry`, the bolt `BoltBone` and the
@@ -51,9 +54,9 @@ changed with ConfigurationManager (F1) or in `BepInEx/config/MC.Combat.Weapons.D
 default after the item that changed it. For the stamina test (T12) use a world with the default stamina world
 modifier. Multiplayer: a dedicated server or a host with the mod, and a second game. For M03, make a build with another
 network version without deploying it: `dotnet build src/Combat/Weapons.DualWield/MC.Combat.Weapons.DualWield.csproj
--p:ModNetworkVersion=2 -p:DeployToGame=false`, copy `src/Combat/Weapons.DualWield/bin/Debug/MC.Combat.Weapons.DualWield.dll`
+-p:ModNetworkVersion=3 -p:DeployToGame=false`, copy `src/Combat/Weapons.DualWield/bin/Debug/MC.Combat.Weapons.DualWield.dll`
 over the second game's copy in `BepInEx/plugins/MC_Valheim/Combat/MC.Combat.Weapons.DualWield/`, and put the normal
-build back afterwards (build again without `-p:ModNetworkVersion=2` and copy it the same way).
+build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it the same way).
 
 ## 0.1.0 — single player
 
@@ -106,8 +109,8 @@ build back afterwards (build again without `-p:ModNetworkVersion=2` and copy it 
 - [ ] **T13 Club:** `Club` in the main hand + `SwordIron` in the off hand. Expected: the special attack does nothing
   (like the club alone). Press H (club in the off hand): the cleave works.
 - [ ] **T14 Block and parry:** with the pair, block and parry a `Greyling` and a `Troll`. Expected: the off-hand weapon
-  blocks (its block power) and a timed block parries. Put a knife in the off hand: it blocks badly (far less block
-  power than the sword), like a single knife.
+  blocks (its block power) and a timed block parries. Put a knife in the off hand of the sword: it blocks badly (far
+  less block power than the sword), like a single knife. (Two knives: T34.)
 - [ ] **T15 Trees:** two `AxeIron` on a tree. Expected: every swing is the first swing of the combo, struck by the
   main-hand axe, which chops; Wood Cutting rises. Sword (main) + axe (off): the sword hits the tree and chops nothing;
   press H: the axe now chops. Two knives: the combo goes on, no chopping.
@@ -208,6 +211,16 @@ build back afterwards (build again without `-p:ModNetworkVersion=2` and copy it 
   then true while lying, then get up: the back pair is crossed within a moment of standing, the knives are one per
   hip. Note what looks wrong (blades through the body, the legs or the ground, the crossing point, the angle of the
   knives, a knife floating off the hip, a weapon floating off the back).
+- [ ] **T34 Knife pair block:** first `resetskill Blocking` (the skill raises every block), and eat `MeatPlatter`,
+  `SerpentStew` and `HoneyGlazedChicken` (80 health each, about 265 max health: a block or parry fails when the damage
+  that gets through fills your stagger bar, 40% of your max health). Two `KnifeBlackMetal`: hold block and let a
+  `Troll` hit you (no timed parry). Expected: the "Blocked" number on each big hit is about 18 (a hit
+  more than twice the block power shows the block power itself); one `KnifeBlackMetal` alone, or in the off hand of
+  `SwordIron`, shows 2. Block just as the hit lands (parry): most of the hit is blocked and the Troll staggers (one
+  knife alone parries only 8). `KnifeFlint` + `KnifeBlackMetal`, either hand order: about 10. Set
+  `KnifePairBlock = 0`: two knives block 2 and parry 8, like one knife; set 200: about 36; put it back to 100.
+  `KnifeBlackMetal` (main) + `SwordIron` (off): the sword blocks (21), as before. Block a few hits with two knives and
+  watch the off-hand knife's durability: it drops slowly (a lone knife loses about half the hit's damage per block).
 - [ ] **L01 Live toggle:** with the pair, turn the mod off in the MC Mods panel (Esc → MC Mods). Expected: the axe goes
   back to the inventory, the sword stays, stance and attacks are vanilla, a second one-handed weapon replaces the
   first. Turn it on: pairs work again. With the pair hidden (R), turn it off. Expected: only the sword stays on the
@@ -230,9 +243,9 @@ build back afterwards (build again without `-p:ModNetworkVersion=2` and copy it 
   player …". A player with the mod on joins normally.
 - [ ] **M02 Mod turned off refused:** a player with the mod and `Enabled = false` joins. Expected: refused about a second
   after joining ("Incompatible version"); the server log says "their game has the mod turned off".
-- [ ] **M03 Other network version refused:** a player with the network version 2 build of the Setup joins. Expected:
+- [ ] **M03 Other network version refused:** a player with the network version 3 build of the Setup joins. Expected:
   refused about a second after joining ("Incompatible version"); the server log says "their game has another version
-  of the mod (network version 2, the server has 1)"; their MC Mods panel says the versions cannot talk to each other.
+  of the mod (network version 3, the server has 2)"; their MC Mods panel says the versions cannot talk to each other.
 - [ ] **M04 Allowed without the mod:** set `AllowPlayersWithoutMod = true` on the server; the three players of M01-M03
   join. Expected: all three play; for each the server log warns "<player> plays without Dual Wielding: their game
   <reason>. AllowPlayersWithoutMod is on, so they may play, without this mod's rules (with another dual wield mod
@@ -247,7 +260,9 @@ build back afterwards (build again without `-p:ModNetworkVersion=2` and copy it 
   second): they stay. With `AllowPlayersWithoutMod = true`: they stay and the server log warns.
 - [ ] **M06 Server settings:** server `OffHandDamage = 50`, the client's own left at 100. Expected: the client logs
   "Using the server's dual wielding rules: off-hand damage 50%, …" and its off-hand hits deal about half (T11); the
-  client's config file is unchanged. Back in single player the client uses its own 100.
+  client's config file is unchanged. Back in single player the client uses its own 100. Then server
+  `KnifePairBlock = 0`, the client's own at 100: the client's log line says "knife pair block 0%", and its two
+  `KnifeBlackMetal` block 2, like one knife (T34).
 - [ ] **M07 Rejoin with a pair:** log out from the server holding a pair, join again. Expected: the same pair after
   spawning. Log out again with the pair; the server sets `ExcludedWeapons = AxeIron`; join again. Expected: no pair
   right after spawning: one weapon in the main hand, the other in the inventory (which one stays depends on whether

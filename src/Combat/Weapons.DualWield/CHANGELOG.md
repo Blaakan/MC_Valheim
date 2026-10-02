@@ -20,7 +20,11 @@
   hang one on each hip (mirrored), and a knife with a sword, axe or mace hangs where the game puts each (knife at the
   hip, the other weapon on the back).
 - The off-hand weapon gets a swing trail too.
+- Two knives block like Skoll and Hati: they block as one, with Skoll and Hati's block power scaled to the knives'
+  slash, pierce and blunt damage (two Black Metal knives 18, two Nord daggers 40) and its parry bonus (4 times), never
+  worse than one knife. A knife with any other weapon blocks with the off-hand weapon, as in the game.
 - Settings: off-hand damage, both-hands damage, hit pattern (Alternate or BothHands), attack stamina, special attack,
-  the items whose moves pairs use, excluded weapons, the two keys, the off-hand trail and the sheathed pair placement.
+  knife pair block, the items whose moves pairs use, excluded weapons, the two keys, the off-hand trail and the
+  sheathed pair placement.
 - Required on the server (or the host) and on every player's game: the server refuses players whose game does not run
   it (AllowPlayersWithoutMod) and its combat settings apply to everyone. Next to another dual wield mod it does not run.

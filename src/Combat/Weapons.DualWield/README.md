@@ -47,18 +47,42 @@ damage, effects, skill and wear.
   weapons. Set **HitPattern** to BothHands to have both weapons strike on every hit instead. If **PairMoves** names an
   item that is not a dual weapon (a sword, for example), the swings of its combo alternate between your weapons (main
   hand first) and its special attack strikes with both.
-- **Balanced like the game's own dual weapons.** The game's dual weapons hit about as hard per hit as a one-handed
-  weapon of their tier and get their edge from more hits per combo. With two weapons of the same tier and the default
-  settings, a pair plays the same way: with the dual axe moves its combo deals about 50% more damage per stamina than
-  one of its weapons alone (the same gain as the Berserkir axes), two knives deal what Skoll and Hati deal, the special
-  attack deals and costs the same as the special attack of the game's dual weapon, and you have no shield.
+- **Balanced like the game's own dual weapons.** The Berserkir axes hit about as hard per hit as a one-handed weapon of
+  their tier and get their edge from more hits per combo. With two weapons of the same tier and the default settings,
+  a pair plays the same way: with the dual axe moves its combo deals about 50% more damage per stamina than one of its
+  weapons alone (the same gain as the Berserkir axes), the special attack deals and costs the same as the special
+  attack of the game's dual weapon, and you have no shield. Two knives fight and block like Skoll and Hati: its combo
+  and leap, which deal what one of your knives deals alone, and its block, scaled to your knives (below).
 - **Stamina.** A dual attack costs the higher normal attack cost of your two weapons (so a cheap weapon in the main hand
   never pays for a strong one in the off hand). The special attack costs 2 times that with the dual axe moves and 3
   times with the dual knife moves, like the game's own dual weapons. Your main weapon's skill, your equipment and your
   status effects still lower it as usual.
 - **Blocking and parrying** use your off-hand weapon (the game's own rule for anything in the left hand): its block
-  power and parry bonus. Swap hands to block with the other weapon. A knife in the off hand blocks badly, like a single
-  knife.
+  power and parry bonus. Swap hands to block with the other weapon. A knife in the off hand of a sword, axe or mace
+  blocks badly, like a single knife.
+- **Two knives block like Skoll and Hati.** A pair of two knives blocks as one, like Skoll and Hati (block power 24,
+  parry bonus 4 times), scaled to your knives' slash, pierce and blunt damage: knives that hit half as hard as Skoll
+  and Hati block half as well. Which knife is in which hand does not matter (their mean counts), and the pair never
+  blocks worse than its off-hand knife alone. Two of each knife, at the default settings and Blocking skill 0 (the
+  skill raises every block, as in the game):
+
+  | Two knives | Block power | Parry power |
+  |---|---|---|
+  | Flint Knife | 2.7 | 10.7 |
+  | Copper Knife | 6.4 | 25.6 |
+  | Abyssal Razor | 10.7 | 42.7 |
+  | Silver Knife | 13.3 | 53.3 |
+  | Black Metal Knife | 18.1 | 72.5 |
+  | Nord Dagger | 40 | 160 |
+  | Frostfire Dagger | 33.1 | 132.3 |
+  | Thunderblood Dagger | 42.7 | 170.7 |
+  | *one knife alone* | *2* | *8* |
+  | *Skoll and Hati* | *24* | *96* |
+
+  Frost, fire, lightning and spirit damage do not count, so a Frostfire Dagger, which trades some slash and pierce for
+  frost and fire, blocks a little less than a Nord Dagger. Blocking also wears your knives far less than a lone knife:
+  the game takes durability by the hit's damage divided by the block power. Setting **KnifePairBlock** scales the
+  pair's block (0 = the game's rule: the off-hand knife blocks alone). A knife with any other weapon blocks as above.
 - **Skills.** Each hit trains the skill of the weapon that struck it: a sword + axe pair trains both Swords and Axes.
   When both weapons strike at once, each gets half.
 - **The pair holds.** Your weapons stay in the hands you chose through everything the game does to your hands: hiding
@@ -104,6 +128,7 @@ ConfigurationManager, or by editing the file (the game picks up the change while
 | Combat | BothHandsDamage | `50` | When both weapons strike the same hit, the damage of each, in percent of its normal damage (10 to 100). 50 = together they deal about one weapon's hit. Higher values make pairs much stronger. The off-hand weapon's share is also scaled by OffHandDamage. |
 | Combat | SwingStamina | `100` | Stamina of a dual attack, in percent of the higher normal attack cost of your two weapons (25 to 300). The special attack costs 2 times more with the axe moves and 3 times more with the knife moves. |
 | Combat | SecondaryMoves | `PairMoves` | Special attack of a pair. `PairMoves`: the cleave of the Berserkir axes, or the leap of Skoll and Hati, struck by both weapons. `MainWeapon`: the normal special attack of your main-hand weapon, struck by that weapon only. A pair has no special attack when its main-hand weapon has none (the wooden club). |
+| Combat | KnifePairBlock | `100` | Block power of a pair of two knives, in percent of the block power of the item whose moves two knives use (KnifePairMoves, Skoll and Hati by default), scaled to the knives' slash, pierce and blunt damage (0 to 200). The pair parries with that item's parry bonus, and never blocks worse than its off-hand knife alone. 0 = the off-hand knife blocks on its own, as in the game. A knife paired with another kind of weapon blocks with the off-hand weapon, as in the game. |
 | Combat | ExcludedWeapons | (empty) | One-handed weapons that can never be dual wielded, as comma-separated prefab names (as used by the spawn command, for example `AxeBronze`), for modded weapons that look wrong in the dual moves. A name the game does not know is ignored and named in the log. When a weapon of the pair you hold becomes excluded, your off-hand weapon is put away. |
 | Moves | PairMoves | `AxeBerzerkr` | The game item whose moves (stance, attack combo, special attack, reach and damage multipliers) a pair uses, unless both weapons are knives. Default: the Berserkir axes. If the item does not exist or its animations are missing, the default is used and the log says why. With an item that is not a dual weapon (a sword, an axe), the swings of its combo alternate between your weapons (main hand first) and its special attack strikes with both. |
 | Moves | KnifePairMoves | `KnifeSkollAndHati` | The game item whose moves a pair of two knives uses. Default: Skoll and Hati. Same checks as PairMoves. |
@@ -184,6 +209,8 @@ stance and dual moves.
   change the swap the same way.
 - **Creature weapons** from the spawn command (items a player normally never gets) pair too if they are one-handed
   swords, axes, clubs or knives.
+- **Knife pair block in tooltips:** a knife's tooltip shows its own block power (2); the pair's block applies while both
+  knives are in your hands. When you block, the game's "Blocked" number shows it at work.
 
 ## Installation
 
@@ -227,6 +254,8 @@ weapon (see Good to know).
 - **Inventory and equipment slot mods** (extra slots, loadouts, quick slots): equipping through the game follows the
   rules above. Mods that put items straight into the hands skip them.
 - **Other mods using Left Alt or H**: change MainHandKey or SwapHandsKey.
+- **Block and parry mods**: two knives block through the game's own block code, with the pair's values in place for
+  the length of each block, so mods that change blocking see them.
 - **Mods that move sheathed weapons** (holster or back-slot mods): this mod places a sheathed pair only when both
   weapons are still on the game's own back spot or both on its hip spot; a pair such a mod moved elsewhere is left
   where that mod put it. If the result looks wrong, set CrossSheathedPair = false.
