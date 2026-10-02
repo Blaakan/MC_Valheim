@@ -2449,20 +2449,27 @@
                       "userLink":  "",
                       "status":  "Idea",
                       "feasibility":  "medium",
-                      "side":  "depends",
+                      "side":  "both",
                       "needsAssets":  true,
                       "hooks":  [
-                                    "GameCamera.SetTempFOV",
-                                    "GameCamera.ResetTempFOV",
                                     "GameCamera.UpdateCamera",
-                                    "PlayerController.m_mouseSens",
+                                    "Player.SetControls",
+                                    "Player.SetMouseLook",
+                                    "Player.AlwaysRotateCamera",
+                                    "Player.UpdateHover",
+                                    "Player.OnDamaged",
                                     "Player.Update",
+                                    "Player.LateUpdate",
+                                    "Hud.UpdateCrosshair",
                                     "ObjectDB.Awake",
+                                    "ObjectDB.CopyOtherDB",
+                                    "ObjectDB.GetAllCraftableWeapons",
+                                    "ZNetScene.Awake",
                                     "Minimap.AddPin",
                                     "Minimap.Explore"
                                 ],
-                      "sketch":  "While a key/secondary action is held (spyglass equipped or in inventory), force first person (m_distance=0), call SetTempFOV(65/zoom) and scale mouse sensitivity, show a vignette and a long raycast readout (name/distance of target). Optional: drop a map pin or reveal a small fog radius at the hit point via Minimap.AddPin / private Minimap.Explore.",
-                      "risks":  "Objects beyond the synced simulation distance do not exist (only terrain/LOD visible); GrapplingPoint shares the temp-FOV API; camera/first-person mods fight over m_distance/FOV; held-item version needs a model/icon and is deleted from inventories without the mod.",
+                      "sketch":  "Built (Spyglass, 2026-10-02): a craftable tool like the hammer (clone of KnifeFlint made a Tool with no build pieces, both hands taken, model and icon made in code), raised with Attack: a two-bone arm pose made in code (synced by a player ZDO bool) brings it to the eye while a GameCamera.UpdateCamera postfix slides the camera into the eye and narrows the field of view of both cameras (no SetTempFOV, m_fov, m_distance or m_mouseSens); a round sharp view with a blurred, darker edge drawn without a shader of its own (OnRenderImage downsample + UI ring meshes); aim scaled in Player.SetMouseLook, feet locked in Player.SetControls. Far land and objects come from the MC Distant Horizons mod, which draws finer land and farther objects in the looked-at direction while a spyglass is up (AppDomain slot, no reference). Both side with server rules (recipe, max zoom, fog clearing). Map pins, map reveal and the target readout are left for later.",
+                      "risks":  "Far creatures, ships and carts never exist outside the active area, so the spyglass cannot show them; without Distant Horizons the view ends at the vanilla range (about 300-500 m of objects, land in the fog); camera and first-person mods also place the camera in UpdateCamera (the spyglass runs last); the item is deleted from inventories without the mod; the arm pose fights the animator (AnimatePhysics) and needs remote players to have the mod.",
                       "relatedIdeas":  [
                                            "Cartography table revamp"
                                        ],
@@ -2598,7 +2605,7 @@
                       "scope":  "New",
                       "existsPerUser":  "No",
                       "userLink":  "",
-                      "status":  "Idea",
+                      "status":  "Implemented",
                       "feasibility":  "medium",
                       "side":  "client-only",
                       "needsAssets":  false,
@@ -2615,8 +2622,8 @@
                                     "ZDOMan.m_onZDODestroyed",
                                     "ZNetScene.HaveInstance"
                                 ],
-                      "sketch":  "Built (Distant Horizons, ported 2026-10-02 from the author's standalone mod): a level-of-detail quadtree of the game's own distant heightmaps over the whole world replaces TerrainLod's 3x3 grid (exact zone heights on the finest levels, computed on the game's builder thread); far tiles are painted by a camera CommandBuffer in a scaled-down space so the terrain shader's 200-400 m fade never starts; far trees as runtime-baked impostor cards plus big rocks and buildings from the client's ZDO store, handed over to the real objects once spawned; a far sea sheet with the game's water material; clear-weather fog thinning that multiplies the rendered density. Client-only, nothing sent.",
-                      "risks":  "GPU/CPU cost and memory; the builder thread is shared with zone loading; shader constants (fades, water bands) are not in the code and can change with a game update; fog mods that write the fog density (NoFogBruh, Seasons, GammaOfNightLights, Skarif) stack with its thinning; New Horizons: Treelines does the same job; world-size mods need WorldRadius set by hand; on a host far objects show every generated zone, other players' bases included.",
+                      "sketch":  "Built (Distant Horizons, ported 2026-10-02 from the author\u0027s standalone mod): a level-of-detail quadtree of the game\u0027s own distant heightmaps over the whole world replaces TerrainLod\u0027s 3x3 grid (exact zone heights on the finest levels, computed on the game\u0027s builder thread); far tiles are painted by a camera CommandBuffer in a scaled-down space so the terrain shader\u0027s 200-400 m fade never starts; far trees as runtime-baked impostor cards plus big rocks and buildings from the client\u0027s ZDO store, handed over to the real objects once spawned; a far sea sheet with the game\u0027s water material; clear-weather fog thinning that multiplies the rendered density. Client-only, nothing sent.",
+                      "risks":  "GPU/CPU cost and memory; the builder thread is shared with zone loading; shader constants (fades, water bands) are not in the code and can change with a game update; fog mods that write the fog density (NoFogBruh, Seasons, GammaOfNightLights, Skarif) stack with its thinning; New Horizons: Treelines does the same job; world-size mods need WorldRadius set by hand; on a host far objects show every generated zone, other players\u0027 bases included.",
                       "relatedIdeas":  [
 
                                        ],

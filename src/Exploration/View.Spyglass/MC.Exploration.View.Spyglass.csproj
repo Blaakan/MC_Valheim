@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Spyglass</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>New</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Spyglass</ModIdea>
+    <!-- Package name without the "View" system word (default would be ViewSpyglass). -->
+    <ModPackageName>Spyglass</ModPackageName>
+    <!-- Both: user rule (gameplay mod = required everywhere). New craftable item (recipe cost, item must exist on
+         every game or it vanish) and how far a player can scout. Server refuse players without me, with me off, or
+         other network version (PlayerCheck), and send its rules (ServerRules). Zoomed view only local. -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. The spyglass is a new craftable item, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. The zoomed view only changes your own screen; other players with the mod see you hold the spyglass to your eye. Spyglasses only exist for games with the mod: a player without it never sees them (on the ground, in chests or in hands), and a chest loses its spyglasses when such a player takes or adds an item in it. On a server without the mod, spyglasses dropped on the ground can be deleted.</ModMultiplayerNotes>
+    <!-- Wire format of me: RPC <guid>.Settings / <guid>.SettingsRequest (SpyglassRules layout 1), player ZDO bool
+         "<guid>.Raised", item prefab MC_Spyglass, recipe Recipe_MC_Spyglass. Bump when any of them change. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Craft a bronze spyglass, hold it in your right hand and click to raise it to your eye: the view narrows and zooms in on far land, trees and buildings. Aim with the mouse; you stand still while looking.</ModDescription>
+  </PropertyGroup>
+</Project>

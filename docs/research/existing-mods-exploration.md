@@ -244,11 +244,11 @@ Also:
 The user believed no spyglass mod exists; several do.
 
 **Vanilla hooks**
-- Zoom is a change of `GameCamera.m_fov` (65 by default). Free-fly mode already allows a FOV as low as 5.
+- Zoom is a change of the camera's field of view (`GameCamera.m_fov`, 65 by default, copied to both cameras at the start of every `GameCamera.UpdateCamera`). Free-fly mode already allows a FOV as low as 5. A postfix on `UpdateCamera` that writes both cameras' field of view leaves nothing to restore (MC Spyglass); `SetTempFOV` is shared with grappling and keeps its base for the whole session.
 
 | Mod | Status | Notes |
 |-----|--------|-------|
-| [Spyglass](https://thunderstore.io/c/valheim/p/Advize/Spyglass/) (Advize) | 3.2.0, 2026-09-11, 1.0 tagged | Craftable (2 obsidian, 2 bronze, 1 crystal) and upgradable. 3 zoom levels (right mouse button / Shift+right mouse button, gamepad triggers). Doubles as a bash weapon that can block. ServerSync. GPL-3.0, [GitHub](https://github.com/AdvizeGH/Advize_ValheimMods). |
+| [Spyglass](https://thunderstore.io/c/valheim/p/Advize/Spyglass/) (Advize) | 3.2.0, 2026-09-11, 1.0 tagged | Craftable and upgradable: its README says 2 obsidian, 2 bronze, 1 crystal, its code (read 2026-10-02) 2 Crystal, 4 Leather scraps, 2 Bronze at the workbench. 3 zoom levels (right mouse button / Shift+right mouse button, gamepad triggers): writes `m_fov` in an `UpdateCamera` prefix and pushes the camera forward (zoom level x 5 m); vignette through the post-processing profile; no aim scaling, no movement lock, nothing beyond the loaded area. Item and model from an embedded asset bundle. Doubles as a bash weapon that can block. ServerSync. GPL-3.0, [GitHub](https://github.com/AdvizeGH/Advize_ValheimMods). |
 | [Monocular](https://thunderstore.io/c/valheim/p/jg224/Monocular/) (jg224) | 0.5.1, 2026-09-09, deprecated | Handheld monocular with mouse-wheel zoom. |
 | [Visby Lens](https://www.nexusmods.com/valheim/mods/432) (Nexus) | 2021-era | Lore-friendly spyglass with right-click zoom. |
 

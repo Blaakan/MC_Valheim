@@ -63,7 +63,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 | Exploration | Mob variant | New | medium | Both | no | partial | idea |
 | Exploration | New ability depending on skill level | New | medium | Depends | no | partial | idea |
 | Exploration | Sailing revamp | New | medium | Both | no | partial | [Sailing Skill 0.1.0](../src/Exploration/Sailing.Skill) (in development) |
-| Exploration | Spyglass | New | medium | Depends | yes | full | idea |
+| Exploration | Spyglass | New | medium | both | yes | full | [Spyglass 0.1.0](../src/Exploration/View.Spyglass) (in development) |
 | Exploration | Weather staff | New | medium | Both | yes | partial | idea |
 | Exploration | Late Game quest | New | hard | Depends | no | partial | idea |
 | Exploration | Swim dive | New | hard | Client | yes | full | [Swim Dive 0.1.0](../src/Exploration/Swimming.Dive) (in development) |
@@ -866,10 +866,10 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 > See things far away
 
-- **Scope:** New · **Feasibility:** medium · **Who needs it:** Depends · **Custom assets:** yes · **Status:** idea
-- **Approach:** While a key/secondary action is held (spyglass equipped or in inventory), force first person (m_distance=0), call SetTempFOV(65/zoom) and scale mouse sensitivity, show a vignette and a long raycast readout (name/distance of target). Optional: drop a map pin or reveal a small fog radius at the hit point via Minimap.AddPin / private Minimap.Explore.
-- **Hooks:** `GameCamera.SetTempFOV`, `GameCamera.ResetTempFOV`, `GameCamera.UpdateCamera`, `PlayerController.m_mouseSens`, `Player.Update`, `ObjectDB.Awake`, `Minimap.AddPin`, `Minimap.Explore`
-- **Risks:** Objects beyond the synced simulation distance do not exist (only terrain/LOD visible); GrapplingPoint shares the temp-FOV API; camera/first-person mods fight over m_distance/FOV; held-item version needs a model/icon and is deleted from inventories without the mod.
+- **Scope:** New · **Feasibility:** medium · **Who needs it:** both · **Custom assets:** yes · **Status:** [Spyglass 0.1.0](../src/Exploration/View.Spyglass) (in development)
+- **Approach:** Built (Spyglass, 2026-10-02): a craftable tool like the hammer (clone of KnifeFlint made a Tool with no build pieces, both hands taken, model and icon made in code), raised with Attack: a two-bone arm pose made in code (synced by a player ZDO bool) brings it to the eye while a GameCamera.UpdateCamera postfix slides the camera into the eye and narrows the field of view of both cameras (no SetTempFOV, m_fov, m_distance or m_mouseSens); a round sharp view with a blurred, darker edge drawn without a shader of its own (OnRenderImage downsample + UI ring meshes); aim scaled in Player.SetMouseLook, feet locked in Player.SetControls. Far land and objects come from the MC Distant Horizons mod, which draws finer land and farther objects in the looked-at direction while a spyglass is up (AppDomain slot, no reference). Both side with server rules (recipe, max zoom, fog clearing). Map pins, map reveal and the target readout are left for later.
+- **Hooks:** `GameCamera.UpdateCamera`, `Player.SetControls`, `Player.SetMouseLook`, `Player.AlwaysRotateCamera`, `Player.UpdateHover`, `Player.OnDamaged`, `Player.Update`, `Player.LateUpdate`, `Hud.UpdateCrosshair`, `ObjectDB.Awake`, `ObjectDB.CopyOtherDB`, `ObjectDB.GetAllCraftableWeapons`, `ZNetScene.Awake`, `Minimap.AddPin`, `Minimap.Explore`
+- **Risks:** Far creatures, ships and carts never exist outside the active area, so the spyglass cannot show them; without Distant Horizons the view ends at the vanilla range (about 300-500 m of objects, land in the fog); camera and first-person mods also place the camera in UpdateCamera (the spyglass runs last); the item is deleted from inventories without the mod; the arm pose fights the animator (AnimatePhysics) and needs remote players to have the mod.
 - **Related:** Cartography table revamp
 - **Game systems:** [docs/game/exploration-player.md](game/exploration-player.md)
 - **Existing mods:** full
