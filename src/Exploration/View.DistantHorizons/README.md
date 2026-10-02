@@ -28,6 +28,10 @@ the whole world, fine near you and coarser with distance, and adds what stands o
 - **Thinner fog in clear weather** (`FogDensityMultiplier`, default 0.25): clear days show the far land. Rain and
   storms keep their fog, and so does dense weather such as thick mist and blizzards; lighter fog, like the Black
   Forest's daytime mist, is thinned partly (see `FogClearDensity` and `FogStormDensity`).
+- **More through a spyglass** (with the MC Spyglass mod): while a spyglass is at your eye, the land in the direction
+  you look is drawn in finer detail and far trees, rocks and buildings are drawn farther out there, as if that area were
+  as many times nearer as the spyglass zooms (up to `SpyglassMaxBoost`, default 4). It builds up within a few seconds
+  and goes back to normal when you lower the spyglass. Nothing changes without the Spyglass mod.
 - **Turns on and off live** from the MC Mods panel: off gives back the normal fog and water at once and the normal
   distant terrain within a few seconds.
 
@@ -47,7 +51,7 @@ second after the last change; everything else applies at once.
 | LOD layout | BaseTileSize | `256` | Edge in metres of the finest tile; each further level doubles it. Rebuilds all terrain. |
 | LOD layout | BaseVertexSpacing | `2.5` | Metres between terrain samples on the finest level (real zones use 1 m, vanilla distant terrain 10 m); each level doubles it. Tiles are limited to 250x250 quads, so tiny values are rounded up (the log says what is used, at game start and after each change). Rebuilds all terrain. |
 | LOD layout | LodLevels | `7` | Number of levels: 256 m tiles doubling up to 16.4 km tiles with the defaults. Clamped so the root grid stays between 2x2 and 8x8 tiles; the log reports the levels used. Rebuilds all terrain. |
-| LOD layout | SplitFactor | `1` | A tile splits into four while the camera is closer than this many tile widths. 1 keeps neighbours at most one level apart; 0.5 uses far fewer tiles. |
+| LOD layout | SplitFactor | `1` | A tile splits into four while the camera is closer than this many tile widths. 1 keeps neighbours at most one level apart (while a spyglass is raised, the edge of the sharpened area can put two or three levels side by side; `FillCracks` hides the seam); 0.5 uses far fewer tiles. |
 | LOD layout | SplitHysteresis | `0.2` | A split tile stays split until the camera is `SplitFactor x (1 + SplitHysteresis)` tile widths away, so hovering around a boundary does not rebuild tiles. |
 | LOD layout | ViewDistance | `22000` | Tiles farther than this (metres, up to 30000) are never subdivided, but still drawn as one coarse tile, so the ground never has holes. Also the outer edge of the far sea. |
 | LOD layout | WorldRadius | `10500` | Tiles entirely outside this radius are skipped, and the far sea ends here (up to 20000 m). With a world-size mod, set its world radius plus edge size. Rebuilds all terrain. |
@@ -104,6 +108,8 @@ second after the last change; everything else applies at once.
 | Objects | MaxVertsPerObject | `1500` | Up to `ObjectMeshDistance`, trees whose lowest-detail model has more vertices than this are drawn as cards instead (keeps dense pine forests cheap). |
 | Objects | SnapObjectsToTerrain | `true` | Place far objects on the far (coarse) terrain instead of at their true height, so they mostly neither float nor sink. Trees are placed one by one; rocks and buildings move with their zone. |
 | Objects | FarObjectWind | `false` | Let far trees sway in the wind. Off: merged trees share one origin, so sway would make whole trees slide. |
+| Spyglass | SpyglassDetail | `true` | While a spyglass from the MC Spyglass mod is at your eye, draw finer land and farther objects in the direction you look. Nothing changes without that mod or while the spyglass is down. |
+| Spyglass | SpyglassMaxBoost | `4` | Most the spyglass may bring things nearer for detail (1 to 8; 1 = no boost). Higher shows more far buildings and trees and finer land through a strong zoom, but builds more tiles each time you turn. |
 | Logging | DebugLogging | `false` | Log tile builds and removals, and every 30 seconds the tile and object counts, to `BepInEx/LogOutput.log`. With it on, the tree card atlas is also saved once as `BepInEx/DistantHorizons_atlas.png`. |
 
 To see less and save work: lower `ViewDistance` and `CameraFarClip` together, raise `BaseVertexSpacing` (for example
@@ -195,6 +201,9 @@ Built for Valheim 1.0.16. Safe to add or remove at any time: it stores nothing i
   upstream build also keep this section order; aedenthorn's (Nexus 740) sorts the sections by name (General, LOD
   layout, Logging, Objects, Rendering, Streaming) and shows `SplitHysteresis` as a percentage (0.2 = 20%). Layout
   settings rebuild the terrain half a second after the last change.
+- **Spyglass** (MC): through its spyglass you see this mod's far land and objects, with finer land and farther
+  objects in the direction you look (`SpyglassDetail`, `SpyglassMaxBoost`) and less haze in clear weather (its
+  `FogClearing`, applied on top of this mod's fog thinning).
 - **Swim Dive** (MC): under water its own fog takes over as usual. **Sneak Ambush** (MC): its fog bonus uses the
   weather's own fog, not the rendered one, so thinner fog does not change stealth. **Deep North Awakening** (MC): its
   blizzards keep their fog when their density is at or above `FogStormDensity`.

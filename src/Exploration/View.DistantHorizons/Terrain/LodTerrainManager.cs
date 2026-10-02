@@ -53,6 +53,10 @@ internal sealed class LodTerrainManager : MonoBehaviour
     private Vector3 _lastUpdatePos = new Vector3(99999f, 0f, 99999f);
     private float _updateTimer;
     private bool _dirty = true;
+
+    // Spyglass boost (ViewBoost): read every frame, used by Visit and Priority; recompute when it moved enough.
+    private ViewBoost.State _boost;
+    private ViewBoost.Applied _boostApplied;
     private bool _rebuildPending;
     private float _rebuildAt;
     private int _rootLevel = -1;
@@ -255,6 +259,9 @@ internal sealed class LodTerrainManager : MonoBehaviour
         if (cam == null) return;
         Vector3 camPos = cam.transform.position;
 
+        _boost = ViewBoost.Read(cfg.SpyglassDetail.Value, cfg.SpyglassMaxBoost.Value);
+        if (ViewBoost.Poll(ref _boostApplied, _boost, Time.unscaledTime)) _dirty = true;
+
         _updateTimer += Time.deltaTime;
         if (_dirty || (_updateTimer >= cfg.UpdateInterval.Value && Utils.DistanceXZ(camPos, _lastUpdatePos) >= cfg.UpdateStepDistance.Value))
         {
@@ -400,8 +407,10 @@ internal sealed class LodTerrainManager : MonoBehaviour
                 h += Cfg.SplitHysteresis.Value;
             float cheb = AabbCheb(camPos.x, camPos.z, minX, minZ, maxX, maxZ);
             float dist = AabbDist(camPos.x, camPos.z, minX, minZ, maxX, maxZ);
+            // Spyglass up: node in the looked-at direction count as boost times nearer (split finer).
+            float boost = _boost.Factor(camPos, minX, minZ, maxX, maxZ);
             // ViewDistance limit refinement only: far node stay one coarse tile, never hole.
-            split = cheb < Cfg.SplitFactor.Value * h * size && dist <= Cfg.ViewDistance.Value * h;
+            split = cheb < Cfg.SplitFactor.Value * h * size * boost && dist <= Cfg.ViewDistance.Value * h;
         }
 
         if (split)
@@ -451,8 +460,10 @@ internal sealed class LodTerrainManager : MonoBehaviour
 
     private float Priority(LodTile t, Vector3 cam)
     {
-        // Nearest first, but coarse tile covering camera beat fine tile far away.
-        return AabbDist(cam.x, cam.z, t.MinX, t.MinZ, t.MaxX, t.MaxZ) / t.Size;
+        // Nearest first, but coarse tile covering camera beat fine tile far away. Spyglass up: looked-at tiles count
+        // nearer, so they come first.
+        return AabbDist(cam.x, cam.z, t.MinX, t.MinZ, t.MaxX, t.MaxZ) / t.Size
+               / _boost.Factor(cam, t.MinX, t.MinZ, t.MaxX, t.MaxZ);
     }
 
     private void PumpBuilds(Vector3 camPos)
@@ -2244,6 +2255,23 @@ internal sealed class LodTerrainManager : MonoBehaviour
         y += t.Go.transform.position.y + TileDrop;
         return true;
     }
+
+#if DEBUG
+    // Self test (horizons.boost): wanted leaf tiles farther than minDistance whose centre lie within halfAngle of
+    // forward (XZ).
+    internal int CountLeavesInView(Vector3 cam, Vector2 forward, float halfAngle, float minDistance)
+    {
+        int n = 0;
+        foreach (KeyValuePair<TileKey, NodeRole> kv in _desired)
+        {
+            if (kv.Value != NodeRole.Leaf) continue;
+            GetBounds(kv.Key, out float minX, out float minZ, out float maxX, out float maxZ);
+            var c = new Vector2((minX + maxX) * 0.5f - cam.x, (minZ + maxZ) * 0.5f - cam.z);
+            if (c.magnitude >= minDistance && Vector2.Angle(forward, c) <= halfAngle) n++;
+        }
+        return n;
+    }
+#endif
 
     // ------------------------------------------------------------------ stats
 

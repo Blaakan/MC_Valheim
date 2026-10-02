@@ -77,6 +77,10 @@ internal sealed class DHConfig
     public readonly ConfigEntry<bool> SnapObjectsToTerrain;
     public readonly ConfigEntry<bool> FarObjectWind;
 
+    // Spyglass (MC Spyglass mod, see ViewBoost)
+    public readonly ConfigEntry<bool> SpyglassDetail;
+    public readonly ConfigEntry<float> SpyglassMaxBoost;
+
     // Debug
     public readonly ConfigEntry<bool> DebugLogging;
 
@@ -85,6 +89,7 @@ internal sealed class DHConfig
     public const string StreamingSection = "Streaming";
     public const string RenderingSection = "Rendering";
     public const string ObjectsSection = "Objects";
+    public const string SpyglassSection = "Spyglass";
     public const string LoggingSection = "Logging";
 
     // Me fire this after any setting change, with entry that changed. Each handler run alone (throw in one never
@@ -126,7 +131,8 @@ internal sealed class DHConfig
 
         SplitFactor = Bind(LodSection, "SplitFactor", 1f, new ConfigDescription(
             "A tile is subdivided into 4 finer tiles while the camera is closer than SplitFactor * tile size (Chebyshev distance). " +
-            "1.0 guarantees neighbouring tiles differ by at most one LOD level. Lower values (0.5) use far fewer tiles.",
+            "1.0 keeps neighbouring tiles at most one LOD level apart (except at the edge of the area a raised MC spyglass sharpens, " +
+            "where two or three levels can meet; FillCracks hides that seam). Lower values (0.5) use far fewer tiles.",
             new AcceptableValueRange<float>(0.25f, 3f)));
 
         SplitHysteresis = Bind(LodSection, "SplitHysteresis", 0.2f, new ConfigDescription(
@@ -342,6 +348,15 @@ internal sealed class DHConfig
 
         FarObjectWind = Bind(ObjectsSection, "FarObjectWind", false,
             "Let far trees sway in the wind. Off by default: merged meshes share one origin, so the leaf shader's sway makes whole trees slide.");
+
+        SpyglassDetail = Bind(SpyglassSection, "SpyglassDetail", true,
+            "While a spyglass from the MC Spyglass mod is at your eye, draw the land in finer detail and the far objects farther out " +
+            "in the direction you look (as if that area were as many times nearer as the spyglass zooms, up to SpyglassMaxBoost). " +
+            "Nothing changes without that mod or while the spyglass is down.");
+        SpyglassMaxBoost = Bind(SpyglassSection, "SpyglassMaxBoost", 4f, new ConfigDescription(
+            "Most the spyglass may bring things nearer for detail (1 = no boost). Higher shows more far buildings and trees and finer land " +
+            "through a strong zoom, but builds more tiles each time you turn.",
+            new AcceptableValueRange<float>(1f, 8f)));
 
         DebugLogging = Bind(LoggingSection, "DebugLogging", false,
             "Log tile builds and removals, and every 30 seconds the tile and object counts, to the BepInEx log.");

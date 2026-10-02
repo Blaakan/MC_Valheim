@@ -9,7 +9,7 @@
 | Sheet idea | `Distant horizon` |
 | Origin | The standalone mod `D:\Gits\valheim-distant-horizons` (plugin `com.distanthorizons.valheim` 0.1.0, last commit 2026-09-28), written and tested in game by its author 2026-09-21 to 09-28, ported into the MC framework on 2026-10-02 |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` in `.ref/` (TerrainLod, Heightmap, HeightmapBuilder, ZoneSystem, ZDOMan, ZNetScene, EnvMan, Water, RenderGroupSystem, Terminal, Game); shader facts from the standalone's disassembly of `Custom/Heightmap` and `Custom/Water` (2026-09-22, not in `.ref`); sources of 26 other mods and three ConfigurationManager builds (2026-10-02) |
-| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-02 with all 24 MC mods (JitCheck 592 methods, 0 failures); in-world self tests passed 2026-10-02 (4/4 `horizons.*`; full run of every mod's tests with it deployed 108/108); one adversarial review round, 18 findings fixed (5.4); near-ground fix after a user report (5.5): smoke test and `horizons.*` self tests passed 2026-10-02; not yet tested by hand in game in its MC form |
+| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-02 with all 24 MC mods (JitCheck 592 methods, 0 failures); in-world self tests passed 2026-10-02 (4/4 `horizons.*`; full run of every mod's tests with it deployed 108/108); one adversarial review round, 18 findings fixed (5.4); near-ground fix after a user report (5.5): smoke test and `horizons.*` 6/6 passed 2026-10-02; not yet tested by hand in game in its MC form |
 
 ## Goal
 
@@ -269,6 +269,26 @@ impostor atlas), `Patches/` (one file per game class).
   `FogStormDensity` (unverified). It also hooks `m_onZDODestroyed` (multicast, both coexist).
 - Sailing Skill patches `Terminal.InitTerminal`; no longer relevant (the `dh` command is registered live).
 
+### 3.14 Spyglass boost (added 2026-10-02 with the Spyglass mod) — `ViewBoost.cs`
+
+The MC Spyglass ([design](exploration-view-spyglass.md), 2.6) zooms the main camera's field of view, which DH's paint
+already follows (`PaintFor` uses the frame's projection), but DH picks detail by XZ distance only, so a zoomed far view
+showed coarse land and no buildings beyond `PieceDistance`. While a spyglass is up it writes a `double[]` in the
+AppDomain slot `MC.ViewBoost.v1` every frame (layout 1, frame, zoom, weight, forward, half fields of view); no assembly
+reference either way, a reading older than 5 frames is ignored. `ViewBoost.Read` (once per frame) turns it into a
+state; `State.Factor(cam, tile box)` = `min(zoom × weight, SpyglassMaxBoost)` for tiles within the view's half
+horizontal field of view + 4° (XZ angle minus the tile's angular radius), fading to 1 over 20° (smoothstep), 1 for
+everything else and whenever no spyglass is up (code paths then identical to before). Terrain: `Visit` splits when
+`cheb < SplitFactor × h × size × factor`; `Priority` divides by the factor (looked-at tiles build first). Objects:
+`Visit` uses `distance ÷ factor` for the band and the building and rock distances, keeps the Mesh band within its true
+distance (farther = cards), puts the terrain keys in the signature of boosted tiles too (the land under them refines
+two levels right after they build, so their trees and buildings are seated again), and `RecomputeDesired` widens the
+search by the largest factor (tiles outside the view stop at their band limit at once). `ViewBoost.Poll` asks both managers for a recompute when the boost starts or stops, the
+view turns by a third of its width (at least 2°) or the zoom changes by 15%, at most every 0.2 s. Settings (section
+Spyglass, no rebuild on change): `SpyglassDetail` (true), `SpyglassMaxBoost` (4, 1-8). Measured (`horizons.boost`):
+9 far leaf tiles within 8° of the view before, 37 with x4, 9 again after. Known limits: the cone edge can put tiles two
+(x8: three) levels apart (crack filling covers it as for any refinement); panning streams new tiles at the normal build budget.
+
 ## 4. Edge cases
 
 - Feature turned on in a world: the vanilla grid disappears at once and the far terrain streams in over a few
@@ -366,7 +386,7 @@ fixed:
 ## 6. Tests
 
 `src/Exploration/View.DistantHorizons/TESTING.md`: T00 (automated in-world tests `horizons.logic`, `.terrain`,
-`.objects`, `.detach`, `.near`), T01-T22 single player (one or more per goal; T21-T22: ground next to the player
-and at the edge of the loaded area), M01-M03 multiplayer (vanilla server, friend without the mod, both with it),
-C01-C06 cross-mod. ConfigurationManager items for the collection: `src/Shared/TESTING.md`
+`.objects`, `.boost`, `.detach`, `.near`), T01-T22 single player (one or more per goal; T21-T22: ground next to
+the player and at the edge of the loaded area), M01-M03 multiplayer (vanilla server,
+friend without the mod, both with it), C01-C08 cross-mod (C07-C08: Spyglass boost). ConfigurationManager items for the collection: `src/Shared/TESTING.md`
 F13-F15, Batch Station Feeding T27, Crafting Search and Sort T34.

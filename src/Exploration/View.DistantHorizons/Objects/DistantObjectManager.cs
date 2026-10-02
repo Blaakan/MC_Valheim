@@ -108,6 +108,10 @@ internal sealed class DistantObjectManager : MonoBehaviour
     private bool _loggedFirstTile;
     private bool _atlasDumped;
 
+    // Spyglass boost (ViewBoost): read every frame, used by RecomputeDesired / Visit; recompute when it moved enough.
+    private ViewBoost.State _boost;
+    private ViewBoost.Applied _boostApplied;
+
     // Context of one recompute.
     private Vector3 _camPos;
     private Vector2s _refZone;
@@ -311,6 +315,9 @@ internal sealed class DistantObjectManager : MonoBehaviour
             _surfaceTimer = 0f;
             _dirty = true;
         }
+
+        _boost = ViewBoost.Read(cfg.SpyglassDetail.Value, cfg.SpyglassMaxBoost.Value);
+        if (ViewBoost.Poll(ref _boostApplied, _boost, Time.unscaledTime)) _dirty = true;
 
         _timer += Time.deltaTime;
         if (_dirty || (_timer >= cfg.ObjectUpdateInterval.Value && Utils.DistanceXZ(camPos, _lastPos) >= cfg.UpdateStepDistance.Value))
@@ -518,7 +525,8 @@ internal sealed class DistantObjectManager : MonoBehaviour
         _desiredKeys.Clear();
         _zoneTile.Clear();
 
-        float limit = cfg.ObjectFarDistance.Value * (1f + Hysteresis) + 64f;
+        // Spyglass up: looked-at tiles count nearer, so the search reach that much farther (others stop early).
+        float limit = (cfg.ObjectFarDistance.Value * (1f + Hysteresis) + 64f) * _boost.Max;
         int size = TileSizes[TopLevel];
         int minX = FloorDiv(camPos.x - limit, size), maxX = FloorDiv(camPos.x + limit, size);
         int minZ = FloorDiv(camPos.z - limit, size), maxZ = FloorDiv(camPos.z + limit, size);
@@ -561,13 +569,17 @@ internal sealed class DistantObjectManager : MonoBehaviour
             ForgetTile(key);
             return;
         }
-        float d = AabbDist(_camPos.x, _camPos.z, minX, minZ, maxX, maxZ);
+        float trueDistance = AabbDist(_camPos.x, _camPos.z, minX, minZ, maxX, maxZ);
+        // Spyglass up: tile in the looked-at direction count as boost times nearer (nearer band, buildings farther).
+        float d = trueDistance / _boost.Factor(_camPos, minX, minZ, maxX, maxZ);
         Band band = TileBand(key, d);
         if (band == Band.None)
         {
             ForgetTile(key);
             return;
         }
+        // Mesh band (real low-LOD meshes, the costly one) stay near whatever the boost: farther = cards.
+        if (band == Band.Mesh && trueDistance >= cfg.ObjectMeshDistance.Value * (1f + Hysteresis)) band = Band.Full;
 
         bool split = key.Level == TopLevel ? band <= Band.Full : (key.Level > 0 && band == Band.Mesh);
         if (split)
@@ -586,9 +598,11 @@ internal sealed class DistantObjectManager : MonoBehaviour
             sig = sig * 31 + (piecesOn ? 1 : 0);
             sig = sig * 31 + (rocksOn ? 1 : 0);
             // Near tiles follow terrain under them when it refine; far cards seated once at build time
-            // (metre of error at 2 km = below a pixel, and rebuilding them all = expensive).
+            // (metre of error at 2 km = below a pixel, and rebuilding them all = expensive). Spyglass-boosted tiles
+            // follow too: the land under them refine two levels right after they build, and the zoom show the gap.
             LodTerrainManager terrain = LodTerrainManager.Instance;
-            if (cfg.SnapObjectsToTerrain.Value && terrain != null && band <= Band.Full)
+            bool boosted = d < trueDistance;
+            if (cfg.SnapObjectsToTerrain.Value && terrain != null && (band <= Band.Full || boosted))
             {
                 sig = sig * 31 + TerrainKeyHash(terrain, minX + 1f, minZ + 1f);
                 sig = sig * 31 + TerrainKeyHash(terrain, maxX - 1f, minZ + 1f);

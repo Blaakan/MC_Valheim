@@ -22,6 +22,9 @@
 - Turning the far sea off gives the game's own distant water plane back at once (the standalone left it hidden until
   the simulation distance changed).
 - Far tiles never count as the ground of a loaded zone for other mods (for example Valheim Community Patch).
+- Works with the MC Spyglass mod: while a spyglass is at your eye, the land in the looked-at direction is drawn in
+  finer detail and far trees, rocks and buildings farther out there (new Spyglass settings `SpyglassDetail` and
+  `SpyglassMaxBoost`). Nothing changes without that mod.
 - Stays off, with a Status saying why, while the standalone Distant Horizons or New Horizons: Treelines is installed.
 - Console: `dh on` and `dh toggle` are gone (use the MC Mods panel). `dh dump`, `dh atlas`, `dh shot` and `dh terrain`
   (the tile inspector and render experiments) are only in Debug builds; with `DebugLogging` on, the diagnostics and

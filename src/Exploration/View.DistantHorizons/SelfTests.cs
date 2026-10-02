@@ -16,6 +16,8 @@ namespace MC.Exploration.ViewDistantHorizonsMod;
 //   horizons.terrain  far tiles built and on screen, vanilla 3x3 gone, paint buffer on main camera, far clip up;
 //                     screenshot; NOTE tile stats
 //   horizons.objects  far object tiles built (NOTE when world have none near), NOTE object stats
+//   horizons.boost    spyglass boost (ViewBoost): factor maths, slot reading (stale, weight, cap, setting off), recompute
+//                     trigger; live: fake spyglass slot = more far tiles in the looked-at direction, back after; NOTE counts
 //   horizons.detach   turn-off path (TerrainLink.Detach, same code OnDeactivated run): managers and their objects
 //                     gone, vanilla 3x3 back, no buffer left on camera, far clip back, game's distant water plane
 //                     back; then TerrainLink.AttachIfInWorld (turn-on-in-a-world path) and far tiles back
@@ -26,6 +28,7 @@ internal static class SelfTests
     private const string TerrainName = "horizons.terrain";
     private const string ObjectsName = "horizons.objects";
     private const string DetachName = "horizons.detach";
+    private const string BoostName = "horizons.boost";
 
     [Conditional("DEBUG")]
     internal static void Register()
@@ -34,6 +37,7 @@ internal static class SelfTests
         SelfTest.Register(LogicName, RunLogic);
         SelfTest.Register(TerrainName, RunTerrain);
         SelfTest.Register(ObjectsName, RunObjects);
+        SelfTest.Register(BoostName, RunBoost);
         SelfTest.Register(DetachName, RunDetach);
         NearGroundTests.Register();
 #endif
@@ -46,6 +50,8 @@ internal static class SelfTests
         SelfTest.Unregister(LogicName);
         SelfTest.Unregister(TerrainName);
         SelfTest.Unregister(ObjectsName);
+        SelfTest.Unregister(BoostName);
+        ViewBoost.TestSlot = null;
         SelfTest.Unregister(DetachName);
         NearGroundTests.Unregister();
 #endif
@@ -169,6 +175,100 @@ internal static class SelfTests
         if (Check(ObjectsName, om.TotalBuilds > 0, $"far object tiles built within {BuildTimeout:0} s"))
         {
             SelfTest.Pass(ObjectsName, $"{om.TotalBuilds} object tile builds");
+        }
+    }
+
+    private static double[] FakeSlot(float zoom, float weight, Vector3 forward, float halfAngle, int frame) =>
+        new double[] { 1, frame, zoom, weight, forward.x, forward.y, forward.z, halfAngle, halfAngle * 0.6f };
+
+    private static IEnumerator RunBoost()
+    {
+        var ok = true;
+        // Pure: factor. View to +Z, 10 degrees wide, boost 4.
+        var s = new ViewBoost.State { Active = true, Boost = 4f, Forward = new Vector2(0f, 1f), HalfAngle = 10f };
+        var cam = Vector3.zero;
+        ok &= Check(BoostName, Mathf.Approximately(s.Factor(cam, -64f, 1936f, 64f, 2064f), 4f), "tile straight ahead: full boost");
+        ok &= Check(BoostName, Mathf.Approximately(s.Factor(cam, -64f, -2064f, 64f, -1936f), 1f), "tile behind: none");
+        var side = s.Factor(cam, 664f, 1936f, 792f, 2064f); // about 19 degrees off: inside the fade
+        ok &= Check(BoostName, side > 1f && side < 4f, $"tile at the edge of the view: partial ({side:0.##})");
+        ok &= Check(BoostName, Mathf.Approximately(s.Factor(cam, -10f, -10f, 10f, 10f), 4f), "tile around the camera: full");
+        ok &= Check(BoostName, Mathf.Approximately(default(ViewBoost.State).Factor(cam, 0f, 100f, 10f, 110f), 1f), "no spyglass: 1");
+
+        // Pure: reading the slot (TestSlot replace the shared slot).
+        var f = Time.frameCount;
+        ViewBoost.TestSlot = FakeSlot(6f, 1f, Vector3.forward, 10f, f);
+        var r = ViewBoost.Read(true, 4f);
+        ok &= Check(BoostName, r.Active && Mathf.Approximately(r.Boost, 4f), $"zoom 6 capped to SpyglassMaxBoost 4 ({r.Boost:0.##})");
+        yield return null;
+        ViewBoost.TestSlot = FakeSlot(6f, 1f, Vector3.forward, 10f, Time.frameCount);
+        ok &= Check(BoostName, !ViewBoost.Read(false, 4f).Active, "SpyglassDetail off: no boost");
+        yield return null;
+        ViewBoost.TestSlot = FakeSlot(3f, 0.5f, Vector3.forward, 10f, Time.frameCount);
+        r = ViewBoost.Read(true, 4f);
+        ok &= Check(BoostName, r.Active && Mathf.Approximately(r.Boost, 2f), $"half raised: half the zoom ({r.Boost:0.##})");
+        yield return null;
+        ViewBoost.TestSlot = FakeSlot(3f, 1f, Vector3.forward, 10f, Time.frameCount - 20);
+        ok &= Check(BoostName, !ViewBoost.Read(true, 4f).Active, "old slot (20 frames): no boost");
+        yield return null;
+        ViewBoost.TestSlot = FakeSlot(3f, 1f, Vector3.up, 10f, Time.frameCount);
+        ok &= Check(BoostName, !ViewBoost.Read(true, 4f).Active, "looking straight up: no boost");
+        ViewBoost.TestSlot = null;
+
+        // Pure: recompute trigger.
+        var last = default(ViewBoost.Applied);
+        ok &= Check(BoostName, ViewBoost.Poll(ref last, s, 10f), "boost on: recompute");
+        ok &= Check(BoostName, !ViewBoost.Poll(ref last, s, 10.5f), "same view: no recompute");
+        var turned = s;
+        turned.Forward = new Vector2(Mathf.Sin(10f * Mathf.Deg2Rad), Mathf.Cos(10f * Mathf.Deg2Rad));
+        ok &= Check(BoostName, !ViewBoost.Poll(ref last, turned, 10.1f), "turned, but too soon after the last");
+        ok &= Check(BoostName, ViewBoost.Poll(ref last, turned, 10.5f), "turned 10 degrees: recompute");
+        ok &= Check(BoostName, ViewBoost.Poll(ref last, default, 11.01f), "boost off: recompute at once");
+
+        // Live: a fake spyglass looking along the camera = more far tiles that way.
+        var wait = new Box();
+        yield return WaitForTiles(wait);
+        var mgr = LodTerrainManager.Instance;
+        var camera = Utils.GetMainCamera();
+        if (!wait.Ok || mgr == null || camera == null)
+        {
+            SelfTest.Note(BoostName, "no far terrain to test live: " + wait.Detail);
+        }
+        else
+        {
+            try
+            {
+                var fwd3 = camera.transform.forward;
+                var fwd = new Vector2(fwd3.x, fwd3.z);
+                if (fwd.sqrMagnitude < 0.01f)
+                {
+                    fwd = new Vector2(0f, 1f);
+                }
+                fwd.Normalize();
+                var pos = camera.transform.position;
+                var before = mgr.CountLeavesInView(pos, fwd, 8f, 600f);
+                var until = Time.realtimeSinceStartup + 4f;
+                var during = before;
+                while (Time.realtimeSinceStartup < until)
+                {
+                    ViewBoost.TestSlot = FakeSlot(4f, 1f, new Vector3(fwd.x, 0f, fwd.y), 8f, Time.frameCount);
+                    during = Mathf.Max(during, mgr.CountLeavesInView(pos, fwd, 8f, 600f));
+                    yield return null;
+                }
+                ViewBoost.TestSlot = null;
+                yield return new WaitForSeconds(1.5f);
+                var after = mgr.CountLeavesInView(pos, fwd, 8f, 600f);
+                SelfTest.Note(BoostName, $"far leaf tiles within 8 deg of the view: {before} before, {during} with boost x4, {after} after");
+                ok &= Check(BoostName, during >= before + 2, $"boost gives more far tiles that way ({before} -> {during})");
+                ok &= Check(BoostName, after < during, $"back to fewer after the spyglass is lowered ({during} -> {after})");
+            }
+            finally
+            {
+                ViewBoost.TestSlot = null;
+            }
+        }
+        if (ok)
+        {
+            SelfTest.Pass(BoostName, "boost maths, slot reading and recompute trigger checked");
         }
     }
 

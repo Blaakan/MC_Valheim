@@ -7,9 +7,10 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 **Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
 MC Mods panel. Smoke test passed 2026-10-02 with all 24 MC mods (loads, patches cleanly, JitCheck clean: 592
 methods, 0 failures). In-world self tests (T00) passed 2026-10-02 on the same code: 4/4 `horizons.*`, and the full
-run of every mod's tests with this mod deployed (108/108). Near-ground fix after that (same day, real zones next to
-the player drawn at true size, T21-T22): smoke test passed (JitCheck 0 failures) and the `horizons.*` self tests
-passed, including the new `horizons.near` (in-world run 2026-10-02). No hands-on in-game test yet. The
+run of every mod's tests with this mod deployed (108/108). Near-ground fix after that (same day, real zones next
+to the player drawn at true size, T21-T22), then the Spyglass boost (same day, C07-C08): smoke test of all 25 MC mods
+passed (JitCheck 700 methods, 0 failures), `horizons.*` 6/6 including the new `horizons.near` and `horizons.boost`,
+run together with the Spyglass mod's tests (in-world run 2026-10-02). No hands-on in-game test yet. The
 standalone Distant Horizons was tested in game by its author (2026-09-21 to 09-28); this port changes its life cycle,
 so everything below is pending.
 
@@ -29,7 +30,9 @@ far plane value (note `cam` in the `DebugLogging` stats line before and after T1
 - [ ] **T00 Automated in-world self tests:** `./tools/Test-InWorld.ps1 -Mod View.DistantHorizons -Only horizons.`
   (Debug build, game closed). Expected: `[selftest] PASS` for `horizons.logic` (other-mod list, every setting has a
   ConfigurationManager order, no own Enabled), `horizons.terrain` (far tiles built, vanilla grid gone, paint buffer on
-  the camera, far plane raised), `horizons.objects` (far object tiles built) and `horizons.detach` (the turn-off path
+  the camera, far plane raised), `horizons.objects` (far object tiles built), `horizons.boost` (spyglass boost maths,
+  slot reading, recompute trigger, and more far tiles in the looked-at direction while a fake spyglass is up, back after)
+  and `horizons.detach` (the turn-off path
   leaves no manager, root object, bake rig or camera buffer, gives back the vanilla grid with its meshes without the
   camera moving, the far plane and the game's distant water plane; the turn-on path in a world brings the far
   terrain back), and `horizons.near` (at a Meadows sea shore near spawn: no far-tile vertex above the real ground
@@ -135,3 +138,11 @@ far plane value (note `cam` in the `DebugLogging` stats line before and after T1
   line in the log (far tiles are never registered as real ground).
 - [ ] **C06 Expand World Size:** bigger world, `WorldRadius` set to its radius plus edge size: far land and sea reach
   the new edge.
+- [ ] **C07 Spyglass (MC), detail where you look:** with the Spyglass mod, clear weather (`env Clear`), noon, on a high
+  point, raise the spyglass (x8) toward land 2-5 km away and wait 5 s. Expected: the land there gets finer within a
+  few seconds and far buildings (yours or ruins) and forests show up farther than without the spyglass; turning to a
+  new direction refines that one too; frame rate stays playable. Lower the spyglass: within a second or two the detail
+  goes back to normal (no holes, no flicker). Automated part: `horizons.boost` (T00).
+- [ ] **C08 Spyglass settings:** `SpyglassDetail = false` (or `SpyglassMaxBoost = 1`): raising the spyglass changes no
+  detail. Set `SpyglassMaxBoost = 8`: more detail through a x8 spyglass. Put them back. Without the Spyglass mod
+  installed nothing changes and the log has no Spyglass line.
