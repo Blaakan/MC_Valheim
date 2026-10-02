@@ -13,15 +13,20 @@ internal sealed partial class Plugin : ModPlugin
 
     protected override void BindConfig()
     {
-        KeepCrossbows = Config.Bind("Weapons", "Crossbows", true,
-            "All crossbows keep their load: every weapon that uses the Crossbows skill, including crossbows added by other mods.");
-        ExtraItems = Config.Bind("Weapons", "ExtraItems", "GrapplingHook",
+        // Order: ConfigurationManager list a section by Order (high first), else by name; "two settings above" need it.
+        KeepCrossbows = Config.Bind("Weapons", "Crossbows", true, new ConfigDescription(
+            "All crossbows keep their load: every weapon that uses the Crossbows skill, including crossbows added by other mods.",
+            null, new ConfigurationManagerAttributes { Order = 100 }));
+        ExtraItems = Config.Bind("Weapons", "ExtraItems", "GrapplingHook", new ConfigDescription(
             "Other weapons that must be reloaded and should also keep their load: comma-separated item names, as used by "
-            + "the spawn command. Examples: GrapplingHook, StaffLightning (Dundr), or reload weapons from other mods.");
-        ExcludedItems = Config.Bind("Weapons", "ExcludedItems", "",
-            "Weapons that must never keep their load: comma-separated item names. Wins over the two settings above.");
-        ShowLoadedInTooltip = Config.Bind("UI", "ShowLoadedInTooltip", true,
-            "Show \"Loaded\" in the tooltip of a crossbow that still holds a bolt.");
+            + "the spawn command. Examples: GrapplingHook, StaffLightning (Dundr), or reload weapons from other mods.",
+            null, new ConfigurationManagerAttributes { Order = 90 }));
+        ExcludedItems = Config.Bind("Weapons", "ExcludedItems", "", new ConfigDescription(
+            "Weapons that must never keep their load: comma-separated item names. Wins over the two settings above.",
+            null, new ConfigurationManagerAttributes { Order = 80 }));
+        ShowLoadedInTooltip = Config.Bind("UI", "ShowLoadedInTooltip", true, new ConfigDescription(
+            "Show \"Loaded\" in the tooltip of a crossbow that still holds a bolt.",
+            null, new ConfigurationManagerAttributes { Order = 100 }));
 
         // Me rebuild name lists now and on every change (panel, ConfigurationManager, file edit).
         RebuildWeaponFilter();

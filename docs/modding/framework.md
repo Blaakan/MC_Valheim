@@ -6,7 +6,8 @@ no extra "core" download and no mod depends on another one just to work. It give
 - **each feature can be turned on or off on its own, live, without restarting;**
 - **a feature whose dependency is missing or turned off goes inactive, says why, and never crashes;**
 - **a feature that needs the server switches itself off on servers that don't have it;**
-- **everything is visible in one place: the in-game _MC Mods_ panel.**
+- **everything is visible in one place: the in-game _MC Mods_ panel** (or a configuration manager's window, F1, when
+  one is installed: the panel then hides its button).
 
 ## Turning features on and off
 
@@ -14,12 +15,12 @@ Three equivalent ways, all writing to the same file, `BepInEx/config/MC.<Categor
 
 | Where | How |
 |---|---|
-| In game | Main menu or pause menu (Esc): click **MC Mods** (top-right). Tick or untick a feature. |
+| In game | Main menu or pause menu (Esc): click **MC Mods** (top-right). Tick or untick a feature. With a configuration manager installed this button is hidden: use its window (F1, see below). |
 | Mod manager | r2modman / Thunderstore Mod Manager → Config editor → the mod's file → `General.Enabled`. |
 | By hand | Edit `Enabled = true/false` in the mod's `.cfg`. The game picks the change up while running. |
 
-ConfigurationManager (F1, shudnal's build for Valheim 1.0) also shows every setting, including `Enabled` and the
-read-only `Status`.
+A configuration manager (F1, see [ConfigurationManager](#configurationmanager) below) also shows every setting,
+including `Enabled` and the read-only `Status`.
 
 Uninstalling or disabling a mod in the mod manager (r2modman, Thunderstore Mod Manager, Vortex) also works: every mod
 is a separate package, so mod managers can enable/disable each one individually. Players who install the whole
@@ -47,6 +48,59 @@ Each mod keeps a read-only `Status` line in its config file and in the panel:
 
 When you spawn in a world, one short message lists features that are inactive for a reason you did not choose
 (shown again only when that list changes, and not while the HUD is hidden).
+
+## ConfigurationManager
+
+A configuration manager is an optional mod that lists every BepInEx setting in a window (F1). Nothing in MC_Valheim
+depends on it: it reads each mod's BepInEx config file like any other, and changing a setting there is the same as
+editing the `.cfg` file: MC mods apply it at once, without a restart.
+
+**The MC Mods button is hidden when a configuration manager is installed** (user decision 2026-10-02): its window
+already lists every MC mod with `Enabled` and `Status`, so there is one place for everything. The panel recognises the
+three builds below by plugin ID, and any other plugin whose name ends with "Configuration Manager"; a manager that
+failed to load does not count. The spawn notice about inactive features stays and points to F1 instead. What only the
+panel shows (build id, who needs the mod, multiplayer notes, the "Turn on X" button for a dependency) is in each mod's
+README; a dependency that is off is named in the mod's `Status`. Remove the manager and the button comes back.
+
+Three builds exist for Valheim (checked 2026-10-02, from their source code):
+
+| Build | Where | On Valheim 1.0 |
+|---|---|---|
+| Valheim Configuration Manager (shudnal) | Nexus mod 2746, Thunderstore `shudnal/ConfigurationManager` | Maintained (1.1.23, 2026-10-02). The one to recommend. |
+| Configuration Manager (aedenthorn) | Nexus mod 740 | Version 0.5.0 from 2021, no longer updated by its author. Its main-menu button looks for an older menu and does not appear, and its console hook was built for the old console: on 1.0 it can stop the F5 console from running commands (expected from its code, not yet seen in game). cjayride's fork (Thunderstore `cjayride/ConfigurationManager` 0.6.2, same plugin) fixes these. |
+| BepInEx ConfigurationManager (upstream; Azumatt's Thunderstore upload) | Thunderstore `Azumatt/Official_BepInEx_ConfigurationManager` | The upload is deprecated and built for the pre-1.0 BepInEx pack. |
+
+What MC mods do so all three show their settings correctly (new mods follow every point):
+
+- Each setting carries a `ConfigurationManagerAttributes` object as its **first** tag (the managers stop reading tags
+  at the first one they do not know) with an `Order`: inside a section, settings are listed in the order the mod's
+  README gives them (higher `Order` first). Without it a manager sorts them by name.
+- `Status` is drawn as plain text with no Reset button. `ReadOnly` alone only greys it out in shudnal's build; the
+  others still draw an edit box (typing in it does nothing).
+- Whole-number settings whose range is 0..100 or 1..100 but that are not percentages (counts, levels) set
+  `ShowRangeAsPercent = false`; aedenthorn's and the upstream build otherwise show them as a percentage slider with no
+  number box, and do the same with float ranges 0..1 (shudnal's build never turns percent on by itself).
+- Expensive reactions to a change (rebuilds, scene-wide updates, sending the rules to players) should wait until the
+  value stops changing (about 0.5 s; see the `ServerRules` of Weapon Moveset or Deep North Awakening): a slider being
+  dragged sets the value (and rewrites the `.cfg` file) every frame, and a text field at every keystroke. Not yet done
+  in Switchable Lights, Sneak Ambush, Forge Idol Upgrades, Dual Wielding and Breeding Star Inheritance: they send
+  their rules again at the next network update after each change (follow-up).
+- Key settings: a manager can store any key, including keys the game cannot read (F13 and up, some symbol keys,
+  Mouse5/6). Mods check the key when it changes and log a warning instead of failing every frame.
+- Never `IsAdvanced`: shudnal's and the upstream build hide advanced settings by default.
+
+Differences between the builds that players can see:
+
+- **Section order:** aedenthorn's build (Nexus 740) sorts sections alphabetically, so `General` (`Enabled`, `Status`)
+  is not always first. shudnal's and the upstream build keep the mod's order. The `.cfg` file itself always lists
+  sections alphabetically.
+- **Game keys while the window is open:** aedenthorn's and the upstream build do not block the game's keys (the game
+  reads keys through the new Input System, which their blocking does not reach), so a letter typed in their text
+  fields also reaches the game, MC hotkeys included (Y for Trinkets on Demand, H for Dual Wielding). shudnal's build
+  blocks game input while its window is open.
+- **Key settings stored as a plain key** (`KeyCode`): aedenthorn's build shows them as a long drop-down list of every
+  key; the others let you press the key.
+- **Two managers at once:** aedenthorn's and shudnal's builds do not detect each other: both open on F1. Install one.
 
 ## Content that stays registered
 

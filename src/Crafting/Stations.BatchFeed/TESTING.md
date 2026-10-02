@@ -151,6 +151,10 @@ mod's own count logs `stop=pending` or `stop=otherammo`.
 - [ ] **T26 Mod-only key never turns a fire off:** only if T24 found a fire with `canRefill=True canTurnOff=True`
   (else `[-]`). `ModifierKey = RightShift`. Fill that fire to its maximum, then R-Shift+E: "You can't add more ...",
   the fire stays on. Plain E still toggles it. Set `ModifierKey` back to `None`.
+- [ ] **T27 Key the game cannot read:** set `ModifierKey = F13` (in the file, or in ConfigurationManager's key list).
+  Expected: one warning in the log ("the game cannot read this key ... Alternative placement key"), no error, the
+  hover hint at a kiln names the Alternative placement key (for example `[L-Shift + E]`), not F13, and Shift+E still
+  batch-feeds. Set `ModifierKey` back to `None`.
 
 ## 0.1.0 — multiplayer (needs a second player)
 

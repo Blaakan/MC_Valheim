@@ -53,12 +53,12 @@ registered while the mod is off) and comes back into use when you turn the mod o
 
 ## Configuration
 
-The config file `BepInEx/config/MC.Exploration.Sailing.Skill.cfg` is created the first time you launch the game with
-the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. Every setting can be changed
-in-game with ConfigurationManager, or by editing the file (the game picks up the change while it runs); changes apply
-at once. In multiplayer the server's (or host's) settings are used for everyone; AllowPlayersWithoutMod is read only
-by the server. Every "AtMax" setting is the value at Sailing 100; lower levels get a share in proportion (Sailing 50 =
-half).
+The config file `BepInEx/config/MC.Exploration.Sailing.Skill.cfg` is created the first time you launch the game with the
+mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration manager
+installed that button is hidden: press F1 and use its window). Every setting can be changed in-game with
+ConfigurationManager, or by editing the file (the game picks up the change while it runs); changes apply at once. In
+multiplayer the server's (or host's) settings are used for everyone; AllowPlayersWithoutMod is read only by the server.
+Every "AtMax" setting is the value at Sailing 100; lower levels get a share in proportion (Sailing 50 = half).
 
 | Section | Setting | Default | Description |
 |---|---|---|---|

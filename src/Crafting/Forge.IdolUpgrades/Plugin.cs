@@ -66,7 +66,7 @@ internal sealed partial class Plugin : ModPlugin
             "With OnFailure = LoseLevels: how many levels the item loses when a refinement fails (it never goes below "
             + "level 1)." + ServerWins,
             new AcceptableValueRange<int>(1, ForgeRules.MaxLevelsLost),
-            new ConfigurationManagerAttributes { Order = 91 }));
+            new ConfigurationManagerAttributes { Order = 91, ShowRangeAsPercent = false }));
         TierByLevel = Config.Bind("Refinement", "HigherIdolAtHighLevels", true, new ConfigDescription(
             "On (default): past a certain level, refining an item needs an idol of a higher tier than the one the game "
             + "asks for, so an early item cannot climb forever on cheap idols (see LevelsOnOwnIdol and "
@@ -101,12 +101,12 @@ internal sealed partial class Plugin : ModPlugin
                 $"Metal (or wood for wooden idols) needed to upgrade an idol to {levelText[level]}, on top of the idol itself."
                 + ServerWins,
                 new AcceptableValueRange<int>(0, ForgeRules.MaxCost),
-                new ConfigurationManagerAttributes { Order = 100 - level * 2 }));
+                new ConfigurationManagerAttributes { Order = 100 - level * 2, ShowRangeAsPercent = false }));
             TrophyCost[level] = Config.Bind("Upgrade costs", "Level" + level + "Trophies", trophies[level], new ConfigDescription(
                 $"Trophies needed to upgrade an idol to {levelText[level]}: any mix of the {trophyClass[level]} trophies of the idol's tier."
                 + ServerWins,
                 new AcceptableValueRange<int>(0, ForgeRules.MaxCost),
-                new ConfigurationManagerAttributes { Order = 99 - level * 2 }));
+                new ConfigurationManagerAttributes { Order = 99 - level * 2, ShowRangeAsPercent = false }));
         }
 
         foreach (var d in IdolTierDefaults.All)

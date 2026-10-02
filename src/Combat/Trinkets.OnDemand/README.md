@@ -77,8 +77,9 @@ ago). A bar waiting full fires at your next hit or block only if that comes befo
 ## Configuration
 
 The config file `BepInEx/config/MC.Combat.Trinkets.OnDemand.cfg` is created the first time you launch the game with the
-mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. Every setting can be changed in-game
-with ConfigurationManager, or by editing the file (the game picks up the change while it runs), and applies at once. In
+mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration manager
+installed that button is hidden: press F1 and use its window). Every setting can be changed in-game with
+ConfigurationManager, or by editing the file (the game picks up the change while it runs), and applies at once. In
 multiplayer the server's (or host's) settings are used for everyone, except the Controls and Feedback settings (each
 player's own choice); AllowPlayersWithoutMod is read only by the server.
 

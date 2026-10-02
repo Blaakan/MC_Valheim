@@ -100,11 +100,11 @@ internal static class HoverHint
     }
 
     // Modifier as it really work: game binding (vanilla ItemStand rule: alt keys on alternative controller layouts),
-    // or mod-only key on keyboard.
+    // or mod-only key on keyboard (only when the game can read it, else game binding too).
     private static string ModifierLabel(bool gamepad)
     {
         var key = Plugin.ModifierKey.Value;
-        if (key == KeyCode.None || gamepad)
+        if (key == KeyCode.None || gamepad || !BatchFeeder.KeyUsable(key))
         {
             return BoundKey(ZInput.IsNonClassicFunctionality() && gamepad ? "AltKeys" : "AltPlace", gamepad);
         }

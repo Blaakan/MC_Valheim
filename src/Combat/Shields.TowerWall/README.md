@@ -112,12 +112,14 @@ push you back while your stamina lasts. The attack button bashes with the shield
 
 ## Configuration
 
-The config file `BepInEx/config/MC.Combat.Shields.TowerWall.cfg` is created the first time you launch the game with
-the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. Every setting can be changed
-in-game with ConfigurationManager, or by editing the file (the game picks up the change while it runs); changes apply
-about half a second after the last edit (about a second for the other players of a server), without re-equipping. In
-multiplayer the server's (or host's) settings are used for everyone, except `Enabled`. The file and
-ConfigurationManager list the sections in alphabetical order (Bash, Bracing, General, Tower shields).
+The config file `BepInEx/config/MC.Combat.Shields.TowerWall.cfg` is created the first time you launch the game with the
+mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration manager
+installed that button is hidden: press F1 and use its window). Every setting can be changed in-game with
+ConfigurationManager, or by editing the file (the game picks up the change while it runs); changes apply about half a
+second after the last edit (about a second for the other players of a server), without re-equipping. In multiplayer the
+server's (or host's) settings are used for everyone, except `Enabled`. The file lists the sections in alphabetical order
+(Bash, Bracing, General, Tower shields); so does aedenthorn's ConfigurationManager (Nexus 740), while shudnal's and the
+upstream build list them as General, Tower shields, Bracing, Bash.
 
 | Section | Setting | Default | Description |
 |---|---|---|---|

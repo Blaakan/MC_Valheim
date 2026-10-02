@@ -551,6 +551,25 @@ internal static class SelfTests
 
     private static bool Near(float a, float b, float tolerance = 0.001f) => Mathf.Abs(a - b) <= tolerance;
 
+    // Loaded mods known to change RenderSettings.fogDensity after the game wrote it (name, or null when none).
+    private static readonly string[] RenderedFogMods =
+    {
+        "MC.Exploration.View.DistantHorizons", "vapok.mods.nofogbruh", "shudnal.Seasons",
+        "com.Skarif.ValheimPerformanceOverhaul_WATER", "marc.donegalhorizonlift",
+    };
+
+    private static string RenderedFogMod()
+    {
+        foreach (var guid in RenderedFogMods)
+        {
+            if (Chainloader.PluginInfos.TryGetValue(guid, out var info) && info != null && info.Instance != null)
+            {
+                return info.Metadata.Name;
+            }
+        }
+        return null;
+    }
+
     private static Vector3 Flat(Vector3 v)
     {
         v.y = 0f;
@@ -1669,8 +1688,18 @@ internal static class SelfTests
                 yield return new WaitForSeconds(0.7f);
                 var ours = StealthState.FogDensity;
                 var render = RenderSettings.fogDensity;
-                c.Check(StealthState.FogDensityKnown && Near(ours, render, 0.001f),
-                    $"{pair.Key}: fog density from data {F(ours)}, rendered {F(render)}");
+                c.Check(StealthState.FogDensityKnown, $"{pair.Key}: fog density from data not known");
+                // Another loaded mod may change the RENDERED fog (Distant Horizons thin clear weather): bonus never
+                // follow it (game data only, design 2.4), so then me only note the two values.
+                var fogMod = RenderedFogMod();
+                if (fogMod == null)
+                {
+                    c.Check(Near(ours, render, 0.001f), $"{pair.Key}: fog density from data {F(ours)}, rendered {F(render)}");
+                }
+                else
+                {
+                    c.Note($"{pair.Key}: fog density from data {F(ours)}, rendered {F(render)} ({fogMod} changes the rendered fog)");
+                }
                 var pct = Mathf.RoundToInt(rules.FogBonus * StealthState.FogShareFor(ours, rules));
                 var shown = StealthCues.Has(player, CueKind.Fog);
                 if (pct >= 2)

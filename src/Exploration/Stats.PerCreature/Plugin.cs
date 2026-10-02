@@ -22,13 +22,15 @@ internal sealed partial class Plugin : ModPlugin
     // Both read each time Compendium open: change show next open, no restart.
     protected override void BindConfig()
     {
-        SortBy = Config.Bind("Display", "SortBy", SortOrder.MostKilled,
+        SortBy = Config.Bind("Display", "SortBy", SortOrder.MostKilled, new ConfigDescription(
             "Order of the creature list in Player Statistics. MostKilled: the creatures you killed most come first. "
-            + "Name: alphabetical.");
-        ShowWeaponTypes = Config.Bind("Display", "ShowWeaponTypes", true,
+            + "Name: alphabetical.",
+            null, new ConfigurationManagerAttributes { Order = 100 }));
+        ShowWeaponTypes = Config.Bind("Display", "ShowWeaponTypes", true, new ConfigDescription(
             "After each kill count, show how the kills were made: melee, ranged, magic, unarmed, or other (several "
             + "weapon types, no weapon, or kills from before the game recorded weapon types, that is before the Deep "
-            + "North update). Left out when only other is known.");
+            + "North update). Left out when only other is known.",
+            null, new ConfigurationManagerAttributes { Order = 90 }));
     }
 
     // Me turned on mid-game: start tame counting now for this character (spawn patch missed it).

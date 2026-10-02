@@ -108,13 +108,14 @@ corners them. And when a pack leader falls, the rest of its pack runs away.
 
 ## Configuration
 
-The config file `BepInEx/config/MC.Combat.Creatures.Morale.cfg` is created the first time you launch the game with the mod.
-To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. Every setting can be changed in-game with
-ConfigurationManager, or by editing the file (the game picks up the change while it runs). Every setting applies
-while you play, no restart needed: a creature setting takes effect about a second after you stop editing it, so
-typing a list or dragging a slider applies only the final value. In multiplayer the server's (or host's) settings are
-used for everyone, except ShowProgressMessages. Creature names in the lists are prefab names, as
-used by the `spawn` command, comma-separated.
+The config file `BepInEx/config/MC.Combat.Creatures.Morale.cfg` is created the first time you launch the game with the
+mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration manager
+installed that button is hidden: press F1 and use its window). Every setting can be changed in-game with
+ConfigurationManager, or by editing the file (the game picks up the change while it runs). Every setting applies while
+you play, no restart needed: a creature setting takes effect about a second after you stop editing it, so typing a list
+or dragging a slider applies only the final value. In multiplayer the server's (or host's) settings are used for
+everyone, except ShowProgressMessages. Creature names in the lists are prefab names, as used by the `spawn` command,
+comma-separated.
 
 | Section | Setting | Default | Description |
 |---|---|---|---|

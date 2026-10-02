@@ -48,11 +48,64 @@ internal static class BatchFeeder
     internal static bool BatchKeyHeld(bool alt)
     {
         var key = Plugin.ModifierKey.Value;
-        if (key == KeyCode.None || ZInput.IsGamepadActive())
+        if (key == KeyCode.None || ZInput.IsGamepadActive() || !KeyUsable(key))
         {
             return alt;
         }
-        return ZInput.GetKey(key, logWarning: false);
+        try
+        {
+            return ZInput.GetKey(key, logWarning: false);
+        }
+        catch (ArgumentException)
+        {
+            // Key the check missed (Keyboard.current[Key.None] throw): treat as unusable from now on.
+            _checkedKey = key;
+            _keyUsable = false;
+            WarnUnusable(key);
+            return alt;
+        }
+    }
+
+    // ConfigurationManager (or a hand edit) can store any KeyCode. Me check each new value once: ZInput throw on a
+    // keyboard key it no can map (F13, Hash, At...), Mouse5/6 never fire. Unusable = vanilla alt key work instead.
+    private static KeyCode _checkedKey = KeyCode.None;
+    private static bool _keyUsable = true;
+
+    internal static bool KeyUsable(KeyCode key)
+    {
+        if (key != _checkedKey)
+        {
+            _checkedKey = key;
+            _keyUsable = IsUsableKey(key);
+            if (!_keyUsable)
+            {
+                WarnUnusable(key);
+            }
+        }
+        return _keyUsable;
+    }
+
+    private static bool IsUsableKey(KeyCode k)
+    {
+        if (!ZInput.IsKeyCodeValid(k))
+        {
+            return false; // Mouse5, Mouse6, Joystick1Button0 and up
+        }
+        if (k >= KeyCode.Mouse0 && k <= KeyCode.Mouse4)
+        {
+            return true;
+        }
+        if (k >= KeyCode.JoystickButton0)
+        {
+            return true; // ZInput fall back to South button, no throw
+        }
+        return ZInput.TryKeyCodeToKey(k, out _);
+    }
+
+    private static void WarnUnusable(KeyCode key)
+    {
+        Log.Warning($"General.ModifierKey = {key}: the game cannot read this key, so batch feeding uses the game's "
+                    + "Alternative placement key (Left Shift by default) instead. Pick another key.");
     }
 
     // Batch press. True = me handled it, skip vanilla press. False = let vanilla do its normal one press.

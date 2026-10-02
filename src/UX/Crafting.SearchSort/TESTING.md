@@ -163,6 +163,10 @@ The vanilla log line `Setting selected recipe <n>` appears on every list update:
 - [ ] **T33 Live toggle from the MC Mods panel:** close the inventory, Esc → MC Mods → untick Crafting Search and
   Sort, back to a station. Expected: vanilla panel (no row, full-height list, vanilla order). Tick it again, reopen:
   the row is back with the remembered sort, no restart.
+- [ ] **T34 Focus key the game cannot read:** set `FocusSearchKey = F13` (in the file, or in ConfigurationManager).
+  Expected: one warning in the log ("the game cannot read ... jumps to the search field is off"), no error; at a
+  station, typing in the search field (clicked with the mouse) still filters and the sort menu still works. Set it
+  back to `F`: F focuses the field again.
 
 ## 0.1.0 — multiplayer (needs a second player)
 

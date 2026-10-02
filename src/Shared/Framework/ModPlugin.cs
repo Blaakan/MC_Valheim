@@ -81,7 +81,15 @@ internal abstract class ModPlugin : BaseUnityPlugin
             null, new ConfigurationManagerAttributes { Order = 100 }));
         _statusEntry = Config.Bind("General", "Status", "Starting", new ConfigDescription(
             "Written by the mod: shows whether the feature is active, and if not, why. Editing it has no effect.",
-            null, new ConfigurationManagerAttributes { Order = 99, ReadOnly = true }));
+            null, new ConfigurationManagerAttributes
+            {
+                Order = 99,
+                ReadOnly = true,
+                // ReadOnly alone: some ConfigurationManager builds (Nexus 740, upstream) still draw an edit box and a
+                // Reset button that do nothing. Plain label + no Reset button = look read-only in every build.
+                HideDefaultButton = true,
+                CustomDrawer = ConfigurationManagerAttributes.ReadOnlyText,
+            }));
         Harmony = new Harmony(d.Guid);
 
         // Register FIRST: even if rest of start blow up, mod still show in panel with Error,

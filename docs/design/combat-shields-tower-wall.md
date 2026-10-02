@@ -1860,9 +1860,10 @@ hand, bash and Braced steps are stage 2), `TowerGuard.cs` and `Patches/ZNetPatch
 
 Deviations from the text above (small, each for a reason):
 
-- **Section order** (5): BepInEx writes the sections of the `.cfg` file in alphabetical order, and ConfigurationManager
-  sorts its categories by name too (not checked in game), so they show as Bash, Bracing, General, Tower shields instead
-  of General, Tower shields, Bracing, Bash. Forcing the design's order would need numbered section names, which become
+- **Section order** (5): BepInEx writes the sections of the `.cfg` file in alphabetical order, so they show as Bash,
+  Bracing, General, Tower shields instead of General, Tower shields, Bracing, Bash. Of the ConfigurationManager builds
+  only aedenthorn's (Nexus 740) also sorts them by name; shudnal's and the upstream build keep the bind order (read in
+  their source code 2026-10-02, `docs/modding/framework.md`, "ConfigurationManager"). Forcing the design's order would need numbered section names, which become
   permanent config keys; the names stay as designed. Inside each section the `Order` attributes give the order of 5.
 - **Setting descriptions** (5): every server rule ends with "In multiplayer the setting of the server (or host) is used
   for everyone." (as Forge Idol Upgrades and the sibling Combat mods); `BashAnimation` adds "Try the options in single

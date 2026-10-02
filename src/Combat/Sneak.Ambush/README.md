@@ -111,11 +111,12 @@ in your inventory and chests.
 ## Configuration
 
 The config file `BepInEx/config/MC.Combat.Sneak.Ambush.cfg` is created the first time you launch the game with the mod.
-To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. Every setting can be changed in-game with
-ConfigurationManager, or by editing the file (the game picks up the change while it runs): recipe settings rebuild the
-recipe, the cloud's size and duration apply to the next throw, the rest applies at once. In multiplayer the server's
-(or host's) settings are used for everyone, except ShowSneakAttackMessage and ShowStealthCues (each player's own
-choice); AllowPlayersWithoutMod is read only by the server.
+To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration manager installed
+that button is hidden: press F1 and use its window). Every setting can be changed in-game with ConfigurationManager, or
+by editing the file (the game picks up the change while it runs): recipe settings rebuild the recipe, the cloud's size
+and duration apply to the next throw, the rest applies at once. In multiplayer the server's (or host's) settings are
+used for everyone, except ShowSneakAttackMessage and ShowStealthCues (each player's own choice); AllowPlayersWithoutMod
+is read only by the server.
 
 | Section | Setting | Default | Description |
 |---|---|---|---|

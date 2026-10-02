@@ -402,7 +402,7 @@ if ($buildPack) {
     $md.Add('')
     $md.Add('## Pick what you want')
     $md.Add('')
-    $md.Add('Every mod can be turned on or off on its own, live: in the main menu or the pause menu (Esc) click **MC Mods**, or edit its config file in `BepInEx/config/`. If a feature needs another one that is turned off, it stays inactive and tells you why, and comes back by itself when you turn the other one back on. You can also simply delete the folders of the mods you do not want.')
+    $md.Add('Every mod can be turned on or off on its own, live: in the main menu or the pause menu (Esc) click **MC Mods** (with a configuration manager installed that button is hidden: press F1 and use its window), or edit its config file in `BepInEx/config/`. If a feature needs another one that is turned off, it stays inactive and tells you why, and comes back by itself when you turn the other one back on. You can also simply delete the folders of the mods you do not want.')
     $md.Add('')
     $md.Add('## Included mods')
     $md.Add('')

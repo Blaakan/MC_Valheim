@@ -116,11 +116,11 @@ internal sealed partial class Plugin : ModPlugin
             + "between ClearKillsMin and ClearKillsMax. Half way, players there see \"The Jotun army is weakening\"."
             + ServerWins,
             new AcceptableValueRange<int>(AwakeningRules.KillsMin, AwakeningRules.KillsMax),
-            new ConfigurationManagerAttributes { Order = 80 }));
+            new ConfigurationManagerAttributes { Order = 80, ShowRangeAsPercent = false }));
         ClearKillsMax = Config.Bind(AwakeningSection, "ClearKillsMax", d.ClearKillsMax, new ConfigDescription(
             "Most Jotun kills an area can need to be cleared (see ClearKillsMin)." + ServerWins,
             new AcceptableValueRange<int>(AwakeningRules.KillsMin, AwakeningRules.KillsMax),
-            new ConfigurationManagerAttributes { Order = 79 }));
+            new ConfigurationManagerAttributes { Order = 79, ShowRangeAsPercent = false }));
 
         StormShare = Config.Bind(StormsSection, "StormShare", d.StormShare, new ConfigDescription(
             "Share of the time an invaded area storms (Deep North blizzard and Fimbul meteors), in percent. Each area "

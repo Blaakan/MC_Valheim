@@ -42,10 +42,11 @@ Shows how many of each creature you have killed, and how, plus how many you have
 
 ## Configuration
 
-The config file `BepInEx/config/MC.Exploration.Stats.PerCreature.cfg` is created the first time you launch the game
-with the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. The display settings can
-be changed in-game with ConfigurationManager, or by editing the file (the game picks up the change while it runs).
-Display settings apply the next time you open the Valheim Compendium.
+The config file `BepInEx/config/MC.Exploration.Stats.PerCreature.cfg` is created the first time you launch the game with
+the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration manager
+installed that button is hidden: press F1 and use its window). The display settings can be changed in-game with
+ConfigurationManager, or by editing the file (the game picks up the change while it runs). Display settings apply the
+next time you open the Valheim Compendium.
 
 | Section | Setting | Default | Description |
 |---|---|---|---|

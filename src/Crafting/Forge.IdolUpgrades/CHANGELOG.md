@@ -18,3 +18,4 @@
 - Required on the server (or the host) and on every player's game: the server refuses players without it, with a
   version that cannot talk to this one, or with it turned off (AllowPlayersWithoutMod), and its settings apply to
   everyone.
+- ConfigurationManager shows LevelsLost and the upgrade costs as numbers, not as percentages.

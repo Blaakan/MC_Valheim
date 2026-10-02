@@ -45,23 +45,75 @@ internal static class CraftSearch
     {
         _focusMain = shortcut.MainKey;
         _focusMods = shortcut.Modifiers?.ToArray() ?? new KeyCode[0];
+        if (_focusMain == KeyCode.None)
+        {
+            return;
+        }
+        // ConfigurationManager (or a hand edit) can store any key: check once here, not every frame.
+        var bad = IsUsableKey(_focusMain) ? _focusMods.FirstOrDefault(m => !IsUsableKey(m)) : _focusMain;
+        if (bad != KeyCode.None)
+        {
+            FocusKeyUnusable(shortcut.ToString(), bad);
+        }
     }
 
     // Focus key went down this frame (with its modifiers held).
     internal static bool FocusKeyDown()
     {
-        if (_focusMain == KeyCode.None || !ZInput.GetKeyDown(_focusMain, logWarning: false))
+        if (_focusMain == KeyCode.None)
         {
             return false;
         }
-        for (var i = 0; i < _focusMods.Length; i++)
+        try
         {
-            if (!ZInput.GetKey(_focusMods[i], logWarning: false))
+            if (!ZInput.GetKeyDown(_focusMain, logWarning: false))
             {
                 return false;
             }
+            for (var i = 0; i < _focusMods.Length; i++)
+            {
+                if (!ZInput.GetKey(_focusMods[i], logWarning: false))
+                {
+                    return false;
+                }
+            }
+        }
+        catch (ArgumentException)
+        {
+            // Key the check missed (Keyboard.current[Key.None] throw ArgumentOutOfRangeException): key off, once.
+            FocusKeyUnusable(Plugin.FocusSearchKey.Value.ToString(), KeyCode.None);
+            return false;
         }
         return true;
+    }
+
+    // Me same check as Loot Pickup Filter: ZInput throw every frame on a keyboard key it no can map (F13, Hash, At...),
+    // and Mouse5/6 never fire. Static map, work before ZInput exist.
+    private static bool IsUsableKey(KeyCode k)
+    {
+        if (!ZInput.IsKeyCodeValid(k))
+        {
+            return false; // None, Mouse5, Mouse6, Joystick1Button0 and up
+        }
+        if (k >= KeyCode.Mouse0 && k <= KeyCode.Mouse4)
+        {
+            return true;
+        }
+        if (k >= KeyCode.JoystickButton0)
+        {
+            return true; // ZInput fall back to South button, no throw
+        }
+        return ZInput.TryKeyCodeToKey(k, out _);
+    }
+
+    // Game cannot read the key: focus key off (search field still work with the mouse). Say so once per setting.
+    private static void FocusKeyUnusable(string shortcut, KeyCode bad)
+    {
+        _focusMain = KeyCode.None;
+        _focusMods = new KeyCode[0];
+        var which = bad != KeyCode.None ? $"the key {bad}" : "this key";
+        Log.Warning($"General.FocusSearchKey = {shortcut}: the game cannot read {which}, so the key that jumps to the "
+                    + "search field is off. Pick another key (for example a letter).");
     }
 
     internal static void Activate()

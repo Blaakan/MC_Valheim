@@ -86,11 +86,11 @@ damage, effects, skill and wear.
 
 ## Configuration
 
-The config file `BepInEx/config/MC.Combat.Weapons.DualWield.cfg` is created the first time you launch the game with
-the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. Every setting can be changed
-in-game with ConfigurationManager, or by editing the file (the game picks up the change while it runs). In
-multiplayer the server's (or host's) Combat and Moves settings are used for everyone; the Controls and Visuals
-settings are each player's own.
+The config file `BepInEx/config/MC.Combat.Weapons.DualWield.cfg` is created the first time you launch the game with the
+mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration manager
+installed that button is hidden: press F1 and use its window). Every setting can be changed in-game with
+ConfigurationManager, or by editing the file (the game picks up the change while it runs). In multiplayer the server's
+(or host's) Combat and Moves settings are used for everyone; the Controls and Visuals settings are each player's own.
 
 | Section | Setting | Default | Description |
 |---|---|---|---|

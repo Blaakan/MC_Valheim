@@ -85,10 +85,11 @@ Adds an Encyclopedia tab to the game's Valheim Compendium: every item, building 
 ## Configuration
 
 The config file `BepInEx/config/MC.Exploration.Compendium.Encyclopedia.cfg` is created the first time you launch the
-game with the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. Every setting can be
-changed in-game with ConfigurationManager, or by editing the file (the game picks up the change while it runs). The
-display settings apply at once, also to an open Encyclopedia, and so does SideButton (the button appears or goes at
-once, the side panel back exactly as the game makes it).
+game with the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration
+manager installed that button is hidden: press F1 and use its window). Every setting can be changed in-game with
+ConfigurationManager, or by editing the file (the game picks up the change while it runs). The display settings apply at
+once, also to an open Encyclopedia, and so does SideButton (the button appears or goes at once, the side panel back
+exactly as the game makes it).
 
 | Section | Setting | Default | Description |
 |---|---|---|---|

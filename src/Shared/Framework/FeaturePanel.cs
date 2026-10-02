@@ -72,7 +72,9 @@ internal sealed class FeaturePanel : MonoBehaviour
     {
         try
         {
-            _canShow = ComputeCanShow();
+            // Configuration manager installed: its window (F1) already list every MC mod with Enabled and Status, so
+            // me hide button and window (user choice 2026-10-02). Spawn notice stay, it point to F1 then.
+            _canShow = ConfigManagerName() == null && ComputeCanShow();
             _scale = Mathf.Clamp(Screen.height / 1080f, 1f, 3f);
             if (!_canShow && _open)
             {
@@ -357,6 +359,56 @@ internal sealed class FeaturePanel : MonoBehaviour
         return s;
     }
 
+    // Known configuration managers (plugin GUID, read in their sources 2026-10-02): shudnal's, aedenthorn's (Nexus 740
+    // and cjayride's fork share it; his universal one differ only in case), upstream BepInEx. Any other plugin whose
+    // name end with "Configuration Manager" count too (forks). Plugin that failed to load (no instance) no count.
+    private static readonly string[] ConfigManagerGuids =
+    {
+        "_shudnal.ConfigurationManager",
+        "aedenthorn.ConfigurationManager",
+        "com.bepis.bepinex.configurationmanager",
+    };
+
+    private static bool _cmChecked;
+    private static string _cmName;
+
+    // Name of the loaded configuration manager, or null. Me check once, after every plugin loaded (panel is added in
+    // ModPlugin.Start, notices come later still). Pure part in IsConfigManager (probe and self tests can hammer it).
+    internal static string ConfigManagerName()
+    {
+        if (_cmChecked)
+        {
+            return _cmName;
+        }
+        _cmChecked = true;
+        foreach (var pair in BepInEx.Bootstrap.Chainloader.PluginInfos)
+        {
+            var info = pair.Value;
+            if (info?.Metadata == null || info.Instance == null || !IsConfigManager(info.Metadata.GUID, info.Metadata.Name))
+            {
+                continue;
+            }
+            _cmName = string.IsNullOrEmpty(info.Metadata.Name) ? info.Metadata.GUID : info.Metadata.Name;
+            Log.Info($"{_cmName} is installed: the MC Mods button is hidden; every MC mod's settings, including Enabled "
+                     + "and Status, are in its window (F1).");
+            break;
+        }
+        return _cmName;
+    }
+
+    internal static bool IsConfigManager(string guid, string name)
+    {
+        foreach (var g in ConfigManagerGuids)
+        {
+            if (string.Equals(g, guid, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        var compact = (name ?? "").Replace(" ", "");
+        return compact.EndsWith("ConfigurationManager", StringComparison.OrdinalIgnoreCase);
+    }
+
     // One combined line (TopLeft slot show one message at a time), only when the problem set changed
     // (no repeat on every death). Hidden HUD: skip and retry next spawn (user hid HUD on purpose).
     private static void OnPlayerSpawned(Player __instance)
@@ -382,8 +434,10 @@ internal sealed class FeaturePanel : MonoBehaviour
             }
 
             _lastNotice = names;
+            var cm = ConfigManagerName();
+            var where = cm == null ? "Esc > MC Mods" : $"F1 ({cm}), each mod's General > Status,";
             MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft,
-                $"MC Mods: {problems.Count} feature(s) inactive ({names}). Esc > MC Mods for details.");
+                $"MC Mods: {problems.Count} feature(s) inactive ({names}). {where} for details.");
         }
         catch (Exception e)
         {

@@ -3,3 +3,4 @@
 ## 0.1.0
 
 - Initial version.
+- ConfigurationManager lists SortBy before ShowWeaponTypes.

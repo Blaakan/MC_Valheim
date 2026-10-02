@@ -21,3 +21,4 @@
 - Worlds that already broke Malicious Ice start at the matching stage. Admin console command `deepnorth_stones`.
 - Required on the server (or the host) and on every player's game: the server refuses players without the mod, with it
   turned off or with another version of it (AllowPlayersWithoutMod), and its settings apply to everyone.
+- ConfigurationManager shows ClearKillsMin and ClearKillsMax as numbers, not as percentages.

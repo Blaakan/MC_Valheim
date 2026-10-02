@@ -44,10 +44,11 @@ Worked examples (p = the extra-star chance):
 ## Configuration
 
 The config file `BepInEx/config/MC.Farming.Breeding.StarInheritance.cfg` is created the first time you launch the game
-with the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods**. Every setting can be changed
-in-game with ConfigurationManager, or by editing the file (the game picks up the change while it runs). All settings
-apply to the next birth. In multiplayer, the five breeding settings of the server (or the host) are used by everyone:
-see Multiplayer.
+with the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration manager
+installed that button is hidden: press F1 and use its window). Every setting can be changed in-game with
+ConfigurationManager, or by editing the file (the game picks up the change while it runs). All settings apply to the
+next birth. In multiplayer, the five breeding settings of the server (or the host) are used by everyone: see
+Multiplayer.
 
 | Section | Setting | Default | Description |
 |---|---|---|---|

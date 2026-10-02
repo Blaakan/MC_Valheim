@@ -9,8 +9,8 @@ Automated coverage: `./tools/Test-Framework.ps1` (live toggle, config watching, 
 
 ## Framework v1 — panel and notices
 
-- [ ] **F01 Panel button:** main menu shows an **MC Mods (N)** button top-right. Also in the pause menu (Esc) in a
-  world. It does not show during normal play.
+- [ ] **F01 Panel button:** (no configuration manager installed) main menu shows an **MC Mods (N)** button top-right.
+  Also in the pause menu (Esc) in a world. It does not show during normal play.
 - [ ] **F02 Panel content:** click it. Each MC mod appears under its category with a toggle, version + build id, scope,
   who needs it, multiplayer support, a coloured status line, and its multiplayer notes.
 - [x] **F03 Live toggle:** (passed 2026-09-28 as crossbow T21, build f15f765) in a world, pause → MC Mods → untick Crossbow Stays Loaded. Status turns grey "Off".
@@ -41,6 +41,32 @@ Automated coverage: `./tools/Test-Framework.ps1` (live toggle, config watching, 
   logs "Activated." again and there is no "Could not activate" error. Before the fix (2026-09-29, found by the
   in-world harness), every active MC mod logged "Activated." once more while the game closed, because the world's
   shutdown re-checked plugins that were already destroyed. If the log stops before the shutdown lines, repeat once.
+
+## Framework v1 — ConfigurationManager (needs a configuration manager mod; install one at a time)
+
+Builds and their known differences: `docs/modding/framework.md`, "ConfigurationManager". While a configuration manager
+is installed, every test that says "Esc → MC Mods" is done in its window instead (F1, the mod's `General/Enabled`).
+
+- [ ] **F16 MC Mods button hidden by a configuration manager:** with shudnal's manager installed, no **MC Mods** button
+  in the main menu or the pause menu, and `BepInEx/LogOutput.log` says "<manager> is installed: the MC Mods button is
+  hidden ...". Turn one MC mod's dependency off (or use `Test-Framework.ps1 -KeepProbes` and turn Probe A off) and
+  enter a world: the top-left notice ends with "F1 (<manager>), each mod's General > Status, for details". Remove the
+  manager: the button is back.
+- [ ] **F13 shudnal's Valheim Configuration Manager** (Nexus 2746 or Thunderstore `shudnal/ConfigurationManager`):
+  press F1 in the main menu and in a world. Every MC mod is listed; in each, `General` comes first with `Enabled`
+  then `Status`. `Status` is plain text (no edit box, no Reset button). Untick `Enabled` of one mod: it turns off at
+  once (its `Status` says "Off"); tick it again: Active. Settings inside a section are in
+  the README's order. No error in the log.
+- [ ] **F14 aedenthorn's Configuration Manager 0.5.0** (Nexus 740), alone: the game reaches the main menu; note any
+  error the manager logs at start (its main-menu button is expected to be missing on Valheim 1.0). F1 opens it: every
+  MC mod is listed (sections alphabetical in this build), `Status` is plain text without a Reset button, `Enabled`
+  toggles live as in F13, and a slider (for example Distant Horizons `Rendering/FogDensityMultiplier`) applies while
+  dragging. Then start the game with `-console`, open F5 and run `help`: if the console no longer answers while 740 is
+  installed, note it (expected from its 2021 code) and repeat with cjayride's fork (Thunderstore
+  `cjayride/ConfigurationManager`, same plugin): the console works.
+- [ ] **F15 Counts are not percentages:** in aedenthorn's build (F14 setup; shudnal's never shows these as "%"),
+  Forge Idol Upgrades `Refinement/LevelsLost` and `Upgrade costs/Level1Material`, and Deep North Awakening
+  `Awakening/ClearKillsMin` show numbers (1, 5, 8) with a number box, not "%".
 
 ## Framework v1 — multiplayer (needs a second player and/or a dedicated server)
 
