@@ -23,6 +23,7 @@
     <Project Path="src/Exploration/Sleep.ThroughDay/MC.Exploration.Sleep.ThroughDay.csproj" />
     <Project Path="src/Exploration/Stats.PerCreature/MC.Exploration.Stats.PerCreature.csproj" />
     <Project Path="src/Exploration/Swimming.Dive/MC.Exploration.Swimming.Dive.csproj" />
+    <Project Path="src/Exploration/View.DistantHorizons/MC.Exploration.View.DistantHorizons.csproj" />
   </Folder>
   <Folder Name="/Farming/">
     <Project Path="src/Farming/Breeding.StarInheritance/MC.Farming.Breeding.StarInheritance.csproj" />

@@ -41,6 +41,7 @@ clearly who needs to install it and how it behaves in multiplayer. Details: [doc
 | [Sailing Skill](src/Exploration/Sailing.Skill) | Exploration | New | server and every player | works | in development |
 | [Swim Dive](src/Exploration/Swimming.Dive) | Exploration | New | server and every player | works | in development |
 | [Deep North Awakening](src/Exploration/DeepNorth.Awakening) | Exploration | New | server and every player | works | in development |
+| [Distant Horizons](src/Exploration/View.DistantHorizons) | Exploration | New | only you (client-side) | works | in development |
 | [Switchable Lights](src/Building/Lights.Switchable) | Building | QoL | server and every player | works | in development |
 | [One Click Repair All](src/Crafting/Repair.OneClickAll) | Crafting | QoL | only you (client-side) | works | in development |
 | [Batch Station Feeding](src/Crafting/Stations.BatchFeed) | Crafting | QoL | only you (client-side) | works | in development |

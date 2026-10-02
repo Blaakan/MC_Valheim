@@ -10,7 +10,7 @@ Research done 2026-09 (2026-09-28), about three weeks after Valheim 1.0 (Deep No
   - `updated post-1.0`: released after 2026-09-09 but without the tag. It probably works.
   - `pre-1.0`: last release before 2026-09-09. Assume it is broken until tested. Hosting blogs report that 1.0 changed the item DB, the ZNetScene registry, skills and piece categories. Jotunn 2.30 shipped a 1.0 fix on launch day.
   - `deprecated`: Thunderstore's deprecated flag is set.
-- **Refreshed sections** (section 1, Cartography table revamp, and section 19, Wish bone deep north fix, both written 2026-09-29) write the status as `vX.Y.Z, updated YYYY-MM-DD, 1.0: yes|likely|unknown|dead`, as [existing-mods-combat-ux.md](existing-mods-combat-ux.md) does: `yes` = the author says it supports 1.0 (usually the `1.0 tagged` category), `likely` = `updated post-1.0` without that claim, `unknown` = `pre-1.0`, `dead` = deprecated or unchanged since 2021-2022.
+- **Refreshed sections** (section 1, Cartography table revamp, and section 19, Wish bone deep north fix, both written 2026-09-29; section 10, Distant horizon, refreshed 2026-10-02) write the status as `vX.Y.Z, updated YYYY-MM-DD, 1.0: yes|likely|unknown|dead`, as [existing-mods-combat-ux.md](existing-mods-combat-ux.md) does: `yes` = the author says it supports 1.0 (usually the `1.0 tagged` category), `likely` = `updated post-1.0` without that claim, `unknown` = `pre-1.0`, `dead` = deprecated or unchanged since 2021-2022.
 - **AI** means the author tagged the package "AI Generated" on Thunderstore. A lot of 2026 mods carry this tag, so treat their code quality as unknown.
 - **Licenses**: we only borrow ideas. Code under GPL (for example Advize's mods) must never be copied into our repos.
 - **Vanilla hooks** list what the decompiled 1.0.16 code already provides. They are cited as `Class.Member` and were checked in `.ref/decompiled/assembly_valheim`.
@@ -318,12 +318,30 @@ The user already knew this exists.
 
 | Mod | Status | Notes |
 |-----|--------|-------|
-| [Render Limits](https://thunderstore.io/c/valheim/p/JereKuusela/Render_Limits/) (JereKuusela) | 1.15.0, 2026-08-30, deprecated (no reason given; probably superseded by the vanilla 1.0 setting) | Controls how many zones are active, loaded and generated, the real-terrain distance, LOD bias, clutter distance, shadows and pixel lights, with server-side caps. [GitHub](https://github.com/JereKuusela/valheim-render_limits). |
-| [RenderSettings](https://thunderstore.io/c/valheim/p/romenh/RenderSettings/) (romenh) | 2021, dead | Extra camera and render settings. |
+| [Render Limits](https://thunderstore.io/c/valheim/p/JereKuusela/Render_Limits/) (JereKuusela) | v1.15.0, updated 2026-08-30, 1.0: dead (deprecated) | Controls how many zones are active, loaded and generated, the real-terrain distance, LOD bias, clutter distance, shadows and pixel lights, with server-side caps. It writes `ZoneSystem.m_activeArea`, which 1.0 replaced with `SimulationDistance`. [GitHub](https://github.com/JereKuusela/valheim-render_limits). |
+| [Render Limits Fix](https://thunderstore.io/c/valheim/p/MagiCorp/Render_Limits_Fix/) (MagiCorp) | v1.16.0, updated 2026-09-17, 1.0: yes, AI | 1.0 fork of Render Limits with the same plugin ID (`render_limits`). Turns its zone limits into the 1.0 `SimulationDistance`. |
+| [New Horizons: Treelines](https://thunderstore.io/c/valheim/p/EchoesOfBunglas/New_Horizons_Treelines/) (EchoesOfBunglas) | v4.6.35, updated 2026-07-17, 1.0: unknown, AI | The closest existing "Distant Horizons", read in its decompiled code 2026-10-02: an unlit far-terrain underlay of 700 m tiles from about 1.3-2 km out to about 8.5 km from the player (heights from WorldGenerator.GetBaseHeight only: no rivers, mountains too low; colours per biome), tree cards from shipped painted atlases placed by seeded noise (Meadows, Black Forest, Mountains; not the real trees), no rocks, buildings or sea, a raised far plane, clear-sky fog and cloud dimming by weather name. Patches nothing, all on the main thread, 525 settings. Its last release predates 1.0 but every game member it uses still exists in 1.0.16. Closed source; 773 downloads. Does the same job as our mod, so the two must not be used together. |
+| [Valheim Performance Overhaul](https://thunderstore.io/c/valheim/p/Skarif/ValheimPerformanceOverhaul/) (Skarif) | v8.2.4, updated 2026-09-29, 1.0: yes, AI | "Distant Terrain LOD Improvements" (on by default): camera far plane 3000 m, terrain LOD blend x1.25, fog density divided by 2.25. Partial "see farther" coverage. |
+| [Valheim Community Patch](https://thunderstore.io/c/valheim/p/MidnightMods/ValheimCommunityPatch/) (MidnightMods) | v0.32.1, updated 2026-10-01, 1.0: yes | Spreads vanilla's 3x3 distant-terrain rebuild over several frames and speeds up the terrain build thread. No extra range. |
+| [NoFogBruh](https://thunderstore.io/c/valheim/p/Vapok/NoFogBruh/) (Vapok) | v2.1.2, updated 2026-10-01, 1.0: yes | Removes distance fog (on by default), mist and fog particles. Covers the "less fog" part of the idea. [GitHub](https://github.com/Vapok/NoFogBruh). |
+| [GammaOfNightLights](https://thunderstore.io/c/valheim/p/shudnal/GammaOfNightLights/) (shudnal) | v1.0.10, updated 2026-09-10, 1.0: yes | Fog density multipliers per time of day and indoors, applied to the weather settings. [GitHub](https://github.com/shudnal/GammaOfNightLights). |
+| [Expand World Size](https://thunderstore.io/c/valheim/p/JereKuusela/Expand_World_Size/) (JereKuusela) | v1.43.0, updated 2026-10-01, 1.0: likely | Not a view-distance mod, but sets the world radius a distant-terrain mod must cover (config `World radius` + `World edge size`; written to the water material's `_WaterEdge`). [GitHub](https://github.com/JereKuusela/valheim-expand_world_size). |
+| [Badgers HD Terrain 2.0](https://www.nexusmods.com/valheim/mods/2887) (Badger) | 2.x, updated 2026-04-19 (Nexus, approximate), 1.0: unknown (reported broken by 1.0, unverified) | Replacement terrain shader and textures, grass draw distance. |
+| [Grass Render Distance](https://thunderstore.io/c/valheim/p/Mode_Smith/GrassRenderDistance/) (Mode_Smith) | v1.1.0, updated 2026-09-30, 1.0: likely | Grass and clutter draw distance (vanilla 40 m). Close range only. |
+| [RenderSettings](https://thunderstore.io/c/valheim/p/romenh/RenderSettings/) (romenh) | 2021, 1.0: dead | Extra camera and render settings. |
+
+Rows refreshed 2026-10-02 while porting the mod (sources read where public; Nexus facts approximate).
+
+Built as [Distant Horizons](../../src/Exploration/View.DistantHorizons) (2026-10-02, ported from the author's
+standalone mod): far terrain over the whole world, far trees, rocks and buildings from the client's object store, far
+sea, clear-weather fog thinning; client-only.
 
 **Inspiration**
 
-- **Gap:** nothing like Minecraft's "Distant Horizons" exists for Valheim.
+- **Gap (2026-10-02):** partial. New Horizons: Treelines (pre-1.0, AI, three biomes, closed source) and Skarif's
+  Performance Overhaul (3 km far plane, thinner fog) extend the view. Nothing draws the whole world with level of
+  detail and objects taken from the save data.
+- **Gap (2026-09-28, original):** nothing like Minecraft's "Distant Horizons" exists for Valheim.
 - **Idea:** a client-only LOD layer. It draws cheap impostors (billboards or instanced low-poly meshes) for trees, rocks and major landmarks beyond loaded zones. The positions can be computed from `WorldGenerator` and zone vegetation data, or cached from zones already visited. Add better distant-terrain LOD and fog tuning.
 - **Difference from Render Limits:** Render Limits loads more zones, which costs network and CPU. This layer would load nothing from the server.
 - **Risk:** high technical risk. We must first check which Unity 6 render pipeline Valheim uses and how it does GPU instancing.

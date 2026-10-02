@@ -59,7 +59,7 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 | Exploration | Boss summon revamp | New | medium | Both | no | partial | idea |
 | Exploration | Compendium | New | medium | Client | no | partial | [Encyclopedia 0.1.0](../src/Exploration/Compendium.Encyclopedia) (in development) |
 | Exploration | Deep North revamp | New | medium | Both | no | none | [Deep North Awakening 0.1.0](../src/Exploration/DeepNorth.Awakening) (in development) |
-| Exploration | Distant horizon | New | medium | Depends | no | partial | idea |
+| Exploration | Distant horizon | New | medium | Client | no | partial | [Distant Horizons 0.1.0](../src/Exploration/View.DistantHorizons) (in development) |
 | Exploration | Mob variant | New | medium | Both | no | partial | idea |
 | Exploration | New ability depending on skill level | New | medium | Depends | no | partial | idea |
 | Exploration | Sailing revamp | New | medium | Both | no | partial | [Sailing Skill 0.1.0](../src/Exploration/Sailing.Skill) (in development) |
@@ -777,10 +777,10 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 
 > See farther
 
-- **Scope:** New · **Feasibility:** medium · **Who needs it:** Depends · **Custom assets:** no · **Status:** idea
-- **Approach:** Client horizon profile: enlarge TerrainLod (6-8 km, coarser vertices), raise camera far clip, scale fog density, optional LOD bias; optional server part accepts higher simulation levels (server clamps clients), and mark big landmark prefabs m_distant so they stream in the far ring. True distant objects (impostors of unloaded vegetation) would be a separate very-hard project.
-- **Hooks:** `TerrainLod.OnEnable`, `GameCamera.Awake`, `EnvMan.SetEnv`, `SimulationDistance.GetSimulationDistance`, `GraphicsSettingIntExtentions.GetRange`, `ZNet.RPC_RequestValidSimulationDistance`, `Heightmap.GetLodHideDistance`, `Water.ApplySettings`, `GraphicsSettingsManager.GetLodBias`, `GraphicsSettingsManager.ApplyQualitySettings`, `ZNetView.Awake (m_distant)`, `ClutterSystem.m_distance`
-- **Risks:** GPU/CPU cost and hitches from HeightmapBuilder rebuilds every 256m; network/CPU cost of higher simulation distance; depth precision; fog/sky mismatch; m_distant changes persist in ZDO flags; overlap with Render Limits-style mods and ValheimPlus graphics/camera options.
+- **Scope:** New · **Feasibility:** medium · **Who needs it:** Client · **Custom assets:** no · **Status:** [Distant Horizons 0.1.0](../src/Exploration/View.DistantHorizons) (in development)
+- **Approach:** Built (Distant Horizons, ported 2026-10-02 from the author's standalone mod): a level-of-detail quadtree of the game's own distant heightmaps over the whole world replaces TerrainLod's 3x3 grid (exact zone heights on the finest levels, computed on the game's builder thread); far tiles are painted by a camera CommandBuffer in a scaled-down space so the terrain shader's 200-400 m fade never starts; far trees as runtime-baked impostor cards plus big rocks and buildings from the client's ZDO store, handed over to the real objects once spawned; a far sea sheet with the game's water material; clear-weather fog thinning that multiplies the rendered density. Client-only, nothing sent.
+- **Hooks:** `TerrainLod.OnEnable`, `TerrainLod.OnDisable`, `HeightmapBuilder.Build`, `HeightmapBuilder.RequestTerrain`, `Heightmap.ApplySettingsOnAll`, `Water.ApplySettings`, `EnvMan.SetEnv`, `Camera.onPreRender (CommandBuffer)`, `ZDOMan.m_objectsBySector`, `ZDOMan.m_onZDODestroyed`, `ZNetScene.HaveInstance`
+- **Risks:** GPU/CPU cost and memory; the builder thread is shared with zone loading; shader constants (fades, water bands) are not in the code and can change with a game update; fog mods that write the fog density (NoFogBruh, Seasons, GammaOfNightLights, Skarif) stack with its thinning; New Horizons: Treelines does the same job; world-size mods need WorldRadius set by hand; on a host far objects show every generated zone, other players' bases included.
 - **Game systems:** [docs/game/exploration-world.md](game/exploration-world.md)
 - **Existing mods:** partial
 
@@ -788,8 +788,12 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
   |---|---|---|
   | [Render Limits (JereKuusela)](https://thunderstore.io/c/valheim/p/JereKuusela/Render_Limits/) | 1.15.0, 2026-08-30, deprecated (probably superseded by the vanilla 1.0 setting) | Number of active, loaded and generated zones; real-terrain distance; LOD bias; clutter distance; shadows; server caps. |
   | [RenderSettings (romenh)](https://thunderstore.io/c/valheim/p/romenh/RenderSettings/) | 2021, dead | Extra camera and render settings. |
+  | [Render Limits Fix (MagiCorp)](https://thunderstore.io/c/valheim/p/MagiCorp/Render_Limits_Fix/) | 1.16.0, 2026-09-17, 1.0 yes, AI | 1.0 fork of Render Limits (same plugin ID); maps its zone limits to the 1.0 SimulationDistance. |
+  | [New Horizons: Treelines (EchoesOfBunglas)](https://thunderstore.io/c/valheim/p/EchoesOfBunglas/New_Horizons_Treelines/) | 4.6.35, 2026-07-17, 1.0 unknown, AI | Unlit far terrain underlay (700 m tiles, about 1.3-2 km to 8.5 km from the player, heights from GetBaseHeight only) and painted billboard tree cards placed by seeded noise (Meadows, Black Forest, Mountains), raised far plane, clear-sky fog and cloud dimming. Patches nothing. Closed source. Same job as Distant Horizons. |
+  | [Valheim Performance Overhaul (Skarif)](https://thunderstore.io/c/valheim/p/Skarif/ValheimPerformanceOverhaul/) | 8.2.4, 2026-09-29, 1.0 yes, AI | Distant Terrain LOD Improvements: far plane 3000 m, LOD hide distance x1.25, fog density / 2.25. |
+  | [NoFogBruh (Vapok)](https://thunderstore.io/c/valheim/p/Vapok/NoFogBruh/) | 2.1.2, 2026-10-01, 1.0 yes | Removes distance fog, mist and fog particles. |
 
-- **Inspiration:** Vanilla 1.0 added a SimulationDistance setting (more near zones; far ring fixed at 2; server-synced). Distant terrain already draws as a low-detail heightmap (Heightmap.IsDistantLod), but objects beyond loaded zones do not. Nothing like Minecraft's 'Distant Horizons' exists for Valheim. Idea: a client-only impostor layer for trees, rocks and landmarks beyond loaded zones (from WorldGenerator and vegetation data, or cached from visited zones), plus better distant terrain and fog. Unlike Render Limits it loads nothing from the server. High technical risk: investigate Unity 6 rendering and instancing first.
+- **Inspiration:** Built as Distant Horizons (src/Exploration/View.DistantHorizons, 2026-10-02). Before: vanilla 1.0 added a SimulationDistance setting (more near zones; far ring fixed at 2; server-synced). Distant terrain already draws as a low-detail heightmap (Heightmap.IsDistantLod), but objects beyond loaded zones do not. Nothing like Minecraft's 'Distant Horizons' exists for Valheim. Idea: a client-only impostor layer for trees, rocks and landmarks beyond loaded zones (from WorldGenerator and vegetation data, or cached from visited zones), plus better distant terrain and fog. Unlike Render Limits it loads nothing from the server. High technical risk: investigate Unity 6 rendering and instancing first.
 
 ### Mob variant
 

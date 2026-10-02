@@ -111,9 +111,9 @@ Local on every peer → the AltBiome list must be identical on all peers (a mod 
 
 ### Key classes
 - `Heightmap` - one terrain tile (zone tile or distant LOD tile). `m_width`, `m_scale`, `m_isDistantLod`, `m_cornerBiomes[4]`, `m_cornerAltBiomes`, paint mask texture (dirt/cultivated/paved/**lava**; in Deep North the cultivation channel doubles as **deep snow depth** - see `Heightmap.GetCultivationMask` uses in `Character`, `Vagon`, `SnowRoller`, `Player` build checks).
-- `HeightmapBuilder` - background thread building height/mask arrays (`RequestTerrainSync`, `IsTerrainReady`, `Build`).
+- `HeightmapBuilder` - background thread building height/mask arrays (`RequestTerrainSync`, `IsTerrainReady`, `Build`). One FIFO thread for real zones and distant terrain alike: `m_toBuild` queue, `m_ready` results capped at 16 (oldest dropped), one `m_lock`; `Build(HMBuildData)` runs outside the lock. The private `RequestTerrain` takes a ready result (removing it from `m_ready`) or queues the job and returns null, never blocking; `RequestTerrainSync` spins on it. A distant build uses one biome per vertex, then smooths; a real-zone build blends the four corner biomes with smoothstep. `instance` is created on first access and disposed in `Game.OnApplicationQuit` (`m_lock` becomes null).
 - `TerrainComp`/`TerrainModifier`/`TerrainOp` - player terrain edits (ZDO `s_TCData`).
-- `TerrainLod` - distant terrain rings (see §9).
+- `TerrainLod` - distant terrain: a 3x3 grid of 800 m heightmaps at 10 m spacing (see §9). `Heightmap.Awake` adds every map whose `m_isDistantLod` is still false to `s_heightmaps` (what `GetAllHeightmaps`/`FindHeightmap` return); the `IsDistantLod` setter removes it again, so `TerrainLod` tiles join that list for a moment. `Generate` reuses an injected `m_buildData` when centre, scale, size and generator match.
 
 ### Flow
 `Heightmap.Regenerate` → `Generate` → `HeightmapBuilder.RequestTerrainSync` → `ApplyModifiers` (TerrainComp deltas) → `RebuildCollisionMesh`/`RebuildRenderMesh`. Biome at a point inside a tile is a weighted choice of the 4 corner biomes (`Heightmap.GetBiome`) - biome resolution is effectively per zone corner. Terrain textures are chosen from vertex colors (`Heightmap.GetBiomeColor(Biome)`), which only encode a fixed set of combos (Meadows=none, Swamp=R, Mountain=G, BlackForest=B, Plains=A, AshLands=R+A, DeepNorth=G (same channel as Mountain), Mistlands=B+A). **A truly new biome terrain texture needs terrain-shader work**; reuse via `AltBiome.m_terrainTextureOverride` is free.
@@ -350,6 +350,23 @@ Patch points: `TerrainLod.OnEnable` prefix (set private fields before `CreateMes
 
 Vanilla quirk: `ZDOMan.FindSectorObjects` far ring tests the radius of the `y-k` row for the `y+k` row (symmetric, harmless).
 
+Learned while porting Distant Horizons (2026-10-02, 1.0.16):
+- `TerrainLod.CreateMeshes`/`ResetMeshes` are its only mesh calls; `ResetMeshes` clears `m_heightmaps` at once (the
+  objects are destroyed at the end of the frame) and resets its point, so a later `CreateMeshes` rebuilds around the
+  camera on the next `Update`. With no meshes, `Update` does nothing useful. Nothing else in the game references it.
+- `Water.ApplySettings` (writes `_VisibleMaxDistance` in a property block) only runs in `Water.Awake`, `OnEnable` and
+  `ZNet.ApplySimulationDistance`: a mod that changes it must call `Water.ApplySettingsOnAll` itself to undo.
+- `EnvMan.SetEnv` writes `RenderSettings.fogDensity` fresh on every call that has a main camera and returns early
+  without one; `FixedUpdate` calls it at most once per rendered frame with a physics step, never while paused.
+  `InterpolateEnvironment` keeps the previous environment's `m_isWet` during the 2 s blend.
+- Simulation levels 0 and 2 (classic) load a square of zones (`ZoneSystem.CreateLocalZones`), the others a circle of
+  radius near x 64 + 32 m (`ZoneSystem.ZonesWithinRadius`).
+- Shader facts (not in `.ref`, from a disassembly of the 1.0 shaders, 2026-09-22): `Custom/Heightmap` fades albedo to
+  black between 200 m and 400 m from the camera with literal constants (every variant); `Custom/Water` fades alpha to
+  zero between 300 m and 800 m (literal), and for LOD water `_VisibleMaxDistance` is a fade-in radius. This is why
+  vanilla terrain or water can never be seen far away without fog, whatever the settings.
+- Portal ZDOs live in `ZDOMan.m_portalObjects`, not in the sector lists.
+
 ---
 
 ## 10. Boss altars, summoning and boss AI
@@ -445,6 +462,7 @@ The Hildir quest loop, fully data-driven: Hildir dungeons (themes `ForestCryptHi
 - **Risks:** room geometry is parented to the generator, which exists only while its zone is instantiated for that client: the whole dungeon must fit within the player's near simulation ring of the entrance zone (≈1 zone at the lowest setting) - otherwise chain several zone-sized generators linked by `Teleport` pairs. The interior env box from `Location.Awake` covers only 64×500×64 m (add EnvZones). One location per zone; placement only in ungenerated zones; generation time rises with prioritized attempts. Removing the mod leaves orphan ZDOs/rooms ("Missing room"). Overlap/hash collisions with location packs (Warpalicious, Expand World, Better Continents). Performance: many rooms × renderers/lights.
 
 ### Distant horizon (New, exists: no)
+- **Status:** implemented as [Distant Horizons](../../src/Exploration/View.DistantHorizons) (0.1.0, [design](../design/exploration-view-distant-horizons.md)), client-only: a level-of-detail quadtree of the game's own distant heightmaps over the whole world (replacing `TerrainLod`'s 3x3 grid), far tiles painted in a scaled-down space to defeat the shader's 200-400 m fade, far trees as baked impostor cards plus big rocks and buildings from the client's object store, a far sea, and clear-weather fog thinning. It does not raise the loaded-zone cap. The notes below are the original research; its actual hooks are listed in the design doc (3.6).
 - **Feasibility:** medium for "see farther terrain + less fog + more loaded zones"; very hard for true distant objects (impostors of unloaded vegetation/locations).
 - **Who needs the mod:** client-only for rendering; host/server must also run it (or set `-simulationdistance`) to raise the loaded-zone cap, since the server clamps clients.
 - **Assets:** no (yes for an impostor system).

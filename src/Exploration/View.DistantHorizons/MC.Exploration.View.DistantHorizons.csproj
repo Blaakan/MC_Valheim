@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Distant Horizons</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>New</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Distant horizon</ModIdea>
+    <!-- Package name without the "View" system word (default would be ViewDistantHorizons). -->
+    <ModPackageName>DistantHorizons</ModPackageName>
+    <ModSide>Client</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Only you need it; it works on vanilla servers and with friends who do not have it. It only draws, nothing is sent over the network. Far objects come from the world data your game already holds: the whole world as host or in single player; when you join someone else's game (a dedicated server or a friend's hosted world), only the areas you have been near.</ModMultiplayerNotes>
+    <ModRequires></ModRequires>
+    <ModDescription>Draws the world all the way to the horizon: far terrain streamed as a level-of-detail quadtree over the whole map, far trees, rocks and buildings, the far sea, and thinner fog in clear weather.</ModDescription>
+  </PropertyGroup>
+</Project>
