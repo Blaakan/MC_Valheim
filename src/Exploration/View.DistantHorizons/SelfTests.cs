@@ -35,6 +35,7 @@ internal static class SelfTests
         SelfTest.Register(TerrainName, RunTerrain);
         SelfTest.Register(ObjectsName, RunObjects);
         SelfTest.Register(DetachName, RunDetach);
+        NearGroundTests.Register();
 #endif
     }
 
@@ -46,6 +47,7 @@ internal static class SelfTests
         SelfTest.Unregister(TerrainName);
         SelfTest.Unregister(ObjectsName);
         SelfTest.Unregister(DetachName);
+        NearGroundTests.Unregister();
 #endif
     }
 

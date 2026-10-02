@@ -14,8 +14,9 @@ the whole world, fine near you and coarser with distance, and adds what stands o
   around you, so the two meet without a step.
 - **Lit like the ground around you.** Far tiles use the real terrain material. The game's terrain shader fades every
   biome to black between 200 m and 400 m from the camera (vanilla never shows terrain that far without fog), so the
-  mod paints the far tiles in a scaled-down space where that fade never starts. The same fix keeps the real terrain
-  lit when you set a large simulation distance (`RealTerrainFadeFix`).
+  mod paints the far tiles in a scaled-down space where that fade never starts. The real terrain stays lit too when
+  you set a large simulation distance (`RealTerrainFadeFix`): beyond about 120 m it is drawn again at its true size
+  with the fade switched off, and nearer ground is left exactly as the game draws it.
 - **Far trees, rocks and buildings.** Beyond the loaded zones the mod draws what your game knows is there: trees as
   impostor cards (baked at run time from each tree's own model), big rocks and buildings (yours and ruins) as their
   lowest-detail meshes. Objects are placed on the far terrain (trees one by one, rocks and buildings with their
@@ -68,7 +69,7 @@ second after the last change; everything else applies at once.
 | Rendering | FogClearDensity | `0.006` | Weather with a fog density at or below this counts as clear and gets the full multiplier. `dh envs` lists the game's weathers and their densities. |
 | Rendering | FogStormDensity | `0.02` | Weather with a fog density at or above this (storms, mist, blizzards) keeps its fog; the thinning fades out between the two values. |
 | Rendering | KeepWetWeatherFog | `true` | Never thin the fog of rain and thunderstorms. |
-| Rendering | RealTerrainFadeFix | `true` | The same shader fade darkens the real terrain between 200 m and 400 m, fully visible with a large simulation distance and thin fog. When on (with `FarTerrainDraw = shrink`), real zones reaching farther than 100 m from the camera are painted again in the scaled-down space, so the ground stays lit up to the far tiles. |
+| Rendering | RealTerrainFadeFix | `true` | The same shader fade darkens the real terrain between 200 m and 400 m, fully visible with a large simulation distance and thin fog. When on (with `FarTerrainDraw = shrink`), real zones reaching farther than about 120 m from the camera are drawn again at their true size with that fade switched off, so the ground stays lit up to the far tiles; nearer zones are left to the game. |
 | Rendering | FarWater | `true` | Draw the sea past the point where the game stops drawing it. |
 | Rendering | FarWaterInnerRadius | `0` | Where the far sea starts (metres). 0 = automatic: one zone inside the game's own water, so the two overlap. |
 | Rendering | FarWaterGloss | `-1` | Glossiness of the far sea. -1 keeps the game's own value. Lower it if the far sea ever turns white. |

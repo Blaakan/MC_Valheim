@@ -18,7 +18,7 @@ internal static class DhCommand
         "Distant Horizons: dh [stats] | dh rebuild | dh envs | dh objects [on|off|rebuild] | dh get|set <Setting> [value]"
         + " | dh off | debug: dh dump | dh atlas | dh shot [seconds] | dh terrain [depth0|depthreset|hide <m>|shadows on|off"
         + "|layer <n>|material zone|lod|keyword on|off|vanilla on|off|copies off|zone|far|lod|event before|after|seabg on|off"
-        + "|seafog on|off|water on|off|ambient on|off|paintonly on|off|paintlift <m>|skirt on|off]";
+        + "|seafog on|off|water on|off|ambient on|off|paintonly on|off|paintlift <m>|skirt on|off|abshots [seconds]]";
 #else
     private const string Help =
         "Distant Horizons: dh [stats] | dh rebuild | dh envs | dh objects [on|off|rebuild] | dh get|set <Setting> [value]"
@@ -274,6 +274,14 @@ internal static class DhCommand
                 mgr.SetSkirtDisabled(arg == "off");
                 args.Context.AddString(Prefix + "skirt " + (arg == "off" ? "OFF" : "ON"));
                 break;
+            case "abshots":
+            {
+                var delay = arg.Length > 0 ? ParseFloat(arg, 3f) : 3f;
+                Plugin.Instance.StartCoroutine(AbShots(delay));
+                args.Context.AddString($"{Prefix}A/B screenshots in {delay:0.#} s: close the console and keep still. "
+                                       + "Files: BepInEx/DistantHorizons_ab_*.png, numbers in the log.");
+                break;
+            }
             case "vanilla":
                 mgr.SetVanillaCompare(arg == "on");
                 args.Context.AddString(Prefix + "vanilla 3x3 LOD compare " + (arg == "on"
@@ -301,6 +309,49 @@ internal static class DhCommand
     private static float ParseFloat(string text, float fallback)
     {
         return float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : fallback;
+    }
+
+    // dh terrain abshots: same view in every draw mode (NearGroundCapture), then mod off for one shot, then back on.
+    private static System.Collections.IEnumerator AbShots(float delay)
+    {
+        yield return new WaitForSecondsRealtime(delay);
+        var mgr = LodTerrainManager.Instance;
+        var cam = Utils.GetMainCamera();
+        if (mgr == null || cam == null)
+        {
+            yield break;
+        }
+        var stamp = DateTime.Now.ToString("HHmmss");
+        var at = Player.m_localPlayer != null ? Player.m_localPlayer.transform.position : cam.transform.position;
+        Log.Info($"A/B {stamp}: camera {cam.transform.position} looking {cam.transform.forward}, player {at}");
+        Log.Info($"A/B {stamp}: {NearGroundCapture.DescribeSettings(at)}");
+        Log.Info($"A/B {stamp}: {mgr.ProbeNearGround(cam.transform.position, at, 120f, out _, out _)}");
+        Log.Info($"A/B {stamp}: {mgr.GetStats()}");
+        yield return NearGroundCapture.Modes(mgr, mode => Capture(stamp, mode));
+        try
+        {
+            // Mod off for one shot (same code the toggle run).
+            TerrainLink.Detach();
+            yield return new WaitForSecondsRealtime(3f);
+            Capture(stamp, "9-mod-off");
+            yield return null;
+            yield return null;
+        }
+        finally
+        {
+            if (LodTerrainManager.Instance == null && Plugin.Instance != null && Plugin.Instance.IsActive)
+            {
+                TerrainLink.AttachIfInWorld();
+            }
+            Log.Info($"A/B {stamp}: done, mod back on");
+        }
+    }
+
+    private static void Capture(string stamp, string mode)
+    {
+        var path = System.IO.Path.Combine(BepInEx.Paths.BepInExRootPath, $"DistantHorizons_ab_{stamp}_{mode}.png");
+        ScreenCapture.CaptureScreenshot(path);
+        Log.Info("A/B screenshot: " + path);
     }
 #endif
 

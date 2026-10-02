@@ -14,6 +14,10 @@
   aedenthorn's sorts sections by name, General first). `ImpostorShader` is a choice list. Far-object settings apply
   half a second after the last change instead of on every step of a slider.
 - Fog thinning now multiplies the fog the game (and other fog mods) set, instead of replacing it.
+- The ground around you looks like the game's own again: with the Tessellation graphics setting on, the standalone
+  showed dark oval patches and thin dark lines on the grass next to the player and a too-wide pale shore. The real
+  ground within about 120 m is now left to the game, and the real ground farther out is redrawn at its true size
+  (only to remove the game's fade to black in the distance).
 - The far sea follows the world's water level and ends at `WorldRadius`; it is hidden inside dungeons.
 - Turning the far sea off gives the game's own distant water plane back at once (the standalone left it hidden until
   the simulation distance changed).

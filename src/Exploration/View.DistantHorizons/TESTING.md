@@ -7,7 +7,9 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 **Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
 MC Mods panel. Smoke test passed 2026-10-02 with all 24 MC mods (loads, patches cleanly, JitCheck clean: 592
 methods, 0 failures). In-world self tests (T00) passed 2026-10-02 on the same code: 4/4 `horizons.*`, and the full
-run of every mod's tests with this mod deployed (108/108). No hands-on in-game test yet. The
+run of every mod's tests with this mod deployed (108/108). Near-ground fix after that (same day, real zones next to
+the player drawn at true size, T21-T22): smoke test passed (JitCheck 0 failures) and the `horizons.*` self tests
+passed, including the new `horizons.near` (in-world run 2026-10-02). No hands-on in-game test yet. The
 standalone Distant Horizons was tested in game by its author (2026-09-21 to 09-28); this port changes its life cycle,
 so everything below is pending.
 
@@ -30,7 +32,10 @@ far plane value (note `cam` in the `DebugLogging` stats line before and after T1
   the camera, far plane raised), `horizons.objects` (far object tiles built) and `horizons.detach` (the turn-off path
   leaves no manager, root object, bake rig or camera buffer, gives back the vanilla grid with its meshes without the
   camera moving, the far plane and the game's distant water plane; the turn-on path in a world brings the far
-  terrain back).
+  terrain back), and `horizons.near` (at a Meadows sea shore near spawn: no far-tile vertex above the real ground
+  within 120 m, every painted zone's depth renderer untessellated, also with every zone forced to be painted;
+  screenshots of the same views in every draw mode in the run's `shots\` folder, to compare by eye: no dark ovals or
+  lines on the grass in `1-mod` and `a-all-zones-painted`).
 - [ ] **T01 Terrain to the horizon:** `env Clear`, `tod 0.5`, `fly` up about 200 m above a mountain. Expected: land
   in every direction up to the world's edge (the sea beyond), no holes, no sky-coloured cracks between tiles, mountains
   and coasts in their real shape. Screenshot it. Then Esc → MC Mods → untick Distant Horizons: the land ends about
@@ -93,6 +98,18 @@ far plane value (note `cam` in the `DebugLogging` stats line before and after T1
 - [ ] **T20 Standalone also installed:** put the standalone `DistantHorizons.dll` back in `BepInEx/plugins/`. Expected:
   this mod's Status says "Inactive: The standalone Distant Horizons (BepInEx/plugins/DistantHorizons) also draws the
   distant terrain. Remove one of them.", one warning in the log, only the standalone draws. Remove it again.
+- [ ] **T21 Ground next to you (Tessellation on):** Settings > Graphics > Tessellation on. `env Clear`, `tod 0.5`, then
+  `tod 0.7` (low sun). Walk 300-400 m along a Meadows sea shore just above sea level, and across open meadow, looking
+  at the ground 5-80 m around you from the normal camera and from high up (zoom out). Expected: no dark or brownish
+  oval patches on the grass, no ground that looks like a second surface crossing the real one, no dark straight lines
+  across the grass (the 64 m zone grid), and the shore's sand and wet bands the same as with the mod off (Esc → MC
+  Mods → untick: only the fog is thicker). Tessellation off: the same. If anything looks wrong, Debug build: stand
+  still, F5 → `dh terrain abshots`, close the console within 3 s and keep still about 10 s; send the
+  `BepInEx/DistantHorizons_ab_*.png` files and the log.
+- [ ] **T22 Far ground at the edge of the loaded area, low simulation distance:** Settings > Graphics > lowest
+  simulation distance, Tessellation on, clear noon. Look at the ground 60-200 m away all around (where the real zones
+  end). Expected: no dark specks or ovals on the far ground there, and far trees and rocks still standing on it (not
+  floating, not sunk). Put the simulation distance back.
 
 ## 0.1.0 — multiplayer (needs a second player)
 

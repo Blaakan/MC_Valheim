@@ -365,6 +365,16 @@ Learned while porting Distant Horizons (2026-10-02, 1.0.16):
   black between 200 m and 400 m from the camera with literal constants (every variant); `Custom/Water` fades alpha to
   zero between 300 m and 800 m (literal), and for LOD water `_VisibleMaxDistance` is a fade-in radius. This is why
   vanilla terrain or water can never be seen far away without fog, whatever the settings.
+- More `Custom/Heightmap` facts (same disassembly, checked in game 2026-10-02): with the Tessellation graphics
+  setting on (global keyword `TESSELATION_ON`, `GraphicsSettingsManager.ApplyTesselation`) the domain stage adds a
+  bump to the ground: `sin(1.4x)·sin(2.235x)·cos(1.5z)·cos(2.435z)` times up to 0.25 m (0.1 m on dirt or paved ground,
+  none in the Mistlands, under snow, outside the world edge or on a heightmap's border vertices), x and z = vertex
+  world position. The hull tessellates by `_Tess` (zone material 4) within 10 m of the camera, falling linearly to
+  none at 50 m, so near the camera the bump is smooth and farther it is only sampled at the 1 m vertices. The domain
+  stage also lifts ground above `_WaterLevel` by `2·smoothstep((d - 100) / 200)` m and sinks ground below it by the
+  same (d = XZ distance to the camera; added before the object-to-world transform, so in real metres). The fragment
+  stage uses the camera position only for the albedo fade, the `_LodHideDistance` dissolve and the snow glint. Zone
+  material: `_LodHideModifier` 0; a real zone's `_LodHideDistance` = near simulation distance × 90.5 m.
 - Portal ZDOs live in `ZDOMan.m_portalObjects`, not in the sector lists.
 
 ---

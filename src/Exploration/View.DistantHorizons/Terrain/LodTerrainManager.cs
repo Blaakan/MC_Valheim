@@ -633,8 +633,10 @@ internal sealed class LodTerrainManager : MonoBehaviour
     {
         if (t.Go == null) return;
         t.Mode = mode;
-        // Exact near tiles sit a bit under real terrain, so two never z-fight where both drawn.
+        // Exact near tiles sit a bit under real terrain, so two never z-fight where both drawn. Shrink mode: renderer
+        // only give depth, TileDepthDrop lower than paint (PaintFor and SampleTile add it back).
         float y = mode == DisplayMode.Lowered ? -Cfg.CrackFillDepth.Value * t.Scale : (t.Exact ? -Cfg.NearTerrainOffset.Value : 0f);
+        y -= TileDrop;
         Transform tr = t.Go.transform;
         if (tr.position.y != y) tr.position = new Vector3(t.Center.x, y, t.Center.z);
         if (mode == DisplayMode.Hidden && t.CoverSignature != 0) RestoreCoverage(t);
@@ -969,12 +971,14 @@ internal sealed class LodTerrainManager : MonoBehaviour
         public Material Mat;
         public Heightmap Hm;
         public float S;
+        // Real-zone copy: drawn at true size (S = 1) with shader camera moved to Cam (see RelocatedCamera).
+        public bool Relocate;
+        public Vector3 Cam;
     }
 
     // Farthest pixel of a draw stay inside this many shader metres of camera. 100 not 200 (where albedo fade
-    // start) because tessellation domain stage also lift terrain by 2 * smoothstep((d - 100)/200) shader metres,
-    // which = 1/s times that in real metres: at s = 1/64 a 0.31 m shader lift raise painted horizon 20 m above
-    // true height. Under 100 both lift and fade = exactly zero.
+    // start) because domain stage also lift terrain above water by 2 * smoothstep((d - 100)/200) m (and sink it
+    // below), d = XZ distance to camera. Under 100 both lift and fade = exactly zero.
     private const float FadeSafeDistance = 100f;
 
     // Top of widest band shader draw above _WaterLevel (sand and flat-ground override that also cancel snow).
@@ -1074,14 +1078,14 @@ internal sealed class LodTerrainManager : MonoBehaviour
             Bounds b = t.Mesh.bounds;
             b.center += pos;
             if (!GeometryUtility.TestPlanesAABB(_planes, b)) continue;
-            pos.y += Lift; // nearer than renderer, so paint always win depth test
+            pos.y += Lift + TileDrop; // nearer than renderer, so paint always win depth test
             if (t.Renderer.forceRenderingOff != (PaintOnly || !t.Drawn)) t.Renderer.forceRenderingOff = PaintOnly || !t.Drawn;
             _draws.Add(new ShrinkDraw { Mesh = t.Mesh, Pos = pos, Mat = m, Hm = t.Heightmap, S = ShrinkFor(c, b) });
             _cmdDrawsLastFrame++;
         }
 
         // Real zones beyond fade: me draw them, not their renderers.
-        if (Cfg.RealTerrainFadeFix.Value) CollectRealZoneCopies(c);
+        if (Cfg.RealTerrainFadeFix.Value && !NoRealCopies) CollectRealZoneCopies(c);
         else if (_realRenderersOff) RestoreRealRenderers();
 
         // Emit, grouped by shrink factor (largest first), so matrices change as rarely as possible.
@@ -1091,6 +1095,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
         bool fixFog = !deferred && RenderSettings.fog;
         Vector4 fog = fixFog ? FogParams() : Vector4.zero;
         float curS = -1f;
+        Vector3 curCam = new Vector3(float.NaN, 0f, 0f);
         Matrix4x4 scale = Matrix4x4.identity;
         _shrinkGroupsLastFrame = 0;
         _minShrinkLastFrame = 1f;
@@ -1112,8 +1117,14 @@ internal sealed class LodTerrainManager : MonoBehaviour
                 // SetViewProjectionMatrices take projection in Camera.projectionMatrix convention and convert it
                 // itself (feed it GL.GetGPUProjectionMatrix output = every painted pixel land at near plane).
                 _cmd.SetViewProjectionMatrices(viewShrunk, projShrunk);
-                _cmd.SetGlobalVector(s_cameraPosId, new Vector4(c.x * curS, c.y * curS, c.z * curS, 0f));
                 if (fixFog) _cmd.SetGlobalVector(s_fogParamsId, new Vector4(fog.x / curS, fog.y / curS, fog.z / curS, fog.w));
+            }
+            // Shader camera: real-zone copies get theirs moved next to them, everything else the shrunk real one.
+            Vector3 shaderCam = d.Relocate ? d.Cam : c * curS;
+            if (shaderCam != curCam)
+            {
+                curCam = shaderCam;
+                _cmd.SetGlobalVector(s_cameraPosId, new Vector4(shaderCam.x, shaderCam.y, shaderCam.z, 0f));
             }
             Material m = d.Mat;
             int pass = m.FindPass(passName);
@@ -1126,7 +1137,8 @@ internal sealed class LodTerrainManager : MonoBehaviour
             _cmdBlock.SetFloat(s_uvScaleId, m.GetFloat(s_uvScaleId) / curS);
             // Band tops, not water line: see ShoreBandTop. Scaling water level alone made every lowland below
             // roughly 50 m render as wet sand with its snow cancelled.
-            _cmdBlock.SetFloat(s_waterLevelId, (m.GetFloat(s_waterLevelId) + ShoreBandTop) * curS - ShoreBandTop);
+            float water = m.GetFloat(s_waterLevelId);
+            _cmdBlock.SetFloat(s_waterLevelId, curS == 1f ? water : (water + ShoreBandTop) * curS - ShoreBandTop);
             // _depth (four corner ocean depths) compared against literals on its own, never against shrunk
             // height, so me leave it exactly as material has it.
             if (m.IsKeywordEnabled("_ISDISTANTLOD_ON"))
@@ -1151,32 +1163,64 @@ internal sealed class LodTerrainManager : MonoBehaviour
 
     // ------------------------------------------------------------------ real terrain beyond 200 m
 
-    // Shader's fade to black start 200 m from camera. Shader's own dissolve cannot remove real draw (its dither
-    // keep every pixel whose noise sample = zero), so real zones whose nearest point farther than RealOffRadius
-    // simply not drawn by their renderers; command buffer draw them in shrunk space instead. Zones still
-    // rendered normally reach at most RealOffRadius + 90 m (a zone's diagonal), where fade = a few percent.
-    // Shadows, occlusion and depth pre-pass only matter within shadow distance (80 to 150 m), which those near
-    // zones still give.
-    // Zone left to game exactly while ALL of it inside RealCopyStart, because under 100 m shader's albedo fade
-    // and its tessellation lift both = exactly zero: such zone look same either way and meet painted neighbour
-    // without step. Every other zone sunk and painted.
-    private const float RealCopyStart = 100f;
-    // Shrunk copy sit this far below real draw, so two never fight where both exist.
-    private const float RealCopyOffset = 0.1f;
-    // Painted copy of any surface sit this far above renderer that give its depth.
+    // Shader's fade to black start 200 m from camera (3D), its domain lift 100 m (XZ). Shader's own dissolve cannot
+    // remove real draw (its dither keep every pixel whose noise sample = zero), so zone that reach past those keep
+    // its renderer for depth (sunk, see SetRealSunk) and command buffer paint copy of it over that.
+    // Zone left to game while every point of it within RealGameMaxXZ (XZ) and FadeStart (3D): there lift at most
+    // 2 * smoothstep(0.1) = 0.056 m (about RealCopyLift) and no fade, so it meet painted neighbour without step and
+    // keep game's own tessellation near camera.
+    // Copy drawn at true size, not shrunk: game's Tessellation setting (keyword TESSELATION_ON) add bump to ground in
+    // domain stage, phase from world position (sin 1.4x * sin 2.235x * cos 1.5z * cos 2.435z, up to 0.25 m), and
+    // every shore, snow and cliff band = literal metres above _WaterLevel. Shrunk copy got bump of other pattern than
+    // its depth renderer (renderer poked through in dark ovals) and bands stretched by 1/s (wide pale shore). True
+    // size keep both exact; shader camera moved next to zone instead (RelocatedCamera) so lift and fade never start.
+    private const float RealGameMaxXZ = 120f;
+    private const float FadeStart = 200f;
+    // Copy and its depth renderer = same mesh, same bump, both untessellated: lift only break depth ties.
+    private const float RealCopyLift = 0.05f;
+    // Moved shader camera sit at most this far from zone centre: zone point then within 50 + 45 m (XZ) of it.
+    private const float RelocateRadius = 50f;
+    // Painted copy of far tile sit this far above renderer that give its depth.
     private const float RenderOffset = 0.1f;
+    // Far tile renderer sit this much lower again (shrink mode): its bump pattern (true position) and its shrunk
+    // paint's (shrunk position) differ by up to 2 x 0.25 m, so renderer could poke through paint near camera.
+    private const float TileDepthDrop = 0.5f;
     // Water level for depth-only renderers: everything count as underwater, so domain stage sink instead of
     // lift (y - far) and snow displacement off.
     private const float SunkWaterLevel = 1000000f;
     private readonly Dictionary<Heightmap, bool> _realSunk = new Dictionary<Heightmap, bool>();
 
+    // Sunk = depth only under painted copy: sink beyond 100 m, and tessellation off like copy (bump on same
+    // vertices in both). Not sunk = game's own values back.
     private static void SetRealSunk(MeshRenderer r, bool sunk)
     {
         Material m = r.sharedMaterial;
         float water = m != null && m.HasProperty(s_waterLevelId) ? m.GetFloat(s_waterLevelId) : 30f;
         r.GetPropertyBlock(s_hideBlock);
         s_hideBlock.SetFloat(s_waterLevelId, sunk ? SunkWaterLevel : water);
+        if (m != null && m.HasProperty(s_tessId)) s_hideBlock.SetFloat(s_tessId, sunk ? 1f : m.GetFloat(s_tessId));
         r.SetPropertyBlock(s_hideBlock);
+    }
+
+    // Zone (renderer bounds) need painted copy: some point of it past lift start (XZ) or fade start (3D).
+    private bool NeedsCopy(Vector3 c, Bounds b)
+    {
+        if (PaintAllRealZones) return true;
+        float dx = Mathf.Max(Mathf.Abs(c.x - b.min.x), Mathf.Abs(c.x - b.max.x));
+        float dz = Mathf.Max(Mathf.Abs(c.z - b.min.z), Mathf.Abs(c.z - b.max.z));
+        float dy = Mathf.Max(Mathf.Abs(c.y - b.min.y), Mathf.Abs(c.y - b.max.y));
+        float xz = dx * dx + dz * dz;
+        return xz > RealGameMaxXZ * RealGameMaxXZ || xz + dy * dy > FadeStart * FadeStart;
+    }
+
+    // Shader camera for real-zone copy: on line from zone centre toward real camera, at most RelocateRadius away.
+    // Every distance shader measure then stay under lift start (100 m XZ) and fade start (200 m), and view
+    // direction keep its real sense (snow glint only use it).
+    private static Vector3 RelocatedCamera(Vector3 cam, Bounds b)
+    {
+        Vector3 toCam = cam - b.center;
+        float dist = toCam.magnitude;
+        return dist <= RelocateRadius ? cam : b.center + toCam * (RelocateRadius / dist);
     }
 
     private bool _realRenderersOff;
@@ -1192,9 +1236,15 @@ internal sealed class LodTerrainManager : MonoBehaviour
     internal bool SkirtDisabled;
     // Console: hide every renderer that only give depth, so paint seen alone.
     internal bool PaintOnly = false;
+    // Self test: real zones left to game (renderers back, no copies), far tiles still painted.
+    internal bool NoRealCopies;
+    // Self test: every real zone painted, also the ones near enough for game to draw (hardest case for near ground).
+    internal bool PaintAllRealZones;
     // Console: how far above its renderer paint drawn (default RenderOffset).
     internal float PaintLift = -1f;
     private float Lift => PaintLift >= 0f ? PaintLift : RenderOffset;
+    // How far far-tile renderers sit under their own surface (shrink mode only, see TileDepthDrop).
+    private float TileDrop => Cfg != null && ShrinkMode ? TileDepthDrop : 0f;
     private readonly Dictionary<Heightmap, Material> _copyMaterials = new Dictionary<Heightmap, Material>();
 
     internal void SetCommandBufferEvent(bool before)
@@ -1283,9 +1333,8 @@ internal sealed class LodTerrainManager : MonoBehaviour
             }
             if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
             Bounds b = r.bounds;
-            float nearest = Mathf.Sqrt(b.SqrDistance(c));
-            // Zone that reach past RealCopyStart keep rendering for depth, but sunk under its painted copy.
-            bool off = nearest + b.size.magnitude >= RealCopyStart;
+            // Zone that reach past lift or fade start keep rendering for depth, but sunk under its painted copy.
+            bool off = NeedsCopy(c, b);
             if (!off && r.forceRenderingOff) r.forceRenderingOff = false;
             bool wantSunk = off;
             if (!_realSunk.TryGetValue(hm, out bool sunk) || sunk != wantSunk)
@@ -1301,9 +1350,12 @@ internal sealed class LodTerrainManager : MonoBehaviour
             Material m = CopyMaterial(hm, r.sharedMaterial);
             if (mesh == null || m == null) continue;
             Vector3 pos = hm.transform.position;
-            pos.y += Lift; // above sunk renderer, so copy win depth test everywhere
+            pos.y += PaintLift >= 0f ? PaintLift : RealCopyLift; // above sunk renderer, so copy win depth test everywhere
             if (r.forceRenderingOff != PaintOnly) r.forceRenderingOff = PaintOnly;
-            _draws.Add(new ShrinkDraw { Mesh = mesh, Pos = pos, Mat = m, Hm = hm, S = ShrinkFor(c, b) });
+            _draws.Add(new ShrinkDraw
+            {
+                Mesh = mesh, Pos = pos, Mat = m, Hm = hm, S = 1f, Relocate = true, Cam = RelocatedCamera(c, b),
+            });
             _cmdRealDrawsLastFrame++;
         }
     }
@@ -2031,6 +2083,92 @@ internal sealed class LodTerrainManager : MonoBehaviour
         sb.AppendLine().Append("  material: ").Append(Diagnostics.DescribeMaterial(m));
     }
 
+#if DEBUG
+    // Self test (horizons.near): far-tile vertices within radius (XZ) of centre whose drawn surface sit above real
+    // ground there (they would poke through it), and how each real zone near centre get drawn from cam (game, or
+    // painted copy over a depth renderer). mismatched = painted zones whose depth renderer still tessellate (its
+    // bump then differ from its copy's).
+    internal string ProbeNearGround(Vector3 cam, Vector3 center, float radius, out int poking, out int mismatched)
+    {
+        poking = 0;
+        mismatched = 0;
+        float drop = TileDrop;
+        float worst = 0f;
+        string worstAt = "-";
+        int checkedVerts = 0;
+        var tiles = new StringBuilder();
+        float r2 = radius * radius;
+        foreach (LodTile t in _tiles.Values)
+        {
+            if (t.Mode == DisplayMode.Hidden || !t.Drawn || t.Mesh == null || t.Go == null) continue;
+            if (t.MaxX < center.x - radius || t.MinX > center.x + radius || t.MaxZ < center.z - radius || t.MinZ > center.z + radius) continue;
+            Vector3[] verts = t.Mesh.vertices;
+            Vector3 o = t.Go.transform.position;
+            int above = 0;
+            for (int i = 0; i < verts.Length; i++)
+            {
+                Vector3 w = o + verts[i];
+                float dx = w.x - center.x, dz = w.z - center.z;
+                if (dx * dx + dz * dz > r2) continue;
+                if (!Heightmap.GetHeight(w, out float realY)) continue;
+                checkedVerts++;
+                float excess = w.y + drop - realY;
+                if (excess <= 0.02f) continue;
+                above++;
+                if (excess > worst)
+                {
+                    worst = excess;
+                    worstAt = $"{t.Key} ({w.x:0.#},{w.z:0.#})";
+                }
+            }
+            poking += above;
+            tiles.Append(' ').Append(t.Key).Append(':').Append(t.Mode).Append(t.Exact ? "/exact" : "")
+                 .Append(" sig=").Append(t.CoverSignature != 0 ? "on" : "off").Append(" above=").Append(above);
+        }
+        var sb = new StringBuilder();
+        sb.Append("far-tile vertices within ").Append(radius.ToString("0")).Append(" m checked=").Append(checkedVerts)
+          .Append(" aboveReal=").Append(poking).Append(" worst=").Append(worst.ToString("0.00")).Append(" m at ").Append(worstAt)
+          .Append(" | tiles:").Append(tiles);
+        sb.Append(" | real zones (from camera):");
+        List<Heightmap> real = Heightmap.GetAllHeightmaps();
+        var block = new MaterialPropertyBlock();
+        if (real != null)
+        {
+            foreach (Heightmap hm in real)
+            {
+                if (hm == null) continue;
+                MeshRenderer r = hm.GetComponent<MeshRenderer>();
+                if (r == null) continue;
+                Vector3 p = hm.transform.position;
+                if (Mathf.Abs(p.x - center.x) > radius || Mathf.Abs(p.z - center.z) > radius) continue;
+                Bounds b = r.bounds;
+                bool painted = RealFadeFixActive && !NoRealCopies && NeedsCopy(cam, b);
+                r.GetPropertyBlock(block);
+                Material m = r.sharedMaterial;
+                float blockTess = block.GetFloat(s_tessId); // 0 = not set in block
+                float tess = m != null && m.HasProperty(s_tessId) ? (blockTess > 0f ? blockTess : m.GetFloat(s_tessId)) : 1f;
+                if (painted && tess > 1f) mismatched++;
+                sb.Append(' ').Append('(').Append(p.x.ToString("0")).Append(',').Append(p.z.ToString("0")).Append(")=")
+                  .Append(painted ? $"painted cam {Vector3.Distance(RelocatedCamera(cam, b), b.center):0} m from centre" : "game")
+                  .Append(" tess=").Append(tess.ToString("0.#"))
+                  .Append(r.forceRenderingOff ? "/off" : "");
+            }
+        }
+        return sb.ToString();
+    }
+
+    // Self test: far tiles cast no shadow (off = true), or back to what ApplyShadowMode want.
+    internal void SetTileShadowsOffForTest(bool off)
+    {
+        foreach (LodTile t in _tiles.Values)
+        {
+            if (t.Renderer == null) continue;
+            if (off) t.Renderer.shadowCastingMode = ShadowCastingMode.Off;
+            else ApplyShadowMode(t);
+        }
+    }
+#endif
+
     // ------------------------------------------------------------------ surface sampling (for far objects)
 
     // Change whenever set of tiles drawn at ground level change (refine, merge, orphan).
@@ -2079,7 +2217,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
         return false;
     }
 
-    private static bool SampleTile(LodTile t, float x, float z, out float y)
+    private bool SampleTile(LodTile t, float x, float z, out float y)
     {
         y = 0f;
         List<float> heights = t.Heightmap.m_heights;
@@ -2102,7 +2240,8 @@ internal sealed class LodTerrainManager : MonoBehaviour
         // Same diagonal as Heightmap.RebuildCollisionMesh: triangles (A, C, B) and (B, C, D).
         if (fu + fv <= 1f) y = hA + fu * (hB - hA) + fv * (hC - hA);
         else y = hD + (1f - fu) * (hC - hD) + (1f - fv) * (hB - hD);
-        y += t.Go.transform.position.y; // surface tiles sit at y = 0; keep exact anyway
+        // Surface tiles sit at y = 0 (exact ones a bit under); in shrink mode renderer TileDrop under what is drawn.
+        y += t.Go.transform.position.y + TileDrop;
         return true;
     }
 

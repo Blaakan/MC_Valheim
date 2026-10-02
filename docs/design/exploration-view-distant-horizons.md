@@ -9,7 +9,7 @@
 | Sheet idea | `Distant horizon` |
 | Origin | The standalone mod `D:\Gits\valheim-distant-horizons` (plugin `com.distanthorizons.valheim` 0.1.0, last commit 2026-09-28), written and tested in game by its author 2026-09-21 to 09-28, ported into the MC framework on 2026-10-02 |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` in `.ref/` (TerrainLod, Heightmap, HeightmapBuilder, ZoneSystem, ZDOMan, ZNetScene, EnvMan, Water, RenderGroupSystem, Terminal, Game); shader facts from the standalone's disassembly of `Custom/Heightmap` and `Custom/Water` (2026-09-22, not in `.ref`); sources of 26 other mods and three ConfigurationManager builds (2026-10-02) |
-| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-02 with all 24 MC mods (JitCheck 592 methods, 0 failures); in-world self tests passed 2026-10-02 (4/4 `horizons.*`; full run of every mod's tests with it deployed 108/108); one adversarial review round, 18 findings fixed (5.4); not yet tested by hand in game in its MC form |
+| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-02 with all 24 MC mods (JitCheck 592 methods, 0 failures); in-world self tests passed 2026-10-02 (4/4 `horizons.*`; full run of every mod's tests with it deployed 108/108); one adversarial review round, 18 findings fixed (5.4); near-ground fix after a user report (5.5): smoke test and `horizons.*` self tests passed 2026-10-02; not yet tested by hand in game in its MC form |
 
 ## Goal
 
@@ -75,7 +75,10 @@ The expected behaviours are the standalone's features, plus the framework's rule
 - **Shader (not in `.ref`; standalone disassembly 2026-09-22).** `Custom/Heightmap` multiplies albedo by
   `1 - smoothstep((distance - 200) / 200)` with literal constants in every variant (black beyond 400 m); the LOD
   variant sinks the mesh near the camera, the zone variant dissolves beyond `_LodHideDistance`; water-relative bands
-  (wet, sand, snow) are literal metres above `_WaterLevel`. `Custom/Water` multiplies alpha by
+  (wet, sand, snow) are literal metres above `_WaterLevel`. With the game's Tessellation setting on (global keyword
+  `TESSELATION_ON`) the domain stage adds a bump of up to 0.25 m whose pattern comes from the vertex world position,
+  tessellated within 50 m of the camera; it also lifts ground above water by up to 2 m between 100 and 300 m (XZ)
+  from the camera (details: `docs/game/exploration-world.md`, section 9). `Custom/Water` multiplies alpha by
   `1 - saturate((distanceXZ - 300) / 500)`; for LOD water `_VisibleMaxDistance` is a fade-in radius and `_WaterEdge` a
   radial discard.
 - **Water.** Per-zone water tiles plus one distant plane following the player (`_IsLod` material). `Water.ApplySettings`
@@ -130,8 +133,20 @@ camera (`AfterGBuffer` deferred, `AfterForwardOpaque` forward) paints the same m
 a power-of-two factor per draw (the largest that keeps the draw's farthest point within 100 shader metres), with view,
 projection, `_WorldSpaceCameraPos`, fog constants, `_UVScale` and `_WaterLevel` (pinned at the shore band's top)
 compensated, and ambient-probe constants supplied (a command-buffer draw gets none). The far tiles use a clone of the
-real zone material (`TerrainMaterial = zone`, tessellation off). `RealTerrainFadeFix` paints real zones that reach past
-100 m the same way.
+real zone material (`TerrainMaterial = zone`, tessellation off). In shrink mode a tile's renderer sits a further
+0.5 m lower than its paint (the paint's bump pattern follows the shrunk position, the renderer's the true one, up to
+0.5 m apart); `TrySampleSurface` adds it back, so far objects keep sitting on the drawn surface.
+
+`RealTerrainFadeFix` (real zones, fixed 2026-10-02): a zone is left to the game while every point of it is within
+120 m (XZ) and 200 m (3D) of the camera (there the vanilla lift is at most 0.056 m and there is no fade, so it keeps
+the game's own tessellation and meets painted neighbours without a step). Every other zone keeps its renderer for
+depth (sunk as above, and `_Tess` 1 in its property block) and gets a copy painted 0.05 m higher at **true size**,
+untessellated, with `_WorldSpaceCameraPos` moved for that draw to a point at most 50 m from the zone's centre on the
+line to the real camera, so the shader's lift (XZ under 100 m) and fade (under 200 m) never start. Copy and depth
+renderer then have the same mesh, bump and bands, and view directions keep their sense (only the snow glint uses
+them). Before the fix copies were shrunk like far tiles: their tessellation bump followed the shrunk position, so the
+depth renderer poked through in dark oval patches near the player (only with Tessellation on), and shore bands were
+stretched (wider pale shore); a zone at the camera was usually painted too (its bounds' diagonal alone is 90 m).
 
 ### 3.3 Far sea (G5) — `Terrain/FarWater.cs`
 
@@ -198,7 +213,9 @@ live. `DHConfig.Changed` runs each handler in its own try.
 ### 3.8 Console — `DhCommand.cs`
 
 `dh` (stats), `rebuild`, `envs`, `objects [on|off|rebuild]`, `get|set` (this mod's settings only, not General), `off`.
-Debug builds add `dump`, `atlas`, `shot` and `terrain` (tile inspector and live render experiments). Registered in
+Debug builds add `dump`, `atlas`, `shot` and `terrain` (tile inspector and live render experiments;
+`dh terrain abshots [seconds]` saves the current view once per draw mode, the same modes as the self test
+`horizons.near`, plus once with the mod off, and logs the numbers: for bug reports about wrong ground). Registered in
 `OnActivated`, removed in `OnDeactivated` (only our own entry).
 
 ### 3.9 Multiplayer and hand-off (G9)
@@ -288,6 +305,11 @@ impostor atlas), `Patches/` (one file per game class).
 7. **`DebugLogging` kept** as a user setting (stats and atlas dump for bug reports), unlike other MC mods.
 8. **Mid-world activation drops the vanilla grid at once** instead of keeping it until the far terrain is built
    (keeping both would draw two terrains in the same place for a few seconds).
+9. **Real-zone copies at true size with a moved shader camera** (2026-10-02, after the "patches next to the player"
+   report, 5.5) instead of shrunk like far tiles. Only true size keeps the game's tessellation bump and its
+   water-relative bands exact; the shader reads the camera position only for the lift, the fade, the dissolve and the
+   snow glint, so moving it changes nothing else. Cost: painted zones (they start about 30 m from the camera) are not
+   tessellated; the game tessellates only within 50 m (and below factor 2 beyond 30 m), so no visible change.
 
 ### 5.2 Open questions
 
@@ -326,9 +348,25 @@ fixed:
   console setting, fog wording for light mist, "rarely float or sink", "someone else's game" instead of "dedicated
   server", the Release console commands, the live layout log.
 
+### 5.5 Fixes after in-game reports
+
+- **Patches of wrong ground next to the player** (user report 2026-10-02, screenshots at a Meadows sea shore: dark
+  smooth-edged blobs on the grass, as if a second terrain crossed the real one). Reproduced in the probe world with
+  the new self test `horizons.near` (Tessellation on, simulation distance 6): dark ovals inside zones the mod repaints
+  and a thin dark line along the edge of a zone the game draws; gone with real zones left to the game, gone with the
+  depth renderers hidden, gone with the `TESSELATION_ON` keyword off; far tiles, their shadows and far objects not
+  involved (each hidden in turn), and no far-tile vertex above the real ground. Cause: the shrunk copy evaluated the
+  tessellation bump at shrunk positions (other pattern than its depth renderer's, up to 0.5 m apart, against a 0.1 m
+  lift), and nearly every zone was copied (the old rule used the bounds' diagonal, 90 m, so the zone at the camera
+  was copied as well). Fix: 3.2 (true-size copies, tighter left-to-game rule, 0.05 m lift) and decision 9; far tiles
+  got the 0.5 m depth drop for the same bump mismatch. Verified with `horizons.near` before and after at the same spot
+  (every zone forced to be painted: ovals before, none after). The pale shore strip still looks wider than with the
+  mod off, also with real zones left to the game: that is the thinner fog (G6), not the copies.
+
 ## 6. Tests
 
 `src/Exploration/View.DistantHorizons/TESTING.md`: T00 (automated in-world tests `horizons.logic`, `.terrain`,
-`.objects`, `.detach`), T01-T20 single player (one or more per goal), M01-M03 multiplayer (vanilla server, friend
-without the mod, both with it), C01-C06 cross-mod. ConfigurationManager items for the collection: `src/Shared/TESTING.md`
+`.objects`, `.detach`, `.near`), T01-T22 single player (one or more per goal; T21-T22: ground next to the player
+and at the edge of the loaded area), M01-M03 multiplayer (vanilla server, friend without the mod, both with it),
+C01-C06 cross-mod. ConfigurationManager items for the collection: `src/Shared/TESTING.md`
 F13-F15, Batch Station Feeding T27, Crafting Search and Sort T34.

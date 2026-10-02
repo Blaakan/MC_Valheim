@@ -236,8 +236,9 @@ internal sealed class DHConfig
         RealTerrainFadeFix = Bind(RenderingSection, "RealTerrainFadeFix", true,
             "The game's terrain shader also fades the REAL terrain to black between 200 m and 400 m from the camera; with a " +
             "large simulation distance that band is fully visible once the fog is thin. When on (and FarTerrainDraw = shrink), " +
-            "every real zone that reaches farther than 100 m from the camera keeps rendering only for depth (sunk out of sight) " +
-            "and the mod paints it again in its shrunk space on top, so the ground stays lit all the way to the far tiles.");
+            "every real zone that reaches farther than about 120 m from the camera keeps rendering only for depth (sunk out of " +
+            "sight) and the mod draws it again on top at its true size with that fade switched off, so the ground stays lit all " +
+            "the way to the far tiles. Nearer zones are left to the game.");
 
         FarWater = Bind(RenderingSection, "FarWater", true,
             "Draw the sea past the point where the game stops drawing it. The game only gives water to its loaded zones " +
