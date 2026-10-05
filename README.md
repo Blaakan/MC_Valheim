@@ -50,6 +50,7 @@ clearly who needs to install it and how it behaves in multiplayer. Details: [doc
 | [Harpoon Hooks Tames](src/Farming/Harpoon.HooksTames) | Farming | QoL | only you (client-side) | works | in development |
 | [Breeding Star Inheritance](src/Farming/Breeding.StarInheritance) | Farming | Revamp | server and every player | works | in development |
 | [Fishing Fight](src/Farming/Fishing.Fight) | Farming | New | server and every player | works | in development |
+| [Cultivator Replant](src/Farming/Cultivator.Replant) | Farming | Revamp | server and every player | works | in development |
 | [Crafting Search and Sort](src/UX/Crafting.SearchSort) | UX | QoL | only you (client-side) | works | in development |
 | [Loot Pickup Filter](src/UX/AutoPickup.Filter) | UX | QoL | only you (client-side) | works | in development |
 | [Sort Chest](src/UX/Container.Sort) | UX | QoL | only you (client-side) | works | in development |

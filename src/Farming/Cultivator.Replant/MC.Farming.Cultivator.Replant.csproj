@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
+  <PropertyGroup>
+    <ModName>Cultivator Replant</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>Revamp</ModScope>
+    <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
+    <ModIdea>Cultivator revamp</ModIdea>
+    <!-- Both: user rule (gameplay mod = required everywhere). New items (transplants), new saplings, cultivator levels
+         4-7 with new costs, root sap drain. Server refuse players without me, with me off, or other network version
+         (PlayerCheck), and send its rules (ServerRules). -->
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. The transplant items, the transplant saplings and the new cultivator levels change the game, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. A player without the mod loses any transplant items they receive and does not see transplant saplings; plants that have finished growing are ordinary game plants. On a server without the mod, transplants dropped on the ground can be deleted.</ModMultiplayerNotes>
+    <!-- Wire format of me: RPC <guid>.Settings / <guid>.SettingsRequest (CultivatorRules layout 1), item prefabs
+         MC_Transplant_<Key>, sapling prefabs MC_Sapling_<Key> (PlantCatalog keys). Bump when any of them change. -->
+    <ModNetworkVersion>1</ModNetworkVersion>
+    <ModRequires></ModRequires>
+    <ModDescription>Dig up wild berry bushes, mushrooms, thistle and dandelions with the cultivator and replant them at home. Four new cultivator levels (black metal, eitr, flametal, bloodgold) unlock cloudberries, Yggdrasil shoots, Ashlands plants and lingonberries.</ModDescription>
+  </PropertyGroup>
+</Project>
