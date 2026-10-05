@@ -43,6 +43,7 @@ clearly who needs to install it and how it behaves in multiplayer. Details: [doc
 | [Deep North Awakening](src/Exploration/DeepNorth.Awakening) | Exploration | New | server and every player | works | in development |
 | [Distant Horizons](src/Exploration/View.DistantHorizons) | Exploration | New | only you (client-side) | works | in development |
 | [Spyglass](src/Exploration/View.Spyglass) | Exploration | New | server and every player | works | in development |
+| [Music Instruments](src/Exploration/Music.Instruments) | Exploration | New | server and every player | works | in development |
 | [Switchable Lights](src/Building/Lights.Switchable) | Building | QoL | server and every player | works | in development |
 | [One Click Repair All](src/Crafting/Repair.OneClickAll) | Crafting | QoL | only you (client-side) | works | in development |
 | [Batch Station Feeding](src/Crafting/Stations.BatchFeed) | Crafting | QoL | only you (client-side) | works | in development |

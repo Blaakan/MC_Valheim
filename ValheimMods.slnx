@@ -19,6 +19,7 @@
   <Folder Name="/Exploration/">
     <Project Path="src/Exploration/Compendium.Encyclopedia/MC.Exploration.Compendium.Encyclopedia.csproj" />
     <Project Path="src/Exploration/DeepNorth.Awakening/MC.Exploration.DeepNorth.Awakening.csproj" />
+    <Project Path="src/Exploration/Music.Instruments/MC.Exploration.Music.Instruments.csproj" />
     <Project Path="src/Exploration/Sailing.Skill/MC.Exploration.Sailing.Skill.csproj" />
     <Project Path="src/Exploration/Sleep.ThroughDay/MC.Exploration.Sleep.ThroughDay.csproj" />
     <Project Path="src/Exploration/Stats.PerCreature/MC.Exploration.Stats.PerCreature.csproj" />

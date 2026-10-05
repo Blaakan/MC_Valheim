@@ -22,6 +22,7 @@ Game version: 1.0.16 (network 40). Source: decompiled assembly_valheim.
 | Skills | `Skills`, `Skills.SkillDef`, `Skills.SkillType`, `SkillsDialog` | Local player | Player save (`Skills.Save/Load`) |
 | Camera | `GameCamera`, `PlayerController` | Client-local | `PlatformPrefs` settings only |
 | Lights & utility slot | `Humanoid.EquipItem`, `VisEquipment`, `SE_Demister` | Owner equips; visuals replicated via ZDO item hashes | Inventory in player save |
+| Comfort, resting & music | `SE_Rested`, `SE_Cozy`, `Player.UpdateBaseValue`, `AudioMan`, `MusicMan` | Local player computes its own comfort and effects; music is client-local | none (effects are not saved) |
 
 Key take-aways for this area:
 
@@ -367,6 +368,32 @@ So a perk system is new content; the clean hook set is `Skills.GetSkillLevel` (e
 
 ---
 
+## 11. Comfort, resting and music
+
+### Key classes
+`SE_Rested` (Rested; static comfort calculation), `SE_Cozy` (Resting), `Player` (`UpdateBaseValue`, `UpdateEnvStatusEffects`, `m_comfortLevel`), `Piece` (`m_comfort`, `m_comfortGroup`), `AudioMan`, `MusicMan`, `MusicVolume`, `GameCamera` (audio listener). Checked in 1.0.16 (research 2026-10-05, Music Instruments).
+
+### Comfort and Rested
+* Comfort is computed on the **local player only, every 2 s**: `Player.FixedUpdate` → `Player.UpdateBaseValue` → `SE_Rested.CalculateComfortLevel(Player)` → `CalculateComfortLevel(InShelter(), position)`, stored in the private `m_comfortLevel` and returned by `Player.GetComfortLevel()` (0 without a ZNetView; remote players never compute it). A higher value raises the `MaxComfort` profile stat and its platform achievement stat (the "Comfort is King" achievement needs 20).
+* The value is 1, and **only in shelter** (`Player.InShelter`: cover ≥ 0.8 and under a roof, refreshed every 1 s) +1 and the best piece of each `Piece.ComfortGroup` within 10 m (ungrouped pieces each count, duplicate names once; an unlit fire counts 0). Outside a shelter comfort is always 1. No cap in code.
+* Readers: `SE_Cozy.GetIconText` (the Resting icon's "Comfort: N"), `SE_Rested.UpdateTTL` (length) and `SE_Rested.Setup` (the "You feel rested" message with comfort, only when Rested is newly added). The Rested icon shows the time left.
+* Resting (`Player.UpdateEnvStatusEffects`): not sensed by an enemy (`IsSensed`, last 1 s), sitting **or** in shelter, near a heat `EffectArea` (fire) in the last 0.25 s, not cold/freezing, not wet (unless in a warm cozy area), not burning. While it holds, Resting is re-added each tick; after its delay (prefab data, wiki: 20 s) `SE_Cozy` adds Rested with a time reset every tick, so Rested stays pinned at `m_baseTTL + (comfort - 1) × m_TTLPerComfortLevel` (code defaults 300/60, prefab values per the wiki 480/60). `UpdateTTL` only ever lengthens Rested. Waking up (`Player.SetSleeping(false)`) also adds Rested with a reset.
+* `Humanoid.IsSitting` is the animator tag `sitting`: a pose made by writing bones keeps a seated player "sitting" (Resting outdoors needs it).
+
+### Status effects for other players
+* Effects tick only on their owner (`Character.CustomFixedUpdate` → `SEMan.Update`); only the `s_seAttrib` bitmask is synced. `SEMan.AddStatusEffect(int hash, resetTime, ...)` on a non-owned character sends `RPC_AddStatusEffect` to the owner, which looks the hash up in its own `ObjectDB.m_StatusEffects` (unknown hash: silently nothing). `AddStatusEffect(StatusEffect)` has no owner check: on a remote copy it never ticks. Effects are not saved and are cleared on death. `ObjectDB.CopyOtherDB` shares the effect list between the two databases.
+
+### Sound
+* The audio listener is a child of the main camera; `GameCamera.UpdateListner` moves it to `Player.m_localPlayer.m_eye.position` every LateUpdate (orientation stays the camera's).
+* `AudioMan.m_masterMixer` (asset `MasterMixer`) has groups `SFX`, `SFX_LARGE` and others; the Sound effects slider drives the exposed parameter `SfxVol` (and `GuiVol`) through `AudioMan.SetSFXVolume(master × sfx)`. The music slider is not a mixer parameter: `MusicMan.m_masterMusicVolume` multiplies the music source's volume. An `AudioSource` without an output group ignores both sliders.
+* Audio settings: Unity defaults (stereo, sample rate from the device, DSP buffer 1024, 32 real voices). The game itself never uses `OnAudioFilterRead`, `AudioClip.Create` or `AudioSettings.dspTime`. Unity applies a source's volume, 3D rolloff and panning before custom filters (`OnAudioFilterRead`).
+* `MusicMan.Update`: `UpdateCurrentMusic`, `UpdateCombatMusic`, then `m_currentMusicVolMax = MusicVolume.UpdateProximityVolumes(m_musicSource)` (static), then `UpdateMusic` fades the source toward it. The "home" track plays while `Player.IsSafeInHome()` (Resting in shelter).
+
+### Patch points
+`Player.GetComfortLevel` (postfix: add comfort without touching the MaxComfort stat), `SE_Rested.CalculateComfortLevel(Player)` (postfix: the community's usual hook; raises the stat), `SE_Rested.UpdateTTL` (Rested length), `MusicVolume.UpdateProximityVolumes` (postfix: fade the game music), `Chat.HasFocus` (postfix: hold the game's keys back while a mod window or mini-game runs; `Menu.Update` does not ask it).
+
+---
+
 ## Cross-cutting notes for this chapter
 
 * **Persistence choices**: per character → `Player.m_customData` (strings, saved in the character, vanilla-safe if the mod is removed: data is kept and ignored). It is saved on autosave, logout and by `Game._RequestRespawn` before the dead player is destroyed (so it survives death), and loaded by `Game.SpawnPlayer` → `PlayerProfile.LoadPlayerData` just before `Player.OnSpawned`. From `_RequestRespawn` (about 10 s after death) until the new spawn, `Player.m_localPlayer` is null while the game and profile still exist. Per item → `ItemDrop.ItemData.m_customData`. Per world object → ZDO custom keys (namespace them with the mod GUID, e.g. `"MC.Exploration.Sailing.Skill.Level"` on the player ZDO). Per profile/world map → do not change the `Minimap.GetMapData` format.
@@ -431,6 +458,13 @@ Skill gains make it easier to catch the wind, turn, stop and accelerate, and wid
 * **Hooks**: `GameCamera.UpdateCamera` postfix (private; camera to the eye and field of view of both cameras for the frame; keep `m_distance` against the scroll wheel), `Player.SetMouseLook` prefix (scale while zoomed; not `SetTempFOV` nor `PlayerController.m_mouseSens`, section 8), `Player.Update` postfix (input, equipped check via the public `Humanoid.RightItem`/`LeftItem` properties or `Humanoid.GetInventory()`), custom item via Jotunn `ItemManager` or `ObjectDB.Awake` clone, optional `Minimap.AddPin` ("mark target") and `Minimap.Explore(Vector3,float)` ("survey" a small radius at the look point), `Hud` overlay.
 * **Sketch**: Hold a key (or secondary action when the spyglass is equipped) to switch to first person, narrow the field of view by the zoom and scale mouse sensitivity; show a vignette overlay and, via a long `Physics.Raycast` from the camera, the name/distance of the hovered `Character` or location. Optional key drops a map pin at the hit point, making it a natural companion of the cartography revamp.
 * **Risks**: Objects outside the synced simulation distance (`ZNet.GetSyncedSimulationDistance`, `ZNetScene` active area) do not exist, so far creatures cannot be seen, only terrain/distant LOD. `GrapplingPoint` also uses the temp-FOV API (`m_fovBase` captured once): reset properly. Camera mods (first-person mods, camera distance mods) may fight over `m_distance`/FOV. Held-item version needs a model/icon (assets) and is deleted from inventories without the mod.
+
+### Music instruments (New; partially exists as community mods)
+* **Status**: implemented as [Music Instruments](../../src/Exploration/Music.Instruments) (0.1.0, in development); design: [docs/design/exploration-music-instruments.md](../design/exploration-music-instruments.md). Three craftable instruments (flute, lyre, tambourine: `KnifeFlint` clones made Tools, models and icons made in code) played by a synthesizer of the mod's own (no audio files): built-in songs, MIDI files from a folder, or a four-lane rhythm mini-game. The performer's game streams notes to the server, which relays them to compatible players in hearing range; each game plays them at the performer's position. Twenty seconds of good mini-game play give the Music status effect (+3 comfort via a `Player.GetComfortLevel` postfix, in shelter by default) to the performer and to every player in range, each game applying it to its own player.
+* **Feasibility**: hard (sound, network timing, UI and assets all new).
+* **Who needs the mod**: everyone (new items, a comfort bonus, the relay).
+* **Hooks**: section 11; `Player.SetControls` (take the clicks, keep a seated player seated), `Player.LateUpdate` (arm pose), `Chat.HasFocus` (keys held back during the mini-game), `ObjectDB.Awake`/`CopyOtherDB` and `ZNetScene.Awake` (items and effect, always on), plain `ZRpc` per connection for the notes.
+* **Risks**: Rested only grows while resting, so the bonus only helps players who rest during or after a performance; comfort displays that call `CalculateComfortLevel` themselves do not show the bonus; game music mods may fight over the music volume; crossplay resends lost packets after 1-3 s (listeners drop notes that come too late).
 
 ### Swim dive (New; partially exists as community mods)
 * **Status**: implemented as [Swim Dive](../../src/Exploration/Swimming.Dive) (0.1.0, in development); design: [docs/design/exploration-swimming-dive.md](../design/exploration-swimming-dive.md). Differences from the sketch: no breath meter (swim stamina drains under water, also while still and on the sea floor, and drowning at 0 stamina is vanilla); under water the diver moves only up or down (Crouch down, Jump up, no key holds depth; sideways swimming only under a ceiling); a `Character.UpdateSwimming` postfix sets the vertical velocity and `m_swimDepth` is never changed; the camera clamp is lifted per call, the under-water fog is built from a cached base and the water surface mesh is turned over, with no custom assets; it ships as a Both mod with server rules.

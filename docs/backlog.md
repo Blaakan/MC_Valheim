@@ -50,7 +50,8 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 | Combat | New summons | New | medium | Both | yes | partial | idea |
 | Combat | Combat pet | New | hard | Both | no | partial | idea |
 | Combat | Ritual | New | hard | Both | yes | none | idea |
-| Exploration | music instruments |  | not researched yet | ? | ? | ? | idea |
+| Exploration | music instruments |  | hard | both | yes | partial | [Music Instruments 0.1.0](../src/Exploration/Music.Instruments) (in development) |
+| Exploration | grey drop rocks |  | not researched yet | ? | ? | ? | idea |
 | Exploration | Per creature kill count | QoL | trivial | Client | no | partial | [Creature Kill and Tame Counts 0.1.0](../src/Exploration/Stats.PerCreature) (in development) |
 | Exploration | Sleep through the day | QoL | easy | Both | no | partial | [Sleep Through the Day 0.1.0](../src/Exploration/Sleep.ThroughDay) (in development) |
 | Exploration | Wish bone deep north fix | QoL | easy | Client | no | none | idea |
@@ -594,6 +595,26 @@ QoL, trivial or easy, client-side only, no custom assets, not cancelled.
 ### music instruments
 
 > (prerecorded songs + midi support) for buffs well rested
+
+- **Scope:**  · **Feasibility:** hard · **Who needs it:** both · **Custom assets:** yes · **Status:** [Music Instruments 0.1.0](../src/Exploration/Music.Instruments) (in development)
+- **Approach:** Built (Music Instruments, 2026-10-05): three craftable instruments, Wooden Flute (FineWood), Tambourine (FineWood, LeatherScraps) and Silver Lyre (Silver, LinenThread), KnifeFlint clones made Tools with models and icons made in code. A synthesizer of the mod's own plays them in OnAudioFilterRead (flute wavetable with breath, Karplus-Strong lyre, noise and partials tambourine) on an AudioSource that loops a clip of 1.0 samples, so Unity's 3D panning and the SFX mixer group still apply; no audio files. Attack with an instrument opens a song window: eight built-in songs (four public-domain traditional tunes, four written for the mod) or MIDI files from BepInEx/config/MC_Valheim/Songs (own SMF reader; automatic melody part, lyre bass line, tambourine from the drums), played by themselves or in a four-lane rhythm mini-game (keys held back through a Chat.HasFocus postfix). The performer's game streams notes over a plain ZRpc to the server, which relays them to compatible players within hearing range; listeners map the performer's clock to their own audio clock with a small jitter buffer. 20 s of good mini-game play (rolling accuracy, success meter) give the Music status effect (+3 comfort through a Player.GetComfortLevel postfix, in shelter by default) to the performer and, through an Encore flag in the stream, to every listener within BonusRange, each game applying it to its own player. Prerecorded songs (the sheet's wording) are covered by the built-in songs and MIDI files; the buff works through comfort, which lengthens Rested.
+- **Hooks:** `Player.GetComfortLevel`, `SE_Rested.CalculateComfortLevel`, `SE_Rested.UpdateTTL`, `SE_Cozy.UpdateStatusEffect`, `SEMan.AddStatusEffect`, `ObjectDB.Awake`, `ObjectDB.CopyOtherDB`, `ZNetScene.Awake`, `Player.SetControls`, `Player.PlayerAttackInput`, `Player.Update`, `Player.LateUpdate`, `Player.OnDamaged`, `Chat.HasFocus`, `Terminal.TryRunCommand`, `Menu.Update`, `GameCamera.UpdateMouseCapture`, `GameCamera.OnDestroy`, `MusicVolume.UpdateProximityVolumes`, `ZNet.OnNewConnection`, `ZNet.RPC_PeerInfo`
+- **Risks:** Comfort only lengthens Rested while resting (after the Resting delay, near a fire, in shelter or sitting), so the bonus helps players who rest during or after a performance; Rested never shortens. Comfort displays that call CalculateComfortLevel themselves do not show the bonus (the GetComfortLevel hook keeps the MaxComfort stat and its achievement vanilla). Game music mods (Viking Shanties, Ominous) also write the music volume. Crossplay resends lost packets after 1-3 s: listeners drop notes that come too late. The synthesized timbres and the poses need tuning by ear and eye.
+- **Game systems:** [docs/game/exploration-player.md](game/exploration-player.md)
+- **Existing mods:** partial
+
+  | Mod | Status | Notes |
+  |---|---|---|
+  | [Bardheim (LongHouseListings)](https://thunderstore.io/c/valheim/p/LongHouseListings/Bardheim/) | 0.7.0, 2026-06-07, 1.0: unknown; all rights reserved | Lyre, drum and flute (workbench, wood and hides); embedded WAV samples per note; own MIDI parser (format 0/1, tempo, running status); manual play on keys 1-8; multiplayer audio off by default (one routed RPC per note to everybody); no buffs, no mini-game. |
+  | [Bragi (Jumenteam)](https://thunderstore.io/c/valheim/p/Jumenteam/Bragi/) | 0.2.0, 2026-10-01, 1.0: likely; GPL-3 | Lyre, Bone Flute, Jaw Harp; plays your own OGG/WAV songs with a JSON file, synced by a start time; its Rested buff (Skald's Blessing) cannot work (string.GetHashCode for the effect, AddStatusEffect(StatusEffect) on other players). No MIDI, no mini-game. |
+  | [Viking Shanties (Glasir)](https://thunderstore.io/c/valheim/p/Glasir/VikingShanties/) | 1.0.13, 2026-09-30, 1.0: yes | No items: dance and sing nine bundled shanties (MP3) near a fire or on a ship, heard nearby; makes Rested come twice as fast while singing at a sheltered fire; fades the game music. |
+  | [Skald of Camelot (Soukteam)](https://thunderstore.io/c/valheim/p/Soukteam/Skald_Of_Camelot/) | 1.0.7, 2026-10-04, 1.0: likely | Add-on to Bardheim and Bragi: instrument buffs (Rested extension with the same hash bug, carry weight, health regen) with a cooldown; mutes any sound whose name contains "cat". |
+
+- **Inspiration:** Instruments with MIDI exist (Bardheim) and prerecorded songs with a Rested-related buff exist (Viking Shanties, Bragi), but no mod synthesizes its music, has a rhythm mini-game, ties a comfort bonus to playing well, shares the bonus reliably with nearby players, or places the instruments on the progression tiers. Research 2026-10-05: EXISTS ALREADY = Partially.
+
+### grey drop rocks
+
+> rocks thrown by greydwarfs actually creates a pickable rock
 
 - **Scope:**  · **Feasibility:** not researched yet · **Who needs it:** ? · **Custom assets:** ? · **Status:** idea
 - Not researched yet: run a research pass for this idea.
