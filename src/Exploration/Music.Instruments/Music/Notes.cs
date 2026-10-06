@@ -55,6 +55,7 @@ internal enum SongSource : byte
     Preset = 0,
     Midi = 1,     // MIDI file of the player's own songs folder
     Server = 2,   // MIDI file the server shares (SongShare): read from its folder on the server's game, else downloaded
+    FreePlay = 3, // not a song: the window's "Free play" entry (keys play notes, FreePlayMap)
 }
 
 // Small helpers shared by music code (no Unity here: offline tests compile these files).

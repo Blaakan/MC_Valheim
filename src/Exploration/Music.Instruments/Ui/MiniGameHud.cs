@@ -3,6 +3,7 @@ using System.Globalization;
 using MC.Shared;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MC.Exploration.MusicInstrumentsMod;
 
@@ -12,6 +13,9 @@ namespace MC.Exploration.MusicInstrumentsMod;
 //              key labels under the line, judgement (fades 0.6 s), countdown during the lead-in, title, accuracy,
 //              streak, meter state (left of the meter), "Encore! +N comfort" banner (2.5 s), stop hint
 //   autoplay   small panel at the same place: "<title>   m:ss / m:ss   (repeat)" and the stop hint
+//   free play  panel at the same place: title, a piano (17 white keys, 12 black keys between them, like FreePlayKeys
+//              on the keyboard): each key shows its keyboard key, white keys also the note; lit while held; tambourine:
+//              its four keys named by hit, the others greyed; the Space / stop hint
 // Performance feeds me every frame (Update / UpdateAutoplay) and calls Hide on stop. Texts are set only when their
 // value changes; fades use the renderer alpha (no mesh rebuild). A watchdog hides me when nobody fed me for a second
 // (performance code failed before reaching me).
@@ -25,6 +29,16 @@ internal static class MiniGameHud
     private const float ColumnW = 300f;   // text column left of the meter (right-aligned)
     private const float ColumnGap = 12f;
     private const float AutoW = 540f;
+    private const float WhiteW = 36f;
+    private const float WhiteH = 140f;
+    private const float WhiteGap = 2f;
+    private const float BlackW = 24f;
+    private const float BlackH = 86f;
+    private const float FreePad = 14f;
+    private const int FreeKeys = FreePlayMap.KeyCount;
+    private const string StopHint = "Right click or Esc: stop";
+    private const string PadStopHint = "Start or right click: stop";
+    private const string SpaceHint = "Hold Space: octave up    " + StopHint;
     private const float JudgementTime = 0.6f;
     private const float EncoreTime = 2.5f;
     private const float FeedTimeout = 1f;
@@ -53,9 +67,30 @@ internal static class MiniGameHud
     private static readonly TextMeshProUGUI[] HitNames = new TextMeshProUGUI[Chart.Lanes];
     private static TextMeshProUGUI _autoLine;
     private static TextMeshProUGUI _autoHint;
+    private static GameObject _free;
+    private static TextMeshProUGUI _freeTitle;
+    private static TextMeshProUGUI _freeHint;
+    private static int _freeHintPad = -1;
+    private static readonly Image[] FreeBoxes = new Image[FreeKeys];
+    private static readonly TextMeshProUGUI[] FreeKeyText = new TextMeshProUGUI[FreeKeys];
+    private static readonly TextMeshProUGUI[] FreeNoteText = new TextMeshProUGUI[FreeKeys];  // white keys only
+    private static readonly int[] FreePitch = new int[FreeKeys];
+    private static readonly bool[] FreeLit = new bool[FreeKeys];
+    private static readonly Color WhiteIdle = new Color(0.93f, 0.91f, 0.86f, 0.93f);
+    private static readonly Color BlackIdle = new Color(0.09f, 0.08f, 0.07f, 0.96f);
+    private static readonly Color WhiteUnused = new Color(0.93f, 0.91f, 0.86f, 0.25f);
+    private static readonly Color BlackUnused = new Color(0.09f, 0.08f, 0.07f, 0.35f);
+    private static readonly Color WhiteLit = new Color(1f, 0.8f, 0.38f, 1f);
+    private static readonly Color BlackLit = new Color(0.86f, 0.6f, 0.18f, 1f);
+    private static readonly Color InkDark = new Color(0.14f, 0.11f, 0.08f, 1f);
+    private static readonly Color InkDim = new Color(0.36f, 0.31f, 0.25f, 1f);
 
     private static bool _miniShown;
     private static bool _autoShown;
+    private static bool _freeShown;
+    private static bool _freeLayoutKnown;
+    private static InstrumentKind _freeKind;
+    private static bool _freeOctaveUp;
     private static bool _buildFailed;
     private static float _lastFeed;
 
@@ -77,7 +112,7 @@ internal static class MiniGameHud
     private static int _autoLength = -1;
     private static bool _autoRepeat;
 
-    internal static bool Shown => _miniShown || _autoShown;
+    internal static bool Shown => _miniShown || _autoShown || _freeShown;
 
     internal static float LastFeed => _lastFeed;
 
@@ -141,12 +176,72 @@ internal static class MiniGameHud
         }
     }
 
+    // Free play, every frame: piano labels for this instrument and octave (rebuilt only when one changes), keys lit
+    // while held.
+    internal static void UpdateFreePlay(InstrumentKind kind, bool octaveUp)
+    {
+        try
+        {
+            if (!Ensure())
+            {
+                return;
+            }
+            _lastFeed = Time.unscaledTime;
+            ShowFree();
+            if (!_freeLayoutKnown || kind != _freeKind || octaveUp != _freeOctaveUp)
+            {
+                _freeLayoutKnown = true;
+                _freeKind = kind;
+                _freeOctaveUp = octaveUp;
+                _freeHintPad = -1; // hint set below (device and instrument)
+                _freeTitle.text = "Free play: " + InstrumentContent.DisplayName(kind)
+                                  + (octaveUp && kind != InstrumentKind.Tambourine ? "   (octave up)" : "");
+                for (var key = 0; key < FreeKeys; key++)
+                {
+                    var pitch = FreePlayMap.Pitch(kind, key, octaveUp);
+                    FreePitch[key] = pitch;
+                    FreeLit[key] = false;
+                    var black = FreePlayMap.IsBlack(key);
+                    FreeBoxes[key].color = pitch < 0 ? (black ? BlackUnused : WhiteUnused) : black ? BlackIdle : WhiteIdle;
+                    UiKit.SetText(FreeKeyText[key], pitch < 0 ? "" : FreePlayKeys.Label(key));
+                    if (FreeNoteText[key] != null)
+                    {
+                        UiKit.SetText(FreeNoteText[key], FreePlayMap.Name(kind, pitch));
+                    }
+                }
+            }
+            // Hint by device (pad: Start opens the menu, which stops) and instrument (tambourine: no octave).
+            var pad = ZInput.IsGamepadActive() ? 1 : 0;
+            if (pad != _freeHintPad)
+            {
+                _freeHintPad = pad;
+                var stop = pad == 1 ? PadStopHint : StopHint;
+                _freeHint.text = kind == InstrumentKind.Tambourine ? stop : "Hold Space: octave up    " + stop;
+            }
+            for (var key = 0; key < FreeKeys; key++)
+            {
+                var lit = FreePitch[key] >= 0 && FreePlayKeys.Held(key);
+                if (lit != FreeLit[key])
+                {
+                    FreeLit[key] = lit;
+                    var black = FreePlayMap.IsBlack(key);
+                    FreeBoxes[key].color = lit ? (black ? BlackLit : WhiteLit) : black ? BlackIdle : WhiteIdle;
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("MiniGameHud.UpdateFreePlay", e);
+        }
+    }
+
     internal static void Hide()
     {
         try
         {
             _miniShown = false;
             _autoShown = false;
+            _freeShown = false;
             _game = null;
             if (_field != null)
             {
@@ -164,6 +259,8 @@ internal static class MiniGameHud
     {
         _miniShown = false;
         _autoShown = false;
+        _freeShown = false;
+        _freeLayoutKnown = false;
         _game = null;
         _buildFailed = false;
         try
@@ -193,6 +290,16 @@ internal static class MiniGameHud
         _hint = null;
         _autoLine = null;
         _autoHint = null;
+        _free = null;
+        _freeTitle = null;
+        _freeHint = null;
+        for (var i = 0; i < FreeKeys; i++)
+        {
+            FreeBoxes[i] = null;
+            FreeKeyText[i] = null;
+            FreeNoteText[i] = null;
+            FreeLit[i] = false;
+        }
         for (var i = 0; i < Chart.Lanes; i++)
         {
             Keys[i] = null;
@@ -231,18 +338,45 @@ internal static class MiniGameHud
 
     private static void ShowView(bool mini)
     {
-        if (mini != _miniShown || mini == _autoShown)
+        if (mini != _miniShown || mini == _autoShown || _freeShown)
         {
             _miniShown = mini;
             _autoShown = !mini;
+            _freeShown = false;
             UiKit.SetActive(_mini, mini);
             UiKit.SetActive(_auto, !mini);
+            UiKit.SetActive(_free, false);
             if (!mini)
             {
                 _game = null;
                 _field.Game = null;
                 _autoTitle = null;
             }
+        }
+        if (!_root.activeSelf)
+        {
+            _canvas.sortingOrder = UiKit.OrderAboveFrameBuffer(WantedOrder);
+            _root.SetActive(true);
+        }
+    }
+
+    private static void ShowFree()
+    {
+        if (!_freeShown || _miniShown || _autoShown)
+        {
+            _freeShown = true;
+            _miniShown = false;
+            _autoShown = false;
+            UiKit.SetActive(_mini, false);
+            UiKit.SetActive(_auto, false);
+            UiKit.SetActive(_free, true);
+            _game = null;
+            if (_field != null)
+            {
+                _field.Game = null;
+            }
+            _autoTitle = null;
+            _freeLayoutKnown = false;
         }
         if (!_root.activeSelf)
         {
@@ -449,10 +583,14 @@ internal static class MiniGameHud
         var big = UiKit.BigStyle();
         BuildMini(rootRt, hud, big);
         BuildAuto(rootRt, hud);
+        BuildFree(rootRt, hud);
         _mini.SetActive(false);
         _auto.SetActive(false);
+        _free.SetActive(false);
         _miniShown = false;
         _autoShown = false;
+        _freeShown = false;
+        _freeLayoutKnown = false;
         Log.Debug("Mini-game HUD built.");
     }
 
@@ -543,6 +681,63 @@ internal static class MiniGameHud
         _autoHint.text = "Attack or Block: stop";
     }
 
+    // Free play panel: title on top, the piano, hint under it. White keys first, black keys after (drawn on top), each
+    // black key centred on the line after the white key it follows, like a piano.
+    private static void BuildFree(RectTransform rootRt, TMP_Text hud)
+    {
+        var pianoW = FreePlayMap.WhiteCount * (WhiteW + WhiteGap) - WhiteGap;
+        var w = pianoW + 2f * FreePad;
+        var h = FreePad + 24f + 6f + WhiteH + 8f + 30f + FreePad;
+        var panel = UiKit.MakeImage(rootRt, "FreePlay", new Color(0f, 0f, 0f, 0.45f));
+        var rt = panel.rectTransform;
+        rt.anchorMin = new Vector2(LaneAnchorX, 0f);
+        rt.anchorMax = new Vector2(LaneAnchorX, 0f);
+        rt.pivot = new Vector2(0.5f, 0f);
+        rt.sizeDelta = new Vector2(w, h);
+        rt.anchoredPosition = new Vector2(0f, BottomY);
+        _free = panel.gameObject;
+
+        _freeTitle = UiKit.MakeText(rt, "Title", hud, 21f, UiKit.TextLight, TextAlignmentOptions.Center);
+        UiKit.At(_freeTitle.rectTransform, FreePad, h - FreePad - 30f, w - 2f * FreePad, 30f);
+        _freeHint = UiKit.MakeText(rt, "Hint", hud, 16f, UiKit.TextDim, TextAlignmentOptions.Center);
+        UiKit.At(_freeHint.rectTransform, FreePad, FreePad - 4f, w - 2f * FreePad, 24f);
+        _freeHint.text = SpaceHint;
+
+        var keyBottom = FreePad + 24f + 6f;
+        for (var pass = 0; pass < 2; pass++)
+        {
+            for (var key = 0; key < FreeKeys; key++)
+            {
+                var black = FreePlayMap.IsBlack(key);
+                if (black != (pass == 1))
+                {
+                    continue;
+                }
+                var white = FreePlayMap.WhiteIndex(key);
+                var box = UiKit.MakeImage(rt, "Key" + key, black ? BlackIdle : WhiteIdle);
+                if (black)
+                {
+                    var x = FreePad + (white + 1) * (WhiteW + WhiteGap) - WhiteGap * 0.5f - BlackW * 0.5f;
+                    UiKit.At(box.rectTransform, x, keyBottom + WhiteH - BlackH, BlackW, BlackH);
+                    FreeKeyText[key] = UiKit.MakeText(box.rectTransform, "Key", hud, 14f, UiKit.TextLight, TextAlignmentOptions.Center);
+                    UiKit.At(FreeKeyText[key].rectTransform, 0f, 4f, BlackW, 22f);
+                    FreeNoteText[key] = null;
+                }
+                else
+                {
+                    UiKit.At(box.rectTransform, FreePad + white * (WhiteW + WhiteGap), keyBottom, WhiteW, WhiteH);
+                    FreeKeyText[key] = UiKit.MakeText(box.rectTransform, "Key", hud, 17f, InkDark, TextAlignmentOptions.Center);
+                    UiKit.At(FreeKeyText[key].rectTransform, 0f, 6f, WhiteW, 24f);
+                    FreeNoteText[key] = UiKit.MakeText(box.rectTransform, "Note", hud, 11f, InkDim, TextAlignmentOptions.Center);
+                    UiKit.At(FreeNoteText[key].rectTransform, 0f, 30f, WhiteW, 18f);
+                }
+                FreeBoxes[key] = box;
+                FreePitch[key] = -1;
+                FreeLit[key] = false;
+            }
+        }
+    }
+
     // Me hide the HUD when Performance stopped feeding it (its tick failed before reaching me).
     private sealed class HudWatchdog : MonoBehaviour
     {
@@ -569,6 +764,27 @@ internal static class MiniGameHud
 
     internal static bool AutoShown => _autoShown && _root != null && _root.activeSelf;
 
+    internal static bool FreeShown => _freeShown && _root != null && _root.activeSelf;
+
+    internal static string FreeTitle => _freeTitle != null ? _freeTitle.text : null;
+
+    // Lit key boxes now (free play).
+    internal static int FreeLitCount
+    {
+        get
+        {
+            var n = 0;
+            foreach (var lit in FreeLit)
+            {
+                if (lit)
+                {
+                    n++;
+                }
+            }
+            return n;
+        }
+    }
+
     internal static string AutoText => _autoLine != null ? _autoLine.text : null;
 
     internal static string JudgementText => _judgement != null ? _judgement.text : null;
@@ -581,7 +797,7 @@ internal static class MiniGameHud
             return "Mini-game HUD: not built.";
         }
         var sb = new System.Text.StringBuilder();
-        sb.Append("Mini-game HUD: mini ").Append(_miniShown).Append(", autoplay ").Append(_autoShown)
+        sb.Append("Mini-game HUD: mini ").Append(_miniShown).Append(", autoplay ").Append(_autoShown).Append(", free ").Append(_freeShown)
             .Append(", screen ").Append(Screen.width).Append('x').Append(Screen.height)
             .Append(", game ").Append(_game != null ? _game.Title : "none")
             .Append(", visible notes ").Append(_game != null ? _game.Visible.Count : 0).Append('\n');

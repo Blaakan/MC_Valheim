@@ -5,10 +5,10 @@
 | Mod | Music Instruments |
 | GUID / project | `MC.Exploration.Music.Instruments` (`src/Exploration/Music.Instruments/`, root namespace `MC.Exploration.MusicInstrumentsMod`, package `MusicInstruments`) |
 | Category / scope | Exploration / New |
-| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 4. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), sends its gameplay settings to everyone and relays the music (section 4). |
+| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 5. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), sends its gameplay settings to everyone and relays the music (section 4). |
 | Sheet idea | `music instruments` ("prerecorded songs + midi support for buffs well rested") |
 | Game version checked | Valheim 1.0.16 (Unity 6000.0.75f1, Mono), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/` (SE_Rested, SE_Cozy, SEMan, StatusEffect, Player, Humanoid, VisEquipment, ItemDrop, ObjectDB, ZNetScene, ZNet, ZRpc, ZRoutedRpc, ZPackage, ZDOMan, AudioMan, MusicMan, MusicVolume, GameCamera, Menu, Chat, Terminal, ZInput, PlayerController, Emotes, Chair); research briefs of 2026-10-05 (comfort, audio, existing mods, items, input and UI, network, pose, MIDI and preset songs), each fact-checked by a second agent |
-| Status | In development (v0.3.0 code) |
+| Status | In development (v0.4.0 code) |
 
 ## Goal
 
@@ -24,6 +24,7 @@ The user's expected behaviours (run request, 2026-10-05), numbered. Each one is 
 6. **G6 — Assets:** models and icons for the flute, the lyre and the tambourine.
 7. **G7 — Server songs (0.2.0, user request after the first in-game test):** custom songs uploaded on the server alone
    can be played by all connected players; an option (server setting), off by default.
+8. **G8 — Free play (0.4.0, user request):** a free play mode with keyboard input.
 
 ### Added beyond the request (small)
 
@@ -45,7 +46,6 @@ shipped or loaded).
 
 ### Later (cut from v1, one-line sketches)
 
-- Free play: number keys play the notes of a scale, streamed like the mini-game.
 - Ensembles: a second performer joins a performance and plays another part of the same song in time (shared start
   time in the player ZDO).
 - Gamepad lanes (D-pad left/right, X, B with own edges: the D-pad auto-repeats).
@@ -290,6 +290,27 @@ A server (or host) with `ShareSongs` on shares the MIDI files of `ServerSongsFol
 
 Listeners need nothing: a server song is streamed as notes like any other song.
 
+### 2.8 Free play (G8)
+
+The song window's first entry, "Free play" (`SongLibrary.FreePlay`), starts `PerformanceMode.FreePlay` with Play or
+Perform. The keyboard is a piano laid out like one (user rule): `FreePlayKeys` reads 29 keys by place (lower octave:
+white Z X C V B N M, black S D and G H J on the row above where a piano has them; upper octave: white Q W E R T Y U I O
+P, black 2 3, 5 6 7, 9 0 on the number row), every semitone from C to the E two octaves up; holding Space plays
+everything an octave up. ZInput reads Input System keys, which are places, so other layouts keep the piano shape;
+labels show the player's own key names. `FreePlayMap`: key index = semitone; flute lowest C = C4, lyre lowest C = C3;
+tambourine: the first four white keys Z X C V = Thump, Hit, Jingle, Shake. Like the rhythm game, the game's keys are
+held back (`KeyCapture`; `Performance.LiveInput` also for the chat and console holds), the feet stay, Esc, right
+click or any game screen stops, and notes go out live (`Live` batches, 0.25 s safety delay for listeners). The flute
+plays one note at a time: a key down starts a note scheduled for 8 s (the held one ends where the new one starts,
+legato) and its key up sends a note off; a flute key pressed and let go in the same frame (a quick tap, a hitch: the
+Input System then reports both) plays a short 0.12 s note with no held state. Lyre notes ring 2.5 s, tambourine hits
+0.25 s. When a keyboard mode (free play, rhythm game) stops, keys still down are game buttons too: AutoRun, Jump, Use,
+Crouch and the walk buttons are reset (`ZInput.ResetButtonStatus`, auto-run off), so the bard never runs off or jumps.
+Free play is keyboard only: on a pad, A on the Free play entry says so and the window opens on the first song; the
+free view's hint names Start on a pad. The HUD's free view draws a
+piano: 17 white keys and 12 black keys on top of them between the right white keys, each with its keyboard key (white
+keys also the note), lit while held; the tambourine's unused keys greyed. Free play gives no comfort (D18).
+
 ## 3. Decisions
 
 - **D1 Tools, cloned from the Flint Knife** (same as the Spyglass, research: lightest base, no weapon trail, build mode
@@ -351,6 +372,20 @@ Listeners need nothing: a server song is streamed as notes like any other song.
   20 s, half the notes at random in about 35 s (up to a minute); a 25 % player practically never gets an Encore (a lucky start can fill a sliver, which stays). The config
   key changed to `RequiredAccuracy` so the new default reaches config files that saved the old 0.7. Network version 4:
   the rule (and the accuracy floor, 0.1) changed, so 0.2.0 and 0.3.0 games never mix on a server.
+- **D17 Note off on the wire for held notes** (0.4.0): a held flute note's length is not known when it starts, and
+  sending it at key up would delay it by the hold. So the note goes out at key down with the longest hold (8 s) and the
+  key up sends a note off: a note with velocity 0 (NoteBatch layout 2; MIDI notes never have velocity 0 here, senders
+  clamp to 1). Listeners end the note at the anchored time (`Emitter.EndNote` -> `SynthCore.EndNote`: queued and
+  sounding notes of that pitch that started by then); a lost note off only lets the note run to 8 s. A late note on
+  that a listener moves to "now" moves the note off after it by as much, so a late quick tap still ends. The emitter
+  frees its sound source once the synth is silent (a quarter second guard for the hand-off to the audio thread),
+  not after the 8 s note's nominal end. Network version 5.
+- **D18 Free play gives no comfort**: like songs that play by themselves; only the rhythm game measures playing well.
+- **D19 Free play keys laid out like a piano** (user: "the UI layout of the keyboard should match a piano keyboard;
+  holding space could bring the octave up"): the usual computer-piano layout, white keys on a letter row and black keys
+  on the row above at the piano's gaps, two octaves and three notes, all semitones (no scale setting needed), Space
+  for an octave up; keys by place keep the shape on every layout. The first draft (three diatonic rows, Shift for
+  sharps, scale and root settings) was dropped before it was committed. Keys are not configurable in v0.4.
 
 ## 4. Multiplayer
 
@@ -368,10 +403,10 @@ Listeners need nothing: a server song is streamed as notes like any other song.
 ### 4.2 RPCs, ZDO keys, network version
 
 RPCs `MC.Exploration.Music.Instruments.Settings` / `.SettingsRequest` (rules layout 3), `.Notes` (note batch layout
-1), `.SongListRequest` / `.SongList` / `.SongRequest` / `.SongChunk` (server songs, layout 1); player ZDO int `MC.Exploration.Music.Instruments.Playing` (stable hash; the instrument being played, 0 = none);
+2: velocity 0 = note off), `.SongListRequest` / `.SongList` / `.SongRequest` / `.SongChunk` (server songs, layout 1); player ZDO int `MC.Exploration.Music.Instruments.Playing` (stable hash; the instrument being played, 0 = none);
 prefabs `MC_Flute`, `MC_Lyre`, `MC_Tambourine`; recipes `Recipe_MC_Flute`, `Recipe_MC_Lyre`, `Recipe_MC_Tambourine`;
-status effect `SE_MC_Music`. Network version 4 (1 had a shelter flag in the rules, 2 had no server songs, 3 the old
-Encore rule; none released).
+status effect `SE_MC_Music`. Network version 5 (1 had a shelter flag in the rules, 2 had no server songs, 3 the old
+Encore rule, 4 no note off; none released).
 
 ### 4.3 Server settings and join check
 
@@ -455,10 +490,10 @@ bytes in memory (at most 16 x 2 MB).
 
 `Plugin.cs` (config, life cycle), `MusicRules.cs`, `ServerRules.cs`, `PlayerCheck.cs`;
 `Items/` `InstrumentContent.cs` (items, recipes, effect registration), `InstrumentModels.cs`, `InstrumentIcons.cs`,
-`MusicEffect.cs`; `Music/` `Notes.cs`, `MidiReader.cs`, `SongText.cs`, `PresetSongs.cs`, `SongLibrary.cs`,
+`MusicEffect.cs`; `Music/` `Notes.cs`, `FreePlayMap.cs`, `MidiReader.cs`, `SongText.cs`, `PresetSongs.cs`, `SongLibrary.cs`,
 `Arranger.cs`, `Chart.cs`, `Judge.cs` (pure C#, also built by the offline test harness); `Audio/` `SynthCore.cs`
 (pure), `AudioKit.cs`, `Emitter.cs`, `Listeners.cs`; `Net/` `NoteBatch.cs`, `NoteRelay.cs`, `SongShare.cs`; `Play/` `Performance.cs`,
-`MiniGame.cs`, `MusicBonus.cs`, `KeyCapture.cs` (with `LaneKeys`, `GameScreens`); `Pose/InstrumentPose.cs`; `Ui/`
+`MiniGame.cs`, `MusicBonus.cs`, `FreePlayKeys.cs`, `KeyCapture.cs` (with `LaneKeys`, `GameScreens`); `Pose/InstrumentPose.cs`; `Ui/`
 `SongWindow.cs`, `MiniGameHud.cs`; `Patches/` (`ObjectDBPatches`, `ZNetScenePatches`, `PlayerAttackGuardPatches`
 always on; `PlayerPatches`, `ComfortPatches`, `InputPatches` (chat focus, console binds, Esc, cursor, world exit,
 music fade), `ZNetPatches`); `SelfTests.cs`.
@@ -492,7 +527,9 @@ the emitter), `music.window` (window and HUD
 screenshots, Perform from the window), `music.share` (server folder listed with duplicates and other files skipped,
 list and pieces through the real packages, an older pick's piece ignored, progress, download read and arranged,
 out-of-order / damaged / gone pieces refused, retry, send queue rule, clean names, host window lists and plays a server song, AllowPlayerSongs off hides and
-refuses own songs, sharing off hides the section), `music.pose` (markers near targets, screenshots, also as others see it),
+refuses own songs, sharing off hides the section), `music.freeplay` (piano key map and layout, window entry, held flute
+note ends on key up, one note at a time, Space octave up, HUD keys lit, live batches, no Music effect, tambourine keys, stop; a listener's
+long note ended by a note off from the wire), `music.pose` (markers near targets, screenshots, also as others see it),
 `music.export` (icons). Hands-on list: `src/Exploration/Music.Instruments/TESTING.md`.
 
 ## 9. Open questions and unverified

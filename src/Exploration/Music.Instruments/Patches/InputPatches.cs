@@ -53,7 +53,7 @@ internal static class ChatUpdatePatches
     [HarmonyPatch(typeof(Chat), nameof(Chat.Update))]
     private static void Update_Prefix()
     {
-        if (!Performance.WindowOpen && Performance.Mode != PerformanceMode.MiniGame)
+        if (!Performance.WindowOpen && !Performance.LiveInput)
         {
             return;
         }
@@ -79,7 +79,7 @@ internal static class ConsolePatches
     [HarmonyPatch(typeof(Console), nameof(Console.Update))]
     private static void Update_Prefix()
     {
-        if (Performance.Mode != PerformanceMode.MiniGame)
+        if (!Performance.LiveInput)
         {
             return;
         }

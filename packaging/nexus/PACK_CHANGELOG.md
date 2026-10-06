@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Music Instruments 0.4.0 (not released): free play, play your own tune with the keyboard.
+
 ## 0.2.0
 
 - Music Instruments 0.3.0 (not released): the rhythm game's Encore needs half of the notes hit for 20 seconds.

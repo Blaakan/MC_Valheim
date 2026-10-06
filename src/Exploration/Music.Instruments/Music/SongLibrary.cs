@@ -40,6 +40,17 @@ internal static class SongLibrary
     internal const float TailSilence = 0.3f;
     internal const int MaxFiles = 500;
     internal const string AllParts = "All parts";
+    internal const string FreePlayId = "freeplay";
+
+    // The window's first entry: not a song, Play / Perform start free play.
+    internal static readonly SongEntry FreePlay = new SongEntry
+    {
+        Id = FreePlayId,
+        Title = "Free play",
+        Source = SongSource.FreePlay,
+        Info = "Play the keyboard like a piano (Z to M and Q to P, black keys above; Space: octave up)",
+        Loaded = true,
+    };
     private static readonly string[] Extensions = { ".mid", ".midi", ".kar", ".rmi" };
 
     private static List<SongEntry> _presets;
@@ -165,7 +176,7 @@ internal static class SongLibrary
         {
             return false;
         }
-        if (entry.Source == SongSource.Preset)
+        if (entry.Source == SongSource.Preset || entry.Source == SongSource.FreePlay)
         {
             return entry.Error == null;
         }

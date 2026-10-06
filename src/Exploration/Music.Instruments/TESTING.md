@@ -4,9 +4,9 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.3.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.3.0
-makes the Encore easier (half the notes for 20 s; T09, T23 reset, new T29); 0.2.0 added server songs (T26-T28,
-M12-M17). Runs are noted at the end of this paragraph. Earlier runs (0.1.0): smoke
+**Build under test:** 0.4.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.4.0
+adds free play (T30-T35, M18-M19); 0.3.0 made the Encore easier (T09, T23 reset, new T29); 0.2.0 added server songs
+(T26-T28, M12-M17). Runs are noted at the end of this paragraph. Earlier runs (0.1.0): smoke
 test (`./tools/Test-Smoke.ps1 -Mod Music.Instruments`) passed 2026-10-05 after both reviews (loads, patches cleanly,
 JitCheck 1136 methods, 0 failures; build 8811b96+dirty). In-world self-tests (`./tools/Test-InWorld.ps1 -Mod
 Music.Instruments -Only music`) passed 2026-10-05 after both reviews, 10/10: `music.network`, `music.item`,
@@ -27,7 +27,12 @@ forgiven, network version 4): smoke test passed 2026-10-06 (JitCheck 1209 method
 in-world self-tests passed 11/11, `music.perform` with 20 checks (every other note gets the Encore, also with Good
 timing; one note in four never fills the meter in 18 s); offline harness 5395 checks (50 % players succeed also with
 only Good timing or wrong-lane misses, 60 % in under 45 s, 25 % players and mashers never, four lanes on every note =
-a third); same two errors from Sneak Ambush and Spyglass only.
+a third); same two errors from Sneak Ambush and Spyglass only. 0.4.0 (free play, piano keys, after its review): smoke
+test passed 2026-10-06 (JitCheck 1253 methods, 0 failures; build 0ca328e+dirty); in-world self-tests passed 12/12,
+including `music.freeplay` (piano map and layout, window entry, held flute note ended by key up and its note off on
+the wire, legato, same-frame tap, Space octave up, tambourine keys and sound, no Music effect, listener note off, source
+freed after End); offline harness 5406 checks (piano map, note off in the synth); same two errors from Sneak Ambush
+and Spyglass only.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina. Items: `spawn MC_Flute`,
@@ -252,3 +257,39 @@ config folder). The friend's own songs folder should not have these files.
   the meter is red almost all the time and no Encore comes in a minute or two (a lucky start can fill a sliver, which
   stays because the meter never drains). With a config file from an
   older version, RequiredAccuracy appears with 0.5 (the old SuccessAccuracy line is ignored).
+
+## 0.4.0 — free play
+
+- [ ] **T30 Free play on the flute:** hold the flute, open the song window: "Free play" is the first entry; pick it,
+  Play. Expected: a piano right of your character (17 white keys, black keys between them like a real piano), each key
+  showing your keyboard key, white keys also the note (C4 to E6), title "Free play: Wooden Flute"; you cannot walk,
+  jump or use the hotbar. Press and hold Q: a steady C5 that lasts while the key is down and stops when you let go (up
+  to 8 seconds); its piano key lights up. Press Q then E while Q is still down: the note moves to E5 without a gap
+  (one note at a time). Tap a key as fast as you can, many times: each tap sounds briefly, none keeps droning.
+- [ ] **T31 Lyre and tambourine:** free play on the lyre: each key plucks a string that rings on, several at once make a
+  chord (C3 to E5). On the tambourine: only Z X C V light and sound (thump, hit, jingle, shake); the other piano keys
+  are greyed and do nothing.
+- [ ] **T32 Piano layout and Space:** Z X C V B N M play C D E F G A B; S D G H J play the black keys between them
+  (C# D# F# G# A#); Q to P and 2 3 5 6 7 9 0 the same an octave higher, up to E. Hold Space: everything plays an
+  octave higher, the piano's note names and title show it ("octave up"); a flute note held while Space is let go keeps
+  its pitch.
+- [ ] **T33 Keys held back:** while free playing, press Tab, I, M, E, R, the number keys, Space, Enter, F5 (console on):
+  no inventory, map, use, hotbar, jump, chat or console; only notes play. Right click or Esc stops (Esc also opens the
+  menu); the game's keys work again after. Hold Q and Space (and E), then right click: the character neither starts
+  auto-running nor jumps nor uses anything; press the keys again: they work normally.
+- [ ] **T34 AZERTY (or another layout):** with a French keyboard, the keys used are the ones at the same places (bottom
+  row W X C V B N ,), the piano shows those letters, and the window's Free play line names them too ("W to , and A to
+  P").
+- [ ] **T36 Gamepad:** with a gamepad in use, open the song window: the first song is selected, not Free play. Pick Free
+  play and press A: "Free play is played on the keyboard." and nothing starts. Start free play with the mouse, then
+  touch the pad: the hint under the piano says "Start or right click: stop".
+- [ ] **T35 No comfort, stops:** free play for a minute by a fire: no meter, no Encore, no Music effect. Put the
+  instrument away, swim or get hit: free play stops at once and nothing keeps sounding.
+
+### 0.4.0 — multiplayer
+
+- [ ] **M18 Others hear free play (G4):** free play next to a friend. Expected: they hear your notes a quarter of a
+  second after you, from your position; a held flute note lasts as long as you hold it, also for them (never stuck
+  sounding, never cut after a few seconds); they see your playing pose move with the notes.
+- [ ] **M19 Two players and a player without the mod:** two friends free play at once: both are heard, nothing mixes up.
+  A friend without the mod (AllowPlayersWithoutMod = true) hears nothing and nothing breaks for them.

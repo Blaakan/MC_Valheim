@@ -10,6 +10,7 @@ internal enum PerformanceMode : byte
     None,
     Auto,      // a song plays by itself (built-in or MIDI); the bard may walk
     MiniGame,  // the player plays the song's notes in the rhythm game; feet stay
+    FreePlay,  // the player plays the keyboard like a piano (FreePlayKeys, FreePlayMap); feet stay; no comfort
 }
 
 // Me = the local player's performance. Input from Player.SetControls prefix (Attack with an instrument in hand = song
@@ -26,6 +27,13 @@ internal enum PerformanceMode : byte
 internal static class Performance
 {
     internal const string PlayerSongsOff = "This server allows only the built-in songs and its own songs.";
+    // Free play note lengths: a held flute note lasts while its key is down (note off), at most FreeFluteHold; a lyre
+    // string rings, a tambourine hit is short.
+    private const float FreeFluteHold = 8f;
+    private const float FreeLyreLength = 2.5f;
+    private const float FreeHitLength = 0.25f;
+    private const float FreeTapLength = 0.12f;  // flute key down and up in the same frame
+    private const byte FreeVelocity = 100;
     private const float LookAhead = 0.5f;
     private const float FlushInterval = 0.2f;
     private const float LiveFlushInterval = 0.05f;
@@ -68,12 +76,18 @@ internal static class Performance
     private static float _weight;
     private static readonly List<Pulse> Pulses = new List<Pulse>(64);
     private static float _pendingMessageAt = float.NegativeInfinity;
+    // Free play: flute key whose note sounds (FreePlayMap key index, -1 none): one note at a time.
+    private static int _freeFluteKey = -1;
+    private static int _freeFlutePitch = -1;
 
     internal static bool Repeat;
     internal static string LastSongId;
     internal static int LastPart = -1;
 
     internal static PerformanceMode Mode => _mode;
+
+    // Rhythm game or free play: the keyboard is the instrument (game keys held back, feet still, Esc / right click stop).
+    internal static bool LiveInput => _mode == PerformanceMode.MiniGame || _mode == PerformanceMode.FreePlay;
     internal static InstrumentKind Instrument => _mode == PerformanceMode.None ? InstrumentKind.None : _kind;
     internal static bool WindowOpen => _windowOpen;
     internal static string Title => _title;
@@ -171,7 +185,7 @@ internal static class Performance
         {
             return false;
         }
-        if (_windowOpen || _mode == PerformanceMode.MiniGame)
+        if (_windowOpen || LiveInput)
         {
             zeroAll = true;
             return true;
@@ -293,7 +307,7 @@ internal static class Performance
             Stop(_stopReason);
             return;
         }
-        if (_mode == PerformanceMode.MiniGame && (GameScreens.AnyOpen() || ZInput.GetKeyDown(KeyCode.Mouse1, false)))
+        if (LiveInput && (GameScreens.AnyOpen() || ZInput.GetKeyDown(KeyCode.Mouse1, false)))
         {
             SwallowClicks();
             Stop(null);
@@ -304,6 +318,10 @@ internal static class Performance
         if (_mode == PerformanceMode.Auto)
         {
             TickAuto();
+        }
+        else if (_mode == PerformanceMode.FreePlay)
+        {
+            TickFreePlay();
         }
         else
         {
@@ -410,12 +428,60 @@ internal static class Performance
             return false;
         }
         var rules = ServerRules.Current;
+        var songLength = Mathf.Max(length, notes[notes.Length - 1].End);
+        Begin(player, kind, mode, song.Title, notes, songLength);
+        LastSongId = song.Id;
+        LastPart = part;
+        _game = mode == PerformanceMode.MiniGame
+            ? new MiniGame(Chart.Build(notes, kind, _length), kind, song.Title, rules.SuccessSeconds, rules.SuccessAccuracy)
+            : null;
+        Log.Debug($"Playing \"{song.Title}\" on the {kind} ({mode}, {notes.Length} notes, {_length:0.#} s).");
+        return true;
+    }
+
+    // Free play: the keyboard is a piano (FreePlayKeys -> FreePlayMap), streamed live like the rhythm game. No song,
+    // no meter, no comfort (design D18).
+    internal static bool StartFreePlay(out string error)
+    {
+        var player = Player.m_localPlayer;
+        if (player == null)
+        {
+            error = "No player.";
+            return false;
+        }
+        var kind = Held;
+        if (kind == InstrumentKind.None)
+        {
+            error = "Hold an instrument to play.";
+            return false;
+        }
+        if (_mode != PerformanceMode.None)
+        {
+            Stop(null);
+        }
+        if (!CanStart(player, out error))
+        {
+            error ??= "You cannot play now.";
+            return false;
+        }
+        Begin(player, kind, PerformanceMode.FreePlay, "Free play", Array.Empty<Note>(), 0f);
+        _game = null;
+        LastSongId = SongLibrary.FreePlayId;
+        LastPart = -1;
+        Log.Debug($"Free play on the {kind}.");
+        return true;
+    }
+
+    // What every performance starts with: mode, clock and anchor, a new performance id, the sound source, feet, flag.
+    private static void Begin(Player player, InstrumentKind kind, PerformanceMode mode, string title, Note[] notes, float length)
+    {
+        var rules = ServerRules.Current;
         CloseWindow();
         _mode = mode;
         _kind = kind;
         _notes = notes;
-        _length = Mathf.Max(length, notes[notes.Length - 1].End);
-        _title = song.Title;
+        _length = length;
+        _title = title;
         _next = 0;
         _passOffset = 0f;
         _performanceId = UnityEngine.Random.Range(1, int.MaxValue);
@@ -424,14 +490,13 @@ internal static class Performance
         _stopRequest = false;
         _stopReason = null;
         Pulses.Clear();
+        ResetFreeKeys();
         _anchor = AudioKit.DspNow + StartDelay;
         _clock = -StartDelay;
         _lastClock = _clock;
         // First batch goes out at once (listeners anchor on it: its notes lead its send time like every later batch).
         _lastFlush = _clock - FlushInterval;
         _lastSent = _clock;
-        LastSongId = song.Id;
-        LastPart = part;
         if (_emitter != null && (_emitter.Kind != kind || _emitter.Failed))
         {
             _emitter.Hush();
@@ -442,13 +507,8 @@ internal static class Performance
         {
             _emitter = Emitter.Create(player.transform, LocalEmitterOffset, kind, true, rules.HearingRange);
         }
-        _game = mode == PerformanceMode.MiniGame
-            ? new MiniGame(Chart.Build(notes, kind, _length), kind, song.Title, rules.SuccessSeconds, rules.SuccessAccuracy)
-            : null;
         StopFeet(player);
         SetPlayingFlag(player, kind);
-        Log.Debug($"Playing \"{song.Title}\" on the {kind} ({mode}, {notes.Length} notes, {_length:0.#} s).");
-        return true;
     }
 
     // Graceful stop: notes ring out, End sent, pose blends back.
@@ -463,10 +523,16 @@ internal static class Performance
         {
             _emitter.ReleaseAll();
         }
+        var wasLive = LiveInput;
         Batch.Flags |= BatchFlags.End;
         Flush();
         _mode = PerformanceMode.None;
+        if (wasLive)
+        {
+            ForgetHeldKeys(player);
+        }
         _game = null;
+        ResetFreeKeys();
         _stopRequest = false;
         _stopReason = null;
         Pulses.Clear();
@@ -555,7 +621,7 @@ internal static class Performance
         {
             Flush();
         }
-        Batch.Notes.Add(new Note(t, n.Length, n.Pitch, n.Velocity));
+        Batch.Notes.Add(new Note(t, n.Length, n.Pitch, Math.Max((byte)1, n.Velocity))); // 0 = note off on the wire
         if (Pulses.Count < 256)
         {
             Pulses.Add(new Pulse { At = start, Pitch = n.Pitch, Velocity = n.Velocity });
@@ -640,13 +706,181 @@ internal static class Performance
             {
                 Flush();
             }
-            Batch.Notes.Add(new Note(_clock + offset, n.Length, n.Pitch, n.Velocity));
+            Batch.Notes.Add(new Note(_clock + offset, n.Length, n.Pitch, Math.Max((byte)1, n.Velocity)));
             if (Pulses.Count < 256)
             {
                 Pulses.Add(new Pulse { At = start, Pitch = n.Pitch, Velocity = n.Velocity });
             }
         }
     }
+
+    // ---------- free play ----------
+
+    private static void TickFreePlay()
+    {
+        KeyCapture.Hold();
+        var now = AudioKit.DspNow;
+        var octaveUp = FreePlayKeys.OctaveUp;
+        for (var key = 0; key < FreePlayMap.KeyCount; key++)
+        {
+            // Down and up can both come in one frame (a quick tap during a hitch): not held now = pressed then let go
+            // (a tap); still held = let go then pressed again (the press ends the old note anyway).
+            var down = FreePlayKeys.Down(key);
+            var up = FreePlayKeys.Up(key);
+            if (down && up && !FreePlayKeys.Held(key))
+            {
+                FreeTap(key, FreePlayMap.Pitch(_kind, key, octaveUp), now);
+            }
+            else if (down)
+            {
+                FreePress(key, FreePlayMap.Pitch(_kind, key, octaveUp), now);
+            }
+            else if (up)
+            {
+                FreeRelease(key, now);
+            }
+        }
+        if (_clock - _lastFlush >= LiveFlushInterval && Batch.Notes.Count > 0)
+        {
+            Flush();
+        }
+        if (_clock - _lastSent >= KeepAlive)
+        {
+            Flush(keepAlive: true);
+        }
+        MiniGameHud.UpdateFreePlay(_kind, octaveUp);
+    }
+
+    // Key down: its note sounds now and goes out live. Flute: one note at a time (the one held ends where the new one
+    // starts: legato), held until the key comes up (Space let go meanwhile: the note keeps its pitch).
+    private static void FreePress(int key, int pitch, double now)
+    {
+        if (pitch < 0)
+        {
+            return;
+        }
+        float length;
+        switch (_kind)
+        {
+            case InstrumentKind.Flute:
+                if (_freeFlutePitch >= 0)
+                {
+                    FreeNoteOff(_freeFlutePitch, now);
+                }
+                _freeFluteKey = key;
+                _freeFlutePitch = pitch;
+                length = FreeFluteHold;
+                break;
+            case InstrumentKind.Lyre:
+                length = FreeLyreLength;
+                break;
+            default:
+                length = FreeHitLength;
+                break;
+        }
+        var p = (byte)pitch;
+        if (_emitter != null)
+        {
+            _emitter.Schedule(now, now + length, p, FreeVelocity);
+        }
+        AddLive(new Note(_clock, length, p, FreeVelocity));
+        if (Pulses.Count < 256)
+        {
+            Pulses.Add(new Pulse { At = now, Pitch = p, Velocity = FreeVelocity });
+        }
+    }
+
+    // Key down and up in one frame: lyre and tambourine as a press; flute a short note with no held state and no note
+    // off (never a note held for 8 s by a key that is already up).
+    private static void FreeTap(int key, int pitch, double now)
+    {
+        if (_kind != InstrumentKind.Flute)
+        {
+            FreePress(key, pitch, now);
+            return;
+        }
+        if (pitch < 0)
+        {
+            return;
+        }
+        if (_freeFlutePitch >= 0)
+        {
+            FreeNoteOff(_freeFlutePitch, now);
+        }
+        _freeFluteKey = -1;
+        _freeFlutePitch = -1;
+        var p = (byte)pitch;
+        if (_emitter != null)
+        {
+            _emitter.Schedule(now, now + FreeTapLength, p, FreeVelocity);
+        }
+        AddLive(new Note(_clock, FreeTapLength, p, FreeVelocity));
+        if (Pulses.Count < 256)
+        {
+            Pulses.Add(new Pulse { At = now, Pitch = p, Velocity = FreeVelocity });
+        }
+    }
+
+    // Key up: the flute note of that key ends (lyre strings and tambourine hits ring by themselves).
+    private static void FreeRelease(int key, double now)
+    {
+        if (_freeFluteKey != key || _freeFlutePitch < 0)
+        {
+            return;
+        }
+        FreeNoteOff(_freeFlutePitch, now);
+        _freeFluteKey = -1;
+        _freeFlutePitch = -1;
+    }
+
+    private static void FreeNoteOff(int pitch, double now)
+    {
+        if (_emitter != null)
+        {
+            _emitter.EndNote(now, (byte)pitch);
+        }
+        AddLive(new Note(_clock, 0f, (byte)pitch, 0)); // velocity 0 = note off (NoteBatch layout 2)
+    }
+
+    private static void AddLive(Note note)
+    {
+        if (Batch.Notes.Count >= NoteBatch.MaxNotes)
+        {
+            Flush();
+        }
+        Batch.Notes.Add(note);
+#if DEBUG
+        if (note.Velocity == 0)
+        {
+            NoteOffsSent++;
+        }
+        else
+        {
+            NoteOnsSent++;
+        }
+        SentRing[SentRingPos] = new KeyValuePair<byte, byte>(note.Pitch, note.Velocity);
+        SentRingPos = (SentRingPos + 1) % SentRing.Length;
+#endif
+    }
+
+    private static void ResetFreeKeys()
+    {
+        _freeFluteKey = -1;
+        _freeFlutePitch = -1;
+    }
+
+#if DEBUG
+    internal static int FreeFlutePitch => _freeFlutePitch;
+    internal static int NoteOnsSent;
+    internal static int NoteOffsSent;
+    internal static BatchFlags LastFlags;
+    // Last 8 free play notes put in a batch (pitch, velocity), oldest overwritten.
+    internal static readonly KeyValuePair<byte, byte>[] SentRing = new KeyValuePair<byte, byte>[8];
+    internal static int SentRingPos;
+
+    // n = 1: the last note sent, 2: the one before...
+    internal static KeyValuePair<byte, byte> SentBack(int n) => SentRing[((SentRingPos - n) % SentRing.Length + SentRing.Length) % SentRing.Length];
+#endif
 
     private static void Encore(Player player, MiniGame game)
     {
@@ -674,7 +908,7 @@ internal static class Performance
         Batch.Instrument = _kind;
         Batch.Seq = _seq++;
         Batch.SentAt = _clock;
-        if (_mode == PerformanceMode.MiniGame)
+        if (LiveInput)
         {
             Batch.Flags |= BatchFlags.Live;
         }
@@ -688,6 +922,7 @@ internal static class Performance
             NoteRelay.Send(Batch);
 #if DEBUG
             BatchesSent++;
+            LastFlags = Batch.Flags;
 #endif
         }
         finally
@@ -718,6 +953,22 @@ internal static class Performance
             }
         }
     }
+
+    // Keyboard was the instrument: keys still down at the stop are also game buttons (Q = auto-run, Space = jump,
+    // E = use, the letters = walking). Forget them until pressed again, or the bard runs off or jumps at once.
+    private static void ForgetHeldKeys(Player player)
+    {
+        foreach (var button in HeldButtons)
+        {
+            ZInput.ResetButtonStatus(button);
+        }
+        if (player != null)
+        {
+            player.m_autoRun = false;
+        }
+    }
+
+    private static readonly string[] HeldButtons = { "AutoRun", "Jump", "Use", "Forward", "Backward", "Left", "Right", "Crouch" };
 
     // A click that stops or closes is the game's Attack/Block too: forget it now, or the still-held button reaches
     // vanilla next tick (a seated player stands up, a toggled block switches on). Same as the game's own windows do.

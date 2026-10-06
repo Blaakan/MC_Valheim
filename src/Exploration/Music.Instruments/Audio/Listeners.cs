@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using MC.Shared;
 using UnityEngine;
@@ -256,6 +257,8 @@ internal static class Listeners
         }
         remote.LastBatchDsp = now;
 
+        // A late note on is moved to now; a note off after it moves by as much (a quick tap keeps its note off).
+        var shift = 0.0;
         foreach (var note in batch.Notes)
         {
             // Note far from its batch's send time: broken or hostile stream (it would keep the emitter alive).
@@ -267,6 +270,15 @@ internal static class Listeners
                 continue;
             }
             var start = remote.Anchor + note.Time;
+            if (note.Velocity == 0)
+            {
+                // Note off (free play held note): end it there (late = now). No pulse, no new sound.
+                if (remote.Emitter != null)
+                {
+                    remote.Emitter.EndNote(Math.Max(start + shift, now), note.Pitch);
+                }
+                continue;
+            }
             if (start < now - LateDrop)
             {
 #if DEBUG
@@ -276,6 +288,7 @@ internal static class Listeners
             }
             if (start < now)
             {
+                shift = Math.Max(shift, now - start);
                 start = now;
             }
             if (remote.Emitter != null)

@@ -29,6 +29,7 @@ internal sealed class Emitter : MonoBehaviour
         internal byte Velocity;
         internal bool ReleaseAll;
         internal bool Hush;
+        internal bool EndNote;
     }
 
     private readonly object _lock = new object();
@@ -42,7 +43,7 @@ internal sealed class Emitter : MonoBehaviour
     private volatile string _error;
     private bool _errorReported;
     private volatile bool _silent = true;
-    private long _lastQueued;    // sample of the last note end queued (main thread)
+    private long _lastQueued;    // sample until which a hand-off to the audio thread may still be unseen (main thread)
     private long _clockSample;   // audio thread: sample at the start of the current buffer
     private float _range = -1f;  // hearing range last applied (3D)
 
@@ -179,12 +180,38 @@ internal sealed class Emitter : MonoBehaviour
             _pending[_pendingCount++] = new Pending { Start = start, End = end, Pitch = pitch, Velocity = velocity };
         }
         _silent = false;
-        // Tail: notes may ring past their end (lyre up to ~3.6 s, release).
-        var tail = end + (long)(4.0 * _rate);
-        if (tail > _lastQueued)
+        GuardHandOff();
+    }
+
+    // The audio thread may drain pending items and only report the synth state a buffer later: Silent waits a quarter
+    // second after the last hand-off. Queued notes (also far ahead) and ringing tails then show in the synth's own state
+    // (a note off that ends a held note frees the source soon, never 8 s + 4 s later).
+    private void GuardHandOff()
+    {
+        var guard = (long)(AudioKit.DspRaw * _rate) + _rate / 4;
+        if (guard > _lastQueued)
         {
-            _lastQueued = tail;
+            _lastQueued = guard;
         }
+    }
+
+    // Note off at an audio-clock time (seconds): notes of that pitch sounding past it end there (free play).
+    internal void EndNote(double dspEnd, byte pitch)
+    {
+        if (_failed)
+        {
+            return;
+        }
+        var end = (long)(dspEnd * _rate);
+        lock (_lock)
+        {
+            if (_pendingCount >= MaxPending)
+            {
+                return;
+            }
+            _pending[_pendingCount++] = new Pending { Start = end, End = end, Pitch = pitch, EndNote = true };
+        }
+        GuardHandOff();
     }
 
     // Every note let go now (tails ring) and queued ones dropped.
@@ -195,11 +222,7 @@ internal sealed class Emitter : MonoBehaviour
             _pendingCount = 0;
             _pending[_pendingCount++] = new Pending { ReleaseAll = true };
         }
-        var tail = (long)(AudioKit.DspRaw * _rate) + (long)(4.0 * _rate);
-        if (tail > _lastQueued)
-        {
-            _lastQueued = tail;
-        }
+        GuardHandOff();
     }
 
     // Silence now (feature off, world exit).
@@ -348,6 +371,10 @@ internal sealed class Emitter : MonoBehaviour
                 else if (p.ReleaseAll)
                 {
                     _synth.ReleaseAll(now);
+                }
+                else if (p.EndNote)
+                {
+                    _synth.EndNote(p.Pitch, Math.Max(now, p.End)); // late note off: ends it now
                 }
                 else if (p.End > now && p.Start >= now - _rate / 10)
                 {

@@ -44,13 +44,14 @@ internal static class SelfTests
     private const string ListenName = "music.listen";
     private const string WindowName = "music.window";
     private const string ShareName = "music.share";
+    private const string FreePlayName = "music.freeplay";
     private const string PoseName = "music.pose";
     private const string ExportName = "music.export";
 
     private static readonly string[] Names =
     {
-        NetworkName, ItemName, SynthName, SongsName, PerformName, AutoplayName, ListenName, WindowName, ShareName, PoseName,
-        ExportName,
+        NetworkName, ItemName, SynthName, SongsName, PerformName, AutoplayName, ListenName, WindowName, ShareName,
+        FreePlayName, PoseName, ExportName,
     };
 #endif
 
@@ -67,6 +68,7 @@ internal static class SelfTests
         SelfTest.Register(ListenName, RunListen);
         SelfTest.Register(WindowName, RunWindow);
         SelfTest.Register(ShareName, RunShare);
+        SelfTest.Register(FreePlayName, RunFreePlay);
         SelfTest.Register(PoseName, RunPose);
         SelfTest.Register(ExportName, RunExport);
 #endif
@@ -92,6 +94,7 @@ internal static class SelfTests
         InstrumentPose.TestAsRemote = false;
         TestCamera.Active = false;
         Plugin.TestInactive = false;
+        FreePlayKeys.ClearTest();
         for (var i = 0; i < LaneKeys.TestPress.Length; i++)
         {
             LaneKeys.TestPress[i] = false;
@@ -445,8 +448,8 @@ internal static class SelfTests
             "batch header kept");
         c.Check(read.Notes.Count == 2 && Mathf.Abs(read.Notes[0].Time - 12.501f) < 0.0011f && read.Notes[0].Pitch == 60
                 && Mathf.Abs(read.Notes[0].Length - 0.75f) < 0.0011f, "notes kept to the millisecond");
-        c.Check(Mathf.Approximately(read.Notes[1].Length, NoteBatch.MaxLengthMs / 1000f) && read.Notes[1].Velocity == 1,
-            "long length and zero velocity brought into range");
+        c.Check(Mathf.Approximately(read.Notes[1].Length, NoteBatch.MaxLengthMs / 1000f) && read.Notes[1].Velocity == 0,
+            "long length brought into range, velocity 0 kept (note off, layout 2)");
         // Bad instrument / too many notes / cut off.
         var bad = new ZPackage();
         bad.Write(NoteBatch.Layout);
@@ -900,6 +903,210 @@ internal static class SelfTests
         vlq.CopyTo(result, 0);
         data.CopyTo(result, vlq.Count);
         return result;
+    }
+
+    // ---------- music.freeplay ----------
+
+    // Free play: piano key map, window entry, held flute note ends on key up (legato, Space = octave up), HUD keys lit,
+    // live batches, no comfort, tambourine keys, stop; listener: a note off on the wire ends a long note early.
+    private static IEnumerator RunFreePlay()
+    {
+        var c = new Checks(FreePlayName);
+        var player = Player.m_localPlayer;
+        if (player == null)
+        {
+            SelfTest.Fail(FreePlayName, "no player");
+            yield break;
+        }
+        var rig = new Rig(player);
+        try
+        {
+            rig.TakeControls();
+            ServerRules.TestRules = TestRules();
+            FreePlayKeys.ClearTest();
+            player.GetSEMan().RemoveStatusEffect(InstrumentContent.EffectHash, true);
+
+            // Key map (pure): piano keys, Z = C4 on the flute, Q = C5, P = E6; Space an octave up.
+            c.Check(FreePlayMap.Pitch(InstrumentKind.Flute, 0, false) == 60 && FreePlayMap.Pitch(InstrumentKind.Flute, 12, false) == 72
+                    && FreePlayMap.Pitch(InstrumentKind.Flute, 28, false) == 88 && FreePlayMap.Pitch(InstrumentKind.Flute, 12, true) == 84,
+                "flute piano: C4 to E6, Space an octave up");
+            c.Check(FreePlayMap.Pitch(InstrumentKind.Lyre, 0, false) == 48 && FreePlayMap.Pitch(InstrumentKind.Lyre, 1, false) == 49,
+                "lyre piano from C3, black keys are the sharps");
+            c.Check(FreePlayMap.IsBlack(1) && !FreePlayMap.IsBlack(4) && FreePlayMap.WhiteIndex(1) == 0 && FreePlayMap.WhiteIndex(2) == 1
+                    && FreePlayMap.WhiteIndex(28) == FreePlayMap.WhiteCount - 1 && FreePlayKeys.Key(1) == KeyCode.S
+                    && FreePlayKeys.Key(13) == KeyCode.Alpha2,
+                "piano layout: S is C#, 2 is the upper C#, 17 white keys");
+            c.Check(FreePlayMap.Pitch(InstrumentKind.Tambourine, 2, false) == (int)TambourineHit.Hit
+                    && FreePlayMap.Pitch(InstrumentKind.Tambourine, 5, false) == (int)TambourineHit.Shake
+                    && FreePlayMap.Pitch(InstrumentKind.Tambourine, 1, false) < 0 && FreePlayMap.Pitch(InstrumentKind.Tambourine, 7, false) < 0,
+                "tambourine: Z X C V only");
+
+            // From the window's first entry.
+            rig.Hold(InstrumentKind.Flute);
+            yield return new WaitForSeconds(0.4f);
+            Performance.TestRequestOpen();
+            yield return Frames(3);
+            c.Check(SongWindow.IsOpen && SongWindow.TestSelect(SongLibrary.FreePlayId), "Free play in the song window");
+            yield return Frames(2);
+            SongWindow.TestPress("Play");
+            yield return Frames(3);
+            c.Check(Performance.Mode == PerformanceMode.FreePlay && KeyCapture.Active, "free play runs, game keys held back");
+            c.Check(MiniGameHud.FreeShown, "free play keys shown: " + MiniGameHud.FreeTitle);
+            var sentBefore = Performance.BatchesSent;
+            var emitter = Performance.LocalEmitter;
+            var onsBefore = Performance.NoteOnsSent;
+            var offsBefore = Performance.NoteOffsSent;
+
+            // Q (upper C): C5, held.
+            FreePlayKeys.TestDown[12] = true;
+            yield return Frames(3);
+            c.Check(Performance.FreeFlutePitch == 72, "held flute key: C5 (" + Performance.FreeFlutePitch + ")");
+            c.Check(MiniGameHud.FreeLitCount == 1, "its key box lit");
+            var last = Performance.SentBack(1);
+            c.Check(Performance.NoteOnsSent == onsBefore + 1 && last.Key == 72 && last.Value > 0, $"note on 72 sent ({last.Key}, {last.Value})");
+            yield return new WaitForSeconds(0.3f);
+            SelfTest.Screenshot(FreePlayName, "flute");
+            if (emitter != null)
+            {
+                emitter.ResetMeasure();
+            }
+            yield return new WaitForSeconds(0.4f);
+            c.Check(emitter != null && emitter.Rms > 0.001f, $"held flute note sounds (rms {F(emitter != null ? emitter.Rms : 0f)})");
+            c.Check(Performance.BatchesSent > sentBefore && (Performance.LastFlags & BatchFlags.Live) != 0, "streamed live");
+            FreePlayKeys.TestUp[12] = true;
+            yield return Frames(2);
+            last = Performance.SentBack(1);
+            c.Check(Performance.NoteOffsSent == offsBefore + 1 && last.Key == 72 && last.Value == 0, $"key up sends the note off for 72 ({last.Key}, {last.Value})");
+            yield return new WaitForSeconds(0.5f);
+            if (emitter != null)
+            {
+                emitter.ResetMeasure();
+            }
+            yield return new WaitForSeconds(0.4f);
+            c.Check(emitter != null && emitter.Rms < 0.0002f, $"key up ends the flute note (rms {F(emitter != null ? emitter.Rms : 0f)})");
+            c.Check(Performance.FreeFlutePitch < 0 && MiniGameHud.FreeLitCount == 0, "nothing held");
+
+            // One flute note at a time: the new key takes over; letting go of the old one keeps the new note.
+            FreePlayKeys.TestDown[12] = true;
+            yield return Frames(2);
+            FreePlayKeys.TestDown[16] = true;
+            yield return Frames(2);
+            c.Check(Performance.FreeFlutePitch == 76, "second flute key (E) takes over: E5 (" + Performance.FreeFlutePitch + ")");
+            var before = Performance.SentBack(2);
+            last = Performance.SentBack(1);
+            c.Check(before.Key == 72 && before.Value == 0 && last.Key == 76 && last.Value > 0, "takeover: note off 72 then note on 76");
+            var offsTakeover = Performance.NoteOffsSent;
+            FreePlayKeys.TestUp[12] = true;
+            yield return Frames(2);
+            c.Check(Performance.FreeFlutePitch == 76 && Performance.NoteOffsSent == offsTakeover,
+                "letting go of the first key keeps the second note (no note off)");
+            FreePlayKeys.TestUp[16] = true;
+            yield return Frames(2);
+
+            // Down and up in the same frame (a quick tap during a hitch): a short note, nothing left held.
+            var tapOns = Performance.NoteOnsSent;
+            var tapOffs = Performance.NoteOffsSent;
+            FreePlayKeys.TestDown[14] = true;
+            FreePlayKeys.TestUp[14] = true;
+            yield return Frames(2);
+            last = Performance.SentBack(1);
+            c.Check(Performance.FreeFlutePitch < 0 && Performance.NoteOnsSent == tapOns + 1 && Performance.NoteOffsSent == tapOffs
+                    && last.Key == 74, $"same-frame tap: short D5, nothing held ({last.Key}, held {Performance.FreeFlutePitch})");
+            yield return new WaitForSeconds(0.4f);
+            if (emitter != null)
+            {
+                emitter.ResetMeasure();
+            }
+            yield return new WaitForSeconds(0.3f);
+            c.Check(emitter != null && emitter.Rms < 0.0002f, $"the tap does not keep sounding (rms {F(emitter != null ? emitter.Rms : 0f)})");
+
+            // Space held = octave up.
+            FreePlayKeys.TestOctave = true;
+            FreePlayKeys.TestDown[12] = true;
+            yield return Frames(2);
+            c.Check(Performance.FreeFlutePitch == 84, "Space: octave up, C6 (" + Performance.FreeFlutePitch + ")");
+            c.Check(MiniGameHud.FreeTitle != null && MiniGameHud.FreeTitle.Contains("octave up"), "piano shows the octave up");
+            yield return Frames(2);
+            SelfTest.Screenshot(FreePlayName, "octave");
+            FreePlayKeys.TestUp[12] = true;
+            FreePlayKeys.TestOctave = false;
+            yield return Frames(2);
+            c.Check(!player.GetSEMan().HaveStatusEffect(InstrumentContent.EffectHash), "free play gives no Music effect");
+            Performance.TestRequestStop();
+            yield return Frames(3);
+            c.Check(Performance.Mode == PerformanceMode.None && !MiniGameHud.FreeShown, "stopped, keys panel gone");
+            yield return Frames(2);
+            c.Check(!KeyCapture.Active, "keys given back");
+
+            // Tambourine: its four keys only.
+            rig.Hold(InstrumentKind.Tambourine);
+            yield return new WaitForSeconds(0.4f);
+            c.Check(Performance.StartFreePlay(out var error), "free play on the tambourine: " + error);
+            yield return Frames(2);
+            var drum = Performance.LocalEmitter; // a new source: the instrument changed
+            if (drum != null)
+            {
+                drum.ResetMeasure();
+            }
+            var drumOns = Performance.NoteOnsSent;
+            FreePlayKeys.TestDown[2] = true;
+            yield return Frames(2);
+            c.Check(MiniGameHud.FreeLitCount == 1, "tambourine Hit key (X) lit");
+            last = Performance.SentBack(1);
+            c.Check(Performance.NoteOnsSent == drumOns + 1 && last.Key == (byte)TambourineHit.Hit, $"X sends a Hit ({last.Key})");
+            yield return new WaitForSeconds(0.1f);
+            c.Check(drum != null && drum.Rms > 0.001f, $"the hit sounds (rms {F(drum != null ? drum.Rms : 0f)})");
+            yield return Frames(2);
+            SelfTest.Screenshot(FreePlayName, "tambourine");
+            FreePlayKeys.TestUp[2] = true;
+            FreePlayKeys.TestDown[1] = true;
+            yield return Frames(2);
+            c.Check(MiniGameHud.FreeLitCount == 0 && Performance.NoteOnsSent == drumOns + 1, "a key outside its four plays nothing");
+            FreePlayKeys.TestUp[1] = true;
+            yield return Frames(2);
+            Performance.TestRequestStop();
+            yield return Frames(3);
+
+            // Listener: a held note (8 s) heard, then a note off on the wire ends it.
+            var other = new ZDOID(434343L, 9u);
+            var place = player.transform.position + player.transform.right * 5f;
+            var on = new NoteBatch { Performance = 77, Performer = other, Position = place, Instrument = InstrumentKind.Flute, SentAt = 0f, Flags = BatchFlags.Live };
+            on.Notes.Add(new Note(0.05f, 8f, 72, 100));
+            Listeners.Receive(on);
+            yield return new WaitForSeconds(0.8f);
+            var remote = Listeners.FirstEmitter;
+            if (remote != null)
+            {
+                remote.ResetMeasure();
+            }
+            yield return new WaitForSeconds(0.3f);
+            c.Check(remote != null && remote.Rms > 0.0005f, $"listener hears the held note (rms {F(remote != null ? remote.Rms : 0f)})");
+            var off = new NoteBatch { Performance = 77, Performer = other, Position = place, Instrument = InstrumentKind.Flute, SentAt = 1.1f, Flags = BatchFlags.Live };
+            off.Notes.Add(new Note(1.1f, 0f, 72, 0));
+            var offPkg = off.ToPackage();
+            offPkg.SetPos(0);
+            var offBack = new NoteBatch();
+            c.Check(NoteBatch.TryRead(offPkg, offBack) && offBack.Notes.Count == 1 && offBack.Notes[0].Velocity == 0,
+                "note off kept on the wire (velocity 0)");
+            Listeners.Receive(off);
+            yield return new WaitForSeconds(0.7f);
+            if (remote != null)
+            {
+                remote.ResetMeasure();
+            }
+            yield return new WaitForSeconds(0.4f);
+            c.Check(remote != null && remote.Rms < 0.0002f, $"note off ends the listener's note (rms {F(remote != null ? remote.Rms : 0f)})");
+            var end = new NoteBatch { Performance = 77, Performer = other, Position = place, Instrument = InstrumentKind.Flute, SentAt = 2.3f, Flags = BatchFlags.End };
+            Listeners.Receive(end);
+            yield return WaitFor(() => Listeners.RemoteCount == 0, 6f);
+            c.Check(Listeners.RemoteCount == 0, "listener sound source freed soon after End (note off ended the 8 s note)");
+            c.Report();
+        }
+        finally
+        {
+            FreePlayKeys.ClearTest();
+            rig.Restore();
+        }
     }
 
     // ---------- music.share ----------

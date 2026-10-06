@@ -120,6 +120,26 @@ internal sealed class SynthCore
 
     internal bool Silent => _queued == 0 && ActiveVoices == 0;
 
+    // Note off (free play: a held flute note's length is not known when it starts): every queued or sounding note of
+    // that pitch that started by end and lasts past it ends at end. Later notes of the pitch are left alone.
+    internal void EndNote(byte pitch, long end)
+    {
+        for (var i = 0; i < _queued; i++)
+        {
+            if (_queue[i].Pitch == pitch && _queue[i].Start <= end && _queue[i].End > end)
+            {
+                _queue[i].End = Math.Max(_queue[i].Start + 1, end);
+            }
+        }
+        foreach (var v in _voices)
+        {
+            if (v.Active && v.Pitch == pitch && v.StartSample <= end)
+            {
+                v.ReleaseAt(end);
+            }
+        }
+    }
+
     // Add count samples starting at sample clock from into mono[offset..] (mono is cleared by caller).
     internal void Render(float[] mono, int offset, int count, long from)
     {
@@ -185,6 +205,8 @@ internal sealed class SynthCore
             return;
         }
         // Stolen voice still sounding go on from its level and phase (no click).
+        pick.Pitch = s.Pitch;
+        pick.StartSample = now;
         pick.Begin(s.Pitch, s.Velocity, now, s.End, ++_age);
     }
 
@@ -209,6 +231,8 @@ internal sealed class SynthCore
         protected uint Seed;
         internal bool Active;
         internal long Age;
+        internal byte Pitch;        // note it plays (note off finds it)
+        internal long StartSample;  // when it started (note off never ends a later note)
         protected long EndSample;
 
         protected Voice(int rate, uint seed)

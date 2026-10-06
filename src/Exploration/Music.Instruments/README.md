@@ -25,6 +25,17 @@ mini-game whose good performances give everyone nearby extra comfort.
     it again and again. Attack or Block stops it. It keeps playing behind the pause menu, like the game's music.
   - **Perform**: play it yourself in the rhythm game (below).
   - **Close**, Esc or the gamepad B button closes the window.
+- **Free play** (the window's first entry): play the keyboard like a piano. The bottom letter row Z X C V B N M is
+  the lower octave's white keys (C to B) with its black keys on the row above (S D, then G H J, where a piano has
+  them); the top letter row Q W E R T Y U I O P is the upper octave's white keys with its black keys on the number row
+  (2 3, 5 6 7, 9 0): every note from C to the E two octaves up. Hold Space to play everything an octave higher. Keys
+  go by place on the keyboard, so an AZERTY keyboard uses the keys at the same places; a piano on screen shows your own
+  key names and the notes and lights the keys you hold. The flute plays one note at a time and holds it while the key
+  is down (up to 8 seconds); the lyre's strings ring and can sound together; the tambourine has four keys, Z X C V:
+  thump, hit, jingle and shake. You stand still while you play, the game's keys are held back, and right click or Esc
+  stops (keys still held then do nothing in the game until pressed again: no sudden run or jump). Free play is played
+  on the keyboard, not with a gamepad. Other players hear you live, like the rhythm game. Free play gives no comfort
+  bonus.
 - **Built-in songs**: four traditional tunes (Drunken Sailor, Greensleeves, Vem kan segla förutan vind, Kjerringa med
   staven) and four written for this mod (Hearthfire Lullaby, Row the Longship, Raven's Jig, Mead Hall Reel). Each
   instrument plays its own part: the flute the melody, the lyre the melody with strummed chords, the tambourine the

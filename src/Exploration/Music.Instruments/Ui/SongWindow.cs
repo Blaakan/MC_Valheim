@@ -45,6 +45,7 @@ internal static class SongWindow
     private const string WindowName = ModInfo.Guid + ".SongWindow";
     private const string MidiHeader = "Your MIDI songs";
     private const string ServerHeader = "Server songs";
+    private const string FreePlayOnKeyboard = "Free play is played on the keyboard.";
     private const string NoSongText = "Choose a song.";
     private const string CannotPlay = "You cannot play now.";
     private const string NavKeys = "Up/Down: choose a song    Left/Right: part    Enter: play    Esc: close";
@@ -157,8 +158,18 @@ internal static class SongWindow
             _selected = -1;
             _part = -1;
             _loadPending = false;
+            // The free play line names the player's own keys (labels by keyboard layout).
+            SongLibrary.FreePlay.Info = "Play the keyboard like a piano: " + FreePlayKeys.Label(0) + " to "
+                                        + FreePlayKeys.Label(11) + " and " + FreePlayKeys.Label(12) + " to "
+                                        + FreePlayKeys.Label(FreePlayMap.KeyCount - 1)
+                                        + ", black keys on the row above; Space: octave up";
             var last = Find(Performance.LastSongId);
-            Select(last >= 0 ? last : NextSong(-1, 1), keepPart: true, loadNow: true);
+            var pick = last >= 0 ? last : NextSong(-1, 1);
+            if (ZInput.IsGamepadActive() && pick >= 0 && Items[pick].Entry.Source == SongSource.FreePlay)
+            {
+                pick = NextSong(pick, 1); // on a pad, A plays the first song, as before free play
+            }
+            Select(pick, keepPart: true, loadNow: true);
             _canvas.sortingOrder = UiKit.OrderAboveFrameBuffer(WantedOrder);
             _group.m_groupPriority = UiKit.TopPriority(_group);
             _heldDir = 0;
@@ -588,6 +599,7 @@ internal static class SongWindow
     private static void RebuildItems()
     {
         Items.Clear();
+        Items.Add(new Item { Kind = ItemKind.Song, Entry = SongLibrary.FreePlay });
         foreach (var song in SongLibrary.Presets)
         {
             Items.Add(new Item { Kind = ItemKind.Song, Entry = song });
@@ -1073,7 +1085,9 @@ internal static class SongWindow
             return false;
         }
         string error;
-        var ok = miniGame ? Performance.StartMiniGame(e, _part, out error) : Performance.StartAuto(e, _part, out error);
+        var ok = e.Source == SongSource.FreePlay
+            ? Performance.StartFreePlay(out error)
+            : miniGame ? Performance.StartMiniGame(e, _part, out error) : Performance.StartAuto(e, _part, out error);
         if (ok)
         {
             return true;
@@ -1262,6 +1276,13 @@ internal static class SongWindow
             if (ZInput.GetButtonDown("JoyButtonA"))
             {
                 ZInput.ResetButtonStatus("JoyButtonA");
+                var e = SelectedEntry;
+                if (e != null && e.Source == SongSource.FreePlay)
+                {
+                    // Free play is the keyboard as a piano: no run the pad cannot play (like the rhythm game).
+                    SetStatus(FreePlayOnKeyboard);
+                    return false;
+                }
                 return StartSelected(miniGame: false);
             }
             if (ZInput.GetButtonDown("JoyButtonX"))

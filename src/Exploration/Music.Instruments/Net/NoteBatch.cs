@@ -17,12 +17,13 @@ internal enum BatchFlags : byte
 // the performer's game), when it was sent (performer's performance clock), flags, and up to MaxNotes notes. Note times
 // are the performance clock (seconds) at which the note sounds for the performer; listeners map that clock to their
 // own audio clock (never compare clocks across machines).
-// Wire (layout 1): byte layout, int performance, ZDOID performer, Vector3 position, byte instrument, int seq,
+// Wire (layout 2): byte layout, int performance, ZDOID performer, Vector3 position, byte instrument, int seq,
 // float sentAt, byte flags, byte count, then per note: int timeMs, byte pitch, byte velocity, ushort lengthMs.
+// Velocity 0 = note off (free play): notes of that pitch sounding at timeMs end there (length ignored).
 // Package goes inside a ZRpc call as a ZPackage (never raw parameters: a bad parameter read logs the host out).
 internal sealed class NoteBatch
 {
-    internal const byte Layout = 1;
+    internal const byte Layout = 2;
     internal const int MaxNotes = 48;
     internal const int MaxLengthMs = 60000;
 
@@ -123,8 +124,7 @@ internal sealed class NoteBatch
                 {
                     return false;
                 }
-                into.Notes.Add(new Note(timeMs / 1000f, Math.Min(lengthMs, (ushort)MaxLengthMs) / 1000f, pitch,
-                    velocity == 0 ? (byte)1 : velocity));
+                into.Notes.Add(new Note(timeMs / 1000f, Math.Min(lengthMs, (ushort)MaxLengthMs) / 1000f, pitch, velocity));
             }
             return true;
         }

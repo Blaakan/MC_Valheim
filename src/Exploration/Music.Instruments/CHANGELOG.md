@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Free play: the song window's first entry turns the keyboard into a piano, laid out like one (by place on the
+  keyboard): Z to M and Q to P are the white keys of two octaves, the black keys sit on the rows above them; hold Space
+  for an octave up. An on-screen piano shows your keys and lights the ones you hold. The flute holds a note while its
+  key is down, the lyre's strings ring together, the tambourine has four keys (Z X C V). Other players hear it live;
+  it gives no comfort bonus.
+- Network version 5: every player and the server need this version.
+
 ## 0.3.0
 
 - The Encore is easier: hitting half of your last 20 notes for 20 seconds is enough (every hit counts, near-perfect or

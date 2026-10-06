@@ -2,7 +2,7 @@
   <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
   <PropertyGroup>
     <ModName>Music Instruments</ModName>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <ModScope>New</ModScope>
     <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
     <ModIdea>music instruments</ModIdea>
@@ -14,11 +14,12 @@
     <ModMultiplayer>Compatible</ModMultiplayer>
     <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. The instruments are new craftable items and their music gives a comfort bonus, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. The server passes each performance on to the players near the performer; those within hearing range hear it from the performer's position; a good mini-game performance gives the Music comfort bonus to every player near the performer. The server can also share its own MIDI songs with every player (ShareSongs). A player without the mod hears nothing, never sees instruments (on the ground, in chests or in hands), and a chest loses its instruments when such a player takes or adds an item in it. On a server without the mod, instruments dropped on the ground can be deleted.</ModMultiplayerNotes>
     <!-- Wire format of me: RPC <guid>.Settings / <guid>.SettingsRequest (MusicRules layout 3), <guid>.Notes (NoteBatch
-         layout 1), <guid>.SongListRequest / .SongList / .SongRequest / .SongChunk (SongShare layout 1), player ZDO int
+         layout 2), <guid>.SongListRequest / .SongList / .SongRequest / .SongChunk (SongShare layout 1), player ZDO int
          "<guid>.Playing", item prefabs MC_Flute / MC_Lyre / MC_Tambourine, recipes Recipe_MC_<X>, status effect
          SE_MC_Music. Bump when any of them change. 2: rules lost shelter flag. 3: server songs (rules AllowPlayerSongs,
-         song RPCs). 4: Encore rule easy now (hit share of last 20 notes, no drain), accuracy floor 0.1. -->
-    <ModNetworkVersion>4</ModNetworkVersion>
+         song RPCs). 4: Encore rule easy now (hit share of last 20 notes, no drain), accuracy floor 0.1. 5: free play, note off (velocity 0)
+         in note batches (NoteBatch layout 2). -->
+    <ModNetworkVersion>5</ModNetworkVersion>
     <ModRequires></ModRequires>
     <ModDescription>Craft a flute, a lyre and a tambourine and play them: built-in songs, your own MIDI files or the server's, or a rhythm mini-game whose good performances give everyone nearby extra comfort.</ModDescription>
   </PropertyGroup>
