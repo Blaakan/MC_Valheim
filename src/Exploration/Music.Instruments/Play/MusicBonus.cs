@@ -37,8 +37,7 @@ internal static class MusicBonus
             var text = fromOther
                 ? "The music warms you: +" + rules.ComfortBonus + " comfort"
                 : "Your music warms everyone near you: +" + rules.ComfortBonus + " comfort";
-            player.Message(MessageHud.MessageType.TopLeft,
-                rules.BonusOnlyInShelter ? text + " in shelter." : text + ".");
+            player.Message(MessageHud.MessageType.TopLeft, text + ".");
         }
         Log.Debug($"Music effect {(had ? "renewed" : "started")} for {rules.BonusMinutes:0.#} min ({(fromOther ? "heard" : "own")} performance).");
         return true;
@@ -49,8 +48,8 @@ internal static class MusicBonus
     internal static int BonusInForce(MusicRules rules) =>
         !Plugin.FeatureActive || rules.IsPending ? 0 : System.Math.Max(0, rules.ComfortBonus);
 
-    // Comfort the Music effect adds now for this (local) player: 0 without the effect, outside shelter when the rules
-    // want shelter, or with bonus off.
+    // Comfort the Music effect adds now for this (local) player: 0 without the effect or with bonus off. Shelter or
+    // not: resting outdoors by a fire (sitting) use this comfort for Rested too.
     internal static int ComfortFor(Player player)
     {
         var seman = player.m_seman;
@@ -61,10 +60,6 @@ internal static class MusicBonus
         var rules = ServerRules.Current;
         var bonus = BonusInForce(rules);
         if (bonus <= 0)
-        {
-            return 0;
-        }
-        if (rules.BonusOnlyInShelter && !player.InShelter())
         {
             return 0;
         }

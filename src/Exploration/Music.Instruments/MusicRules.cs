@@ -42,13 +42,12 @@ internal sealed class MusicRules
     internal int TambourineStationLevel = 2;
 
     // Comfort: a good mini-game run of SuccessSeconds (SuccessAccuracy of the notes hit) gives ComfortBonus comfort
-    // for BonusMinutes to the performer and every player within BonusRange m; only in shelter unless off.
+    // for BonusMinutes to the performer and every player within BonusRange m, wherever they rest (shelter or not).
     internal int ComfortBonus = 3;
     internal float SuccessSeconds = 20f;
     internal float SuccessAccuracy = 0.7f;
     internal float BonusMinutes = 10f;
     internal float BonusRange = 20f;
-    internal bool BonusOnlyInShelter = true;
 
     // Sound: players farther than this hear nothing (and get no notes over the network).
     internal float HearingRange = 40f;
@@ -116,13 +115,13 @@ internal sealed class MusicRules
             SuccessAccuracy = V(Plugin.SuccessAccuracy, d.SuccessAccuracy),
             BonusMinutes = V(Plugin.BonusMinutes, d.BonusMinutes),
             BonusRange = V(Plugin.BonusRange, d.BonusRange),
-            BonusOnlyInShelter = V(Plugin.BonusOnlyInShelter, d.BonusOnlyInShelter),
             HearingRange = V(Plugin.HearingRange, d.HearingRange),
         };
     }
 
     // Wire: layout, then every value in fixed order. Layout bump = other order (ModNetworkVersion too).
-    internal const int Layout = 1;
+    // Layout 2: shelter flag gone (bonus count everywhere).
+    internal const int Layout = 2;
 
     internal void Write(ZPackage pkg)
     {
@@ -141,7 +140,6 @@ internal sealed class MusicRules
         pkg.Write(SuccessAccuracy);
         pkg.Write(BonusMinutes);
         pkg.Write(BonusRange);
-        pkg.Write(BonusOnlyInShelter);
         pkg.Write(HearingRange);
     }
 
@@ -173,7 +171,6 @@ internal sealed class MusicRules
             r.SuccessAccuracy = Clamp(pkg.ReadSingle(), AccuracyMin, AccuracyMax, d.SuccessAccuracy, ref clamped);
             r.BonusMinutes = Clamp(pkg.ReadSingle(), BonusMinutesMin, BonusMinutesMax, d.BonusMinutes, ref clamped);
             r.BonusRange = Clamp(pkg.ReadSingle(), BonusRangeMin, BonusRangeMax, d.BonusRange, ref clamped);
-            r.BonusOnlyInShelter = pkg.ReadBool();
             r.HearingRange = Clamp(pkg.ReadSingle(), HearingRangeMin, HearingRangeMax, d.HearingRange, ref clamped);
             rules = r;
             return true;
@@ -195,7 +192,7 @@ internal sealed class MusicRules
                + "; lyre " + Recipe(LyreResources, LyreStation, LyreStationLevel)
                + "; tambourine " + Recipe(TambourineResources, TambourineStation, TambourineStationLevel)
                + "; +" + ComfortBonus + " comfort for " + F(BonusMinutes) + " min within " + F(BonusRange) + " m"
-               + (BonusOnlyInShelter ? " (in shelter)" : "") + " after " + F(SuccessSeconds) + " s at "
+               + " after " + F(SuccessSeconds) + " s at "
                + F(SuccessAccuracy * 100f) + " % of the notes; heard up to " + F(HearingRange) + " m";
     }
 

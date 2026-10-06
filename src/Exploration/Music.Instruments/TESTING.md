@@ -12,8 +12,11 @@ Music.Instruments -Only music`) passed 2026-10-05 after both reviews, 10/10: `mu
 `music.perform` (simulated hits, Encore, comfort +3), `music.autoplay`, `music.listen` (incl. restart timing, a stall
 and notes after End), `music.window`, `music.pose`, `music.export`; `music.pose` passed again after the flute angle
 change (45 degrees). Both runs end "IN-WORLD TEST FAILED" only because two other MC mods (Sneak Ambush, Spyglass) log
-an error when a third-party mod builds a partial item database; Music Instruments logs no error or warning. No
-hands-on in-game test yet.
+an error when a third-party mod builds a partial item database; Music Instruments logs no error or warning.
+First hands-on test (build 5f6f777): outdoors with a bonfire and Music, Rested was 8 minutes (comfort 1: the shelter
+rule dropped the +3). Fixed after it: the bonus counts everywhere (setting BonusOnlyInShelter removed, network version
+2). Smoke test and in-world self-tests passed again 2026-10-05 (10/10; `music.perform` outdoors: comfort 4 = 1 + 3,
+Rested 660 s = 480 + 3 x 60); same two errors from Sneak Ambush and Spyglass only.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina. Items: `spawn MC_Flute`,
@@ -69,12 +72,15 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   repeats. Right click or Esc stops it (Esc also opens the menu).
 - [ ] **T09 Encore and comfort (G3):** in a shelter (roof and walls) with a burning fire: sit (X) and play the rhythm
   game well for 20 seconds. Expected: the meter fills (it drains if you play badly), "Encore! +3 comfort", the Music
-  icon appears with "+3" and 10:00 counting down; after resting about 20 seconds the Resting icon shows comfort 3
-  higher than before; Rested lasts 3 minutes longer than without Music (compare with a rest without it). Keep playing
-  well: each further 20 s renews Music to 10:00.
-- [ ] **T10 Shelter rule:** outdoors by a campfire, sit and get an Encore. Expected: the Music icon shows, but the
-  Resting comfort stays 1 (BonusOnlyInShelter). Set BonusOnlyInShelter = false: the comfort now includes +3. Put it
-  back.
+  icon appears with "+3" and 10:00 counting down; as soon as the Encore comes, the Resting icon shows comfort 3 higher
+  and the Rested timer jumps 3 minutes higher (no new "You feel rested" message if Rested was already running).
+  Keep playing well: each further 20 s renews Music to 10:00.
+- [ ] **T10 Outdoors:** outdoors by a campfire or a bonfire (no roof), sit (X), open the window and perform. Expected:
+  Resting shows comfort 1 and after about 20 s Rested starts at 8:00 (or keeps running if you were already Rested).
+  When the Encore comes, the Resting icon shows comfort 4 (the game's 1 + 3) and the Rested timer jumps to 11:00 and
+  stays there while you rest. No new "You feel rested" message: the game shows it only when Rested starts. Optional,
+  when you are not Rested: get the Encore first (standing), then sit by the fire: after about 20 s "You feel rested
+  (Comfort: 4)" and 11:00. (Changed after the first in-game test: with a bonfire and Music, Rested was 8 minutes.)
 - [ ] **T11 Autoplay gives no comfort:** let a song play by itself for a minute. Expected: no meter, no Encore, no Music.
 - [ ] **T12 Seated (E3):** sit on a chair (or press X), open the window and play, then perform. Expected: you stay
   seated the whole time (the clicks do not stand you up); stopping with a left or a right click, and closing the window
@@ -135,7 +141,7 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
 - [ ] **X01 Spyglass:** hold the spyglass, raise it; equip an instrument and play; equip the spyglass again. Expected:
   each acts only while it is in your hand; no stuck pose, view or sound.
 - [ ] **X02 Sleep Through the Day:** with Music on (get an Encore), not Rested, sleep in a bed and wake up. Expected:
-  "You feel rested (Comfort: N)" includes the +3 (in shelter).
+  "You feel rested (Comfort: N)" includes the +3.
 - [ ] **X03 Encyclopedia / Crafting Search and Sort:** open the Encyclopedia (Valheim Compendium, Encyclopedia tab) and
   type in its search, or type in the crafting search, then close it and perform. Expected: keys behave normally in
   each (no stuck capture).
@@ -158,7 +164,8 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
 - [ ] **M03 Rhythm game heard:** perform next to your friend. Expected: they hear the notes you hit (not the ones you
   miss), steady, about a quarter of a second after you.
 - [ ] **M04 Shared comfort (G5):** your friend sits near you (within 20 m); you get an Encore. Expected: they also get
-  Music ("The music warms you: +3 comfort"), with the same rules (shelter); a third player farther than 20 m does not.
+  Music ("The music warms you: +3 comfort."), and resting by the fire their comfort is 3 higher (also outdoors); a
+  third player farther than 20 m does not.
 - [ ] **M05 MIDI without the file:** play one of your MIDI files. Expected: your friend (who does not have the file)
   hears it.
 - [ ] **M06 Refused without the mod:** a friend without the mod joins a server with it (AllowPlayersWithoutMod false).

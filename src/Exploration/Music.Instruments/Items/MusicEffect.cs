@@ -73,7 +73,7 @@ internal sealed class MusicEffect : StatusEffect
             }
             var text = "A good performance warmed you: +" + bonus.ToString(CultureInfo.InvariantCulture)
                        + " comfort, so Rested lasts longer when you rest";
-            return rules.BonusOnlyInShelter ? text + " in shelter." : text + ".";
+            return text + ".";
         }
         catch (Exception e)
         {

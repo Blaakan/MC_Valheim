@@ -5,7 +5,7 @@
 | Mod | Music Instruments |
 | GUID / project | `MC.Exploration.Music.Instruments` (`src/Exploration/Music.Instruments/`, root namespace `MC.Exploration.MusicInstrumentsMod`, package `MusicInstruments`) |
 | Category / scope | Exploration / New |
-| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), sends its gameplay settings to everyone and relays the music (section 4). |
+| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 2. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), sends its gameplay settings to everyone and relays the music (section 4). |
 | Sheet idea | `music instruments` ("prerecorded songs + midi support for buffs well rested") |
 | Game version checked | Valheim 1.0.16 (Unity 6000.0.75f1, Mono), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/` (SE_Rested, SE_Cozy, SEMan, StatusEffect, Player, Humanoid, VisEquipment, ItemDrop, ObjectDB, ZNetScene, ZNet, ZRpc, ZRoutedRpc, ZPackage, ZDOMan, AudioMan, MusicMan, MusicVolume, GameCamera, Menu, Chat, Terminal, ZInput, PlayerController, Emotes, Chair); research briefs of 2026-10-05 (comfort, audio, existing mods, items, input and UI, network, pose, MIDI and preset songs), each fact-checked by a second agent |
 | Status | In development (v0.1.0 code) |
@@ -230,8 +230,9 @@ Music status effect, an Encore flag goes into the stream, and every listener who
 renews the effect for `BonusMinutes` (10 min). Songs that play by themselves never fill it.
 
 The Music effect (`MusicEffect`, `SE_MC_Music`, registered always-on in `ObjectDB`) shows "+3" and the time left. A
-`Player.GetComfortLevel` postfix adds `ComfortBonus` (3) for the local player while the effect is on and, by default,
-only in shelter (`BonusOnlyInShelter`, D4/D5). Players resting by the fire therefore get 3 more minutes of Rested.
+`Player.GetComfortLevel` postfix adds `ComfortBonus` (3) for the local player while the effect is on, wherever the
+player is (D4/D5). `SE_Rested.UpdateTTL` reads that getter, so players resting by a fire get 3 more minutes of
+Rested, in a shelter or sitting by a campfire outdoors (base comfort 1 + 3 = 4).
 
 ### 2.6 Pose (E4)
 
@@ -256,9 +257,11 @@ back before every new pose and when a performance ends.
   usual hook, but its result also raises the `MaxComfort` stat and the platform comfort achievement (Comfort is King,
   comfort 20); music should not make an achievement easier. The getter also shows the bonus at once. Other mods that
   compute comfort themselves to display it do not see the bonus (documented).
-- **D5 The bonus counts only in shelter by default** (vanilla-consistent: no comfort source counts outside a shelter;
-  outside, comfort is always 1). `BonusOnlyInShelter = false` lets it count at a campfire under the open sky. Flagged
-  to the user.
+- **D5 The bonus counts everywhere** (user decision after the first in-game test, 2026-10-05): vanilla comfort is
+  always 1 outside a shelter, and the first version also kept the Music bonus to shelters (setting
+  `BonusOnlyInShelter`, default on). Resting by a campfire outdoors then gave no extra Rested, which is not what "+3
+  comfort" promises. The setting is gone (a changed default would not reach config files that already saved it); the
+  bonus now adds to Rested wherever the player rests.
 - **D6 Comfort only matters while resting**: the effect lasts 10 minutes and renews while the performer keeps playing
   well, so listeners resting by the fire get the longer Rested; it does not refresh Rested on its own (that would be a
   full Rested refresh anywhere, much stronger than "+3 comfort").
@@ -294,10 +297,10 @@ back before every new pose and when a performance ends.
 
 ### 4.2 RPCs, ZDO keys, network version
 
-RPCs `MC.Exploration.Music.Instruments.Settings` / `.SettingsRequest` (rules layout 1) and `.Notes` (note batch layout
+RPCs `MC.Exploration.Music.Instruments.Settings` / `.SettingsRequest` (rules layout 2) and `.Notes` (note batch layout
 1); player ZDO int `MC.Exploration.Music.Instruments.Playing` (stable hash; the instrument being played, 0 = none);
 prefabs `MC_Flute`, `MC_Lyre`, `MC_Tambourine`; recipes `Recipe_MC_Flute`, `Recipe_MC_Lyre`, `Recipe_MC_Tambourine`;
-status effect `SE_MC_Music`. Network version 1.
+status effect `SE_MC_Music`. Network version 2 (1 had a shelter flag in the rules; never released).
 
 ### 4.3 Server settings and join check
 
@@ -334,7 +337,6 @@ Items are built from the network prefab list's `KnifeFlint`; no mesh, texture, m
 | Comfort | SuccessAccuracy | 0.7 | 0.3-1 | server wins |
 | Comfort | BonusMinutes | 10 | 1-60 | server wins |
 | Comfort | BonusRange | 20 | 3-50 m | server wins |
-| Comfort | BonusOnlyInShelter | true | | server wins |
 | Hearing | HearingRange | 40 | 10-80 m | server wins |
 | Sound | Volume | 0.8 | 0-1 | personal |
 | Sound | GameMusicVolume | 0.3 | 0-1 | personal |
@@ -402,8 +404,8 @@ In-world self-tests (Debug): `music.network` (rules and note batch wire, clamps,
 (registration, recipes under default rules, tool, no punch also with the feature off, recipes hidden while off, hand
 model, dropped copies screenshot), `music.synth` (filter called, sound out, left/right panning of a source to the right,
 silence after hush, mixer group), `music.songs` (presets and a generated MIDI file through the library),
-`music.perform` (mini-game with simulated presses: Encore, Music effect, comfort +3 with the shelter rule off, no bonus
-outside with it on, stop; a half-right run gets no Encore), `music.autoplay` (notes sound, ZDO flag, pose weight, music
+`music.perform` (mini-game with simulated presses: Encore, Music effect, comfort +3 outdoors, Rested length 3 comfort
+levels longer, stop; a half-right run gets no Encore), `music.autoplay` (notes sound, ZDO flag, pose weight, music
 fade, putting the instrument away stops), `music.listen` (another player's batches heard at their place, Encore in range gives
 the effect and out of range nothing, notes far from their batch time dropped, a restart keeps the old timing, a
 batch late after a 2 s stall has its notes dropped with the delay still bounded, nothing taken after End, End frees
@@ -418,7 +420,8 @@ screenshots, Perform from the window), `music.pose` (markers near targets, scree
   real-size instruments. The flute (36 cm, 2.4 cm thick, like a real recorder) is mostly hidden behind the large
   Valheim hands from the front: if it reads poorly in game, make the model thicker or longer (markers and hand
   offsets follow the model). Pose offsets (mouth position, lyre lean) still to judge in game.
-- `SE_Cozy` delay and Rested values come from prefab data (wiki: 20 s, 8 min + 1 min per comfort).
+- `SE_Cozy` delay comes from prefab data (wiki: 20 s). Rested values confirmed in game (`music.perform`): 480 s + 60 s
+  per comfort above 1, so outdoors 8 minutes, with Music 11.
 - Checked in game (2026-10-05): Unity 6 applies the spatial gains before custom filters (`music.synth`: a source on
   the right peaks 0.178 right, 0.023 left), and the "SFX" mixer group is found by name (a warning is logged if a
   later game version renames it).

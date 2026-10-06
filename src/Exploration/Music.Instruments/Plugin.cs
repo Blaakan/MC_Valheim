@@ -47,7 +47,6 @@ internal sealed partial class Plugin : ModPlugin
     internal static ConfigEntry<float> SuccessAccuracy;
     internal static ConfigEntry<float> BonusMinutes;
     internal static ConfigEntry<float> BonusRange;
-    internal static ConfigEntry<bool> BonusOnlyInShelter;
 
     // Hearing (rules, server wins).
     internal static ConfigEntry<float> HearingRange;
@@ -138,12 +137,6 @@ internal sealed partial class Plugin : ModPlugin
             "Players within this many metres of the performer get the Music effect too." + ServerWins,
             new AcceptableValueRange<float>(MusicRules.BonusRangeMin, MusicRules.BonusRangeMax),
             new ConfigurationManagerAttributes { Order = 80 }));
-        BonusOnlyInShelter = Config.Bind(ComfortSection, "BonusOnlyInShelter", d.BonusOnlyInShelter,
-            new ConfigDescription(
-                "On (default): like every other comfort source in the game, the Music comfort counts only while you "
-                + "are in shelter (under a roof, with walls around). Off: it counts anywhere, also at a campfire under "
-                + "the open sky." + ServerWins,
-                null, new ConfigurationManagerAttributes { Order = 75 }));
 
         HearingRange = Config.Bind(HearingSection, "HearingRange", d.HearingRange, new ConfigDescription(
             "Players farther than this many metres from a performer do not hear the music (it fades out toward this "

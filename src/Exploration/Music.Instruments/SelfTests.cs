@@ -170,7 +170,6 @@ internal static class SelfTests
             SuccessAccuracy = 0.7f,
             BonusMinutes = 2f,
             BonusRange = 20f,
-            BonusOnlyInShelter = false,
             HearingRange = 40f,
         };
     }
@@ -406,7 +405,7 @@ internal static class SelfTests
         pkg.SetPos(0);
         c.Check(MusicRules.TryRead(pkg, out var back, out var clamped) && !clamped, "rules read back");
         c.Check(back != null && back.FluteResources == "FineWood:9" && Mathf.Approximately(back.SuccessSeconds, 17f)
-                && back.BonusOnlyInShelter == r.BonusOnlyInShelter && back.ComfortBonus == 3, "rules values kept");
+                && Mathf.Approximately(back.BonusRange, r.BonusRange) && back.ComfortBonus == 3, "rules values kept");
         var wild = TestRules(500f);
         wild.ComfortBonus = 99;
         wild.HearingRange = float.NaN;
@@ -956,13 +955,26 @@ internal static class SelfTests
             var emitter = Performance.LocalEmitter;
             c.Check(emitter != null && emitter.Callbacks > 0, "own notes sound");
             c.Check(Performance.BatchesSent > 0, "notes streamed (batches made)");
-            // Shelter rule on: outside, no bonus.
-            var shelter = TestRules(6f);
-            shelter.BonusOnlyInShelter = true;
-            ServerRules.TestRules = shelter;
-            var inShelter = player.InShelter();
-            c.Check(inShelter || player.GetComfortLevel() == comfortField, "shelter rule: no bonus outside");
-            ServerRules.TestRules = TestRules(6f);
+            // Rested length follow the comfort with Music, also outdoors (test world: no shelter, comfort 1 + 3).
+            c.Note($"in shelter {player.InShelter()}");
+            var hadRested = seman.HaveStatusEffect(SEMan.s_statusEffectRested);
+            seman.RemoveStatusEffect(SEMan.s_statusEffectRested, true);
+            var rested = seman.AddStatusEffect(SEMan.s_statusEffectRested, resetTime: true) as SE_Rested;
+            if (rested != null)
+            {
+                var wanted = rested.m_baseTTL + (player.GetComfortLevel() - 1) * rested.m_TTLPerComfortLevel;
+                c.Note($"Rested {F(rested.m_ttl)} s (base {F(rested.m_baseTTL)} s, {F(rested.m_TTLPerComfortLevel)} s per comfort)");
+                c.Check(Mathf.Approximately(rested.m_ttl, wanted) && rested.m_ttl >= rested.m_baseTTL + 3f * rested.m_TTLPerComfortLevel - 0.5f,
+                    "Rested lasts 3 comfort levels longer with Music");
+            }
+            else
+            {
+                c.Check(false, "Rested effect added");
+            }
+            if (!hadRested)
+            {
+                seman.RemoveStatusEffect(SEMan.s_statusEffectRested, true);
+            }
             // Stop: everything back.
             Performance.TestRequestStop();
             yield return Frames(3);

@@ -53,10 +53,11 @@ good performances give everyone nearby extra comfort.
   one three quarters, a missed note or a key pressed with no note to hit nothing; three misses in a row also stop it. **After 20 seconds of good
   playing: Encore!** You and every player within 20 metres get **Music** for 10 minutes: **+3 comfort**. Each further
   20 seconds of good playing renews it. Songs that play by themselves never fill the meter.
-- **What +3 comfort does**: comfort sets how long Rested lasts (in the base game 1 minute per point), so resting by the
-  fire with Music gives 3 more minutes of Rested. Like every other source of comfort in the game, it counts only in
-  shelter (under a roof, with walls around); the server can let it count anywhere (BonusOnlyInShelter). The Music icon
-  shows the bonus and the time left.
+- **What +3 comfort does**: comfort sets how long Rested lasts (in the base game 1 minute per point), so resting by a
+  fire with Music gives 3 more minutes of Rested. It counts wherever you rest: in a shelter, and also sitting by a
+  campfire under the open sky (the game's own comfort there is 1 and Rested lasts 8 minutes; with Music, comfort 4 and
+  11 minutes). The Music icon shows the bonus and
+  the time left.
 
 ### Other players
 
@@ -96,7 +97,6 @@ Sound, MiniGame and Songs sections are each player's own.
 | Comfort | SuccessAccuracy | `0.7` | How well you must play while the meter fills: the average of your last ten notes (a near-perfect hit counts 1, a less exact one 0.75, a miss or a stray key 0), 0.3 to 1. Server's setting. |
 | Comfort | BonusMinutes | `10` | How long Music lasts (1 to 60 minutes). Server's setting. |
 | Comfort | BonusRange | `20` | Players within this many metres of the performer get Music too (3 to 50). Server's setting. |
-| Comfort | BonusOnlyInShelter | `true` | On: the Music comfort counts only in shelter, like every other comfort source. Off: it counts anywhere, also at a campfire under the open sky. Server's setting. |
 | Hearing | HearingRange | `40` | Players farther than this from a performer hear nothing (10 to 80 metres; the sound fades toward it). Server's setting. |
 | Sound | Volume | `0.8` | Loudness of every instrument you hear, yours and others' (0 to 1; the game's Master and Sound effects volume apply on top). Your own choice. |
 | Sound | GameMusicVolume | `0.3` | Loudness of the game's own music while you hear someone play (0 to 1; 1 = unchanged). It fades back afterwards. Your own choice. |
@@ -145,8 +145,6 @@ without the mod, instruments dropped on the ground can be deleted.
 
 - **Rested only grows while you rest.** Comfort counts when Rested is set: after about 20 seconds of resting by a fire
   (sitting or in shelter), and while you keep resting. Music that ends while you rest never shortens Rested.
-- **Shelter.** With the default BonusOnlyInShelter, play inside: under a roof with walls around (the same rule as for
-  furniture and fires).
 - **Comfort displays.** The Resting icon shows the comfort with the bonus. Mods that compute comfort on their own to
   display it do not include the Music bonus, and the bonus does not count toward the game's comfort achievement or
   the "highest comfort" statistic.

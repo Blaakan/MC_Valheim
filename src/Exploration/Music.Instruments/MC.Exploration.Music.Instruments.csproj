@@ -13,10 +13,10 @@
     <ModSide>Both</ModSide>
     <ModMultiplayer>Compatible</ModMultiplayer>
     <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. The instruments are new craftable items and their music gives a comfort bonus, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. The server passes each performance on to the players near the performer; those within hearing range hear it from the performer's position; a good mini-game performance gives the Music comfort bonus to every player near the performer. A player without the mod hears nothing, never sees instruments (on the ground, in chests or in hands), and a chest loses its instruments when such a player takes or adds an item in it. On a server without the mod, instruments dropped on the ground can be deleted.</ModMultiplayerNotes>
-    <!-- Wire format of me: RPC <guid>.Settings / <guid>.SettingsRequest (MusicRules layout 1), <guid>.Notes (NoteBatch
+    <!-- Wire format of me: RPC <guid>.Settings / <guid>.SettingsRequest (MusicRules layout 2), <guid>.Notes (NoteBatch
          layout 1), player ZDO int "<guid>.Playing", item prefabs MC_Flute / MC_Lyre / MC_Tambourine, recipes
-         Recipe_MC_<X>, status effect SE_MC_Music. Bump when any of them change. -->
-    <ModNetworkVersion>1</ModNetworkVersion>
+         Recipe_MC_<X>, status effect SE_MC_Music. Bump when any of them change. 2: rules lost shelter flag. -->
+    <ModNetworkVersion>2</ModNetworkVersion>
     <ModRequires></ModRequires>
     <ModDescription>Craft a flute, a lyre and a tambourine and play them: built-in songs, your own MIDI files, or a rhythm mini-game whose good performances give everyone nearby extra comfort.</ModDescription>
   </PropertyGroup>
