@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Regression tests for the tooling itself (no game needed): every script parses and is ASCII, the Markdown ->
-    Nexus BBCode converter handles known edge cases, the TESTING.md parser, changelog formatting, the ModIdea split.
+    Nexus BBCode converter handles known edge cases, the TESTING.md parser, changelog formatting, the ModIdea split, the release version rule.
     Run after changing anything in tools/. Exit code 0 = pass.
 #>
 [CmdletBinding()]
@@ -71,6 +71,15 @@ Check 'single idea gives one item' (@(Split-ModIdea 'Sneak revamp').Count -eq 1)
 Check 'empty text gives no idea' (@(Split-ModIdea '').Count -eq 0)
 Check 'blank text gives no idea' (@(Split-ModIdea ' ; ').Count -eq 0)
 Check 'null gives no idea' (@(Split-ModIdea $null).Count -eq 0)
+
+Write-Step 'Release version'
+Check 'first release 1.0.0 accepted' ($null -eq (Get-ReleaseVersionProblem '1.0.0' @()))
+Check 'first release 0.3.0 refused' ($null -ne (Get-ReleaseVersionProblem '0.3.0' @()))
+Check 'first release 1.1.0 refused' ($null -ne (Get-ReleaseVersionProblem '1.1.0' $null))
+Check 'later release above the last accepted' ($null -eq (Get-ReleaseVersionProblem '1.2.0' @('1.0.0', '1.1.0')))
+Check 'versions compare as numbers' ($null -eq (Get-ReleaseVersionProblem '1.10.0' @('1.9.0')))
+Check 'later release below the last refused' ($null -ne (Get-ReleaseVersionProblem '1.1.0' @('1.0.0', '1.2.0')))
+Check 'not x.y.z refused' ($null -ne (Get-ReleaseVersionProblem '1.0' @()))
 
 Write-Host ''
 if ($fails -eq 0) { Write-Host 'TOOL TESTS PASSED' -ForegroundColor Green; exit 0 }

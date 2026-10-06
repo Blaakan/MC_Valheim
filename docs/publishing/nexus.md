@@ -9,14 +9,19 @@ September 2026 (see `docs/research/` for the research notes).
 
 1. Every in-game test for the version passes (`./tools/Get-TestTodo.ps1`). Untested items can only ship with
    `-AllowPending`, and they are then listed on the page sheet.
-2. Bump `<Version>` in the mod's csproj and add a `## x.y.z` entry to its `CHANGELOG.md`
-   (one line per change; Nexus shows changelogs one line per entry).
-3. Pack: bump `version` in `packaging/nexus/pack.json` and add an entry to `packaging/nexus/PACK_CHANGELOG.md`.
+2. Set the release version in the mod's csproj (`<Version>`) and make sure its `CHANGELOG.md` has a `## x.y.z`
+   entry for it (one line per change; Nexus shows changelogs one line per entry). **The first release of a mod is
+   1.0.0**, with a `## 1.0.0` entry ("First release."); the 0.x entries below it are the pre-release history. Before
+   the first release every change already raised the version (0.1.0, 0.2.0, 0.2.1, ...), so each test build has its
+   own number. After it, the first change after a release raises the version, so it is usually already set.
+3. Pack: same in `packaging/nexus/pack.json` (`version`) and `packaging/nexus/PACK_CHANGELOG.md`; its first release
+   is 1.0.0 too.
 4. Commit, then run `./tools/Package-Mod.ps1 -Release` (all mods + pack) or `-Mod X` for one mod (no pack then:
    the pack always contains every mod).
    The release gate refuses: a dirty git tree, a missing changelog entry, failed tests, untested items (mod and
    framework tests, without `-AllowPending`), names/versions/texts that break Nexus rules, a pack version already
-   released, and a mod whose code changed since its released version (bump its version). A mod already released
+   released, a first release (mod or pack) that is not 1.0.0, a version that is not above the last released one,
+   and a mod whose code changed since its released version (raise its version). A mod already released
    and unchanged is simply reused in the pack. On success it creates local tags `nexus/<GUID>/v<version>` and
    `nexus/pack/v<version>` (all or nothing). A dry run of an already-released version writes to `<version>-dev`,
    never over the released files; a sheet built from uncommitted changes says "do not upload".

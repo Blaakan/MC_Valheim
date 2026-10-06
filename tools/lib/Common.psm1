@@ -182,6 +182,19 @@ function Split-ModIdea([string]$Text) {
     @("$Text" -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
 
+# Me check version of a release not tagged yet. $Released = versions already released (from tags).
+# No release yet = must be 1.0.0. Else must be above highest one. Me give problem text, or $null when fine.
+function Get-ReleaseVersionProblem([string]$Version, [string[]]$Released) {
+    if ($Version -notmatch '^\d+\.\d+\.\d+$') { return "version '$Version' is not x.y.z" }
+    $old = @($Released | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | ForEach-Object { [version]$_ } | Sort-Object -Descending)
+    if ($old.Count -eq 0) {
+        if ([version]$Version -ne [version]'1.0.0') { return "first release must be 1.0.0, not $Version" }
+        return $null
+    }
+    if ([version]$Version -le $old[0]) { return "version $Version is not above the last release ($($old[0]))" }
+    $null
+}
+
 # Me check ModRequires graph over ALL mods. Cycle = BepInEx load NO plugin at all (topological sort throw).
 function Assert-ModRequiresAcyclic {
     $graph = @{}

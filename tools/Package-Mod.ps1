@@ -16,7 +16,8 @@
     every mod). Without -Mod: every mod + the pack.
 .PARAMETER Release
     Release gate: clean git tree, CHANGELOG entry, no failed test, no untested item (unless -AllowPending), valid
-    names for Nexus. A mod already released (git tag nexus/<Guid>/v<Version>) must be unchanged since that tag: then
+    names for Nexus. A first release (no nexus/<Guid>/v* tag; pack: no nexus/pack/v* tag) must be 1.0.0, a later
+    one above the last released version. A mod already released (git tag nexus/<Guid>/v<Version>) must be unchanged since that tag: then
     it is reused in the pack and not re-tagged; if it changed, bump its <Version>. On success, tags locally.
 .PARAMETER AllowPending
     With -Release: allow untested items (mod TESTING.md + framework src/Shared/TESTING.md); they are listed.
@@ -103,6 +104,8 @@ function Reset-StageDir([string]$Path) {
 
 function Test-TagExists([string]$Tag) { @(& git -C $root tag -l $Tag).Count -gt 0 }
 function Test-TagName([string]$Tag) { & git -C $root check-ref-format "refs/tags/$Tag"; $LASTEXITCODE -eq 0 }
+# Versions already released under tag prefix (nexus/<Guid>/v or nexus/pack/v).
+function Get-ReleasedVersions([string]$Prefix) { @(& git -C $root tag -l "$Prefix*" | ForEach-Object { $_.Substring($Prefix.Length) }) }
 
 # True when code compiled into this mod changed since the tag (working tree vs tag).
 function Test-ChangedSince([string]$Tag, [string]$ModDir) {
@@ -195,6 +198,10 @@ foreach ($p in $toPack) {
     $testing = Join-Path $dir 'TESTING.md'
     $icon = Join-Path $dir 'icon.png'
     if (-not (Test-TagName $tag)) { $problems += "version '$version' gives an invalid git tag name ($tag)" }
+    if ($Release -and -not $released) {
+        $vp = Get-ReleaseVersionProblem $version (Get-ReleasedVersions "nexus/$guid/v")
+        if ($vp) { $problems += "$($vp): set <Version> and its CHANGELOG entry" }
+    }
     if (-not (Test-Path $readme)) { $problems += 'README.md missing' }
     else {
         $readmeRaw = Get-Content $readme -Raw -Encoding UTF8
@@ -386,6 +393,10 @@ if ($buildPack) {
     if (-not (Test-TagName $packTag)) { $packProblems += "pack version '$packVersion' gives an invalid git tag name ($packTag): fix packaging/nexus/pack.json" }
     if (-not $packChanges) { $packProblems += "packaging/nexus/PACK_CHANGELOG.md has no '## $packVersion' entry" }
     if ($Release -and $packReleased) { $packProblems += "pack $packVersion already released ($packTag): bump version in packaging/nexus/pack.json" }
+    if ($Release -and -not $packReleased) {
+        $vp = Get-ReleaseVersionProblem $packVersion (Get-ReleasedVersions 'nexus/pack/v')
+        if ($vp) { $packProblems += "pack $($vp): set version in packaging/nexus/pack.json and its PACK_CHANGELOG entry" }
+    }
     if ($packProblems) { $packProblems | ForEach-Object { Write-Fail $_ }; Write-Fail 'nothing tagged'; exit 1 }
     if (-not $Release -and $packReleased) { Write-Warn2 "pack $packVersion already released: dry run writes to $packVersion-dev" }
 

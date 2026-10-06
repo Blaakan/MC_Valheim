@@ -108,7 +108,8 @@ when `src/Shared` changes) (+ `Test-InWorld.ps1` when a mod has self-tests) + in
   `[ ]` to test, `[x]` passed, `[!]` failed + note, `[-]` skipped, split single-player / multiplayer, and a
   "build under test" line (build id = git hash from the `[MC:ready]` log line / MC Mods panel).
 - **When the user asks what to test: run `./tools/Get-TestTodo.ps1` and give them that list.** When they report
-  results, tick the boxes (keep IDs stable). When code changes a behaviour, reset its tests to `[ ]`.
+  results, tick the boxes (keep IDs stable). When code changes a behaviour, reset its tests to `[ ]` and raise the
+  mod's version (Mod code conventions, "Versions").
 - New behaviour → new test items in the same change. Multiplayer hand-off cases (items/structures reaching a
   player without the mod) always get a test.
 - A mod's pending tests can also be mirrored in a GitHub issue (backlog mod workflow, step 8). `TESTING.md` stays
@@ -150,8 +151,8 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
      `Enabled = false` + restart, clean log; multiplayer incl. a hand-off item; cross-mod items for MC mods that
      patch the same methods or touch the same items);
    - `docs/design/<category>-<feature>.md`, same outline as the existing design docs;
-   - root `README.md` mods table; `packaging/nexus/pages.json` (empty URL); `packaging/nexus/PACK_CHANGELOG.md`
-     (list the mod in the top entry if that pack version has no `nexus/pack/v*` tag yet, else in a new entry);
+   - root `README.md` mods table; `packaging/nexus/pages.json` (empty URL); `packaging/nexus/pack.json` +
+     `PACK_CHANGELOG.md` (raise the pack version and list the mod in that version's entry, see "Versions");
    - `docs/game/<chapter>.md`: vanilla facts learned, and a status link on the idea's feature note;
    - `./tools/Update-Backlog.ps1`, then check the idea's rows in `docs/backlog.md` link the mod (the script warns
      about a `ModIdea` that matches no sheet idea); `-Offline` when the sheet cannot be downloaded;
@@ -180,8 +181,9 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
    Tick `TESTING.md` (keep IDs; it is what `Package-Mod.ps1` reads), then rewrite the issue body from it
    (`gh issue edit <n> --body-file`): `[x]` = `- [x]`, `[!]` = `- [ ] ... **FAILED:** <note>`, `[-]` =
    `- [x] ~~...~~ (skipped: <why>)`. Commit (push only when asked). A failure that needs a code fix goes back
-   through steps 3-6 (pause before commit); reset the affected tests to `[ ]` in both places and update the issue's
-   build under test after the push. Close the issue when every item is `[x]` or `[-]`.
+   through steps 3-6 (pause before commit) and raises the mod's version ("Versions"); reset the affected tests to
+   `[ ]` in both places, and after the push update the issue's title (new version) and build under test. Close the
+   issue when every item is `[x]` or `[-]`.
 
 ## Game code reference
 
@@ -230,12 +232,24 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   others reference with `[BepInDependency]`.
 - Every mod has: `README.md` (features, config table, multiplayer section), `CHANGELOG.md` (`## x.y.z` per
   version), `icon.png` 256×256, `TESTING.md`, and `docs/design/<category>-<feature>.md`.
+- **Versions** (user rule; `<Version>` and `packaging/nexus/pack.json`, plain `x.y.z`): a new mod starts at 0.1.0.
+  **Until its first release, every change to what a mod does raises its version**, fixes included: minor for new or
+  changed behaviour, patch for a fix, once per piece of work (not per commit). The same change adds a `## x.y.z`
+  CHANGELOG entry, updates the `TESTING.md` "Build under test" line and renames the mod's open test issue
+  (`gh issue edit <n> --title "In-game tests: <ModName> <Version>"`). Changes to docs or tests only (README,
+  TESTING.md, design doc), and `src/Shared` changes that change nothing in a mod's behaviour, keep the version. The
+  pack follows the same rule: a mod added or a mod's version raised = a higher `pack.json` version with a new
+  `PACK_CHANGELOG.md` entry. **The first release of a mod or of the pack is 1.0.0** (a `## 1.0.0` entry "First
+  release."; the 0.x entries stay below it as the pre-release history). After that, the first change after a release
+  raises the version and later changes join that unreleased version's entry. `Package-Mod.ps1 -Release` refuses a
+  first release that is not 1.0.0 and a version that is not above the last released one.
 - **Publishing target: Nexus Mods only (for now)**: each mod as its own page + one "all mods" pack page
   (`packaging/nexus/`: `pack.json`, `PACK_CHANGELOG.md`, shared `install.md`, `pages.json` with page URLs).
   Thunderstore packaging still exists behind `Package-Mod.ps1 -Thunderstore`.
 - Release flow: all `TESTING.md` items pass (or release with `-AllowPending`, which lists the untested ones on the
-  page sheet); bump `<Version>` + CHANGELOG entry (pack: bump `pack.json` version + PACK_CHANGELOG); commit;
-  `./tools/Package-Mod.ps1 -Release` (refuses a dirty tree, an already-released version, failed tests; tags
+  page sheet); set the release version + CHANGELOG entry (first release: 1.0.0, see "Versions"; pack: `pack.json`
+  version + PACK_CHANGELOG); commit; `./tools/Package-Mod.ps1 -Release` (refuses a dirty tree, an already-released
+  version, a first release that is not 1.0.0, a version not above the last release, failed tests; tags
   `nexus/<GUID>/v<ver>` and `nexus/pack/v<ver>` locally); then follow each `dist/nexus/.../nexus-page.md`
   (step-by-step guide: `docs/publishing/nexus.md`). After a first upload, save the page URL in `packaging/nexus/pages.json`.
   After tagging, run `./tools/Update-Backlog.ps1` and commit `docs/backlog.md` (the backlog shows "released" from the
