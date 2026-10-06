@@ -1,7 +1,7 @@
 # Music Instruments
 
-Craft a flute, a lyre and a tambourine and play them: built-in songs, your own MIDI files, or a rhythm mini-game whose
-good performances give everyone nearby extra comfort.
+Craft a flute, a lyre and a tambourine and play them: built-in songs, your own MIDI files or the server's, or a rhythm
+mini-game whose good performances give everyone nearby extra comfort.
 
 ## Features
 
@@ -29,11 +29,18 @@ good performances give everyone nearby extra comfort.
   staven) and four written for this mod (Hearthfire Lullaby, Row the Longship, Raven's Jig, Mead Hall Reel). Each
   instrument plays its own part: the flute the melody, the lyre the melody with strummed chords, the tambourine the
   rhythm.
-- **Your own MIDI files**: put `.mid` files (also `.midi`, `.kar`, `.rmi`) in `BepInEx/config/MC_Valheim/Songs` (the
+- **Your own MIDI files** (any song you have a MIDI file of, for your own use): put `.mid` files (also `.midi`, `.kar`, `.rmi`) in `BepInEx/config/MC_Valheim/Songs` (the
   folder is made the first time you open the window; the SongsFolder setting can point elsewhere). The window lists
   them every time it opens. For each instrument the mod picks the part that sounds most like the tune (the lyre adds a
   soft bass line, the tambourine plays the drums, or the tune's rhythm when the file has no drums); the part chooser
   lets you pick any other part. Other players do not need the file: they hear your notes.
+- **Server songs** (optional, off by default): a server (or host) with ShareSongs on shares the MIDI files of its
+  `BepInEx/config/MC_Valheim/ServerSongs` folder. They show under "Server songs" in every player's window. Picking one
+  (click, Enter, Play or Perform; moving over it with the keys does not) downloads it from the server, with the progress
+  in the window: about a second for a usual file, up to a minute or more for a very big one. Play or Perform on a song
+  still coming starts it when it is here. It then plays like your own files, split into a part per instrument.
+  Downloaded songs are kept until you leave the world. The server can also allow only its own songs and the built-in
+  ones (AllowPlayerSongs).
 - **Play by the fire**: you can play sitting on a chair or bench or in the sit emote, and you stay seated.
 - **It stops by itself** when you put the instrument away or swap it, swim, take a ship's helm or a saddle, lie in a
   bed, die or teleport, and when you are hit (fire, poison, frost, smoke, water and drowning damage do not count),
@@ -79,8 +86,9 @@ The config file `BepInEx/config/MC.Exploration.Music.Instruments.cfg` is created
 with the mod. To turn the mod on or off in-game, open the menu (Esc) and click **MC Mods** (with a configuration
 manager installed that button is hidden: press F1 and use its window). Every setting can be changed in-game with
 ConfigurationManager, or by editing the file (the game picks up the change while it runs). In multiplayer the
-server's (or host's) settings in the Recipes, Comfort and Hearing sections are used for everyone; Enabled and the
-Sound, MiniGame and Songs sections are each player's own.
+server's (or host's) settings in the Recipes, Comfort and Hearing sections and AllowPlayerSongs are used for
+everyone; ShareSongs and ServerSongsFolder are used only by the server (or host); Enabled and the Sound, MiniGame and
+Songs sections are each player's own.
 
 | Section | Setting | Default | Description |
 |---|---|---|---|
@@ -103,6 +111,9 @@ Sound, MiniGame and Songs sections are each player's own.
 | MiniGame | Lane1Key ... Lane4Key | `D`, `F`, `J`, `K` | Keys of the four lanes, left to right. The game's own keys (walking, hotbar, inventory, map, chat, console) are held back during the rhythm game, so most keyboard keys work. Esc and the right mouse button cannot be lane keys (they stop the rhythm game): such a lane is turned off, with a warning in the log. Your own choice. |
 | MiniGame | NoteSpeed | `1` | How fast the notes fall (0.5 to 2): higher = farther apart, easier to read in fast songs. Does not change the song's tempo. Your own choice. |
 | Songs | SongsFolder | empty | Folder with your MIDI songs. Empty: `BepInEx/config/MC_Valheim/Songs`. Your own choice. |
+| ServerSongs | ShareSongs | `false` | Used only by the server (or host). On: every player can play the MIDI files of the server songs folder; a file is sent to a player's game when they pick it. |
+| ServerSongs | ServerSongsFolder | empty | Used only by the server (or host). Folder of the shared songs (up to 200 files of at most 2 MB). Empty: `BepInEx/config/MC_Valheim/ServerSongs`. Read again when a player opens the song window. |
+| ServerSongs | AllowPlayerSongs | `true` | On: players may also play their own MIDI files. Off: only the built-in songs and the server's songs. Server's setting. |
 
 ## Multiplayer
 
@@ -114,7 +125,7 @@ music gives a comfort bonus, so the server refuses players who do not have the m
 version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the
 settings of the server (or host) apply to everyone. The server passes each performance on to the players near the
 performer; those within hearing range hear it from the performer's position; a good mini-game performance gives the Music comfort bonus
-to every player near the performer. A player without the mod hears nothing, never sees instruments (on the ground, in
+to every player near the performer. The server can also share its own MIDI songs with every player (ShareSongs). A player without the mod hears nothing, never sees instruments (on the ground, in
 chests or in hands), and a chest loses its instruments when such a player takes or adds an item in it. On a server
 without the mod, instruments dropped on the ground can be deleted.
 
@@ -132,14 +143,19 @@ without the mod, instruments dropped on the ground can be deleted.
   bonus rules and the hearing range. Until they arrive after you join, the recipes are hidden and you cannot play
   ("The server has not sent the instrument settings yet."). Your own settings apply again in single player and when
   you host.
-- **The sound settings, the mini-game keys and the songs folder are yours.**
+- **The sound settings, the mini-game keys and the songs folder are yours.** Whether your own MIDI files may be
+  played is the server's choice (AllowPlayerSongs).
+- **Server songs** go only to players with the mod, only when they pick one, one file at a time per player, in small
+  pieces sent only while the connection has room: the world data keeps priority.
 - **The music travels as notes**, not as sound: a performance costs well under 1 KB per second per listener, and only
   players near the performer receive it (within hearing range or the Encore range, plus a small margin). Listeners hear it a fraction of a second late (a quarter of a second for the rhythm game,
   less for songs that play by themselves; a safety margin against network hiccups that can grow to three quarters of a
   second after one; after a longer stall the notes it held back are skipped and the music goes on in time); the
   performer hears it at once.
 - **Dedicated servers:** install BepInEx on the server and put the mod in its `BepInEx/plugins` folder; the server's
-  config file decides the Recipes, Comfort and Hearing settings for everyone. The server makes no sound itself.
+  config file decides the Recipes, Comfort, Hearing and AllowPlayerSongs settings for everyone. To share songs, set
+  ShareSongs = true there and put the MIDI files in its `BepInEx/config/MC_Valheim/ServerSongs` folder (the mod makes it
+  when ShareSongs is on: at start, or when the setting changes). The server makes no sound itself.
 
 ## Good to know
 
@@ -150,7 +166,7 @@ without the mod, instruments dropped on the ground can be deleted.
   the "highest comfort" statistic.
 - **Blocking and clicking.** As with the hammer, Block with an instrument in hand blocks with your fists (not while
   you play or while the window is open). A click with an instrument never punches, also while the mod is turned off.
-- **MIDI files** can be up to 2 MB. Damaged files are read up to the damage; files that cannot be read show why in the
+- **MIDI files** can be up to 2 MB (server songs too). Damaged files are read up to the damage; files that cannot be read show why in the
   window. Very busy files are thinned out: the flute plays one note at a time, the lyre up to four, the tambourine at
   most about fourteen hits a second from a drum part (about seven when it follows the tune of a file without drums).
 - **Uninstalling** the mod removes every instrument from inventories and chests the next time they load, as with any

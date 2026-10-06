@@ -8,4 +8,4 @@
   Switchable Lights 0.1.0, Forge Idol Upgrades 0.1.0, Creature Morale 0.1.0, Tower Shield Wall 0.1.0, Dual Wielding
   0.1.0, Weapon Moveset 0.1.0, Sneak Ambush 0.1.0, Trinkets on Demand 0.1.0, Sailing Skill 0.1.0, Swim Dive
   0.1.0, Fishing Fight 0.1.0, Deep North Awakening 0.1.0, Distant Horizons 0.1.0,
-  Spyglass 0.1.0, Cultivator Replant 0.1.0, Music Instruments 0.1.0.
+  Spyglass 0.1.0, Cultivator Replant 0.1.0, Music Instruments 0.2.0.

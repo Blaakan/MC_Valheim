@@ -174,6 +174,15 @@ internal static class GameCameraDestroyPatches
         {
             PatchGuard.Report("GameCamera.OnDestroy postfix (listeners)", e);
         }
+        try
+        {
+            SongShare.Reset();
+            SongShare.ServerReset();
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("GameCamera.OnDestroy postfix (server songs)", e);
+        }
     }
 }
 

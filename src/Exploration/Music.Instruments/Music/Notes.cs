@@ -53,7 +53,8 @@ internal struct Note : IComparable<Note>
 internal enum SongSource : byte
 {
     Preset = 0,
-    Midi = 1,
+    Midi = 1,     // MIDI file of the player's own songs folder
+    Server = 2,   // MIDI file the server shares (SongShare): read from its folder on the server's game, else downloaded
 }
 
 // Small helpers shared by music code (no Unity here: offline tests compile these files).
@@ -74,6 +75,23 @@ internal static class MusicMath
     }
 
     internal static byte ClampByte(int v, int min, int max) => (byte)(v < min ? min : v > max ? max : v);
+
+    // FNV-1a 32-bit of the bytes: song id and check of a downloaded server song (same on every game).
+    internal static int Fnv1a(byte[] data)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            if (data != null)
+            {
+                foreach (var b in data)
+                {
+                    hash = (hash ^ b) * 16777619u;
+                }
+            }
+            return (int)hash;
+        }
+    }
 
     internal static float Clamp(float v, float min, float max) => v < min ? min : v > max ? max : v;
 

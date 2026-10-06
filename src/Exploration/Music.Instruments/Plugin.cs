@@ -24,6 +24,7 @@ internal sealed partial class Plugin : ModPlugin
     internal const string SoundSection = "Sound";
     internal const string MiniGameSection = "MiniGame";
     internal const string SongsSection = "Songs";
+    internal const string ServerSongsSection = "ServerSongs";
     private const string ServerWins = " In multiplayer the setting of the server (or host) is used for everyone.";
     private const string Personal = " Each player's own choice.";
 
@@ -64,6 +65,11 @@ internal sealed partial class Plugin : ModPlugin
 
     // Songs (personal, never sent).
     internal static ConfigEntry<string> SongsFolder;
+
+    // ServerSongs: ShareSongs and ServerSongsFolder server only (never sent); AllowPlayerSongs a rule (server wins).
+    internal static ConfigEntry<bool> ShareSongs;
+    internal static ConfigEntry<string> ServerSongsFolder;
+    internal static ConfigEntry<bool> AllowPlayerSongs;
 
     private static bool _featureActive;
 
@@ -171,7 +177,24 @@ internal sealed partial class Plugin : ModPlugin
             + "every time it opens." + Personal,
             null, new ConfigurationManagerAttributes { Order = 100 }));
 
+        ShareSongs = Config.Bind(ServerSongsSection, "ShareSongs", false, new ConfigDescription(
+            "Used only by the server (or the host). On: every player can play the MIDI files of the server songs folder "
+            + "(ServerSongsFolder); a file is sent to a player's game when they pick it in the song window. Off "
+            + "(default): nothing is shared.",
+            null, new ConfigurationManagerAttributes { Order = 100 }));
+        ServerSongsFolder = Config.Bind(ServerSongsSection, "ServerSongsFolder", "", new ConfigDescription(
+            "Used only by the server (or the host). Folder with the MIDI songs it shares (.mid, .midi, .kar, .rmi; up to "
+            + SongShare.MaxSongs + " files of at most 2 MB). Empty (default): the folder MC_Valheim/ServerSongs next to "
+            + "this config file (BepInEx/config/MC_Valheim/ServerSongs), made when ShareSongs is on. The list is read again "
+            + "when a player opens the song window; a file is sent only when a player picks it.",
+            null, new ConfigurationManagerAttributes { Order = 90 }));
+        AllowPlayerSongs = Config.Bind(ServerSongsSection, "AllowPlayerSongs", true, new ConfigDescription(
+            "On (default): players may also play the MIDI files of their own songs folder. Off: only the built-in songs "
+            + "and the server's songs." + ServerWins,
+            null, new ConfigurationManagerAttributes { Order = 80 }));
+
         SongLibrary.DefaultFolder = System.IO.Path.Combine(BepInEx.Paths.ConfigPath, "MC_Valheim", "Songs");
+        SongShare.DefaultFolder = System.IO.Path.Combine(BepInEx.Paths.ConfigPath, "MC_Valheim", "ServerSongs");
         SongLibrary.ConfiguredFolder = SongsFolder.Value;
         SongsFolder.SettingChanged += (_, _) => SongLibrary.ConfiguredFolder = SongsFolder.Value;
         Volume.SettingChanged += (_, _) => OnVolumeChanged();
@@ -229,6 +252,7 @@ internal sealed partial class Plugin : ModPlugin
         ServerRules.Start();
         PlayerCheck.Start();
         NoteRelay.Start();
+        SongShare.Start();
         InstrumentContent.Rebuild();
         Performance.Reset();
         SelfTests.Register();
@@ -254,6 +278,7 @@ internal sealed partial class Plugin : ModPlugin
         Step("InstrumentPose.Shutdown", InstrumentPose.Shutdown);
         Step("InstrumentContent.Rebuild", () => InstrumentContent.Rebuild());
         Step("NoteRelay.Stop", NoteRelay.Stop);
+        Step("SongShare.Stop", SongShare.Stop);
         Step("PlayerCheck.Stop", PlayerCheck.Stop);
         Step("ServerRules.Stop", ServerRules.Stop);
     }
@@ -293,9 +318,14 @@ internal sealed partial class Plugin : ModPlugin
                 return;
             }
             var section = setting.Definition.Section;
-            if (section == RecipesSection || section == ComfortSection || section == HearingSection)
+            if (section == RecipesSection || section == ComfortSection || section == HearingSection
+                || setting == AllowPlayerSongs)
             {
                 ServerRules.OwnChanged();
+            }
+            if (setting == ShareSongs || setting == ServerSongsFolder)
+            {
+                SongShare.ServerSettingsChanged();
             }
         }
         catch (Exception ex)

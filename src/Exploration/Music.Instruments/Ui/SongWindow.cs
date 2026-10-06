@@ -12,8 +12,12 @@ namespace MC.Exploration.MusicInstrumentsMod;
 // HudMessage 1000 / menu 1700 / console 5000) with game GUI scale, raycaster, focus group above every other one and a
 // full-screen see-through blocker. Look = vanilla parts: wood frame of the Texts dialog, dialog fonts, clones of the
 // craft button and the recipe list scroll bar. Built on first Open, kept (hidden) until world exit.
-// List = built-in songs, header, MIDI files of the songs folder (scanned at every Open). Rows virtualized: a small pool
-// of row objects bound to the list items around the scroll position (500 files = still 9 rows).
+// List = built-in songs, server songs (SongShare: when the server shares; client ask the list at every Open, rows come
+// when it arrive), header, MIDI files of the songs folder (scanned at every Open; hidden when the server's rules forbid
+// own songs). A server song is downloaded only when PICKED (click, Enter, pad A, Play, Perform, part keys), never while
+// keys just move over it (each request counts on the server's budget): details line show progress; Play/Perform on a
+// song still coming start it when it is here. Rows
+// virtualized: a small pool of row objects bound to the list items around the scroll position (500 files = 9 rows).
 // Performance own the life: Open / Update (every frame while open) / Close / Destroy. Me call back Performance only
 // for Play (StartAuto), Perform (StartMiniGame), Close (CloseWindow) and the Repeat flag.
 // Keys while open (Performance hold KeyCapture: game keys off): Up/Down choose, Left/Right part, Enter play; gamepad:
@@ -40,6 +44,7 @@ internal static class SongWindow
 
     private const string WindowName = ModInfo.Guid + ".SongWindow";
     private const string MidiHeader = "Your MIDI songs";
+    private const string ServerHeader = "Server songs";
     private const string NoSongText = "Choose a song.";
     private const string CannotPlay = "You cannot play now.";
     private const string NavKeys = "Up/Down: choose a song    Left/Right: part    Enter: play    Esc: close";
@@ -115,6 +120,10 @@ internal static class SongWindow
     private static bool _arrowsOk;
     private static bool _enterOk;
     private static bool _padEnterOk;
+    private static int _listVersionShown = -1;
+    private static int _progressShown = -1;
+    private static SongEntry _startWhenReady; // Play/Perform pressed on a server song still downloading
+    private static bool _startMiniGame;
 
     internal static bool IsOpen => _open && _root != null;
 
@@ -143,6 +152,7 @@ internal static class SongWindow
             _padKnown = false;
             _repeatKnown = false;
             SetStatus(null);
+            SongShare.AskList();
             RebuildItems();
             _selected = -1;
             _part = -1;
@@ -190,6 +200,7 @@ internal static class SongWindow
             return;
         }
         _open = false;
+        _startWhenReady = null;
         try
         {
             DropSelection();
@@ -243,6 +254,8 @@ internal static class SongWindow
         _part = -1;
         _boundFirst = -1;
         _loadPending = false;
+        _listVersionShown = -1;
+        _progressShown = -1;
     }
 
     // Every frame while open (Performance.Tick, Player.Update postfix). No allocation unless something changed.
@@ -264,7 +277,21 @@ internal static class SongWindow
             }
             if (_loadPending && Time.unscaledTime >= _loadAt)
             {
-                LoadSelected();
+                LoadSelected(pick: false);
+            }
+            if (SongShare.ListVersion != _listVersionShown)
+            {
+                RebuildKeepSelection(); // server list came (or changed)
+            }
+            else if (SongShare.ProgressVersion != _progressShown)
+            {
+                _progressShown = SongShare.ProgressVersion;
+                _rowsDirty = true; // a download moved or ended
+                Refresh();
+                if (StartWhenReady())
+                {
+                    return; // the song came and started: window closed
+                }
             }
             var pad = ZInput.IsGamepadActive();
             if (!_padKnown || pad != _padShown)
@@ -565,23 +592,121 @@ internal static class SongWindow
         {
             Items.Add(new Item { Kind = ItemKind.Song, Entry = song });
         }
+        _listVersionShown = SongShare.ListVersion;
+        _progressShown = SongShare.ProgressVersion;
+        var shared = SongShare.WindowSongs(out var showShared, out var sharedHint);
+        if (showShared)
+        {
+            Items.Add(new Item { Kind = ItemKind.Header, Text = ServerHeader });
+            foreach (var song in shared)
+            {
+                Items.Add(new Item { Kind = ItemKind.Song, Entry = song });
+            }
+            if (!string.IsNullOrEmpty(sharedHint))
+            {
+                Items.Add(new Item { Kind = ItemKind.Hint, Text = sharedHint });
+            }
+        }
         Items.Add(new Item { Kind = ItemKind.Header, Text = MidiHeader });
-        var midi = SongLibrary.ScanMidiFolder(out var error);
-        foreach (var song in midi)
+        if (!ServerRules.Current.AllowPlayerSongs)
         {
-            Items.Add(new Item { Kind = ItemKind.Song, Entry = song });
+            Items.Add(new Item { Kind = ItemKind.Hint, Text = Performance.PlayerSongsOff });
         }
-        if (midi.Count == 0)
+        else
         {
-            Items.Add(new Item { Kind = ItemKind.Hint, Text = "Put .mid files in " + SongLibrary.Folder });
-        }
-        if (!string.IsNullOrEmpty(error))
-        {
-            Items.Add(new Item { Kind = ItemKind.Hint, Text = error });
+            var midi = SongLibrary.ScanMidiFolder(out var error);
+            foreach (var song in midi)
+            {
+                Items.Add(new Item { Kind = ItemKind.Song, Entry = song });
+            }
+            if (midi.Count == 0)
+            {
+                Items.Add(new Item { Kind = ItemKind.Hint, Text = "Put .mid files in " + SongLibrary.Folder });
+            }
+            if (!string.IsNullOrEmpty(error))
+            {
+                Items.Add(new Item { Kind = ItemKind.Hint, Text = error });
+            }
         }
         _content.sizeDelta = new Vector2(0f, Mathf.Max(RowH, Items.Count * RowH));
         _boundFirst = -1;
         _rowsDirty = true;
+    }
+
+    // List again (server list came) with the same song selected when it is still there; the selection kept in view
+    // (rows above it may have come), double-click memory forgotten (rows moved under the cursor).
+    private static void RebuildKeepSelection()
+    {
+        var old = _selected;
+        var id = SelectedEntry != null ? SelectedEntry.Id : null;
+        RebuildItems();
+        _lastClickItem = -1;
+        var index = Find(id);
+        if (index >= 0)
+        {
+            _selected = index;
+        }
+        else
+        {
+            _selected = -1;
+            Select(NextSong(-1, 1), keepPart: false, loadNow: false);
+        }
+        if (_selected >= 0 && _selected != old)
+        {
+            ScrollTo(_selected, centre: false);
+        }
+        Refresh();
+    }
+
+    // Read (own or host file) or get (downloaded server song) the entry's MIDI data. A server song not here yet is
+    // asked for only on a pick; else only the session cache is looked at.
+    private static void LoadEntry(SongEntry entry, bool pick)
+    {
+        if (entry.Source == SongSource.Server && entry.Path == null)
+        {
+            if (pick)
+            {
+                SongShare.Fetch(entry);
+            }
+            else
+            {
+                SongShare.FromCache(entry);
+            }
+        }
+        else
+        {
+            SongLibrary.Load(entry); // fills parts, length, info, error (cached while the file stays the same)
+        }
+    }
+
+    private static bool NeedsDownload(SongEntry e) =>
+        e != null && e.Source == SongSource.Server && e.Path == null && e.Score == null && e.Error == null;
+
+    // Play/Perform pressed while the song was coming: start it now that it is here (still selected), or say why not.
+    // True = it started (window closed).
+    private static bool StartWhenReady()
+    {
+        var w = _startWhenReady;
+        if (w == null)
+        {
+            return false;
+        }
+        if (w != SelectedEntry)
+        {
+            _startWhenReady = null;
+            return false;
+        }
+        if (w.Score != null)
+        {
+            _startWhenReady = null;
+            return StartSelected(_startMiniGame);
+        }
+        if (w.Error != null || !SongShare.IsDownloading(w))
+        {
+            _startWhenReady = null;
+            SetStatus(w.Error ?? w.Pending);
+        }
+        return false;
     }
 
     private static int Find(string id)
@@ -618,7 +743,9 @@ internal static class SongWindow
 
     // keepPart: the remembered part when this is the last song played (window open), else Automatic.
     // loadNow false (keys): a MIDI file is read only when the selection rest LoadRest, never on each repeat step.
-    private static void Select(int index, bool keepPart, bool loadNow)
+    // pick: the player chose this song (click, test): a server song not here yet is downloaded. Keys moving over it,
+    // or the window opening on it, never download.
+    private static void Select(int index, bool keepPart, bool loadNow, bool pick = false)
     {
         if (index < 0 || index >= Items.Count || Items[index].Kind != ItemKind.Song)
         {
@@ -628,18 +755,23 @@ internal static class SongWindow
         {
             if (loadNow && _loadPending)
             {
-                LoadSelected();
+                LoadSelected(pick);
+            }
+            else if (loadNow && pick && Items[index].Entry.Source == SongSource.Server)
+            {
+                LoadSelected(pick: true); // picked again after a failed download: ask again (no-op while it is coming)
             }
             return;
         }
         _selected = index;
+        _startWhenReady = null;
         var entry = Items[index].Entry;
         _loadPending = false;
-        if (entry.Source == SongSource.Midi)
+        if (entry.Source != SongSource.Preset)
         {
             if (loadNow)
             {
-                SongLibrary.Load(entry); // fills parts, length, info, error (cached while the file stays the same)
+                LoadEntry(entry, pick);
             }
             else
             {
@@ -657,16 +789,17 @@ internal static class SongWindow
         Refresh();
     }
 
-    // Read the selected MIDI file now (rest reached, or Play / Perform / part chooser need it).
-    private static void LoadSelected()
+    // Read the selected MIDI file now (rest reached, or Play / Perform / part chooser need it; pick = download a
+    // server song not here yet).
+    private static void LoadSelected(bool pick)
     {
         _loadPending = false;
         var e = SelectedEntry;
-        if (e == null || e.Source != SongSource.Midi)
+        if (e == null || e.Source == SongSource.Preset)
         {
             return;
         }
-        SongLibrary.Load(e);
+        LoadEntry(e, pick);
         _rowsDirty = true;
         Refresh();
     }
@@ -773,7 +906,7 @@ internal static class SongWindow
                 var bad = e.Error != null;
                 row.Button.interactable = true;
                 SetRowTitle(row, e.Title, 20f, bad ? UiKit.TextGrey : UiKit.TextLight, TextAlignmentOptions.TopLeft, wrap: false);
-                UiKit.SetText(row.Info, bad ? e.Error : e.Info);
+                UiKit.SetText(row.Info, bad ? e.Error : e.Pending ?? e.Info);
                 UiKit.SetColor(row.Info, bad ? Dim(UiKit.ErrorRed) : UiKit.TextDim);
                 break;
             }
@@ -822,17 +955,23 @@ internal static class SongWindow
             UiKit.SetText(_details, e.Title + ": " + e.Error);
             UiKit.SetColor(_details, UiKit.ErrorRed);
         }
+        else if (e.Pending != null)
+        {
+            UiKit.SetText(_details, e.Title + "   -   " + e.Pending);
+            UiKit.SetColor(_details, UiKit.TextDim);
+        }
         else
         {
             UiKit.SetText(_details, string.IsNullOrEmpty(e.Info) ? e.Title : e.Title + "   -   " + e.Info);
             UiKit.SetColor(_details, UiKit.TextLight);
         }
-        var showPart = e != null && e.Source == SongSource.Midi && e.Error == null && e.Parts.Count > 0;
+        var showPart = e != null && e.Source != SongSource.Preset && e.Error == null && e.Parts.Count > 0;
         UiKit.SetActive(_partButton.gameObject, showPart);
         if (showPart)
         {
             UiKit.SetText(_partLabel, "Part: " + PartLabel(e, _part));
         }
+        // A server song not here yet is playable too: Play / Perform download it and start it when it came.
         var playable = e != null && e.Error == null;
         _play.interactable = playable;
         _perform.interactable = playable;
@@ -864,12 +1003,12 @@ internal static class SongWindow
 
     private static void CyclePart(int dir)
     {
-        if (_loadPending)
+        if (_loadPending || NeedsDownload(SelectedEntry))
         {
-            LoadSelected(); // parts known only after the read
+            LoadSelected(pick: true); // parts known only after the read (or the download)
         }
         var e = SelectedEntry;
-        if (e == null || e.Source != SongSource.Midi || e.Error != null || e.Parts.Count == 0)
+        if (e == null || e.Source == SongSource.Preset || e.Error != null || e.Parts.Count == 0)
         {
             return;
         }
@@ -900,13 +1039,33 @@ internal static class SongWindow
     {
         if (_loadPending)
         {
-            LoadSelected(); // its error (bad file) show here, not as a failed start
+            LoadSelected(pick: false); // its error (bad file) show here, not as a failed start
         }
         var e = SelectedEntry;
         if (e == null)
         {
             SetStatus(NoSongText);
             return false;
+        }
+        if (NeedsDownload(e))
+        {
+            SongShare.Fetch(e); // from the cache at once, else asked for (no-op while it is coming)
+            if (e.Score == null)
+            {
+                if (e.Error == null && SongShare.IsDownloading(e))
+                {
+                    _startWhenReady = e; // starts when it came (Update), details line show progress
+                    _startMiniGame = miniGame;
+                    SetStatus(null);
+                }
+                else
+                {
+                    SetStatus(e.Error ?? e.Pending);
+                }
+                _rowsDirty = true;
+                Refresh();
+                return false;
+            }
         }
         if (e.Error != null)
         {
@@ -968,7 +1127,7 @@ internal static class SongWindow
             var twice = index == _lastClickItem && now - _lastClickAt < DoubleClick;
             _lastClickItem = index;
             _lastClickAt = now;
-            Select(index, keepPart: false, loadNow: true);
+            Select(index, keepPart: false, loadNow: true, pick: true);
             if (twice)
             {
                 _lastClickItem = -1;
@@ -1146,7 +1305,7 @@ internal static class SongWindow
         {
             return false;
         }
-        Select(index, keepPart: false, loadNow: true);
+        Select(index, keepPart: false, loadNow: true, pick: true);
         ScrollTo(index, centre: false);
         BindRows();
         return true;

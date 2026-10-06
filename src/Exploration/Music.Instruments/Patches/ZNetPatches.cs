@@ -4,7 +4,7 @@ using MC.Shared;
 
 namespace MC.Exploration.MusicInstrumentsMod.Patches;
 
-// Me = network part (server rules for everyone, refuse players who cannot play by them, note relay). Only while
+// Me = network part (server rules for everyone, refuse players who cannot play by them, note relay, server songs). Only while
 // Active, like every feature patch. Framework NetworkGate patch same methods under own Harmony id (handshake); all
 // postfixes, no order needed. Live re-check of a player who turn me off come from NetworkGate.PeerStateChanged
 // (PlayerCheck), not from here. Copy of Cultivator Replant's (itself Spyglass's and Swim Dive's), plus the notes rpc.
@@ -12,8 +12,8 @@ namespace MC.Exploration.MusicInstrumentsMod.Patches;
 //                    forget old).
 //   RPC_PeerInfo:    peer ready = handshake done. Server: start grace for join check. Client: listen (again) and ask
 //                    server rules.
-//   Update:          timers (join check deadline, rules push after change, recipe rebuild after rules change).
-//                    Nothing to do = three bool reads.
+//   Update:          timers (join check deadline, rules push after change, recipe rebuild after rules change, server
+//                    song pieces to send, download to watch). Nothing to do = four bool reads.
 [HarmonyPatch(typeof(ZNet))]
 internal static class ZNetPatches
 {
@@ -34,8 +34,10 @@ internal static class ZNetPatches
             else
             {
                 ServerRules.RegisterClient(peer.m_rpc, forget: true);
+                SongShare.Reset();
             }
             NoteRelay.Register(peer.m_rpc);
+            SongShare.Register(peer.m_rpc, __instance.IsServer());
         }
         catch (Exception e)
         {
@@ -67,6 +69,7 @@ internal static class ZNetPatches
                 ServerRules.Request(rpc);
             }
             NoteRelay.Register(rpc);
+            SongShare.Register(rpc, __instance.IsServer());
         }
         catch (Exception e)
         {
@@ -79,7 +82,7 @@ internal static class ZNetPatches
     [HarmonyPatch(nameof(ZNet.Update))]
     private static void Update_Postfix()
     {
-        if (!PlayerCheck.HasWork && !ServerRules.PushPending && !InstrumentContent.RebuildPending)
+        if (!PlayerCheck.HasWork && !ServerRules.PushPending && !InstrumentContent.RebuildPending && !SongShare.HasWork)
         {
             return;
         }
@@ -96,6 +99,10 @@ internal static class ZNetPatches
             if (InstrumentContent.RebuildPending)
             {
                 InstrumentContent.UpdatePendingRebuild();
+            }
+            if (SongShare.HasWork)
+            {
+                SongShare.Update();
             }
         }
         catch (Exception e)

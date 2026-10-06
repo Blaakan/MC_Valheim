@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+- Music comfort now counts wherever you rest, also sitting by a campfire outdoors (comfort 1 + 3 = 4, so Rested lasts
+  11 minutes instead of 8). The BonusOnlyInShelter setting is removed (an old line in the config file is ignored).
+- Server songs: with ShareSongs on, a server (or host) shares the MIDI files of its
+  `BepInEx/config/MC_Valheim/ServerSongs` folder. Every player sees them under "Server songs" in the song window and
+  downloads one when they pick it (in small pieces; the world data keeps priority), then plays it like their own files.
+- New server setting AllowPlayerSongs: off = only the built-in songs and the server's songs.
+- Network version 3: every player and the server need this version.
+
 ## 0.1.0
 
 - Initial version. Three craftable instruments with their own models and icons: a Wooden Flute (workbench, Fine Wood),
@@ -10,8 +20,8 @@
   Play a song by itself (you may walk; Repeat available) or perform it in a four-lane rhythm game (D F J K).
 - The sound is synthesized live (no audio files) and heard by players within 40 m, from the performer's position;
   others also see the playing pose. The game's music fades while instruments are heard.
-- 20 seconds of good playing in the rhythm game gives Music (+3 comfort for 10 minutes, so a longer Rested, also when
-  resting outdoors by a campfire) to the performer and every player within 20 m; each further 20 seconds renews it.
+- 20 seconds of good playing in the rhythm game gives Music (+3 comfort for 10 minutes, in shelter) to the performer
+  and every player within 20 m; each further 20 seconds renews it.
 - Required on the server (or the host) and on every player's game: the server refuses players without the mod, with
   it turned off or with another version of it (AllowPlayersWithoutMod), relays the music to players in range, and its
   recipe, comfort and hearing settings apply to everyone.

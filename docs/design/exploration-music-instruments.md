@@ -5,10 +5,10 @@
 | Mod | Music Instruments |
 | GUID / project | `MC.Exploration.Music.Instruments` (`src/Exploration/Music.Instruments/`, root namespace `MC.Exploration.MusicInstrumentsMod`, package `MusicInstruments`) |
 | Category / scope | Exploration / New |
-| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 2. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), sends its gameplay settings to everyone and relays the music (section 4). |
+| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 3. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), sends its gameplay settings to everyone and relays the music (section 4). |
 | Sheet idea | `music instruments` ("prerecorded songs + midi support for buffs well rested") |
 | Game version checked | Valheim 1.0.16 (Unity 6000.0.75f1, Mono), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/` (SE_Rested, SE_Cozy, SEMan, StatusEffect, Player, Humanoid, VisEquipment, ItemDrop, ObjectDB, ZNetScene, ZNet, ZRpc, ZRoutedRpc, ZPackage, ZDOMan, AudioMan, MusicMan, MusicVolume, GameCamera, Menu, Chat, Terminal, ZInput, PlayerController, Emotes, Chair); research briefs of 2026-10-05 (comfort, audio, existing mods, items, input and UI, network, pose, MIDI and preset songs), each fact-checked by a second agent |
-| Status | In development (v0.1.0 code) |
+| Status | In development (v0.2.0 code) |
 
 ## Goal
 
@@ -22,6 +22,8 @@ The user's expected behaviours (run request, 2026-10-05), numbered. Each one is 
 4. **G4 — Others hear it:** in multiplayer, other players nearby hear the music.
 5. **G5 — Others share the comfort:** in multiplayer, other players nearby also get the +3 comfort.
 6. **G6 — Assets:** models and icons for the flute, the lyre and the tambourine.
+7. **G7 — Server songs (0.2.0, user request after the first in-game test):** custom songs uploaded on the server alone
+   can be played by all connected players; an option (server setting), off by default.
 
 ### Added beyond the request (small)
 
@@ -49,6 +51,8 @@ shipped or loaded).
 - Gamepad lanes (D-pad left/right, X, B with own edges: the D-pad auto-repeats).
 - Easy / Hard settings (lane count, minimum gap, timing windows), hold notes for long flute notes.
 - More instruments (frame drum, horn, harp), a placeable music stand, songbook items found in the world.
+- Server songs: a disk cache on players' games (by hash), a pushed list when the server folder changes, sharing to
+  players without the window open.
 
 ## 1. Vanilla behaviour
 
@@ -244,6 +248,47 @@ with a strumming hand, the tambourine raised and shaken. Notes heard pulse the p
 the item are posed, so a seated player stays seated (`IsSitting` is an animator tag). The animated rotations are put
 back before every new pose and when a performance ends.
 
+### 2.7 Server songs (G7)
+
+A server (or host) with `ShareSongs` on shares the MIDI files of `ServerSongsFolder` (default
+`BepInEx/config/MC_Valheim/ServerSongs`; up to 200 files of at most 2 MB, 64 MB in all). `SongShare` (`Net/`):
+
+- **List on demand.** A client asks for the list each time the song window opens (at most every 3 s); the server reads
+  its folder again when asked (at most every 2 s; known files keep their hash by time and size) and answers with each
+  song's id, size and name. Song id = FNV-1a hash of the bytes (`MusicMath.Fnv1a`): the same bytes are one song on
+  every game, changed bytes are a new song, and two files with the same bytes are listed once. Names are cleaned (no
+  control characters, no `<` `>`, so no TMP rich text, 80 characters at most).
+- **File on a pick only.** Picking a server song (click, Enter, pad A, Play, Perform, the part keys) asks for its bytes;
+  moving over it with the keys or opening the window on it never does (only the session cache is looked at), so
+  browsing a long list costs the server nothing. Play or Perform on a song still coming starts it when it is here. The
+  request carries the client's request id, echoed in every piece: pieces of an older pick still on their way are
+  ignored. The server keeps one transfer per player (a new pick replaces it), at most 16 at once (more: "busy"), and
+  sends 4 KB pieces round-robin, at most 4 per frame, only while that connection's send queue is at most 1 984 bytes
+  (`ISocket.GetSendQueueSize`), so right after a piece it is at most about 6 KB and `ZDOMan.SendZDOs` (which sends only
+  while at most 8 192 are queued) still sends world data: world sync keeps priority. Because Steam's queue counts sent
+  but unacknowledged bytes, about one piece goes per round trip: a usual 30 KB file takes about a second, a 2 MB file
+  can take a minute or more. Each piece is a ZPackage in a plain ZRpc (crossplay hands every package whole to PlayFab
+  Party, so no big ones).
+- **Client checks.** Pieces of this pick must come in order, fit the announced size (at most 2 MB) and the last one must
+  make the hash match; anything else stops the download with a reason ("broke off", "damaged", "no longer shared",
+  "busy", "stopped": no piece for 20 s) and picking the song again retries. Turning ShareSongs off on the server
+  tells players downloading at once ("no longer shared"). The bytes are then read by the same `MidiReader` as
+  own files (`SongLibrary.LoadBytes`) and kept for the session (16 MB cache by hash; cleared at world exit).
+- **Window.** "Server songs" section between the built-in songs and "Your MIDI songs"; the details line shows the
+  download progress ("Downloading from the server...", with a percentage once more than one piece has come); when the
+  list arrives after the window opened, the selected song stays selected and in view. On the server's own game (host, single player) the section
+  lists the folder's files directly (read like own files, no transfer).
+- **Rule.** `AllowPlayerSongs` (in the server rules, default on): off = the window hides own MIDI files and
+  `Performance` refuses them ("This server allows only the built-in songs and its own songs."). Only honest games
+  follow it: a modified game could play anything, as notes are only notes.
+- **Server checks.** Requests are read only from ready, compatible peers. List and song requests each have a budget of
+  30 a minute per player; a song request over it gets "busy" at once (no file read), and one far over it (twice the
+  budget) is dropped. Unknown or changed songs answer "gone" (the changed file is read again). One file that cannot be
+  read (locked while copied, no permission) is skipped with one warning, the rest is listed. With sharing on, the
+  folder is made at start so an admin can fill it.
+
+Listeners need nothing: a server song is streamed as notes like any other song.
+
 ## 3. Decisions
 
 - **D1 Tools, cloned from the Flint Knife** (same as the Spyglass, research: lightest base, no weapon trail, build mode
@@ -281,6 +326,19 @@ back before every new pose and when a performance ends.
   names, and other mods add items called "Lyre" and "Flute".
 - **D13 Required everywhere** (user rule for mods that change the experience): new items, a comfort bonus and server
   rules for recipes, comfort and hearing range.
+- **D14 Server songs on demand, off by default** (user request: "as an option"): the list and each file are sent only
+  when a player opens the window or picks a song, so a server with many songs costs nothing until used; one transfer
+  per player and a small send queue keep the world sync first. No disk cache in v0.2 (session cache only): simpler,
+  nothing written on players' games. Version bumped to 0.2.0 (user OK).
+- **D15 No copyrighted tunes built in.** The user asked for Lost Woods (The Legend of Zelda: Ocarina of Time) split
+  across the three instruments, with the condition: "if the title is not free to use, don't ship it as is but prepare
+  it so I can use it on my solo playthrough". It is not free to use (Koji Kondo's composition, Nintendo), so neither the
+  mod, the repository nor a local file contains a transcription of it: writing the notes out is a copy of the work
+  wherever it is kept. The solo path needs no code: any MIDI file the player has goes in
+  `BepInEx/config/MC_Valheim/Songs` (in single player AllowPlayerSongs is the player's own setting, on by default) and
+  shows under "Your MIDI songs", split into a part per instrument (flute melody, lyre tune and bass, tambourine drums
+  or rhythm); when hosting, `BepInEx/config/MC_Valheim/ServerSongs` with ShareSongs on lets friends play it too.
+  Built-in songs stay traditional (public domain) or written for the mod.
 
 ## 4. Multiplayer
 
@@ -297,10 +355,11 @@ back before every new pose and when a performance ends.
 
 ### 4.2 RPCs, ZDO keys, network version
 
-RPCs `MC.Exploration.Music.Instruments.Settings` / `.SettingsRequest` (rules layout 2) and `.Notes` (note batch layout
-1); player ZDO int `MC.Exploration.Music.Instruments.Playing` (stable hash; the instrument being played, 0 = none);
+RPCs `MC.Exploration.Music.Instruments.Settings` / `.SettingsRequest` (rules layout 3), `.Notes` (note batch layout
+1), `.SongListRequest` / `.SongList` / `.SongRequest` / `.SongChunk` (server songs, layout 1); player ZDO int `MC.Exploration.Music.Instruments.Playing` (stable hash; the instrument being played, 0 = none);
 prefabs `MC_Flute`, `MC_Lyre`, `MC_Tambourine`; recipes `Recipe_MC_Flute`, `Recipe_MC_Lyre`, `Recipe_MC_Tambourine`;
-status effect `SE_MC_Music`. Network version 2 (1 had a shelter flag in the rules; never released).
+status effect `SE_MC_Music`. Network version 3 (1 had a shelter flag in the rules, 2 had no server songs; neither
+released).
 
 ### 4.3 Server settings and join check
 
@@ -317,11 +376,15 @@ or another network version are refused after a 1 s grace unless `AllowPlayersWit
 - An instrument handed over through a chest to a player with the mod but feature off: the item is known (always-on
   registration), Attack does nothing (no punch: the attack guard is always on).
 - A Music effect reaching a game without the mod is impossible by design (each game applies it to itself).
+- Server songs never reach a player without the mod: the server answers only compatible peers, and nothing is sent
+  unasked.
 
 ### 4.5 Dedicated server
 
 Items are built from the network prefab list's `KnifeFlint`; no mesh, texture, material, icon, sound or UI is made
-(no graphics device). The rules, the join check and the note relay run on the server.
+(no graphics device). The rules, the join check and the note relay run on the server. With ShareSongs on it also reads
+and hashes its song folder when asked (at most every 2 s; 200 files and 64 MB at most) and holds each active transfer's
+bytes in memory (at most 16 x 2 MB).
 
 ## 5. Config
 
@@ -338,6 +401,9 @@ Items are built from the network prefab list's `KnifeFlint`; no mesh, texture, m
 | Comfort | BonusMinutes | 10 | 1-60 | server wins |
 | Comfort | BonusRange | 20 | 3-50 m | server wins |
 | Hearing | HearingRange | 40 | 10-80 m | server wins |
+| ServerSongs | ShareSongs | false | | server only |
+| ServerSongs | ServerSongsFolder | empty (`BepInEx/config/MC_Valheim/ServerSongs`) | | server only |
+| ServerSongs | AllowPlayerSongs | true | | server wins |
 | Sound | Volume | 0.8 | 0-1 | personal |
 | Sound | GameMusicVolume | 0.3 | 0-1 | personal |
 | MiniGame | Lane1Key .. Lane4Key | D, F, J, K | keys | personal |
@@ -379,7 +445,7 @@ Items are built from the network prefab list's `KnifeFlint`; no mesh, texture, m
 `Items/` `InstrumentContent.cs` (items, recipes, effect registration), `InstrumentModels.cs`, `InstrumentIcons.cs`,
 `MusicEffect.cs`; `Music/` `Notes.cs`, `MidiReader.cs`, `SongText.cs`, `PresetSongs.cs`, `SongLibrary.cs`,
 `Arranger.cs`, `Chart.cs`, `Judge.cs` (pure C#, also built by the offline test harness); `Audio/` `SynthCore.cs`
-(pure), `AudioKit.cs`, `Emitter.cs`, `Listeners.cs`; `Net/` `NoteBatch.cs`, `NoteRelay.cs`; `Play/` `Performance.cs`,
+(pure), `AudioKit.cs`, `Emitter.cs`, `Listeners.cs`; `Net/` `NoteBatch.cs`, `NoteRelay.cs`, `SongShare.cs`; `Play/` `Performance.cs`,
 `MiniGame.cs`, `MusicBonus.cs`, `KeyCapture.cs` (with `LaneKeys`, `GameScreens`); `Pose/InstrumentPose.cs`; `Ui/`
 `SongWindow.cs`, `MiniGameHud.cs`; `Patches/` (`ObjectDBPatches`, `ZNetScenePatches`, `PlayerAttackGuardPatches`
 always on; `PlayerPatches`, `ComfortPatches`, `InputPatches` (chat focus, console binds, Esc, cursor, world exit,
@@ -410,7 +476,10 @@ fade, putting the instrument away stops), `music.listen` (another player's batch
 the effect and out of range nothing, notes far from their batch time dropped, a restart keeps the old timing, a
 batch late after a 2 s stall has its notes dropped with the delay still bounded, nothing taken after End, End frees
 the emitter), `music.window` (window and HUD
-screenshots, Perform from the window), `music.pose` (markers near targets, screenshots, also as others see it),
+screenshots, Perform from the window), `music.share` (server folder listed with duplicates and other files skipped,
+list and pieces through the real packages, an older pick's piece ignored, progress, download read and arranged,
+out-of-order / damaged / gone pieces refused, retry, send queue rule, clean names, host window lists and plays a server song, AllowPlayerSongs off hides and
+refuses own songs, sharing off hides the section), `music.pose` (markers near targets, screenshots, also as others see it),
 `music.export` (icons). Hands-on list: `src/Exploration/Music.Instruments/TESTING.md`.
 
 ## 9. Open questions and unverified

@@ -8,12 +8,13 @@ namespace MC.Exploration.MusicInstrumentsMod;
 // One entry of the song window: a built-in song or a MIDI file of the songs folder.
 internal sealed class SongEntry
 {
-    internal string Id = "";            // "preset:<id>" / "midi:<file name>": stable key
+    internal string Id = "";            // "preset:<id>" / "midi:<file name>" / "server:<hash>": stable key
     internal string Title = "";
     internal SongSource Source;
-    internal string Path;               // MIDI file (null for presets)
+    internal string Path;               // MIDI file (null for presets and downloaded server songs)
     internal string Info = "";          // one line for the window: origin or parts, length
     internal string Error;              // null = fine; else why it cannot play
+    internal string Pending;            // server song not here yet: why (download progress), else null
     internal float Length;              // seconds of one pass (0 until a MIDI file is loaded)
     internal readonly List<string> Parts = new List<string>(); // MIDI parts (after Load); presets: none
     internal PresetSong Preset;
@@ -21,6 +22,8 @@ internal sealed class SongEntry
     internal DateTime FileTime;
     internal long FileSize;
     internal bool Loaded;
+    internal int ServerHash;            // server song: FNV-1a of its bytes (id on the wire)
+    internal int ServerSize;            // server song: bytes
 }
 
 // Me = the songs: built-in ones (PresetSongs) and the MIDI files of the songs folder (Plugin.SongsFolder, default
@@ -82,6 +85,36 @@ internal static class SongLibrary
         return list;
     }
 
+    // MIDI files (by extension) directly in a folder, sorted by name, at most max. Folder made when missing.
+    internal static List<string> MidiFiles(string folder, int max, out bool cut)
+    {
+        cut = false;
+        var files = new List<string>();
+        if (!Directory.Exists(folder))
+        {
+            Directory.CreateDirectory(folder);
+        }
+        foreach (var file in Directory.GetFiles(folder))
+        {
+            var ext = System.IO.Path.GetExtension(file);
+            foreach (var allowed in Extensions)
+            {
+                if (string.Equals(ext, allowed, StringComparison.OrdinalIgnoreCase))
+                {
+                    files.Add(file);
+                    break;
+                }
+            }
+        }
+        files.Sort(StringComparer.OrdinalIgnoreCase);
+        if (files.Count > max)
+        {
+            cut = true;
+            files.RemoveRange(max, files.Count - max);
+        }
+        return files;
+    }
+
     // MIDI files of the folder, by name (folder made when missing). Known files keep their parsed data.
     internal static List<SongEntry> ScanMidiFolder(out string error)
     {
@@ -95,28 +128,10 @@ internal static class SongLibrary
         }
         try
         {
-            if (!Directory.Exists(folder))
-            {
-                Directory.CreateDirectory(folder);
-            }
-            var files = new List<string>();
-            foreach (var file in Directory.GetFiles(folder))
-            {
-                var ext = System.IO.Path.GetExtension(file);
-                foreach (var allowed in Extensions)
-                {
-                    if (string.Equals(ext, allowed, StringComparison.OrdinalIgnoreCase))
-                    {
-                        files.Add(file);
-                        break;
-                    }
-                }
-            }
-            files.Sort(StringComparer.OrdinalIgnoreCase);
-            if (files.Count > MaxFiles)
+            var files = MidiFiles(folder, MaxFiles, out var cut);
+            if (cut)
             {
                 error = $"Only the first {MaxFiles} songs of the folder are listed.";
-                files.RemoveRange(MaxFiles, files.Count - MaxFiles);
             }
             foreach (var file in files)
             {
@@ -154,6 +169,11 @@ internal static class SongLibrary
         {
             return entry.Error == null;
         }
+        if (entry.Source == SongSource.Server && entry.Path == null)
+        {
+            // Downloaded song: LoadBytes filled it when the last piece came (SongShare); before that, Pending says why.
+            return entry.Score != null && entry.Error == null;
+        }
         try
         {
             var info = new FileInfo(entry.Path);
@@ -177,28 +197,57 @@ internal static class SongLibrary
                 entry.Error = "The file is larger than " + MidiReader.MaxFileBytes / (1024 * 1024) + " MB.";
                 return false;
             }
-            var score = MidiReader.Read(File.ReadAllBytes(entry.Path), out var error);
-            if (score == null)
-            {
-                entry.Error = "The file " + error + ".";
-                return false;
-            }
-            entry.Error = null;
-            entry.Score = score;
-            foreach (var part in score.Parts)
-            {
-                entry.Parts.Add(part.Label + " - " + part.Notes.Count.ToString(CultureInfo.InvariantCulture) + " notes");
-            }
-            entry.Length = Trimmed(score);
-            entry.Info = "MIDI, " + score.Parts.Count + (score.Parts.Count == 1 ? " part, " : " parts, ") + Clock(entry.Length)
-                         + (score.Truncated ? " (damaged end skipped)" : "");
-            return true;
+            return Parse(entry, File.ReadAllBytes(entry.Path));
         }
         catch (Exception e)
         {
             entry.Error = "The file could not be read: " + e.Message;
             return false;
         }
+    }
+
+    // A server song's bytes came (download done and checked): parse them like a file. Never trust them more than a
+    // file (same reader, same limits).
+    internal static bool LoadBytes(SongEntry entry, byte[] data)
+    {
+        if (entry == null)
+        {
+            return false;
+        }
+        entry.Loaded = true;
+        entry.Pending = null;
+        entry.Parts.Clear();
+        entry.Score = null;
+        try
+        {
+            return Parse(entry, data);
+        }
+        catch (Exception e)
+        {
+            entry.Error = "The song could not be read: " + e.Message;
+            return false;
+        }
+    }
+
+    private static bool Parse(SongEntry entry, byte[] data)
+    {
+        var score = MidiReader.Read(data, out var error);
+        if (score == null)
+        {
+            entry.Error = "The file " + error + ".";
+            return false;
+        }
+        entry.Error = null;
+        entry.Score = score;
+        foreach (var part in score.Parts)
+        {
+            entry.Parts.Add(part.Label + " - " + part.Notes.Count.ToString(CultureInfo.InvariantCulture) + " notes");
+        }
+        entry.Length = Trimmed(score);
+        entry.Info = (entry.Source == SongSource.Server ? "Server MIDI, " : "MIDI, ") + score.Parts.Count
+                     + (score.Parts.Count == 1 ? " part, " : " parts, ") + Clock(entry.Length)
+                     + (score.Truncated ? " (damaged end skipped)" : "");
+        return true;
     }
 
     // Automatic part for this instrument: index into entry.Parts, -1 = several parts (lyre tune + bass, tambourine
@@ -234,7 +283,7 @@ internal static class SongLibrary
         }
         if (!Load(entry) || entry.Score == null)
         {
-            error = entry.Error ?? "The file could not be read.";
+            error = entry.Error ?? entry.Pending ?? "The file could not be read.";
             return false;
         }
         var score = entry.Score;

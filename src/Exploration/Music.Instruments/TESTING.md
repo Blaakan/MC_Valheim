@@ -4,7 +4,8 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
+**Build under test:** 0.2.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
+adds server songs (items T26-T28, M12-M17); runs on it are noted at the end of this paragraph. Earlier runs (0.1.0): smoke
 test (`./tools/Test-Smoke.ps1 -Mod Music.Instruments`) passed 2026-10-05 after both reviews (loads, patches cleanly,
 JitCheck 1136 methods, 0 failures; build 8811b96+dirty). In-world self-tests (`./tools/Test-InWorld.ps1 -Mod
 Music.Instruments -Only music`) passed 2026-10-05 after both reviews, 10/10: `music.network`, `music.item`,
@@ -16,7 +17,11 @@ an error when a third-party mod builds a partial item database; Music Instrument
 First hands-on test (build 5f6f777): outdoors with a bonfire and Music, Rested was 8 minutes (comfort 1: the shelter
 rule dropped the +3). Fixed after it: the bonus counts everywhere (setting BonusOnlyInShelter removed, network version
 2). Smoke test and in-world self-tests passed again 2026-10-05 (10/10; `music.perform` outdoors: comfort 4 = 1 + 3,
-Rested 660 s = 480 + 3 x 60); same two errors from Sneak Ambush and Spyglass only.
+Rested 660 s = 480 + 3 x 60); same two errors from Sneak Ambush and Spyglass only. 0.2.0 (after its review fixes): smoke test passed
+2026-10-05 (JitCheck 1210 methods, 0 failures; build 5f6f777+dirty); in-world self-tests passed 11/11, including
+`music.share` (23 checks: folder listing, list and a multi-piece download through the real packages, an older pick's
+piece ignored, bad pieces refused, host window lists and plays a server song, AllowPlayerSongs off, sharing off);
+same two errors from Sneak Ambush and Spyglass only.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina. Items: `spawn MC_Flute`,
@@ -185,3 +190,47 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
 - [ ] **M11 Long notes and rests:** play a MIDI song with notes held for several seconds (a slow string or organ part,
   on the flute) and one with a long rest in it. Expected: your friend hears each long note to its end (never cut after
   about 3 seconds) and the song goes on after the rest.
+
+## 0.2.0 — server songs
+
+Setup: on the server (or host), set ShareSongs = true (ServerSongs section) and put a few `.mid` files in
+`BepInEx/config/MC_Valheim/ServerSongs` (the window's hint names the folder; a dedicated server uses its own BepInEx
+config folder). The friend's own songs folder should not have these files.
+
+- [ ] **T26 Server songs as host (G7):** single player or hosting, ShareSongs on, two files in the server songs folder,
+  open the song window. Expected: a "Server songs" section between the built-in songs and "Your MIDI songs" lists both;
+  picking one shows its parts and length at once (your game is the server: no download); Play and Perform work. Copy
+  another file in with the window closed and open it again: it is listed. ShareSongs off: the section is gone.
+- [ ] **T27 AllowPlayerSongs off:** set AllowPlayerSongs = false, open the window. Expected: under "Your MIDI songs" only
+  "This server allows only the built-in songs and its own songs." (no own files); built-in and server songs still play.
+  Put it back.
+- [ ] **T28 Folder problems:** in the server songs folder, a file larger than 2 MB is not listed (one warning in the
+  log); a text file renamed to `.mid` is listed but shows why it cannot play when picked; the same file twice under two
+  names is listed once. With ShareSongs on and the folder deleted, restart (or turn ShareSongs off and on): the folder
+  is made again (log line "Made the server songs folder").
+
+### 0.2.0 — multiplayer
+
+- [ ] **M12 Server songs on a client (G7):** host (or dedicated server) sharing a few files (one over 16 KB); a friend
+  with the mod opens the song window. Expected: "Server songs" lists the server's files (if they come a moment after
+  the window opens, the selected song stays selected and in view). Moving over them with the arrow keys downloads
+  nothing (the line under a song shows its size). Clicking one shows "Downloading from the server..." in the details
+  line (with a percentage for the bigger file), then its parts and length in about a second; Play and Perform work and
+  everyone nearby hears it, split into a part per instrument (flute melody, lyre tune and bass, tambourine drums or
+  rhythm). Press Play on another server song not downloaded yet: it starts by itself when it is here. With ShareSongs
+  off on the server, the friend sees no "Server songs" section.
+- [ ] **M13 Cache and changes:** the friend picks the same song again: no download (at once). The host replaces a file
+  with another version (same name); a few seconds later the friend opens the window again and picks it: the new
+  version downloads. The host deletes a song the friend has not picked yet this session, while the friend's window
+  lists it: picking it says "The server no longer shares this song" (a song already downloaded keeps playing until the
+  friend leaves the world). The host turns ShareSongs off while the friend downloads the big file: the friend sees "no
+  longer shares" at once.
+- [ ] **M14 Big file:** share a 1 to 2 MB MIDI file; the friend picks it while others move around. Expected: the
+  progress goes up to the end (it can take a minute or more) and the song plays; the world keeps loading normally for
+  everyone during the download, also for the friend downloading (no lag or rubber-banding from it).
+- [ ] **M15 AllowPlayerSongs off on the server:** the friend's window shows the hint instead of their own MIDI files;
+  server songs and built-in songs play.
+- [ ] **M16 Hand-off to a player without the mod:** AllowPlayersWithoutMod = true, a friend without the mod joins a
+  sharing server. Expected: nothing breaks for them, and nothing is sent to them (no "Sending server song" line for
+  them in the server log with Debug logging).
+- [ ] **M17 Crossplay:** a friend on crossplay downloads a server song. Expected: it completes and plays.

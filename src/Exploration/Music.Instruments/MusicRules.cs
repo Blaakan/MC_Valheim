@@ -5,8 +5,9 @@ using BepInEx.Configuration;
 namespace MC.Exploration.MusicInstrumentsMod;
 
 // Me = every gameplay number of the mod in one snapshot. Server send its own to every player (ServerRules): same
-// recipes, same comfort bonus, same mini-game bar, same hearing range for everybody. Personal choices (volume, game
-// music, lane keys, note speed) and server-only AllowPlayersWithoutMod are not in here. Snapshot never change after
+// recipes, same comfort bonus, same mini-game bar, same hearing range, same song rule for everybody. Personal choices
+// (volume, game music, lane keys, note speed, songs folder) and server-only AllowPlayersWithoutMod, ShareSongs,
+// ServerSongsFolder are not in here. Snapshot never change after
 // build: new rules = new object. Pending = client still wait for server rules: built in code, never from config,
 // never sent. Game code must check IsPending (recipes hidden, playing refused), not trust the numbers.
 internal sealed class MusicRules
@@ -51,6 +52,10 @@ internal sealed class MusicRules
 
     // Sound: players farther than this hear nothing (and get no notes over the network).
     internal float HearingRange = 40f;
+
+    // Songs: players may play MIDI files of their own songs folder. Off: built-in and server songs only (song window
+    // hides own files, Performance refuse them; a modified game could still play anything: notes are notes).
+    internal bool AllowPlayerSongs = true;
 
     // True only on Pending: client wait for server rules, recipes hidden, no playing.
     internal bool IsPending { get; private set; }
@@ -116,12 +121,13 @@ internal sealed class MusicRules
             BonusMinutes = V(Plugin.BonusMinutes, d.BonusMinutes),
             BonusRange = V(Plugin.BonusRange, d.BonusRange),
             HearingRange = V(Plugin.HearingRange, d.HearingRange),
+            AllowPlayerSongs = V(Plugin.AllowPlayerSongs, d.AllowPlayerSongs),
         };
     }
 
     // Wire: layout, then every value in fixed order. Layout bump = other order (ModNetworkVersion too).
-    // Layout 2: shelter flag gone (bonus count everywhere).
-    internal const int Layout = 2;
+    // Layout 2: shelter flag gone (bonus count everywhere). Layout 3: AllowPlayerSongs at the end.
+    internal const int Layout = 3;
 
     internal void Write(ZPackage pkg)
     {
@@ -141,6 +147,7 @@ internal sealed class MusicRules
         pkg.Write(BonusMinutes);
         pkg.Write(BonusRange);
         pkg.Write(HearingRange);
+        pkg.Write(AllowPlayerSongs);
     }
 
     // Never trust the wire: unknown layout or broken package = false (caller keep what it had); values outside the
@@ -172,6 +179,7 @@ internal sealed class MusicRules
             r.BonusMinutes = Clamp(pkg.ReadSingle(), BonusMinutesMin, BonusMinutesMax, d.BonusMinutes, ref clamped);
             r.BonusRange = Clamp(pkg.ReadSingle(), BonusRangeMin, BonusRangeMax, d.BonusRange, ref clamped);
             r.HearingRange = Clamp(pkg.ReadSingle(), HearingRangeMin, HearingRangeMax, d.HearingRange, ref clamped);
+            r.AllowPlayerSongs = pkg.ReadBool();
             rules = r;
             return true;
         }
@@ -193,7 +201,8 @@ internal sealed class MusicRules
                + "; tambourine " + Recipe(TambourineResources, TambourineStation, TambourineStationLevel)
                + "; +" + ComfortBonus + " comfort for " + F(BonusMinutes) + " min within " + F(BonusRange) + " m"
                + " after " + F(SuccessSeconds) + " s at "
-               + F(SuccessAccuracy * 100f) + " % of the notes; heard up to " + F(HearingRange) + " m";
+               + F(SuccessAccuracy * 100f) + " % of the notes; heard up to " + F(HearingRange) + " m"
+               + (AllowPlayerSongs ? "" : "; own MIDI songs not allowed");
     }
 
     private static string Recipe(string resources, string station, int level) =>

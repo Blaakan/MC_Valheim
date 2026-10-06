@@ -43,12 +43,14 @@ internal static class SelfTests
     private const string AutoplayName = "music.autoplay";
     private const string ListenName = "music.listen";
     private const string WindowName = "music.window";
+    private const string ShareName = "music.share";
     private const string PoseName = "music.pose";
     private const string ExportName = "music.export";
 
     private static readonly string[] Names =
     {
-        NetworkName, ItemName, SynthName, SongsName, PerformName, AutoplayName, ListenName, WindowName, PoseName, ExportName,
+        NetworkName, ItemName, SynthName, SongsName, PerformName, AutoplayName, ListenName, WindowName, ShareName, PoseName,
+        ExportName,
     };
 #endif
 
@@ -64,6 +66,7 @@ internal static class SelfTests
         SelfTest.Register(AutoplayName, RunAutoplay);
         SelfTest.Register(ListenName, RunListen);
         SelfTest.Register(WindowName, RunWindow);
+        SelfTest.Register(ShareName, RunShare);
         SelfTest.Register(PoseName, RunPose);
         SelfTest.Register(ExportName, RunExport);
 #endif
@@ -863,6 +866,27 @@ internal static class SelfTests
         body.WriteTo(ms);
     }
 
+    // Same song with one more track holding only a long text event: bigger file, same notes.
+    private static byte[] PadMidi(byte[] midi, int textBytes)
+    {
+        var ms = new MemoryStream();
+        ms.Write(midi, 0, midi.Length);
+        var text = new List<byte>();
+        text.AddRange(Ev(0, 0xFF, 0x01));
+        text.AddRange(Ev(textBytes));
+        for (var i = 0; i < textBytes; i++)
+        {
+            text.Add((byte)'a');
+        }
+        WriteTrack(ms, new List<byte[]> { text.ToArray(), Ev(0, 0xFF, 0x2F, 0) });
+        var bytes = ms.ToArray();
+        var tracks = (bytes[10] << 8) | bytes[11];
+        tracks++;
+        bytes[10] = (byte)(tracks >> 8);
+        bytes[11] = (byte)tracks;
+        return bytes;
+    }
+
     private static byte[] Ev(long delta, params byte[] data)
     {
         var vlq = new List<byte> { (byte)(delta & 0x7F) };
@@ -876,6 +900,211 @@ internal static class SelfTests
         vlq.CopyTo(result, 0);
         data.CopyTo(result, vlq.Count);
         return result;
+    }
+
+    // ---------- music.share ----------
+
+    // Server songs: folder listing, list and pieces through the real packages (no network: server packages fed to the
+    // client side), bad pieces, host window, the server's AllowPlayerSongs rule, sharing off.
+    private static IEnumerator RunShare()
+    {
+        var c = new Checks(ShareName);
+        var player = Player.m_localPlayer;
+        if (player == null)
+        {
+            SelfTest.Fail(ShareName, "no player");
+            yield break;
+        }
+        var rig = new Rig(player);
+        var folder = Path.Combine(Path.GetTempPath(), "MC_MusicShareTest");
+        var ownFolder = Path.Combine(Path.GetTempPath(), "MC_MusicShareOwn");
+        var savedOwn = SongLibrary.ConfiguredFolder;
+        try
+        {
+            rig.TakeControls();
+            ServerRules.TestRules = TestRules();
+            foreach (var f in new[] { folder, ownFolder })
+            {
+                if (Directory.Exists(f))
+                {
+                    Directory.Delete(f, true);
+                }
+                Directory.CreateDirectory(f);
+            }
+            var tune = MidiOf(Preset("greensleeves"));
+            var big = PadMidi(MidiOf(Preset("ravens-jig")), 3 * SongShare.ChunkBytes + 123);
+            File.WriteAllBytes(Path.Combine(folder, "Shared tune.mid"), tune);
+            File.WriteAllBytes(Path.Combine(folder, "Copy of shared tune.mid"), tune);
+            File.WriteAllBytes(Path.Combine(folder, "Long jig.mid"), big);
+            File.WriteAllBytes(Path.Combine(folder, "notes.txt"), new byte[] { 1, 2, 3 });
+            SongShare.TestFolder = folder;
+            SongShare.TestShare = true;
+            SongShare.TestScan();
+            c.Check(SongShare.SharedCount == 2, $"server lists 2 songs (same bytes once, .txt skipped): {SongShare.SharedCount}");
+
+            // List through its package to the client view.
+            var listPkg = SongShare.ListPackage();
+            listPkg.SetPos(0);
+            c.Check(SongShare.ReceiveList(listPkg), "list read back");
+            SongEntry small = null;
+            SongEntry large = null;
+            foreach (var e in SongShare.ClientList)
+            {
+                if (e.ServerSize == tune.Length)
+                {
+                    small = e;
+                }
+                else if (e.ServerSize == big.Length)
+                {
+                    large = e;
+                }
+            }
+            c.Check(SongShare.ClientList.Count == 2 && small != null && large != null, "client sees both server songs");
+            c.Check(small != null && small.ServerHash == MusicMath.Fnv1a(tune) && small.Title == "Copy of shared tune",
+                "song id = hash of its bytes, first name kept: " + (small != null ? small.Title : "-"));
+
+            // A song bigger than one piece: several pieces, progress, then read like a file.
+            if (large != null)
+            {
+                SongShare.TestForget(large.ServerHash);
+                SongShare.TestBegin(large);
+                var request = SongShare.TestRequest;
+                // A piece of an older pick still on its way: ignored, the download goes on.
+                var stale = SongShare.TestPieces(large.ServerHash, request - 1);
+                stale[stale.Count - 1].SetPos(0);
+                c.Check(!SongShare.ReceiveChunk(stale[stale.Count - 1]) && large.Pending != null
+                        && large.Pending.StartsWith("Downloading", StringComparison.Ordinal), "older pick's piece ignored: " + large.Pending);
+                var pieces = SongShare.TestPieces(large.ServerHash, request);
+                c.Check(pieces.Count >= 4 && pieces.Count == (big.Length + SongShare.ChunkBytes - 1) / SongShare.ChunkBytes,
+                    $"sent in {pieces.Count} pieces of {SongShare.ChunkBytes} bytes ({big.Length} bytes)");
+                var taken = 0;
+                for (var i = 0; i < pieces.Count; i++)
+                {
+                    pieces[i].SetPos(0);
+                    if (SongShare.ReceiveChunk(pieces[i]))
+                    {
+                        taken++;
+                    }
+                    if (i == 0)
+                    {
+                        c.Check(large.Pending != null && large.Pending.Contains("%"), "progress shown: " + large.Pending);
+                    }
+                }
+                c.Check(taken == pieces.Count && large.Score != null && large.Error == null && large.Pending == null
+                        && large.Parts.Count >= 1, $"downloaded song read: {large.Info} {large.Error} {large.Pending}");
+                c.Check(SongShare.CachedCount >= 1, "kept for the session");
+                c.Check(SongLibrary.Arrange(large, InstrumentKind.Lyre, -1, out var notes, out _, out var arrangeError)
+                        && notes.Length > 8, "downloaded song arranged: " + arrangeError);
+            }
+
+            // Bad pieces never load a song.
+            if (small != null)
+            {
+                SongShare.TestForget(small.ServerHash);
+                SongShare.TestBegin(small);
+                var skipped = SongShare.ChunkPackage(small.ServerHash, SongShare.TestRequest, tune, 100);
+                skipped.SetPos(0);
+                c.Check(!SongShare.ReceiveChunk(skipped) && small.Score == null && small.Pending != null
+                        && small.Pending.Contains("broke off"), "piece out of order refused: " + small.Pending);
+                SongShare.TestBegin(small);
+                var damaged = (byte[])tune.Clone();
+                damaged[damaged.Length - 5] ^= 0x55;
+                var damagedPkg = SongShare.ChunkPackage(small.ServerHash, SongShare.TestRequest, damaged, 0);
+                damagedPkg.SetPos(0);
+                SongShare.ReceiveChunk(damagedPkg);
+                c.Check(small.Score == null && small.Pending != null && small.Pending.Contains("damaged"),
+                    "damaged song refused: " + small.Pending);
+                SongShare.TestBegin(small);
+                var gone = SongShare.TestStatus(small.ServerHash, SongShare.TestRequest, SongShare.StatusGone);
+                gone.SetPos(0);
+                SongShare.ReceiveChunk(gone);
+                c.Check(small.Score == null && small.Pending != null && small.Pending.Contains("no longer"),
+                    "song no longer shared: " + small.Pending);
+                SongShare.TestBegin(small);
+                foreach (var p in SongShare.TestPieces(small.ServerHash, SongShare.TestRequest))
+                {
+                    p.SetPos(0);
+                    SongShare.ReceiveChunk(p);
+                }
+                c.Check(small.Score != null && small.Pending == null, "picked again: downloaded");
+            }
+            c.Check(SongShare.CanSend(0) && SongShare.CanSend(SongShare.QueueLimit) && !SongShare.CanSend(SongShare.QueueLimit + 1)
+                    && SongShare.QueueLimit + SongShare.ChunkBytes + 64 <= 8192,
+                "pieces wait for a short send queue (world data keep room)");
+            c.Check(SongShare.CleanName("A <b>bold</b> name") == "A bbold/b name" && SongShare.CleanName("  ") == "Server song",
+                "song names: no rich text, never empty");
+
+            // Host (this game is the server): the folder's songs in the window, playable.
+            rig.Hold(InstrumentKind.Flute);
+            yield return new WaitForSeconds(0.4f);
+            var hostId = SongShare.IdOf(MusicMath.Fnv1a(tune));
+            Performance.TestRequestOpen();
+            yield return Frames(3);
+            c.Check(SongWindow.IsOpen && SongWindow.TestSelect(hostId), "server song in the window: " + hostId);
+            yield return Frames(3);
+            SelfTest.Screenshot(ShareName, "window");
+            yield return Frames(2);
+            SongWindow.TestPress("Play");
+            yield return Frames(3);
+            c.Check(Performance.Mode == PerformanceMode.Auto, "server song plays");
+            Performance.TestRequestStop();
+            yield return Frames(3);
+
+            // Server forbids own songs: hidden in the window, refused by Performance.
+            SongLibrary.ConfiguredFolder = ownFolder;
+            File.WriteAllBytes(Path.Combine(ownFolder, "own tune.mid"), tune);
+            var strict = TestRules();
+            strict.AllowPlayerSongs = false;
+            ServerRules.TestRules = strict;
+            var own = SongLibrary.ScanMidiFolder(out _);
+            c.Check(own.Count == 1, "own song in the folder");
+            if (own.Count == 1)
+            {
+                c.Check(!Performance.StartAuto(own[0], -1, out var refused) && refused == Performance.PlayerSongsOff,
+                    "own song refused: " + refused);
+            }
+            Performance.TestRequestOpen();
+            yield return Frames(3);
+            c.Check(SongWindow.IsOpen && !SongWindow.TestSelect("midi:own tune.mid"), "own songs hidden in the window");
+            c.Check(SongWindow.TestSelect(hostId), "server songs still listed");
+            Performance.CloseWindow();
+            yield return Frames(2);
+            ServerRules.TestRules = TestRules();
+
+            // Sharing off: no server songs.
+            SongShare.TestShare = false;
+            SongShare.ServerSettingsChanged();
+            Performance.TestRequestOpen();
+            yield return Frames(3);
+            c.Check(SongWindow.IsOpen && !SongWindow.TestSelect(hostId), "sharing off: no server songs");
+            Performance.CloseWindow();
+            yield return Frames(2);
+            c.Report();
+        }
+        finally
+        {
+            SongShare.TestShare = null;
+            SongShare.TestFolder = null;
+            SongShare.ServerSettingsChanged();
+            SongShare.Reset();
+            SongLibrary.ConfiguredFolder = savedOwn;
+            if (Performance.WindowOpen)
+            {
+                Performance.CloseWindow();
+            }
+            rig.Restore();
+            foreach (var f in new[] { folder, ownFolder })
+            {
+                try
+                {
+                    Directory.Delete(f, true);
+                }
+                catch (Exception)
+                {
+                    // Temp folder: fine to leave.
+                }
+            }
+        }
     }
 
     // ---------- music.perform ----------

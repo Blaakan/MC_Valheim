@@ -25,6 +25,7 @@ internal enum PerformanceMode : byte
 // on change).
 internal static class Performance
 {
+    internal const string PlayerSongsOff = "This server allows only the built-in songs and its own songs.";
     private const float LookAhead = 0.5f;
     private const float FlushInterval = 0.2f;
     private const float LiveFlushInterval = 0.05f;
@@ -391,6 +392,11 @@ internal static class Performance
         if (!CanStart(player, out error))
         {
             error ??= "You cannot play now.";
+            return false;
+        }
+        if (song.Source == SongSource.Midi && !ServerRules.Current.AllowPlayerSongs)
+        {
+            error = PlayerSongsOff;
             return false;
         }
         if (!SongLibrary.Arrange(song, kind, part, out var notes, out var length, out error))
