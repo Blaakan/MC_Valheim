@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Music Instruments 0.3.0 (not released): the rhythm game's Encore needs half of the notes hit for 20 seconds.
+
 ## 0.1.0
 
 - First version of the pack (not released): Crossbow Stays Loaded 0.1.0, One Click Repair All 0.1.0, Creature Kill and Tame

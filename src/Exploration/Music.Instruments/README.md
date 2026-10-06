@@ -55,11 +55,13 @@ mini-game whose good performances give everyone nearby extra comfort.
   plays that note (and the quick notes after it), so a good run plays the whole song; a miss is silent. You stand
   still while you perform; the song repeats until you stop (right mouse button or Esc). The rhythm game is played
   on the keyboard (no gamepad lanes yet).
-- **The meter** beside the lanes fills while you play well and drains twice as fast when you do not; it waits during
-  long rests. "Well" means your last ten notes average at least 70 %: a near-perfect hit counts fully, a less exact
-  one three quarters, a missed note or a key pressed with no note to hit nothing; three misses in a row also stop it. **After 20 seconds of good
-  playing: Encore!** You and every player within 20 metres get **Music** for 10 minutes: **+3 comfort**. Each further
-  20 seconds of good playing renews it. Songs that play by themselves never fill the meter.
+- **The meter** beside the lanes fills while you hit at least half of your last 20 notes (the Accuracy shown beside
+  it): every hit counts, near-perfect or not; a missed note or a key pressed with no note to hit counts as a miss (one
+  wrong key while a note is due costs nothing more than that note's miss). When you miss more than that, or during a
+  long rest, it waits; it never drains, so a bad stretch only costs time. Hitting about every other note fills it in
+  about 20 to 40 seconds (up to a minute when the hits come in uneven bunches), hitting more of the notes in about 20. **After 20 seconds of playing that well: Encore!** You and every player within 20 metres
+  get **Music** for 10 minutes: **+3 comfort**. Each further 20 seconds renews it. Songs that play by themselves never
+  fill the meter.
 - **What +3 comfort does**: comfort sets how long Rested lasts (in the base game 1 minute per point), so resting by a
   fire with Music gives 3 more minutes of Rested. It counts wherever you rest: in a shelter, and also sitting by a
   campfire under the open sky (the game's own comfort there is 1 and Rested lasts 8 minutes; with Music, comfort 4 and
@@ -102,7 +104,7 @@ Songs sections are each player's own.
 | Recipes | TambourineRecipe, TambourineStation, TambourineStationLevel | `FineWood:3,LeatherScraps:4`, `piece_workbench`, `2` | The same for the tambourine. Server's settings. |
 | Comfort | ComfortBonus | `3` | Comfort added by Music (0 to 10; 0 = no bonus). Server's setting. |
 | Comfort | SuccessSeconds | `20` | Seconds of good playing for an Encore (5 to 120); each further stretch renews Music. Server's setting. |
-| Comfort | SuccessAccuracy | `0.7` | How well you must play while the meter fills: the average of your last ten notes (a near-perfect hit counts 1, a less exact one 0.75, a miss or a stray key 0), 0.3 to 1. Server's setting. |
+| Comfort | RequiredAccuracy | `0.5` | How well you must play while the meter fills: the share of your last 20 notes hit (any hit counts; a miss or a stray key counts as a miss), 0.1 to 1. Below it the meter waits (it never drains). Replaces SuccessAccuracy (0.7), whose old line in the config file is ignored. Server's setting. |
 | Comfort | BonusMinutes | `10` | How long Music lasts (1 to 60 minutes). Server's setting. |
 | Comfort | BonusRange | `20` | Players within this many metres of the performer get Music too (3 to 50). Server's setting. |
 | Hearing | HearingRange | `40` | Players farther than this from a performer hear nothing (10 to 80 metres; the sound fades toward it). Server's setting. |

@@ -606,7 +606,7 @@ internal static class Performance
         }
         var dt = paused ? 0f : Mathf.Max(0f, _clock - _lastClock);
         var near = game.Judge.NoteNear(_clock, SuccessMeter.RestWindow);
-        if (game.Meter.Update(dt, game.Judge.RecentAccuracy, game.Judge.MissStreak, near))
+        if (game.Meter.Update(dt, game.Judge.RecentAccuracy, near))
         {
             Encore(player, game);
         }

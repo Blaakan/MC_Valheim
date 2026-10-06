@@ -410,7 +410,7 @@ internal static class MiniGameHud
                     _meterState.color = UiKit.TextDim;
                     break;
                 default:
-                    _meterState.text = "Out of tune: the meter drains";
+                    _meterState.text = "Hit more notes: the meter waits";
                     _meterState.color = new Color(0.92f, 0.45f, 0.35f, 1f);
                     break;
             }

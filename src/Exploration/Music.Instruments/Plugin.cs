@@ -129,10 +129,12 @@ internal sealed partial class Plugin : ModPlugin
             + ServerWins,
             new AcceptableValueRange<float>(MusicRules.SuccessSecondsMin, MusicRules.SuccessSecondsMax),
             new ConfigurationManagerAttributes { Order = 95 }));
-        SuccessAccuracy = Config.Bind(ComfortSection, "SuccessAccuracy", d.SuccessAccuracy, new ConfigDescription(
-            "How well you must play while the meter fills: the share of your last ten notes hit in time (0.7 = seven "
-            + "out of ten; a near-perfect hit counts fully, a less exact one three quarters, a missed note or a key pressed "
-            + "with no note to hit not at all)." + ServerWins,
+        // Key RequiredAccuracy (was SuccessAccuracy, default 0.7): new key so the new default reach config files that
+        // saved the old one (old line ignored).
+        SuccessAccuracy = Config.Bind(ComfortSection, "RequiredAccuracy", d.SuccessAccuracy, new ConfigDescription(
+            "How well you must play while the meter fills: the share of your last 20 notes hit in time (0.5 = half; every "
+            + "hit counts, near-perfect or not; a missed note or a key pressed with no note to hit counts as a miss). "
+            + "Below it the meter waits; it never drains." + ServerWins,
             new AcceptableValueRange<float>(MusicRules.AccuracyMin, MusicRules.AccuracyMax),
             new ConfigurationManagerAttributes { Order = 90, ShowRangeAsPercent = false }));
         BonusMinutes = Config.Bind(ComfortSection, "BonusMinutes", d.BonusMinutes, new ConfigDescription(

@@ -170,7 +170,7 @@ internal static class SelfTests
             TambourineStationLevel = d.TambourineStationLevel,
             ComfortBonus = 3,
             SuccessSeconds = successSeconds,
-            SuccessAccuracy = 0.7f,
+            SuccessAccuracy = 0.5f,
             BonusMinutes = 2f,
             BonusRange = 20f,
             HearingRange = 40f,
@@ -1110,16 +1110,22 @@ internal static class SelfTests
     // ---------- music.perform ----------
 
     // Press each chart note's lane just before its time (the press is read on the next frame).
-    private static void PressDue(MiniGame game, HashSet<long> pressed, int skipEvery)
+    // skipEvery n: every n-th note not pressed; hitEvery n: only every n-th note pressed (0 = off). late: press this
+    // many seconds after the note (0.08 = a Good, not a Perfect; else just before it).
+    private static void PressDue(MiniGame game, HashSet<long> pressed, int skipEvery, int hitEvery = 0, float late = 0f)
     {
         foreach (var v in game.Visible)
         {
             var t = game.NoteTime(v.Key, v.Value);
             var key = (long)v.Key * 100000 + v.Value;
-            if (t <= game.Clock + 0.025f && !pressed.Contains(key))
+            if (t <= game.Clock + (late > 0f ? -late : 0.025f) && !pressed.Contains(key))
             {
                 pressed.Add(key);
                 if (skipEvery > 0 && pressed.Count % skipEvery == 0)
+                {
+                    continue;
+                }
+                if (hitEvery > 0 && pressed.Count % hitEvery != 0)
                 {
                     continue;
                 }
@@ -1211,18 +1217,53 @@ internal static class SelfTests
             c.Check(view.GetZDO().GetInt(InstrumentPose.PlayingKey) == 0, "playing flag cleared");
             yield return Frames(2);
             c.Check(!KeyCapture.Active, "keys given back");
-            // A poor player (every third note skipped... and strays) never fills the meter quickly.
+            // Half the notes is enough (user rule: 50 % for SuccessSeconds); one note in four never fills it.
             c.Check(Performance.StartMiniGame(song, -1, out error), "second run starts: " + error);
             yield return Frames(2);
             game = Performance.Game;
             pressed.Clear();
             start = Time.time;
-            while (Time.time - start < 9f && game != null && Performance.Mode == PerformanceMode.MiniGame)
+            while (game != null && game.Encores == 0 && Time.time - start < 20f && Performance.Mode == PerformanceMode.MiniGame)
             {
                 PressDue(game, pressed, 2);
                 yield return null;
             }
-            c.Check(game != null && game.Encores == 0, $"half the notes: no Encore (accuracy {F(game != null ? game.Accuracy : -1f)})");
+            c.Check(game != null && game.Encores >= 1,
+                $"half the notes: Encore (accuracy {F(game != null ? game.Accuracy : -1f)}, {F(Time.time - start)} s, "
+                + $"hits {(game != null ? game.Judge.Hits : 0)}, perfect {(game != null ? game.Judge.Perfects : 0)}, "
+                + $"misses {(game != null ? game.Judge.Misses : 0)})");
+            Performance.TestRequestStop();
+            yield return Frames(3);
+            // Same with less exact hits (Good, not Perfect): a hit is a hit.
+            c.Check(Performance.StartMiniGame(song, -1, out error), "Good run starts: " + error);
+            yield return Frames(2);
+            game = Performance.Game;
+            pressed.Clear();
+            start = Time.time;
+            while (game != null && game.Encores == 0 && Time.time - start < 20f && Performance.Mode == PerformanceMode.MiniGame)
+            {
+                PressDue(game, pressed, 2, late: 0.08f);
+                yield return null;
+            }
+            c.Check(game != null && game.Encores >= 1 && game.Judge.Hits > game.Judge.Perfects,
+                $"half the notes, Good timing: Encore (accuracy {F(game != null ? game.Accuracy : -1f)}, {F(Time.time - start)} s, "
+                + $"hits {(game != null ? game.Judge.Hits : 0)}, perfect {(game != null ? game.Judge.Perfects : 0)})");
+            Performance.TestRequestStop();
+            yield return Frames(3);
+            c.Check(Performance.StartMiniGame(song, -1, out error), "third run starts: " + error);
+            yield return Frames(2);
+            game = Performance.Game;
+            pressed.Clear();
+            start = Time.time;
+            var filledMost = 0f;
+            while (Time.time - start < 18f && game != null && Performance.Mode == PerformanceMode.MiniGame)
+            {
+                PressDue(game, pressed, 0, hitEvery: 4);
+                filledMost = Mathf.Max(filledMost, game.Meter.Filled);
+                yield return null;
+            }
+            c.Check(game != null && game.Encores == 0 && filledMost < 0.01f,
+                $"one note in four: meter never fills (accuracy {F(game != null ? game.Accuracy : -1f)}, filled {F(filledMost)} s)");
             Performance.TestRequestStop();
             yield return Frames(3);
             c.Report();

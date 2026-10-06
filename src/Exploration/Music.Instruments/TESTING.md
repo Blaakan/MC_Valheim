@@ -4,8 +4,9 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.2.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
-adds server songs (items T26-T28, M12-M17); runs on it are noted at the end of this paragraph. Earlier runs (0.1.0): smoke
+**Build under test:** 0.3.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.3.0
+makes the Encore easier (half the notes for 20 s; T09, T23 reset, new T29); 0.2.0 added server songs (T26-T28,
+M12-M17). Runs are noted at the end of this paragraph. Earlier runs (0.1.0): smoke
 test (`./tools/Test-Smoke.ps1 -Mod Music.Instruments`) passed 2026-10-05 after both reviews (loads, patches cleanly,
 JitCheck 1136 methods, 0 failures; build 8811b96+dirty). In-world self-tests (`./tools/Test-InWorld.ps1 -Mod
 Music.Instruments -Only music`) passed 2026-10-05 after both reviews, 10/10: `music.network`, `music.item`,
@@ -17,11 +18,16 @@ an error when a third-party mod builds a partial item database; Music Instrument
 First hands-on test (build 5f6f777): outdoors with a bonfire and Music, Rested was 8 minutes (comfort 1: the shelter
 rule dropped the +3). Fixed after it: the bonus counts everywhere (setting BonusOnlyInShelter removed, network version
 2). Smoke test and in-world self-tests passed again 2026-10-05 (10/10; `music.perform` outdoors: comfort 4 = 1 + 3,
-Rested 660 s = 480 + 3 x 60); same two errors from Sneak Ambush and Spyglass only. 0.2.0 (after its review fixes): smoke test passed
-2026-10-05 (JitCheck 1210 methods, 0 failures; build 5f6f777+dirty); in-world self-tests passed 11/11, including
+Rested 660 s = 480 + 3 x 60); same two errors from Sneak Ambush and Spyglass only. 0.2.0 (after its review fixes):
+smoke test passed 2026-10-05 (JitCheck 1210 methods, 0 failures; build 5f6f777+dirty); in-world self-tests passed 11/11, including
 `music.share` (23 checks: folder listing, list and a multi-piece download through the real packages, an older pick's
 piece ignored, bad pieces refused, host window lists and plays a server song, AllowPlayerSongs off, sharing off);
-same two errors from Sneak Ambush and Spyglass only.
+same two errors from Sneak Ambush and Spyglass only. 0.3.0 (easier Encore, after its review: hit share, wrong-lane slip
+forgiven, network version 4): smoke test passed 2026-10-06 (JitCheck 1209 methods, 0 failures; build 7db93c7+dirty);
+in-world self-tests passed 11/11, `music.perform` with 20 checks (every other note gets the Encore, also with Good
+timing; one note in four never fills the meter in 18 s); offline harness 5395 checks (50 % players succeed also with
+only Good timing or wrong-lane misses, 60 % in under 45 s, 25 % players and mashers never, four lanes on every note =
+a third); same two errors from Sneak Ambush and Spyglass only.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina. Items: `spawn MC_Flute`,
@@ -76,9 +82,10 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   missing shows "Miss" and plays nothing; you cannot walk, open the inventory or use the hotbar while it runs; the song
   repeats. Right click or Esc stops it (Esc also opens the menu).
 - [ ] **T09 Encore and comfort (G3):** in a shelter (roof and walls) with a burning fire: sit (X) and play the rhythm
-  game well for 20 seconds. Expected: the meter fills (it drains if you play badly), "Encore! +3 comfort", the Music
-  icon appears with "+3" and 10:00 counting down; as soon as the Encore comes, the Resting icon shows comfort 3 higher
-  and the Rested timer jumps 3 minutes higher (no new "You feel rested" message if Rested was already running).
+  game for 20 seconds, hitting at least half the notes. Expected: the meter fills (it waits when you miss more),
+  "Encore! +3 comfort", the Music icon appears with "+3" and 10:00 counting down; as soon as the Encore comes, the
+  Resting icon shows comfort 3 higher and the Rested timer jumps 3 minutes higher (no new "You feel rested" message
+  if Rested was already running).
   Keep playing well: each further 20 s renews Music to 10:00.
 - [ ] **T10 Outdoors:** outdoors by a campfire or a bonfire (no roof), sit (X), open the window and perform. Expected:
   Resting shows comfort 1 and after about 20 s Rested starts at 8:00 (or keeps running if you were already Rested).
@@ -130,10 +137,10 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   gamepad: D-pad up/down choose, A plays, Y toggles Repeat, B closes; X starts nothing and says the rhythm game is
   played on the keyboard (the gamepad help line does not offer it). Double-click a row: it plays.
 - [ ] **T23 HUD:** perform: the lanes sit to the right of your character (it stays visible), a 3-2-1 countdown, key
-  labels under the line, "Perfect"/"Good"/"Miss" near the line, the meter beside the lanes (gold filling, red
-  draining, grey during rests), "Encore! +3 comfort" when it fills. Hide the HUD (Ctrl+F3): the rhythm game stays
-  visible. While a song plays by itself: a small line with the title and time. Check at your usual GUI scale and once
-  at a different one (Settings). The stop hint under the lanes says "Right click or Esc: stop", and "Start or right
+  labels under the line, "Perfect"/"Good"/"Miss" near the line, the meter beside the lanes (gold "In tune: the meter
+  fills", red "Hit more notes: the meter waits", grey during rests), "Encore! +3 comfort" when it fills. Hide the
+  HUD (Ctrl+F3): the rhythm game stays visible. While a song plays by itself: a small line with the title and time.
+  Check at your usual GUI scale and once at a different one (Settings). The stop hint under the lanes says "Right click or Esc: stop", and "Start or right
   click: stop" once you touch a gamepad.
 - [ ] **T24 Instrument swap:** play a song on the flute, then press the hotbar key of the lyre. Expected: the flute song
   stops at once (no flute song on the lyre), nothing stays posed.
@@ -234,3 +241,14 @@ config folder). The friend's own songs folder should not have these files.
   sharing server. Expected: nothing breaks for them, and nothing is sent to them (no "Sending server song" line for
   them in the server log with Debug logging).
 - [ ] **M17 Crossplay:** a friend on crossplay downloads a server song. Expected: it completes and plays.
+
+## 0.3.0 — easier Encore
+
+- [ ] **T29 Easier Encore (user rule: 50 % for 20 s):** perform and hit about every other note, on time or a bit off
+  (a "Good" counts as much as a "Perfect"). Expected: the Accuracy beside the lanes shows about 50 %, the meter fills
+  (red "Hit more notes" now and then, it waits but never goes down) and the Encore comes after about 20 to 40 seconds
+  (up to a minute if your hits come in uneven bunches).
+  Press a wrong key now and then instead of missing: it costs no more than the miss. Hit only about one note in four:
+  the meter is red almost all the time and no Encore comes in a minute or two (a lucky start can fill a sliver, which
+  stays because the meter never drains). With a config file from an
+  older version, RequiredAccuracy appears with 0.5 (the old SuccessAccuracy line is ignored).

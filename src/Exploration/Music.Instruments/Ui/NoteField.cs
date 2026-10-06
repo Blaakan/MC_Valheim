@@ -44,7 +44,7 @@ internal sealed class NoteField : MaskableGraphic
     private static readonly Color32 MeterFrame = new Color32(0, 0, 0, 170);
     private static readonly Color32 MeterBack = new Color32(40, 32, 24, 200);
     internal static readonly Color32 MeterFlow = new Color32(242, 193, 78, 255);    // in flow: filling
-    internal static readonly Color32 MeterDrain = new Color32(186, 72, 52, 255);    // out of flow: draining
+    internal static readonly Color32 MeterBehind = new Color32(186, 72, 52, 255);   // out of flow: meter wait
     internal static readonly Color32 MeterWait = new Color32(128, 143, 166, 255);   // long rest: waiting
     internal static readonly Color32 MeterIdle = new Color32(120, 112, 100, 255);   // too few notes yet
 
@@ -65,7 +65,7 @@ internal sealed class NoteField : MaskableGraphic
         {
             return MeterWait;
         }
-        return game.Meter.InFlow ? MeterFlow : MeterDrain;
+        return game.Meter.InFlow ? MeterFlow : MeterBehind;
     }
 
     protected override void OnPopulateMesh(VertexHelper vh)

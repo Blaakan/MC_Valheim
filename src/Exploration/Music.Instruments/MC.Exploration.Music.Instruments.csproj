@@ -2,7 +2,7 @@
   <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
   <PropertyGroup>
     <ModName>Music Instruments</ModName>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <ModScope>New</ModScope>
     <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
     <ModIdea>music instruments</ModIdea>
@@ -17,8 +17,8 @@
          layout 1), <guid>.SongListRequest / .SongList / .SongRequest / .SongChunk (SongShare layout 1), player ZDO int
          "<guid>.Playing", item prefabs MC_Flute / MC_Lyre / MC_Tambourine, recipes Recipe_MC_<X>, status effect
          SE_MC_Music. Bump when any of them change. 2: rules lost shelter flag. 3: server songs (rules AllowPlayerSongs,
-         song RPCs). -->
-    <ModNetworkVersion>3</ModNetworkVersion>
+         song RPCs). 4: Encore rule easy now (hit share of last 20 notes, no drain), accuracy floor 0.1. -->
+    <ModNetworkVersion>4</ModNetworkVersion>
     <ModRequires></ModRequires>
     <ModDescription>Craft a flute, a lyre and a tambourine and play them: built-in songs, your own MIDI files or the server's, or a rhythm mini-game whose good performances give everyone nearby extra comfort.</ModDescription>
   </PropertyGroup>

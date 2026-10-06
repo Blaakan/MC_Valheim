@@ -5,10 +5,10 @@
 | Mod | Music Instruments |
 | GUID / project | `MC.Exploration.Music.Instruments` (`src/Exploration/Music.Instruments/`, root namespace `MC.Exploration.MusicInstrumentsMod`, package `MusicInstruments`) |
 | Category / scope | Exploration / New |
-| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 3. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), sends its gameplay settings to everyone and relays the music (section 4). |
+| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 4. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), sends its gameplay settings to everyone and relays the music (section 4). |
 | Sheet idea | `music instruments` ("prerecorded songs + midi support for buffs well rested") |
 | Game version checked | Valheim 1.0.16 (Unity 6000.0.75f1, Mono), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/` (SE_Rested, SE_Cozy, SEMan, StatusEffect, Player, Humanoid, VisEquipment, ItemDrop, ObjectDB, ZNetScene, ZNet, ZRpc, ZRoutedRpc, ZPackage, ZDOMan, AudioMan, MusicMan, MusicVolume, GameCamera, Menu, Chat, Terminal, ZInput, PlayerController, Emotes, Chair); research briefs of 2026-10-05 (comfort, audio, existing mods, items, input and UI, network, pose, MIDI and preset songs), each fact-checked by a second agent |
-| Status | In development (v0.2.0 code) |
+| Status | In development (v0.3.0 code) |
 
 ## Goal
 
@@ -226,12 +226,13 @@ performance id from a sender at most once per second.
 ### 2.5 Comfort (G3, G5)
 
 The mini-game's success meter (`SuccessMeter`) fills with real playing time while the player is "in flow": the
-rolling accuracy of the last ten judgements (Perfect 1, Good 0.75, Miss and stray press 0; at least four judgements) is
-at least `SuccessAccuracy` (0.7) and fewer than three notes in a row were missed. Out of flow it drains twice as fast;
-during a long rest (no note within 1.5 s) it waits. Full (`SuccessSeconds`, 20 s) = **Encore**: the performer gets the
+rolling accuracy of the last 20 judgements, a hit share (Perfect and Good 1, Miss and stray press 0; the first wrong-lane
+press while another lane's note is due records nothing, as that note's Miss counts it; at least four judgements) is
+at least `SuccessAccuracy` (config key `RequiredAccuracy`, 0.5: half the notes). Out of flow, and during a long rest (no
+note within 1.5 s), it waits: it never drains (D16). Full (`SuccessSeconds`, 20 s) = **Encore**: the performer gets the
 Music status effect, an Encore flag goes into the stream, and every listener whose player is within `BonusRange`
-(20 m) of the performer gives the effect to its own player. The meter then starts again: each further 20 s of good play
-renews the effect for `BonusMinutes` (10 min). Songs that play by themselves never fill it.
+(20 m) of the performer gives the effect to its own player. The meter then starts again: each further 20 s of play
+that well renews the effect for `BonusMinutes` (10 min). Songs that play by themselves never fill it.
 
 The Music effect (`MusicEffect`, `SE_MC_Music`, registered always-on in `ObjectDB`) shows "+3" and the time left. A
 `Player.GetComfortLevel` postfix adds `ComfortBonus` (3) for the local player while the effect is on, wherever the
@@ -339,6 +340,17 @@ Listeners need nothing: a server song is streamed as notes like any other song.
   shows under "Your MIDI songs", split into a part per instrument (flute melody, lyre tune and bass, tambourine drums
   or rhythm); when hosting, `BepInEx/config/MC_Valheim/ServerSongs` with ShareSongs on lets friends play it too.
   Built-in songs stay traditional (public domain) or written for the mod.
+- **D16 An easier Encore** (0.3.0, user request after testing: "50 % accuracy for 20 seconds, not 20 seconds of perfect
+  play"). The first rule (last ten notes at 70 %, a Good worth 0.75, three misses in a row stopped it, out of flow it
+  drained twice as fast) felt like it needed perfect play. Now: the share of the last 20 notes hit at 50 % (a longer
+  window, so the figure jumps less), every hit counts the same (a review simulation showed that with Good at 0.75 and
+  wrong-lane presses counted twice, "50 %" in practice meant about 70 % of the notes), the first wrong-lane press near
+  a due note is forgiven (mashing four keys still scores about a third), no miss-run rule, and below it the meter
+  only waits, never drains. Offline harness: players hitting 50 % of the notes succeed also with only Good timing or
+  with their misses on the wrong lane; 25 % players and mashers never do. Hitting every other note fills it in about
+  20 s, half the notes at random in about 35 s (up to a minute); a 25 % player practically never gets an Encore (a lucky start can fill a sliver, which stays). The config
+  key changed to `RequiredAccuracy` so the new default reaches config files that saved the old 0.7. Network version 4:
+  the rule (and the accuracy floor, 0.1) changed, so 0.2.0 and 0.3.0 games never mix on a server.
 
 ## 4. Multiplayer
 
@@ -358,8 +370,8 @@ Listeners need nothing: a server song is streamed as notes like any other song.
 RPCs `MC.Exploration.Music.Instruments.Settings` / `.SettingsRequest` (rules layout 3), `.Notes` (note batch layout
 1), `.SongListRequest` / `.SongList` / `.SongRequest` / `.SongChunk` (server songs, layout 1); player ZDO int `MC.Exploration.Music.Instruments.Playing` (stable hash; the instrument being played, 0 = none);
 prefabs `MC_Flute`, `MC_Lyre`, `MC_Tambourine`; recipes `Recipe_MC_Flute`, `Recipe_MC_Lyre`, `Recipe_MC_Tambourine`;
-status effect `SE_MC_Music`. Network version 3 (1 had a shelter flag in the rules, 2 had no server songs; neither
-released).
+status effect `SE_MC_Music`. Network version 4 (1 had a shelter flag in the rules, 2 had no server songs, 3 the old
+Encore rule; none released).
 
 ### 4.3 Server settings and join check
 
@@ -397,7 +409,7 @@ bytes in memory (at most 16 x 2 MB).
 | Recipes | TambourineRecipe / TambourineStation / TambourineStationLevel | `FineWood:3,LeatherScraps:4` / `piece_workbench` / 2 | | server wins |
 | Comfort | ComfortBonus | 3 | 0-10 | server wins |
 | Comfort | SuccessSeconds | 20 | 5-120 | server wins |
-| Comfort | SuccessAccuracy | 0.7 | 0.3-1 | server wins |
+| Comfort | RequiredAccuracy | 0.5 | 0.1-1 | server wins |
 | Comfort | BonusMinutes | 10 | 1-60 | server wins |
 | Comfort | BonusRange | 20 | 3-50 m | server wins |
 | Hearing | HearingRange | 40 | 10-80 m | server wins |
@@ -463,15 +475,16 @@ listeners down.
 
 Offline (scratch harness, pure code): MIDI reading (formats, tempo map, running status, retrigger, SMPTE, RIFF,
 truncated and random data never throwing), song text and chords, every preset on every instrument (ranges, chart
-lanes), MIDI folder scan, load cache and part choice, arranger rules, judge and success meter (perfect, 85 %, 40 %,
-masher, idle players), synth (pitch within 12 cents, peaks, silence after notes, voices freed, CPU).
+lanes), MIDI folder scan, load cache and part choice, arranger rules, judge and success meter (perfect, 85 %, 60 % and 50 % players, 50 % with only Good timing or with
+wrong-lane misses, 25 % players, four lanes on every note = a third, masher, idle; meter waits below the target), synth (pitch within 12 cents, peaks, silence after notes, voices freed, CPU).
 
 In-world self-tests (Debug): `music.network` (rules and note batch wire, clamps, rule selection), `music.item`
 (registration, recipes under default rules, tool, no punch also with the feature off, recipes hidden while off, hand
 model, dropped copies screenshot), `music.synth` (filter called, sound out, left/right panning of a source to the right,
 silence after hush, mixer group), `music.songs` (presets and a generated MIDI file through the library),
 `music.perform` (mini-game with simulated presses: Encore, Music effect, comfort +3 outdoors, Rested length 3 comfort
-levels longer, stop; a half-right run gets no Encore), `music.autoplay` (notes sound, ZDO flag, pose weight, music
+levels longer, stop; a run hitting every other note gets the Encore, also with Good timing, one hitting one note in four never fills the
+meter in 18 s), `music.autoplay` (notes sound, ZDO flag, pose weight, music
 fade, putting the instrument away stops), `music.listen` (another player's batches heard at their place, Encore in range gives
 the effect and out of range nothing, notes far from their batch time dropped, a restart keeps the old timing, a
 batch late after a 2 s stall has its notes dropped with the delay still bounded, nothing taken after End, End frees

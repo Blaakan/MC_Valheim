@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- The Encore is easier: hitting half of your last 20 notes for 20 seconds is enough (every hit counts, near-perfect or
+  not; one wrong key while a note is due costs no more than that note's miss). Below that the meter only waits (it no
+  longer drains), and misses in a row no longer stop it. The setting is now RequiredAccuracy (default 0.5) and
+  replaces SuccessAccuracy (0.7), whose old line is ignored.
+- Network version 4: every player and the server need this version.
+
 ## 0.2.0
 
 - Music comfort now counts wherever you rest, also sitting by a campfire outdoors (comfort 1 + 3 = 4, so Rested lasts

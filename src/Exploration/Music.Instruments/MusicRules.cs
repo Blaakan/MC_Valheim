@@ -19,7 +19,7 @@ internal sealed class MusicRules
     internal const int ComfortMax = 10;
     internal const float SuccessSecondsMin = 5f;
     internal const float SuccessSecondsMax = 120f;
-    internal const float AccuracyMin = 0.3f;
+    internal const float AccuracyMin = 0.1f;
     internal const float AccuracyMax = 1f;
     internal const float BonusMinutesMin = 1f;
     internal const float BonusMinutesMax = 60f;
@@ -46,7 +46,7 @@ internal sealed class MusicRules
     // for BonusMinutes to the performer and every player within BonusRange m, wherever they rest (shelter or not).
     internal int ComfortBonus = 3;
     internal float SuccessSeconds = 20f;
-    internal float SuccessAccuracy = 0.7f;
+    internal float SuccessAccuracy = 0.5f; // config key RequiredAccuracy
     internal float BonusMinutes = 10f;
     internal float BonusRange = 20f;
 
