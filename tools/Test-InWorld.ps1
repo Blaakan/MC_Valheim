@@ -32,6 +32,9 @@
     Per-test timeout inside the game.
 .PARAMETER NoBuild
     Do not rebuild mods (the probe is always built and deployed).
+.PARAMETER AsConfigured
+    Keep MC mods turned off in their .cfg (Enabled = false) off. By default the script turns them on for the run
+    (the files are put back as before afterwards like every other change), so their tests run too.
 .EXAMPLE
     ./tools/Test-InWorld.ps1 -Mod Sleep.ThroughDay
     ./tools/Test-InWorld.ps1 -NoBuild -Only sleep.
@@ -43,7 +46,8 @@ param(
     [switch]$KeepRunning,
     [int]$TimeoutSec = 900,
     [int]$TestTimeoutSec = 120,
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    [switch]$AsConfigured
 )
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'lib\Common.psm1') -Force
@@ -138,6 +142,19 @@ $cfgNames = @(Get-ChildItem -LiteralPath $cfgDir -File -ErrorAction SilentlyCont
 # pending.txt = configs not put back yet. Restore delete it when every file went back fine; next run check it.
 [IO.File]::WriteAllText((Join-Path $cfgBackup 'pending.txt'), 'configs not put back yet')
 Write-Ok "$($cfgNames.Count) mod config file(s) backed up (put back after the run)"
+
+# Mod off in its .cfg run no test. Me turn it on for this run (backup above put file back after), unless -AsConfigured.
+$turnedOn = @()
+if (-not $AsConfigured) {
+    foreach ($n in $cfgNames) {
+        $p = Join-Path $cfgDir $n
+        $new = Enable-ModConfigText ([IO.File]::ReadAllText($p))
+        if ($null -eq $new) { continue }
+        [IO.File]::WriteAllText($p, $new, (New-Object System.Text.UTF8Encoding $false))
+        $turnedOn += [IO.Path]::GetFileNameWithoutExtension($n)
+    }
+    if ($turnedOn.Count) { Write-Ok "turned on for this run (off in their .cfg; put back after): $($turnedOn -join ', ')" }
+}
 
 # Me put MC mod configs back byte for byte once game gone: changed or deleted ones from backup, ones born in run
 # deleted. Self-contained (no module function): hidden -KeepRunning watcher run same text. One output line per file.
@@ -405,7 +422,7 @@ function Get-NoTestReason($Project) {
     $ready = [regex]::Match($text, "(?m)^\[[A-Za-z]+\s*:(?<src>[^\]]+)\] \[MC:ready\] $([regex]::Escape($guid)) ")
     $why = if (-not $ready.Success) { 'did not load (not deployed? run without -NoBuild)' }
         elseif ($text -notmatch "(?m)^\[[A-Za-z]+\s*:$([regex]::Escape($ready.Groups['src'].Value))\] JitCheck:") { 'a Release build is deployed (self tests exist in Debug builds only; run without -NoBuild)' }
-        elseif (Test-CfgDisabled (Join-Path $cfgBackup "$guid.cfg")) { 'it is turned off in its .cfg (Enabled = false)' }
+        elseif ($AsConfigured -and (Test-CfgDisabled (Join-Path $cfgBackup "$guid.cfg"))) { 'it is turned off in its .cfg (Enabled = false; run without -AsConfigured to turn it on for the run)' }
         else { 'it registered no test (not Active? see its Status line in the log)' }
     [pscustomobject]@{ Bad = $true; Text = $why }
 }

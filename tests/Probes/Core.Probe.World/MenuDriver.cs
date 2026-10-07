@@ -90,6 +90,12 @@ internal static class MenuDriver
         }
         SelfTest.Note(T, $"character file '{profile.GetPath()}' ({profile.m_fileSource})");
 
+        if (ProbeSettings.IsMultiplayer)
+        {
+            JoinServer(fejd, timings);
+            yield break;
+        }
+
         // "Start" on character screen: go to world list (and "new world" panel when list empty).
         fejd.OnCharacterStart();
         yield return null;
@@ -152,6 +158,55 @@ internal static class MenuDriver
             var why = fejd.m_cloudStorageWarningNextSave.activeInHierarchy ? " (cloud storage warning shown)" : "";
             throw new InvalidOperationException("OnWorldStart did not start the world" + why);
         }
+    }
+
+    // Multiplayer test after a refusal: back at main menu, close the error panel, select probe character, join again.
+    internal static IEnumerator Rejoin(ProbeTimings timings, float timeout = 60f)
+    {
+        var end = Time.realtimeSinceStartup + timeout;
+        var seenAt = -1f;
+        while (true)
+        {
+            var f = FejdStartup.instance;
+            var ready = f != null && f.m_profiles != null && ZSteamMatchmaking.instance != null;
+            seenAt = !ready ? -1f : seenAt < 0f ? Time.realtimeSinceStartup : seenAt;
+            if (seenAt >= 0f && Time.realtimeSinceStartup - seenAt >= 1f)
+            {
+                break;
+            }
+            if (Time.realtimeSinceStartup > end)
+            {
+                throw new TimeoutException($"main menu not ready within {timeout:F0} s for a rejoin");
+            }
+            yield return null;
+        }
+        ClearMenuBlockers();
+        var fejd = FejdStartup.instance;
+        if (fejd.m_connectionFailedPanel != null && fejd.m_connectionFailedPanel.activeSelf)
+        {
+            fejd.m_connectionFailedPanel.SetActive(false);
+        }
+        PrefsGuard.Snapshot();
+        var file = ProbeSettings.CharacterName.ToLowerInvariant();
+        fejd.SetSelectedProfile(file);
+        JoinServer(fejd, timings);
+    }
+
+    // Multiplayer run: join dedicated server like "-joinserverwithcharacter" (selected character + FejdStartup.JoinServer,
+    // which does TransitionToMainScene). Password given before: ZNet.RPC_ClientHandshake enter it by itself.
+    private static void JoinServer(FejdStartup fejd, ProbeTimings timings)
+    {
+        FejdStartup.ServerPassword = ProbeSettings.Password;
+        fejd.m_joinServer = new ServerJoinData(new ServerJoinDataDedicated(ProbeSettings.Join));
+        if (!fejd.m_joinServer.IsValid)
+        {
+            throw new InvalidOperationException($"server address '{ProbeSettings.Join}' not understood");
+        }
+        timings.WorldRequested = Time.realtimeSinceStartup;
+        SelfTest.Note("probe", $"joining server {ProbeSettings.Join} (scenario '{ProbeSettings.Scenario}')");
+        fejd.JoinServer();
+        var restored = PrefsGuard.Restore();
+        SelfTest.Note(T, $"menu prefs (last character/world, crossplay) put back: {restored} changed");
     }
 
     // Popups (news, warnings) and a startup cinematic only block a player's clicks, not our calls. Me still close

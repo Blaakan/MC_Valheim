@@ -38,7 +38,7 @@ src/Shared/Framework/     mod framework: ModPlugin life cycle, FeatureRegistry, 
 src/Shared/TESTING.md     in-game tests for the framework
 src/<Category>/<System>.<Feature>/   one mod = one project = one DLL = one Thunderstore package (+ TESTING.md)
 templates/Mod/            template used by tools/New-Mod.ps1
-tests/Probes/             throwaway probe mods for tools/Test-Framework.ps1 and tools/Test-InWorld.ps1 (never shipped)
+tests/Probes/             throwaway probe mods for tools/Test-Framework.ps1, Test-InWorld.ps1, Test-Multiplayer.ps1 (never shipped)
 tools/                    PowerShell workflow scripts (see Commands)
 docs/backlog.md           GENERATED idea backlog (tools/Update-Backlog.ps1): feasibility, who needs it, existing mods
 docs/game/                game-systems knowledge base per category + core-engine.md (read before designing)
@@ -77,7 +77,8 @@ dist/                     packaged zips (git-ignored)
 | Build all (Debug deploys to `<Valheim>/BepInEx/plugins/MC_Valheim/<Category>/<GUID>/`) | `dotnet build ValheimMods.slnx` |
 | Smoke test (launch game, check mods load + patch cleanly, close) | `./tools/Test-Smoke.ps1 [-Mod Crossbow] [-KeepRunning]` |
 | Framework test (probe mods: live toggle, config watch, dependency gating) | `./tools/Test-Framework.ps1` |
-| In-world self-tests (throwaway world "MCProbe", your saves untouched, mod configs put back after; runs every deployed mod's `SelfTest`, screenshots in `%TEMP%\MC_Valheim_InWorld`) | `./tools/Test-InWorld.ps1 [-Mod Sleep.ThroughDay] [-Only sleep.] [-KeepRunning] [-NoBuild]` |
+| In-world self-tests (throwaway world "MCProbe", your saves untouched, mod configs put back after, mods off in their cfg turned on for the run; runs every deployed mod's `SelfTest`, screenshots in `%TEMP%\MC_Valheim_InWorld`) | `./tools/Test-InWorld.ps1 [-Mod Sleep.ThroughDay] [-Only sleep.] [-KeepRunning] [-NoBuild] [-AsConfigured]` |
+| Multiplayer self-tests (dedicated server copy + client on this PC, own BepInEx folders in `%TEMP%\MC_Valheim_MP`, nothing of yours changed) | `./tools/Test-Multiplayer.ps1 [-Scenario modded,vanilla-server,vanilla-client,open-server,each-off] [-Only dive.] [-NoModBuild]` |
 | **In-game test to-do list** | `./tools/Get-TestTodo.ps1 [-Mod X] [-All]` |
 | Tooling regression tests (after changing tools/) | `./tools/Test-Tools.ps1` |
 | Regenerate the idea backlog from the sheet | `./tools/Update-Backlog.ps1` |
@@ -95,7 +96,8 @@ characters at runtime (`[char]0x2014`).
 ## Testing workflow
 
 There are no unit tests: code runs inside Unity. Verification = build + `Test-Smoke.ps1` (+ `Test-Framework.ps1`
-when `src/Shared` changes) (+ `Test-InWorld.ps1` when a mod has self-tests) + in-game tests.
+when `src/Shared` changes) (+ `Test-InWorld.ps1` when a mod has self-tests) (+ `Test-Multiplayer.ps1` for Both
+mods and multiplayer tests) + in-game tests.
 
 - In-world self-tests (Debug builds): a mod registers coroutines with `SelfTest.Register` (`src/Shared/SelfTest.cs`);
   `./tools/Test-InWorld.ps1` runs them in a throwaway world with isolated saves (how to write one:
@@ -103,6 +105,11 @@ when `src/Shared` changes) (+ `Test-InWorld.ps1` when a mod has self-tests) + in
   and takes ~1-2 min plus the tests. Every deployed mod's tests run unless `-Only` filters them; the run fails when
   no mod test ran, or when `-Mod` / `-Only` picked tests that did not run (it says why). It puts
   `BepInEx/config/MC.*.cfg` back as before the run, also after Ctrl+C or a timeout.
+- Multiplayer self-tests: a mod registers client tests with `SelfTest.RegisterMultiplayer(name, scenario, run)` and
+  their server halves with `SelfTest.RegisterServerStep` (called from the client test with `SelfTest.CallServer`);
+  `./tools/Test-Multiplayer.ps1` runs them with a real dedicated server (`docs/modding/framework.md`, "Multiplayer
+  self-tests"). The probes also check generic cases for every Both mod (server without the mod, player without the mod
+  refused or allowed, mod turned off on either side). Close the game first.
 
 - Every mod has `TESTING.md` next to its code (framework: `src/Shared/TESTING.md`): numbered checkboxes
   `[ ]` to test, `[x]` passed, `[!]` failed + note, `[-]` skipped, split single-player / multiplayer, and a

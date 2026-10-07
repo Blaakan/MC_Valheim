@@ -195,6 +195,18 @@ function Get-ReleaseVersionProblem([string]$Version, [string[]]$Released) {
     $null
 }
 
+# Me turn mod on in BepInEx cfg text: "Enabled = false" inside [General] become "Enabled = true", rest byte same.
+# Me give new text, or $null when nothing to change (no [General], no Enabled line, already true).
+function Enable-ModConfigText([string]$Text) {
+    $general = [regex]::Match("$Text", '(?ms)^\[General\][ \t]*\r?$(?<body>.*?)(?=^\[|\z)')
+    if (-not $general.Success) { return $null }
+    $body = $general.Groups['body']
+    $line = [regex]::Match($body.Value, '(?m)^(?<pre>\s*Enabled\s*=\s*)false(?<post>[ \t]*\r?)$')
+    if (-not $line.Success) { return $null }
+    $at = $body.Index + $line.Index
+    $Text.Substring(0, $at) + $line.Groups['pre'].Value + 'true' + $line.Groups['post'].Value + $Text.Substring($at + $line.Length)
+}
+
 # Me check ModRequires graph over ALL mods. Cycle = BepInEx load NO plugin at all (topological sort throw).
 function Assert-ModRequiresAcyclic {
     $graph = @{}

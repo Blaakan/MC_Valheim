@@ -39,6 +39,11 @@ internal static class SaveIsolation
         AppDomain.CurrentDomain.SetData(SelfTest.ShotDirSlot, ProbeSettings.ShotDir);
         _harmony = new Harmony(ModInfo.Guid + ".Isolation");
         _harmony.CreateClassProcessor(typeof(FileHelpersPatches)).Patch();
+        if (ProbeSettings.IsMultiplayer)
+        {
+            // Rejoin in same process must get new session id (see UtilsPatches).
+            _harmony.CreateClassProcessor(typeof(UtilsPatches)).Patch();
+        }
         Applied = true;
         return null;
     }

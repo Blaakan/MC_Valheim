@@ -173,10 +173,15 @@ Each mod has a `TESTING.md` checklist (single-player and multiplayer). The frame
 - `./tools/Test-Framework.ps1`: probe mods check live toggling, config-file watching, dependency gating and recovery.
 - `./tools/Test-InWorld.ps1`: loads a throwaway single-player world and runs every in-world self test the mods
   register (Debug builds). See below.
+- `./tools/Test-Multiplayer.ps1`: starts a dedicated server and a client on this PC, the client joins, and the
+  multiplayer self tests run (Debug builds). See "Multiplayer self-tests" below.
 
 ### In-world self-tests
 
-`./tools/Test-InWorld.ps1 [-Mod <names>] [-Only <tests>] [-KeepRunning] [-TimeoutSec 900] [-TestTimeoutSec 120] [-NoBuild]`
+`./tools/Test-InWorld.ps1 [-Mod <names>] [-Only <tests>] [-KeepRunning] [-TimeoutSec 900] [-TestTimeoutSec 120] [-NoBuild] [-AsConfigured]`
+
+MC mods turned off in their `.cfg` (`Enabled = false`) are turned on for the run (their files are put back afterwards
+like every other config change), so their tests run too; `-AsConfigured` keeps them off.
 builds and deploys the mods (all, or those matching `-Mod`) and the world probe (`tests/Probes/Core.Probe.World`),
 launches the game through `Start-Game.ps1` and waits. Mods already deployed in the game folder load too, so their
 tests run as well: every deployed mod's tests run unless `-Only` picks tests by name. Inside the game the probe:
@@ -280,6 +285,70 @@ internal static class CrossbowSelfTests
 - Tests must not depend on each other or on their order; other mods' tests run in the same world. The player starts
   at the spawn stones in the Meadows, shortly before dawn of day 1 (it is dark): a test that needs daylight or a
   given hour sets the time itself and puts it back.
+
+### Multiplayer self-tests
+
+`./tools/Test-Multiplayer.ps1 [-Scenario all|modded|vanilla-server|vanilla-client|open-server|each-off] [-Only <tests>] [-NoModBuild] [-KeepRunning] [-Port 2466] [-TimeoutSec 2400] [-TestTimeoutSec 120]`
+runs a real dedicated server and a game client on this PC. Nothing of yours is changed: the server runs from a copy
+of the Steam dedicated server install (`%LOCALAPPDATA%\MC_Valheim\server`, refreshed every run, plus the Doorstop
+loader), and server and client each load BepInEx from their own folder in the run folder
+(`%TEMP%\MC_Valheim_MP\<yyyyMMdd-HHmmss>\<scenario>\server|client\BepInEx`, through Doorstop's
+`--doorstop-target-assembly`), with only MC mods, the probes and fresh default configs. Tests may therefore change
+settings freely (also `ConfigEntry.Value`) in a multiplayer test. The client's saves are isolated like in
+`Test-InWorld.ps1`; the server's go to the run folder (`-savedir`, world `MCProbeMP`, shared by the scenarios of one
+run). The game must be closed (the script starts its own client). All five scenarios take about 12 minutes without
+mod tests. `-NoModBuild` reuses the mod DLLs built by the newest earlier run (the probes are always built): use it to
+re-run a scenario while mod code is being edited.
+
+The client runs the world probe (`tests/Probes/Core.Probe.World`), which joins the server instead of starting a world;
+the server runs the server probe (`tests/Probes/Core.Probe.Server`). Scenarios:
+
+| Scenario | Server | Client | Checks |
+|---|---|---|---|
+| `modded` | every MC mod | every MC mod | `probe.mp.baseline` (every Both mod active on both sides), every mod test registered for `modded`, then `probe.mp.server-toggle` (the server turns each Both mod off and on: the client follows live) |
+| `vanilla-server` | probe only | every MC mod | `probe.mp.baseline`: every Both mod `ServerMissing`, every client mod active |
+| `vanilla-client` | every MC mod | probe only | `probe.mp.refused`: the server refuses the player ("Incompatible version"); the script checks a mod logged "Refused" |
+| `open-server` | every MC mod, `AllowPlayersWithoutMod = true` | probe only | the player stays in; the script checks every refusing mod logged that it let the player in |
+| `each-off` | every MC mod | every MC mod | one `probe.mp.off.<GUID>` per Both mod: turned off on the client while in, the server refuses (live re-check), and again when joining with it off; mods without a player check let the player stay, and so do mods with the older player check (`NetworkGate.PeerHasMod` instead of `PeerCompatible`: it only refuses a player who does not have the mod), which the script and the test result name |
+
+**Writing a multiplayer test** (Debug builds only; same file as the mod's other self tests):
+
+```csharp
+SelfTest.RegisterMultiplayer("dive.mp.rules", SelfTest.Modded, RunRulesClient); // client side, in OnActivated
+SelfTest.RegisterServerStep("dive.mp.server-rules", ServerRules);              // server half, in OnActivated too
+// OnDeactivated: SelfTest.UnregisterMultiplayer(...), SelfTest.UnregisterServerStep(...)
+
+private static IEnumerator RunRulesClient()
+{
+    var reply = new SelfTest.ServerReply();
+    yield return SelfTest.CallServer("dive.mp.server-rules", "", reply); // runs ServerRules on the server
+    if (!reply.Answered || !reply.Ok) { SelfTest.Fail(Name, reply.ToString()); yield break; }
+    // compare reply.Detail with what the client received ...
+}
+
+private static IEnumerator ServerRules(string arg, object[] reply)
+{
+    yield return null;
+    SelfTest.Answer(reply, true, ServerRules.Current.Describe()); // what the client test gets as reply.Detail
+}
+```
+
+- A client test runs only in the scenario it registered for, after `probe.mp.baseline`, with the same timeout, filter
+  (`-Only`) and Pass / Fail / Note / Screenshot rules as an in-world test. `SelfTest.Scenario` tells the scenario
+  (`""` in a single-player run), `SelfTest.IsMultiplayerRun` whether this is one.
+- A server step gets the argument string and must call `SelfTest.Answer(reply, ok, detail)`; it runs with a timeout
+  (70 % of the test timeout) on the server. The client waits for the answer up to 75 % of the test timeout.
+  Server-side `Note`/`Pass`/`Fail` lines go to the server's log; the script prints them with an `S` prefix and a
+  server `FAIL` fails the scenario.
+- The server probe has one step of its own: `probe.set-enabled` with `"<GUID>=on"` or `"<GUID>=off"`.
+- The player is in god mode with stamina rate 0 like in a single-player run, on a world with a random seed.
+- Before every test the probe checks that the player is still in the server's world. When the test before left it
+  (refused, kicked, player object gone), the probe logs out if needed, joins again from the main menu and waits for
+  the spawn, so one test cannot make the following ones fail.
+- In a multiplayer run the probe makes `Utils.GenerateUID` return a new value on every call. Without that, a client
+  that leaves and joins again within one game process got the same session id each time; the server keeps the ids of
+  destroyed objects (`ZDOMan.m_deadZDOs`) and destroys a new object that reuses one, so the rejoined player vanished
+  right after spawning.
 
 ## Internals (for mod authors)
 

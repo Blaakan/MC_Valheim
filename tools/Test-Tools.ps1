@@ -81,6 +81,16 @@ Check 'versions compare as numbers' ($null -eq (Get-ReleaseVersionProblem '1.10.
 Check 'later release below the last refused' ($null -ne (Get-ReleaseVersionProblem '1.1.0' @('1.0.0', '1.2.0')))
 Check 'not x.y.z refused' ($null -ne (Get-ReleaseVersionProblem '1.0' @()))
 
+Write-Step 'Turn mod on in its config'
+$crlf = "`r`n"
+$cfgOff = "## head${crlf}${crlf}[Afraid creatures]${crlf}${crlf}Enabled = false${crlf}${crlf}[General]${crlf}${crlf}## Turn on.${crlf}Enabled = false${crlf}${crlf}Status = Off${crlf}"
+$cfgOn = "## head${crlf}${crlf}[Afraid creatures]${crlf}${crlf}Enabled = false${crlf}${crlf}[General]${crlf}${crlf}## Turn on.${crlf}Enabled = true${crlf}${crlf}Status = Off${crlf}"
+Same 'only Enabled of [General] changes, CRLF kept' (Enable-ModConfigText $cfgOff) $cfgOn
+Check 'already on gives no change' ($null -eq (Enable-ModConfigText $cfgOn))
+Check 'no [General] section gives no change' ($null -eq (Enable-ModConfigText "[Other]${nl}Enabled = false${nl}"))
+Same 'last section, LF only' (Enable-ModConfigText "[General]${nl}Enabled = false") "[General]${nl}Enabled = true"
+Check 'empty text gives no change' ($null -eq (Enable-ModConfigText ''))
+
 Write-Host ''
 if ($fails -eq 0) { Write-Host 'TOOL TESTS PASSED' -ForegroundColor Green; exit 0 }
 Write-Host "TOOL TESTS FAILED ($fails)" -ForegroundColor Red

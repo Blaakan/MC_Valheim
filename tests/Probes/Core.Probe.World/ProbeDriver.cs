@@ -55,7 +55,10 @@ internal static class ProbeDriver
         }
         Log.Info($"World probe on. Save data redirected to '{ProbeSettings.SaveDir}' (game default '{Utils.persistantDataPath}'), "
                  + $"cloud saves off for this session, screenshots to '{ProbeSettings.ShotDir}', test timeout {ProbeSettings.TestTimeout:F0} s, "
-                 + $"filter '{string.Join(",", ProbeSettings.Filters)}', keep running {ProbeSettings.Keep}.");
+                 + $"filter '{string.Join(",", ProbeSettings.Filters)}', keep running {ProbeSettings.Keep}"
+                 + (ProbeSettings.IsMultiplayer ? $", multiplayer: join {ProbeSettings.Join}, scenario '{ProbeSettings.Scenario}'." : "."));
+        // Mods read scenario through SelfTest.Scenario ("" = single player).
+        AppDomain.CurrentDomain.SetData(SelfTest.ScenarioSlot, ProbeSettings.Scenario);
         if (_listener == null)
         {
             _listener = new ResultListener();
@@ -99,26 +102,9 @@ internal static class ProbeDriver
             SelfTest.Note("probe", $"timings: menu ready {timings.MenuReady - timings.Start:F1} s, world start to spawn "
                                    + $"{timings.Spawned - timings.WorldRequested:F1} s, settled {timings.Settled - timings.Spawned:F1} s after spawn");
 
-            var tests = new List<KeyValuePair<string, Func<IEnumerator>>>
-            {
-                new KeyValuePair<string, Func<IEnumerator>>(ProbeTests.Baseline, ProbeTests.RunBaseline),
-                new KeyValuePair<string, Func<IEnumerator>>(ProbeTests.Runner, ProbeTests.RunRunnerCheck),
-            };
-            var registered = SelfTest.GetTests();
             var skipped = new List<string>();
-            lock (registered)
-            {
-                foreach (var t in registered)
-                {
-                    if (!ProbeSettings.Wanted(t.Key))
-                    {
-                        skipped.Add($"{t.Key} ({OwnerOf(t.Value)})");
-                        continue;
-                    }
-                    tests.Add(t);
-                }
-            }
-            SelfTest.Note("probe", $"{tests.Count} test(s) to run ({registered.Count} registered by mods, {skipped.Count} filtered out)");
+            var tests = ProbeSettings.IsMultiplayer ? MultiplayerTestList(skipped, out var registeredCount) : SinglePlayerTestList(skipped, out registeredCount);
+            SelfTest.Note("probe", $"{tests.Count} test(s) to run ({registeredCount} registered by mods, {skipped.Count} filtered out)");
             if (skipped.Count > 0)
             {
                 // Script read this line: "<name> (<mod GUID>), ..." tell which mod lost its tests to the filter.
@@ -127,6 +113,17 @@ internal static class ProbeDriver
 
             foreach (var t in tests)
             {
+                if (ProbeSettings.IsMultiplayer && MpTests.NeedsWorld(t.Key))
+                {
+                    // Test before may have left the server (refused, kicked): join again so this one start in the world.
+                    var back = new RunResult();
+                    yield return SafeRunner.Run(MpTests.EnsureInGame(timings), MenuTimeout + SpawnTimeout + SettleTimeout, back);
+                    if (back.TimedOut || back.Error != null)
+                    {
+                        SelfTest.Note("probe", $"could not get back into the server before {t.Key}: "
+                                               + (back.TimedOut ? $"timed out after {back.Seconds:F0} s" : back.Error.Message));
+                    }
+                }
                 var outcome = new bool[1];
                 yield return RunTest(t.Key, t.Value, outcome);
                 run++;
@@ -149,6 +146,12 @@ internal static class ProbeDriver
 
         _listener?.Stop();
         Log.Info($"{SelfTest.Prefix} DONE pass={passed} fail={failed} tests={run}");
+        if (ProbeSettings.IsMultiplayer && !ProbeSettings.Keep)
+        {
+            // Server probe save world and quit (script kill it otherwise).
+            MpLink.SendQuit();
+            MpLink.Uninstall();
+        }
         var restored = PrefsGuard.Restore();
         if (restored > 0)
         {
@@ -165,10 +168,86 @@ internal static class ProbeDriver
         Application.Quit();
     }
 
+    private static List<KeyValuePair<string, Func<IEnumerator>>> SinglePlayerTestList(List<string> skipped, out int registeredCount)
+    {
+        var tests = new List<KeyValuePair<string, Func<IEnumerator>>>
+        {
+            new KeyValuePair<string, Func<IEnumerator>>(ProbeTests.Baseline, ProbeTests.RunBaseline),
+            new KeyValuePair<string, Func<IEnumerator>>(ProbeTests.Runner, ProbeTests.RunRunnerCheck),
+        };
+        var registered = SelfTest.GetTests();
+        lock (registered)
+        {
+            registeredCount = registered.Count;
+            foreach (var t in registered)
+            {
+                if (!ProbeSettings.Wanted(t.Key))
+                {
+                    skipped.Add($"{t.Key} ({OwnerOf(t.Value)})");
+                    continue;
+                }
+                tests.Add(t);
+            }
+        }
+        return tests;
+    }
+
+    // Probe's own multiplayer tests, then mods' multiplayer tests of this scenario (other scenarios not counted).
+    private static List<KeyValuePair<string, Func<IEnumerator>>> MultiplayerTestList(List<string> skipped, out int registeredCount)
+    {
+        var tests = MpTests.ProbeTests();
+        var registered = SelfTest.GetMultiplayerTests();
+        var otherScenario = new List<string>();
+        registeredCount = 0;
+        lock (registered)
+        {
+            foreach (var t in registered)
+            {
+                var name = t.TryGetValue("name", out var n) ? n as string : null;
+                var scenario = t.TryGetValue("scenario", out var s) ? s as string : null;
+                var run = t.TryGetValue("run", out var r) ? r as Func<IEnumerator> : null;
+                if (name == null || run == null)
+                {
+                    continue;
+                }
+                if (scenario != ProbeSettings.Scenario)
+                {
+                    otherScenario.Add(name);
+                    continue;
+                }
+                registeredCount++;
+                if (!ProbeSettings.Wanted(name))
+                {
+                    skipped.Add($"{name} ({OwnerOf(run)})");
+                    continue;
+                }
+                tests.Add(new KeyValuePair<string, Func<IEnumerator>>(name, run));
+            }
+        }
+        if (otherScenario.Count > 0)
+        {
+            SelfTest.Note("probe", $"{otherScenario.Count} multiplayer test(s) of other scenarios not run: {string.Join(", ", otherScenario)}");
+        }
+        tests.AddRange(MpTests.LateTests());
+        return tests;
+    }
+
     private static IEnumerator Setup(ProbeTimings timings)
     {
         yield return MenuDriver.StartWorld(timings);
+        if (ProbeSettings.IsMultiplayer && ProbeSettings.Scenario == MC.Core.ProbeShared.MpProtocol.VanillaClient)
+        {
+            // Player without mods: the server should refuse it. No spawn to wait for.
+            yield return MpTests.WaitRefusal(timings);
+            yield break;
+        }
+        yield return WaitSpawnAndSettle(timings);
+    }
 
+    // After world start or server join: wait local player, area loaded, then god mode + no stamina drain. Multiplayer
+    // tests use it again after a rejoin.
+    internal static IEnumerator WaitSpawnAndSettle(ProbeTimings timings)
+    {
         // Main scene load: menu object go away, then local player come.
         var lastNote = Time.realtimeSinceStartup;
         var leftMenu = false;

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Me = server probe for tools/Test-Multiplayer.ps1 (Debug build). Never shipped: lives outside src/. Script put me in
+    the dedicated server's own BepInEx folder (test tree), never in the game folder. Idle unless env var
+    MC_MP_SERVER_DIR set. Me answer the client probe (Core.Probe.World): hello, server steps of mod tests, quit.
+  -->
+  <PropertyGroup>
+    <ModName>Probe Server</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>QoL</ModScope>
+    <ModSide>Server</ModSide>
+    <ModMultiplayerNotes>Test tool: runs the server half of multiplayer self tests on a dedicated server started by tools/Test-Multiplayer.ps1.</ModMultiplayerNotes>
+    <ModDescription>Server-side self-test runner for MC mods. Does nothing unless tools/Test-Multiplayer.ps1 launched the server.</ModDescription>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\MpProtocol.cs" />
+    <Compile Include="..\Core.Probe.World\SafeRunner.cs" />
+  </ItemGroup>
+</Project>

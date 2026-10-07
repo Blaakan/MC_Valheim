@@ -13,10 +13,13 @@
     <ModNetworkVersion Condition="'$(ModNetworkVersion)' == ''">1</ModNetworkVersion>
     <DeployToGame Condition="'$(DeployToGame)' == '' and '$(Configuration)' == 'Debug'">true</DeployToGame>
     <DeployToGame Condition="'$(DeployToGame)' == ''">false</DeployToGame>
+    <!-- Deploy into other BepInEx folder (test trees of tools/Test-Multiplayer.ps1): -p:DeployBepInExDir=<dir>\BepInEx\.
+         Game refs still come from BepInExDir. -->
+    <DeployBepInExDir Condition="'$(DeployBepInExDir)' == ''">$(BepInExDir)</DeployBepInExDir>
     <!-- BepInEx scan plugins/ recursively, so nesting is fine. One tidy folder for the whole collection. -->
-    <ModDeployDir>$(BepInExDir)plugins\$(ModCollectionFolder)\$(ModCategory)\$(ModGuid)\</ModDeployDir>
+    <ModDeployDir>$(DeployBepInExDir)plugins\$(ModCollectionFolder)\$(ModCategory)\$(ModGuid)\</ModDeployDir>
     <!-- Old flat place. Two copies of one guid = BepInEx load only one (maybe the stale one), so deploy remove it. -->
-    <_ModLegacyDeployDir>$(BepInExDir)plugins\$(ModGuid)\</_ModLegacyDeployDir>
+    <_ModLegacyDeployDir>$(DeployBepInExDir)plugins\$(ModGuid)\</_ModLegacyDeployDir>
     <ModInfoFile>$(IntermediateOutputPath)ModInfo.g.cs</ModInfoFile>
     <!--
       Publicizer 0.4.3 rewrite IgnoresAccessChecksTo.cs EVERY build (File.WriteAllText, no compare), so CoreCompile
