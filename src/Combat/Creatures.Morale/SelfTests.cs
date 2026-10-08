@@ -40,11 +40,14 @@ namespace MC.Combat.CreaturesMoraleMod;
 //                   run alerted (ZDO alert, raised once; base update run, vanilla skipped), late one picks it up, rout
 //                   over = unalerted, shaken (afraid of a rank 0 player: they run from him once the fear is on) then
 //                   hostile again; kill with no attacker = no rout; broadcast path through the Rout message
+// More tests in SelfTestsWorld.cs, SelfTestsWorld2.cs (single player) and SelfTestsMp.cs (client joined to a dedicated
+// server + server halves); shared tools in SelfTestsTools.cs. Every test also fail on a warning or error line of the
+// mod in the log while it run (Checks + LogWatch), except lines a step ask for.
 // Me never write config: rules through ServerRules.TestRules, rank through Standing.TestOverride, messages through
 // Standing.TestMessages, broadcast through Rout.ForceBroadcast; all put back in finally (recent routs forgotten too).
 // Me pause the world spawner, clear
 // other creatures near, destroy all me spawn, take back the knife, put the player back where and as healthy as he was.
-internal static class SelfTests
+internal static partial class SelfTests
 {
     private const string RulesName = "morale.rules";
     private const string PublishName = "morale.publish";
@@ -63,6 +66,8 @@ internal static class SelfTests
         SelfTest.Register(ProvokeName, RunProvoke);
         SelfTest.Register(StealthName, RunStealth);
         SelfTest.Register(RoutName, RunRout);
+        RegisterMore();
+        RegisterMultiplayer();
 #endif
     }
 
@@ -76,6 +81,8 @@ internal static class SelfTests
         SelfTest.Unregister(ProvokeName);
         SelfTest.Unregister(StealthName);
         SelfTest.Unregister(RoutName);
+        UnregisterMore();
+        UnregisterMultiplayer();
         ResetHooks();
 #endif
     }
@@ -87,9 +94,18 @@ internal static class SelfTests
     {
         private readonly string _name;
         private readonly List<string> _failures = new List<string>();
+        private readonly List<string> _expected = new List<string>();
         private int _count;
 
-        internal Checks(string name) => _name = name;
+        // Me also watch the mod's own log while the test run (T24, L04): warning or error line = failed check.
+        internal Checks(string name)
+        {
+            _name = name;
+            LogWatch.Instance.Begin();
+        }
+
+        // Warning or error line a step ask for on purpose (it holds this text): not a problem.
+        internal void Expect(string part) => _expected.Add(part);
 
         internal bool Check(bool ok, string what)
         {
@@ -103,6 +119,10 @@ internal static class SelfTests
 
         internal void Report(string extra = "")
         {
+            var problems = LogWatch.Instance.Problems(_expected);
+            LogWatch.Instance.End();
+            Check(problems.Count == 0, $"clean log: {problems.Count} warning or error line(s) from {ModInfo.Name} during the test"
+                                       + (problems.Count > 0 ? $", first: {problems[0]}" : ""));
             if (_failures.Count == 0)
             {
                 SelfTest.Pass(_name, $"{_count} checks OK{extra}");
@@ -270,6 +290,29 @@ internal static class SelfTests
                 SelfTest.Note(Test, $"{prefabName} has no MonsterAI");
             }
             return ai;
+        }
+
+        // Any prefab (piece, animal, creature without MonsterAI), destroyed at End like creatures.
+        internal GameObject SpawnAny(string prefabName, Vector3 pos, Vector3 facing)
+        {
+            var prefab = ZNetScene.instance.GetPrefab(prefabName);
+            if (prefab == null)
+            {
+                SelfTest.Note(Test, $"prefab {prefabName} not found");
+                return null;
+            }
+            var go = Object.Instantiate(prefab, pos + Vector3.up * 0.1f, Look(facing));
+            _spawned.Add(go);
+            return go;
+        }
+
+        // Object made by something else (projectile, dropped item): destroyed at End too.
+        internal void Track(GameObject go)
+        {
+            if (go != null && !_spawned.Contains(go))
+            {
+                _spawned.Add(go);
+            }
         }
 
         // Item on the ground (like a drop: a new network object this game own), destroyed at End like creatures.
@@ -1892,6 +1935,9 @@ internal static class SelfTests
 
     // ================================================================ morale.calm
 
+    // Longest me wait for an afraid creature to get 1 m farther from the player (a few 2 s flee point picks).
+    private const float RunWait = 10f;
+
     private static IEnumerator RunCalm()
     {
         var c = new Checks(CalmName);
@@ -1940,25 +1986,25 @@ internal static class SelfTests
             var startTimer = gd.m_updateTargetTimer;
             var picked = false;
             var dropped = false;
-            yield return Wait(2.5f, () =>
+            var farthest = startDist;
+            var hadPath = false;
+            var inAttack = false;
+            // Me watch the run every frame: farthest it got, a navmesh path found by the flee itself (not the old chase
+            // path result: only after the first flee frame, which reset the path timers), an attack swing still going.
+            Action watchRun = () =>
             {
                 s.Noise();
+                farthest = Mathf.Max(farthest, Dist(gd, player));
+                hadPath |= CreatureState.TryGet(gd, out var runState) && !runState.FirstFleeFrame && gd.FoundPath();
+                inAttack |= ch.InAttack();
+            };
+            yield return Wait(2.5f, () =>
+            {
+                watchRun();
                 picked |= gd.m_targetCreature != null;
                 dropped |= !gd.IsAlerted();
             });
             var ranDist = Dist(gd, player);
-            var fleePoint = Vector3.Distance(gd.m_fleeTarget, player.transform.position);
-            if (ranDist <= startDist + 1f && !gd.FoundPath())
-            {
-                // Vanilla Flee stands still when it finds no navmesh path (fresh world, rocks): terrain, not the mod.
-                SelfTest.Note(CalmName, $"rank 4: no navmesh path to run on here ({F(startDist)} m -> {F(ranDist)} m, flee point {F(fleePoint)} m "
-                                        + "from the player); the running distance is not checked");
-            }
-            else
-            {
-                c.Check(ranDist > startDist + 1f, $"rank 4: it runs away from the player ({F(startDist)} m -> {F(ranDist)} m in 2.5 s, "
-                                                  + $"flee point {F(fleePoint)} m from the player, path {gd.FoundPath()})");
-            }
             c.Check(!picked && !gd.HaveTarget() && gd.IsAlerted() && FearOf(gd) == player,
                 $"rank 4: while running it has no target and stays alerted (picked a target {picked}, runs from {Who(FearOf(gd))})");
             c.Check(!dropped, "rank 4: the alert stays on every frame of the run (raised once: one alert sound, no flicker of the icon)");
@@ -1967,7 +2013,32 @@ internal static class SelfTests
             c.Check(gd.m_timeSinceHurt - startHurt >= 2f && Mathf.Approximately(gd.m_updateTargetTimer, startTimer),
                 $"rank 4: fear frames run the base update (hurt timer grew {F(gd.m_timeSinceHurt - startHurt)} s) and skip vanilla "
                 + $"(target timer {F(startTimer)} -> {F(gd.m_updateTargetTimer)})");
-            SelfTest.Note(CalmName, $"rank 4: ran {F(ranDist - startDist)} m in 2.5 s");
+
+            // The distance: me wait on it (at most RunWait s in all), not on a clock. Vanilla Flee pick a new point only
+            // every 2 s and MoveTo stand still while that point has no path: first creature of its kind in a fresh
+            // world = its navmesh tiles are not built yet (built on demand), and the test spot is the start temple
+            // (boss stones right behind it). Both runs so far: under 1.3 m in the first 2.5 s, path found by then.
+            var runTook = 2.5f;
+            if (farthest <= startDist + 1f)
+            {
+                yield return Until(() => farthest > startDist + 1f, RunWait - 2.5f, watchRun, w);
+                runTook += w.Took;
+            }
+            var fleePoint = Vector3.Distance(gd.m_fleeTarget, player.transform.position);
+            if (farthest <= startDist + 1f && !hadPath)
+            {
+                // Vanilla Flee stands still when it finds no navmesh path (fresh world, rocks): terrain, not the mod.
+                SelfTest.Note(CalmName, $"rank 4: no navmesh path to run on here in {F(runTook)} s ({F(startDist)} m -> {F(farthest)} m at most, "
+                                        + $"flee point {F(fleePoint)} m from the player); the running distance is not checked");
+            }
+            else
+            {
+                c.Check(farthest > startDist + 1f, $"rank 4: it runs away from the player ({F(startDist)} m -> {F(farthest)} m at most within "
+                                                   + $"{F(runTook)} s; {F(ranDist)} m after 2.5 s; flee point {F(fleePoint)} m from the player, "
+                                                   + $"a path found {hadPath}, in an attack swing meanwhile {inAttack})");
+            }
+            SelfTest.Note(CalmName, $"rank 4: {F(ranDist - startDist)} m farther after 2.5 s, {F(farthest - startDist)} m farther after {F(runTook)} s "
+                                    + $"(path found {hadPath}, in an attack swing meanwhile {inAttack})");
 
             // Pinned 4 m in front, facing the player: it sees them and still does not sense them (never a target).
             Action holdHome = () =>
@@ -2878,7 +2949,10 @@ internal static class SelfTests
             var player = s.Player;
             var rules = NewRules(r =>
             {
-                r.RoutSeconds = 4f;
+                // 6 s, not 4: room for three of vanilla Flee's 2 s point picks (a follower in an attack swing at the
+                // kill, or with no path to its first point, start late; run 2 had one 0.2 m closer after 3 s). Not
+                // longer: at 6 m/s they stay inside the loaded zones around the player.
+                r.RoutSeconds = 6f;
                 r.ShakenSeconds = 12f;
                 r.FearRange = 0f; // fear off first: the shaken calm-down is checked, then the fear is turned on for one step
             });
@@ -2960,6 +3034,10 @@ internal static class SelfTests
             var startHurt = new float[3];
             var startTimer = new float[3];
             var killPos = new Vector3[3];
+            var routFrom = new Vector3[3];
+            var watched = new bool[3];
+            var farthest = new float[3];
+            var hadPath = new bool[3];
             for (var i = 0; i < 3; i++)
             {
                 var g = pack[i];
@@ -2978,18 +3056,38 @@ internal static class SelfTests
                 killPos[i] = g.transform.position;
                 startHurt[i] = g.m_timeSinceHurt;
                 startTimer[i] = g.m_updateTargetTimer;
+                routFrom[i] = from;
+                farthest[i] = startDist[i];
+                watched[i] = true;
             }
+            // Every frame from the kill on: the farthest each follower got from the death point, and whether its flee
+            // found a navmesh path (the rout reset the path timer to -999: a later time = a path search of the rout,
+            // not the old chase one).
+            Action watchPack = () =>
+            {
+                for (var i = 0; i < 3; i++)
+                {
+                    var g = pack[i];
+                    if (!watched[i] || g == null)
+                    {
+                        continue;
+                    }
+                    farthest[i] = Mathf.Max(farthest[i], Vector3.Distance(g.transform.position, routFrom[i]));
+                    hadPath[i] |= g.m_lastFindPathTime > -900f && g.FoundPath();
+                }
+            };
             var left = (packUntil - now) / (double)TimeSpan.TicksPerSecond;
-            c.Check(left > 3.5 && left <= 4.01, $"the rout lasts RoutSeconds (4 s): {F(left)} s left");
+            c.Check(left > rules.RoutSeconds - 0.5 && left <= rules.RoutSeconds + 0.01,
+                $"the rout lasts RoutSeconds ({F(rules.RoutSeconds)} s): {F(left)} s left");
             c.Check(RoutUntilOf(boar) == 0L, "the Boar (not a follower) does not rout");
             c.Check(RoutUntilOf(tame) == 0L, "the tame Greydwarf (exempt) does not rout");
             c.Check(Rout.LastAppliedHere == 3, $"the rout reached the 3 wild Greydwarfs here (single player, applied directly), reached {Rout.LastAppliedHere}");
             s.Destroy(tame); // it would fight the routed pack and reset their hurt timers
 
             // ----- Greydwarf that come 1 s later pick rout up (recent routs) -----
-            yield return WaitUntilTime(killTime + 1f, null);
+            yield return WaitUntilTime(killTime + 1f, watchPack);
             var late = s.Spawn("Greydwarf", Stage.Ground(deathPos + right * 5f), right);
-            yield return Until(() => RoutUntilOf(late) > Attitudes.Now(), 1f, null, w);
+            yield return Until(() => RoutUntilOf(late) > Attitudes.Now(), 1f, watchPack, w);
             c.Check(w.Met && RoutUntilOf(late) == packUntil,
                 "a Greydwarf spawned 5 m from the death point 1 s later picks up the same rout at its first check");
             if (late != null)
@@ -3001,11 +3099,13 @@ internal static class SelfTests
             var dropped = new bool[3];
             yield return WaitUntilTime(killTime + 3f, () =>
             {
+                watchPack();
                 for (var i = 0; i < 3; i++)
                 {
                     dropped[i] |= pack[i] != null && !pack[i].IsAlerted();
                 }
             });
+            var after3 = new float[3];
             for (var i = 0; i < 3; i++)
             {
                 var g = pack[i];
@@ -3013,13 +3113,8 @@ internal static class SelfTests
                 {
                     continue;
                 }
-                var from = RoutFromOf(g);
-                var distance = Vector3.Distance(g.transform.position, from);
                 var grew = g.m_timeSinceHurt - startHurt[i];
-                c.Check(distance > startDist[i] + 0.5f, $"Greydwarf {i + 1}: runs away from the death point ({F(startDist[i])} m -> {F(distance)} m; "
-                                                        + $"moved {F(Vector3.Distance(g.transform.position, killPos[i]))} m since the kill and "
-                                                        + $"{F(Vector3.Distance(killPos[i], scene.Followers[i]))} m from its spawn spot before it; "
-                                                        + $"flee point {F(Vector3.Distance(g.m_fleeTarget, from))} m from the death point, path to it {g.FoundPath()})");
+                after3[i] = Vector3.Distance(g.transform.position, routFrom[i]);
                 c.Check(g.IsAlerted() && g.m_targetCreature == null && !g.HaveTarget(),
                     $"Greydwarf {i + 1}: routed = alerted, no target (alerted {g.IsAlerted()}, target {Who(g.m_targetCreature)})");
                 c.Check(grew >= 2f, $"Greydwarf {i + 1}: the base update runs in rout frames (m_timeSinceHurt grew {F(grew)} s in 3 s)");
@@ -3030,9 +3125,55 @@ internal static class SelfTests
                 c.Check(!dropped[i], $"Greydwarf {i + 1}: the alert stays on every frame of the rout from 1 s after the kill (raised once, no flicker)");
             }
 
+            // Away from the death point: me wait on the distance (until 0.4 s before the rout's end), not on a clock.
+            // Vanilla Flee: a new point every 2 s, within 45 degrees of "away" only when such a point has a full path
+            // and lies no more than 1 m above the ground there, else any direction; no path = it stands until the
+            // next pick; a swing begun before the kill slows it too. This scene (start temple, boss stones, trees)
+            // had a path for 3 of 9 checked points in both runs, and one follower was 0.2 m closer after 3 s.
+            var runEnd = killTime + rules.RoutSeconds - 0.4f;
+            yield return Until(() =>
+            {
+                for (var i = 0; i < 3; i++)
+                {
+                    if (watched[i] && pack[i] != null && farthest[i] <= startDist[i] + 0.5f)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }, Mathf.Max(runEnd - Time.time, 0f), watchPack, w);
+            var ranBy = Time.time - killTime;
+            var ranAway = 0;
+            for (var i = 0; i < 3; i++)
+            {
+                var g = pack[i];
+                if (!watched[i] || g == null)
+                {
+                    continue;
+                }
+                var ran = farthest[i] > startDist[i] + 0.5f;
+                ranAway += ran ? 1 : 0;
+                if (!ran && !hadPath[i])
+                {
+                    // Like morale.calm and T01: no path at all = vanilla Flee stand still, nothing the mod decide.
+                    SelfTest.Note(RoutName, $"Greydwarf {i + 1}: its flee found no navmesh path in the {F(ranBy)} s after the kill "
+                                            + $"({F(startDist[i])} m -> {F(farthest[i])} m at most from the death point); its running distance is not checked");
+                    continue;
+                }
+                c.Check(ran, $"Greydwarf {i + 1}: runs away from the death point ({F(startDist[i])} m -> {F(farthest[i])} m at most within {F(ranBy)} s "
+                             + $"of the kill; {F(after3[i])} m after 3 s; moved {F(Vector3.Distance(g.transform.position, killPos[i]))} m since the kill and "
+                             + $"{F(Vector3.Distance(killPos[i], scene.Followers[i]))} m from its spawn spot before it; "
+                             + $"flee point {F(Vector3.Distance(g.m_fleeTarget, routFrom[i]))} m from the death point, a path found {hadPath[i]}, "
+                             + $"in an attack swing now {g.m_character.InAttack()})");
+            }
+            // No follower with a path at all would leave "they run away" unchecked: that is a failed run, not a pass.
+            c.Check(ranAway > 0, $"at least one of the 3 followers gets farther from the death point during the rout ({ranAway} did within {F(ranBy)} s)");
+            SelfTest.Note(RoutName, $"{ranAway} of 3 followers got 0.5 m farther from the death point within {F(ranBy)} s of the kill "
+                                    + $"(after 3 s: {F(after3[0] - startDist[0])} m, {F(after3[1] - startDist[1])} m, {F(after3[2] - startDist[2])} m)");
+
             // Shaken fear step below need followers within 10 m of the player: me join the scattered pack. (The rout's
             // own alert goes at its end with or without a player near: FleeFrames.Calm, checked in BroadcastSteps too.)
-            yield return WaitUntilTime(killTime + 3.6f, null);
+            yield return WaitUntilTime(runEnd, null);
             pack.RemoveAll(g => g == null);
             if (!c.Check(pack.Count > 0, "no follower left to watch"))
             {
@@ -3093,14 +3234,20 @@ internal static class SelfTests
             ServerRules.TestRules = fearOn;
             if (close.Count == 0)
             {
-                SelfTest.Note(RoutName, "shaken fear: no follower within 10 m of the player; step skipped");
+                // All ran far (first run: step skipped, nothing checked). Me put the first one 8 m from the player,
+                // facing him: the step always check something.
+                var off = pack[0].transform.position - player.transform.position;
+                off.y = 0f;
+                var toward = off.sqrMagnitude > 0.01f ? off.normalized : s.Forward;
+                var nearSpot = Stage.Ground(player.transform.position + toward * 8f);
+                Stage.Place(pack[0].m_character, nearSpot, -toward);
+                spots[0] = nearSpot;
+                close.Add(pack[0]);
+                SelfTest.Note(RoutName, "shaken fear: no follower within 10 m of the player; the first one moved to 8 m from him");
             }
-            else
-            {
-                yield return Until(() => close.TrueForAll(g => g != null && FearOf(g) == player && g.m_targetCreature == null), 2.5f, s.Noise, w);
-                c.Check(w.Met, $"shaken with FearRange 12: the {close.Count} follower(s) within 10 m of the rank 0 player run from him within 2.5 s, "
-                               + $"with no target ({DescribePack(close, player)})");
-            }
+            yield return Until(() => close.TrueForAll(g => g != null && FearOf(g) == player && g.m_targetCreature == null), 2.5f, s.Noise, w);
+            c.Check(w.Met, $"shaken with FearRange 12: the {close.Count} follower(s) within 10 m of the rank 0 player run from him within 2.5 s, "
+                           + $"with no target ({DescribePack(close, player)})");
             ServerRules.TestRules = rules;
             yield return Until(() => AllCalmedDown(pack), 2.5f, () =>
             {

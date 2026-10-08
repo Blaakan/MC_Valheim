@@ -31,9 +31,17 @@ namespace MC.Combat.TrinketsOnDemandMod;
 //   trinkets.ranged-factor  formula (pure) + NOTE dump of bow draw / crossbow reload / arrow and bolt adrenaline, and
 //                           melee pay of player weapons by skill (for the RangedReferenceSeconds default)
 //   trinkets.ranged-shot    real full-draw Bow shot: arrow's m_adrenaline = base x factor from the formula
-// Me force rules only with ServerRules.TestRules / TestPending, the key with Controls.TestPress: never config. Rig put
-// back player (equipment, ammo, bar, drain timer, effects, controls), and destroy all me spawn.
-internal static class SelfTests
+// More tests live in the other SelfTests*.cs files (same class, Debug only), one block per TESTING.md item:
+//   SelfTestsBar.cs       vanilla-parity, drain, full-bar, answers, swap, feedback, keys, gates, toggle, clean-log
+//   SelfTestsFight.cs     block-fight, no-fight, targeting, dodge-fight, bug.pvp-dodge
+//   SelfTestsRanged.cs    bow-hits, crossbow-shot, other-ranged
+//   SelfTestsOtherMods.cs dual-wield (and the other-mod parts the tests above call)
+//   SelfTestsMp.cs        multiplayer: client tests and their server halves (tools/Test-Multiplayer.ps1)
+//   SelfTestsTools.cs     log listener, swing / face / message helpers
+// Me force rules only with ServerRules.TestRules / TestPending, the key with Controls.TestPress, personal settings with
+// Controls.TestKey... / Feedback.Test...: never config in a single-player test. Rig put back player (equipment, ammo,
+// bar, drain timer, effects, controls, skills, health, place), and destroy all me spawn.
+internal static partial class SelfTests
 {
     private const string NetworkName = "trinkets.network";
     private const string ControlsName = "trinkets.controls";
@@ -56,6 +64,7 @@ internal static class SelfTests
         SelfTest.Register(CombatName, RunCombatState);
         SelfTest.Register(RangedName, RunRangedFactor);
         SelfTest.Register(ShotName, RunRangedShot);
+        RegisterMore();
 #endif
     }
 
@@ -71,7 +80,27 @@ internal static class SelfTests
         SelfTest.Unregister(CombatName);
         SelfTest.Unregister(RangedName);
         SelfTest.Unregister(ShotName);
+        UnregisterMore();
         ClearOverrides();
+#endif
+    }
+
+    // BindConfig (every start, also while me inactive): the log listener, and the one multiplayer test that run while
+    // the server has no copy of me (me inactive there: OnActivated never run).
+    [Conditional("DEBUG")]
+    internal static void RegisterInactive()
+    {
+#if DEBUG
+        try
+        {
+            EnsureLog();
+            SelfTest.RegisterMultiplayer(MpNoServerName, VanillaServerScenario, RunMpNoServerMod);
+        }
+        catch (Exception e)
+        {
+            // Test plumbing must never stop the mod from starting.
+            Log.Warning($"Self test set-up failed: {e}");
+        }
 #endif
     }
 
@@ -90,6 +119,15 @@ internal static class SelfTests
         ServerRules.TestPending = false;
         ServerRules.TestRules = null;
         Controls.TestPress = false;
+        Feedback.TestShowFullMessage = null;
+        Feedback.TestFlashInterval = null;
+        if (Controls.TestKey.HasValue || Controls.TestPadModifier.HasValue || Controls.TestPadButton.HasValue)
+        {
+            Controls.TestKey = null;
+            Controls.TestPadModifier = null;
+            Controls.TestPadButton = null;
+            Controls.CacheKeys(); // back to the player's own inputs
+        }
     }
 
     // ---------- helpers ----------
@@ -142,12 +180,26 @@ internal static class SelfTests
         private readonly ItemDrop.ItemData _ammo;
         private readonly float _adrenaline;
         private readonly float _degenTimer;
+        private readonly float _health;
+        private readonly float _eitr;
+        private readonly float _maxEitr;
+        private readonly float _nonBlockLoss;
+        private readonly Vector3 _position;
+        private readonly Quaternion _rotation;
+        private readonly Quaternion _lookYaw;
+        private readonly float _lookPitch;
         private readonly HashSet<int> _tiersBefore = new HashSet<int>();
+        private readonly Dictionary<Skills.SkillType, Vector2> _skills = new Dictionary<Skills.SkillType, Vector2>();
         private readonly List<ItemDrop.ItemData> _items = new List<ItemDrop.ItemData>();
         private readonly List<GameObject> _spawned = new List<GameObject>();
         private readonly HashSet<int> _effects = new HashSet<int>();
+        private readonly HashSet<ItemDrop> _dropsBefore = new HashSet<ItemDrop>();
         private PlayerController _controller;
         private bool _controllerEnabled;
+        private bool _moved;
+        private bool _dropsWatched;
+        private string _centerText;
+        private bool _centerSaved;
 
         private Rig(Player player)
         {
@@ -159,12 +211,24 @@ internal static class SelfTests
             _ammo = player.m_ammoItem;
             _adrenaline = player.m_adrenaline;
             _degenTimer = player.m_adrenalineDegenTimer;
+            _health = player.GetHealth();
+            _eitr = player.m_eitr;
+            _maxEitr = player.m_maxEitr;
+            _nonBlockLoss = player.m_nonBlockDamageAdrenaline;
+            _position = player.transform.position;
+            _rotation = player.transform.rotation;
+            _lookYaw = player.m_lookYaw;
+            _lookPitch = player.m_lookPitch;
             foreach (var tier in player.m_adrenalineEffects)
             {
                 if (tier.m_se != null && player.GetSEMan().HaveStatusEffect(tier.m_se.NameHash()))
                 {
                     _tiersBefore.Add(tier.m_se.NameHash());
                 }
+            }
+            foreach (var pair in player.m_skills.m_skillData)
+            {
+                _skills[pair.Key] = new Vector2(pair.Value.m_level, pair.Value.m_accumulator);
             }
         }
 
@@ -175,6 +239,19 @@ internal static class SelfTests
             {
                 SelfTest.Fail(test, "no local player or no world");
                 return null;
+            }
+            // Earlier test stopped half way (time-out) with feature off: on again, else every later test fail too.
+            try
+            {
+                var plugin = Self();
+                if (plugin != null && plugin.TestOff)
+                {
+                    plugin.TestTurnOn();
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Warning($"Self test set-up (feature back on) failed: {e}");
             }
             CombatState.Reset();
             FullBar.LastResult = TriggerResult.None;
@@ -253,9 +330,57 @@ internal static class SelfTests
             return obj.GetComponent<Character>();
         }
 
-        // Me drive the player (no keyboard in between).
+        // Same, with so much health no test hit can kill it (dead creature = drops left in the world).
+        internal Character Tough(string prefab, Vector3 offset)
+        {
+            var c = Creature(prefab, offset);
+            if (c != null)
+            {
+                c.SetMaxHealth(100000f);
+                c.SetHealth(100000f);
+            }
+            return c;
+        }
+
+        // Thing a test made (arrow, dropped item...): destroyed at the end if still there.
+        internal void Track(GameObject go)
+        {
+            if (go != null && !_spawned.Contains(go))
+            {
+                _spawned.Add(go);
+            }
+        }
+
+        // From now on every item drop that appears in the world belongs to this test (spear given back on a hit...):
+        // destroyed at the end.
+        internal void WatchDrops()
+        {
+            if (_dropsWatched)
+            {
+                return;
+            }
+            _dropsWatched = true;
+            foreach (var drop in ItemDrop.s_instances)
+            {
+                _dropsBefore.Add(drop);
+            }
+        }
+
+        // Skill level forced for a check (put back at the end).
+        internal void Skill(Skills.SkillType type, float level)
+        {
+            var skill = P.m_skills.GetSkill(type);
+            skill.m_level = level;
+            skill.m_accumulator = 0f;
+        }
+
+        // Test move the player (roll, fall): place and view put back at the end.
+        internal void Moves() => _moved = true;
+
+        // Me drive the player (no keyboard in between). Place and view put back at the end too.
         internal void TakeControls()
         {
+            _moved = true;
             if (_controller == null)
             {
                 _controller = P.GetComponent<PlayerController>();
@@ -271,11 +396,55 @@ internal static class SelfTests
         internal void Drive(bool attackHold) =>
             P.SetControls(Vector3.zero, false, attackHold, false, false, false, false, false, false, false, false);
 
+        // Block held or let go (controller off: nothing else write it). Vanilla read m_blocking next fixed tick.
+        internal void Block(bool on)
+        {
+            if (_controller == null)
+            {
+                TakeControls();
+            }
+            P.m_blocking = on;
+        }
+
+        // Center message field with a marker in it: a press that shows a message replace it, one that shows none
+        // leave it. Field is invisible unless a message fades it in. Put back at the end.
+        internal const string NoMessage = "<mc-trinkets-test>";
+
+        internal void MarkCenter()
+        {
+            var hud = MessageHud.instance;
+            if (hud == null || hud.m_messageCenterText == null)
+            {
+                return;
+            }
+            if (!_centerSaved)
+            {
+                _centerSaved = true;
+                _centerText = hud.m_messageCenterText.text;
+            }
+            hud.m_messageCenterText.text = NoMessage;
+        }
+
+        internal static string Center()
+        {
+            var hud = MessageHud.instance;
+            return hud != null && hud.m_messageCenterText != null ? hud.m_messageCenterText.text : null;
+        }
+
         internal void Restore()
         {
+            Safe("feature", () =>
+            {
+                var plugin = Self();
+                if (plugin != null && plugin.TestOff)
+                {
+                    plugin.TestTurnOn();
+                }
+            });
             Safe("overrides", ClearOverrides);
             Safe("controls", () =>
             {
+                P.m_blocking = false;
                 if (_controller != null)
                 {
                     Drive(false);
@@ -325,6 +494,65 @@ internal static class SelfTests
                     DestroyObject(go);
                 }
                 _spawned.Clear();
+            });
+            Safe("drops", () =>
+            {
+                if (!_dropsWatched)
+                {
+                    return;
+                }
+                foreach (var drop in ItemDrop.s_instances.ToArray())
+                {
+                    if (drop != null && !_dropsBefore.Contains(drop))
+                    {
+                        DestroyObject(drop.gameObject);
+                    }
+                }
+                _dropsBefore.Clear();
+            });
+            Safe("skills", () =>
+            {
+                var data = P.m_skills.m_skillData;
+                foreach (var type in data.Keys.ToArray())
+                {
+                    if (_skills.TryGetValue(type, out var was))
+                    {
+                        data[type].m_level = was.x;
+                        data[type].m_accumulator = was.y;
+                    }
+                    else
+                    {
+                        data.Remove(type); // skill the test trained from nothing
+                    }
+                }
+            });
+            Safe("body", () =>
+            {
+                P.m_nonBlockDamageAdrenaline = _nonBlockLoss;
+                P.m_maxEitr = _maxEitr;
+                P.m_eitr = _eitr;
+                if (!Mathf.Approximately(P.GetHealth(), _health))
+                {
+                    P.SetHealth(_health);
+                }
+                if (_moved)
+                {
+                    Put(P, _position);
+                    P.transform.rotation = _rotation;
+                    P.m_body.rotation = _rotation;
+                    P.m_lookYaw = _lookYaw;
+                    P.m_lookPitch = _lookPitch;
+                    P.SetMouseLook(Vector2.zero);
+                }
+            });
+            Safe("message", () =>
+            {
+                var hud = MessageHud.instance;
+                if (_centerSaved && hud != null && hud.m_messageCenterText != null
+                    && hud.m_messageCenterText.text == NoMessage)
+                {
+                    hud.m_messageCenterText.text = _centerText;
+                }
             });
             Safe("bar", () =>
             {

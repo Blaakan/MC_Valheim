@@ -45,6 +45,14 @@ internal static class PlayerCheck
 
     internal static bool HasWork => Queue.Count > 0;
 
+#if DEBUG
+    // Self tests only (multiplayer run, server half). Every verdict me gave, "<player>|<verdict>|<problem>", newest
+    // last, never reset. Dry run = a refusal is decided and logged as usual, but the player is not kicked (the client
+    // test must stay in to read it).
+    internal static readonly List<string> DebugVerdicts = new List<string>();
+    internal static bool DebugDryRun;
+#endif
+
     // Pure: self test hammer it. Compatible = NetworkGate.PeerCompatible in the game.
     internal static JoinVerdict Decide(bool isServer, bool connected, bool ready, bool beingKicked, bool compatible,
         bool allowWithoutMod)
@@ -156,7 +164,14 @@ internal static class PlayerCheck
         var kicked = connected && ZNet.PeersToDisconnectAfterKick.ContainsKey(peer);
         var compatible = connected && NetworkGate.PeerCompatible(peer);
         var allow = Plugin.AllowPlayersWithoutMod != null && Plugin.AllowPlayersWithoutMod.Value;
-        switch (Decide(isServer, connected, ready, kicked, compatible, allow))
+        var verdict = Decide(isServer, connected, ready, kicked, compatible, allow);
+#if DEBUG
+        if (verdict != JoinVerdict.Skip)
+        {
+            DebugVerdicts.Add($"{peer.m_playerName}|{verdict}|{(verdict == JoinVerdict.Compatible ? "" : Problem(peer))}");
+        }
+#endif
+        switch (verdict)
         {
             case JoinVerdict.Compatible:
                 Log.Debug($"{Who(peer)} runs {ModInfo.Name}: allowed.");
@@ -177,6 +192,12 @@ internal static class PlayerCheck
                     + "player, turned on and at a version that can talk to the server's (everybody plays with the same "
                     + "tower shields). Their game shows \"Incompatible version\". To let such players in, set "
                     + "AllowPlayersWithoutMod = true.");
+#if DEBUG
+        if (DebugDryRun)
+        {
+            return;
+        }
+#endif
         // Vanilla client: RPC_Error set connection status, Game.FixedUpdate log out, main menu show the text. Me cut
         // socket only DisconnectDelay s later (vanilla kick use 1 s): client read Error first, even on slow loading.
         peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorVersion);

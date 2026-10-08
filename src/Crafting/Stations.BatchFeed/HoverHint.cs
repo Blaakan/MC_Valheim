@@ -42,7 +42,7 @@ internal static class HoverHint
 
     internal static void Append(Component instance, ref string text)
     {
-        if (!Plugin.ShowHint.Value || string.IsNullOrEmpty(text))
+        if (!Plugin.ReadShowHint() || string.IsNullOrEmpty(text))
         {
             return;
         }
@@ -72,7 +72,7 @@ internal static class HoverHint
             return;
         }
 
-        var gamepad = ZInput.IsGamepadActive();
+        var gamepad = Plugin.GamepadActive();
         if (_insert == null || gamepad != _builtGamepad || ZInput.InputLayout != _builtLayout || _builtVersion != _version
             || now - _builtAt >= RebuildInterval)
         {
@@ -92,7 +92,7 @@ internal static class HoverHint
     {
         var loc = Localization.instance;
         _insert = "\n[<color=yellow><b>" + ModifierLabel(gamepad) + " + " + BoundKey("Use", gamepad) + "</b></color>] "
-                  + loc.Localize(_target.ActionLabel()) + " x" + Plugin.Amount.Value;
+                  + loc.Localize(_target.ActionLabel()) + " x" + Plugin.ReadAmount();
         _builtAt = now;
         _builtGamepad = gamepad;
         _builtLayout = ZInput.InputLayout;
@@ -103,7 +103,7 @@ internal static class HoverHint
     // or mod-only key on keyboard (only when the game can read it, else game binding too).
     private static string ModifierLabel(bool gamepad)
     {
-        var key = Plugin.ModifierKey.Value;
+        var key = Plugin.ReadModifierKey();
         if (key == KeyCode.None || gamepad || !BatchFeeder.KeyUsable(key))
         {
             return BoundKey(ZInput.IsNonClassicFunctionality() && gamepad ? "AltKeys" : "AltPlace", gamepad);

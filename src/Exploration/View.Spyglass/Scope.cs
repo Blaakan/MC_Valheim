@@ -25,6 +25,8 @@ internal static class Scope
     private const float ZoomStep = 1.25f;      // one wheel notch
     private const float PadZoomPerSecond = 2f; // gamepad zoom buttons: x2 per second
 
+    internal const string PendingMessage = "The server has not sent the spyglass settings yet.";
+
     internal static readonly int RaisedKey = (ModInfo.Guid + ".Raised").GetStableHashCode();
 
     private static ScopeState _state;
@@ -53,9 +55,66 @@ internal static class Scope
     {
         get
         {
-            var aim = Plugin.AimSensitivity != null ? Plugin.AimSensitivity.Value : 1f;
-            return aim / Mathf.Max(1f, ScopeCamera.CurrentMagnification);
+            return AimSensitivity / Mathf.Max(1f, ScopeCamera.CurrentMagnification);
         }
+    }
+
+    // Personal settings (section Controls), each read in one place: self test may force them in memory, never the
+    // config file.
+    private static bool HoldToLook
+    {
+        get
+        {
+#if DEBUG
+            if (TestHoldToLook.HasValue)
+            {
+                return TestHoldToLook.Value;
+            }
+#endif
+            return Plugin.HoldToLook != null && Plugin.HoldToLook.Value;
+        }
+    }
+
+    private static float AimSensitivity
+    {
+        get
+        {
+#if DEBUG
+            if (TestAimSensitivity.HasValue)
+            {
+                return TestAimSensitivity.Value;
+            }
+#endif
+            return Plugin.AimSensitivity != null ? Plugin.AimSensitivity.Value : 1f;
+        }
+    }
+
+    private static float StartMagnification
+    {
+        get
+        {
+#if DEBUG
+            if (TestStartMagnification.HasValue)
+            {
+                return TestStartMagnification.Value;
+            }
+#endif
+            return Plugin.StartMagnification != null ? Plugin.StartMagnification.Value : DefaultStartMagnification;
+        }
+    }
+
+    // Mouse wheel this frame (self test may give one notch instead).
+    private static float ReadScroll()
+    {
+#if DEBUG
+        if (TestScroll != 0f)
+        {
+            var notch = TestScroll;
+            TestScroll = 0f;
+            return notch;
+        }
+#endif
+        return ZInput.GetMouseScrollWheel();
     }
 
     // Zoom the player picked this session (wheel), never above the rules' cap.
@@ -67,7 +126,7 @@ internal static class Scope
             var cap = rules.IsPending ? SpyglassRules.MagnificationMin : rules.MaxMagnification;
             if (_magnification < 0f)
             {
-                _magnification = Plugin.StartMagnification != null ? Plugin.StartMagnification.Value : DefaultStartMagnification;
+                _magnification = StartMagnification;
             }
             return Mathf.Clamp(_magnification, MinMagnification, Mathf.Max(MinMagnification, cap));
         }
@@ -119,7 +178,7 @@ internal static class Scope
                 }
                 break;
             default:
-                var hold = Plugin.HoldToLook != null && Plugin.HoldToLook.Value;
+                var hold = HoldToLook;
                 if ((attack && !hold) || block)
                 {
                     _lowerRequest = true;
@@ -193,7 +252,7 @@ internal static class Scope
                 Abort();
                 return;
             }
-            var hold = Plugin.HoldToLook != null && Plugin.HoldToLook.Value;
+            var hold = HoldToLook;
             if (_lowerRequest || (hold && !_held) || MustLower(player))
             {
                 StartLowering(player);
@@ -241,7 +300,10 @@ internal static class Scope
             if (Time.unscaledTime - _pendingMessageAt > 3f)
             {
                 _pendingMessageAt = Time.unscaledTime;
-                player.Message(MessageHud.MessageType.TopLeft, "The server has not sent the spyglass settings yet.");
+                player.Message(MessageHud.MessageType.TopLeft, PendingMessage);
+#if DEBUG
+                TestPendingMessages++;
+#endif
             }
             return;
         }
@@ -325,7 +387,7 @@ internal static class Scope
     // Wheel (and gamepad zoom buttons, like vanilla camera zoom: hold the alt keys) change the zoom while looking.
     private static void UpdateZoom(float dt)
     {
-        var scroll = ZInput.GetMouseScrollWheel();
+        var scroll = ReadScroll();
         var m = Magnification;
         if (scroll > 0.001f)
         {
@@ -357,5 +419,20 @@ internal static class Scope
     internal static void TestRequestLower() => _lowerRequest = true;
 
     internal static void TestSetMagnification(float m) => _magnification = m;
+
+    // Self tests: personal settings forced in memory (null = config), one wheel notch for next zoom update (+ up,
+    // - down), stored zoom pick like it is (below 0 = not picked yet), how many times the "server has not sent the
+    // settings" message went out.
+    internal static bool? TestHoldToLook;
+    internal static float? TestAimSensitivity;
+    internal static float? TestStartMagnification;
+    internal static float TestScroll;
+    internal static int TestPendingMessages;
+
+    internal static float TestRawMagnification
+    {
+        get => _magnification;
+        set => _magnification = value;
+    }
 #endif
 }

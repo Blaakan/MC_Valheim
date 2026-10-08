@@ -17,6 +17,11 @@ internal sealed partial class Plugin : ModPlugin
     internal static Plugin Instance { get; private set; }
     internal static DHConfig Cfg { get; private set; }
 
+#if DEBUG
+    // Self test only, in memory (see LocalBlocker). Null = nothing.
+    internal static string TestBlocker;
+#endif
+
     protected override void BindConfig()
     {
         Instance = this;
@@ -35,6 +40,13 @@ internal sealed partial class Plugin : ModPlugin
     // loaded: me stand aside (ForeignMods).
     protected override string LocalBlocker()
     {
+#if DEBUG
+        // Self test say "something block me": framework then run its real turn-off and turn-on path.
+        if (!string.IsNullOrEmpty(TestBlocker))
+        {
+            return TestBlocker;
+        }
+#endif
         if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
         {
             return "Inactive: no graphics device (dedicated server or batch mode), nothing to draw.";

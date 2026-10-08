@@ -53,14 +53,70 @@ internal static class Controls
 #if DEBUG
     // Self test press the trigger once without a keyboard (next Player.Update). Consumed by Pressed.
     internal static bool TestPress;
+
+    // Self test force personal inputs in memory (never config file). Null = player's own setting. Set, then call
+    // CacheKeys; clear, then call CacheKeys again.
+    internal static KeyCode? TestKey;
+    internal static GamepadModifier? TestPadModifier;
+    internal static GamepadButton? TestPadButton;
+
+    // Self test read and put back "already warned about this key" memory (one warning per bad key).
+    internal static KeyCode TestWarned
+    {
+        get => _warned;
+        set => _warned = value;
+    }
 #endif
+
+    // Player's own inputs. One place: CacheKeys and PadLabel read settings only through these three.
+    private static KeyCode KeySetting
+    {
+        get
+        {
+#if DEBUG
+            if (TestKey.HasValue)
+            {
+                return TestKey.Value;
+            }
+#endif
+            return Plugin.TriggerKey != null ? Plugin.TriggerKey.Value : KeyCode.None;
+        }
+    }
+
+    private static GamepadModifier ModifierSetting
+    {
+        get
+        {
+#if DEBUG
+            if (TestPadModifier.HasValue)
+            {
+                return TestPadModifier.Value;
+            }
+#endif
+            return Plugin.GamepadModifier != null ? Plugin.GamepadModifier.Value : GamepadModifier.None;
+        }
+    }
+
+    private static GamepadButton ButtonSetting
+    {
+        get
+        {
+#if DEBUG
+            if (TestPadButton.HasValue)
+            {
+                return TestPadButton.Value;
+            }
+#endif
+            return Plugin.GamepadButton != null ? Plugin.GamepadButton.Value : GamepadButton.None;
+        }
+    }
 
     // BindConfig, setting change, OnActivated. Static map: work before ZInput exist (BindConfig run early).
     internal static void CacheKeys()
     {
-        _key = Validate(Plugin.TriggerKey != null ? Plugin.TriggerKey.Value : KeyCode.None);
-        _padModifier = ModifierName(Plugin.GamepadModifier != null ? Plugin.GamepadModifier.Value : GamepadModifier.None);
-        _padButton = ButtonName(Plugin.GamepadButton != null ? Plugin.GamepadButton.Value : GamepadButton.None);
+        _key = Validate(KeySetting);
+        _padModifier = ModifierName(ModifierSetting);
+        _padButton = ButtonName(ButtonSetting);
     }
 
     // Trigger input went down this frame (key, or gamepad combination while the gamepad is in use). Every frame: plain
@@ -206,13 +262,12 @@ internal static class Controls
         {
             return null;
         }
-        var button = Glyph(_padButton, PlainName(Plugin.GamepadButton != null ? Plugin.GamepadButton.Value : GamepadButton.None));
+        var button = Glyph(_padButton, PlainName(ButtonSetting));
         if (_padModifier == null)
         {
             return button;
         }
-        var modifier = Glyph(_padModifier,
-            PlainName(Plugin.GamepadModifier != null ? Plugin.GamepadModifier.Value : GamepadModifier.None));
+        var modifier = Glyph(_padModifier, PlainName(ModifierSetting));
         return modifier + " + " + button;
     }
 

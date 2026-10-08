@@ -27,13 +27,13 @@ internal static class EnvManPatches
         }
         try
         {
-            var mult = c.FogDensityMultiplier.Value;
+            var mult = c.V(c.FogDensityMultiplier);
             // No main camera = vanilla return early, no fog write: me multiply nothing (would compound).
             if (mult == 1f || Utils.GetMainCamera() == null)
             {
                 return;
             }
-            if (c.KeepWetWeatherFog.Value && env.m_isWet)
+            if (c.V(c.KeepWetWeatherFog) && env.m_isWet)
             {
                 return; // rain and thunderstorms keep their fog
             }
@@ -42,8 +42,8 @@ internal static class EnvManPatches
                           + env.m_fogDensityMorning * morningInt
                           + env.m_fogDensityEvening * eveningInt;
             // Clear weather = full thinning, storms/mist/blizzards = none, linear ramp between.
-            var clear = c.FogClearDensity.Value;
-            var storm = Mathf.Max(c.FogStormDensity.Value, clear + 0.00001f);
+            var clear = c.V(c.FogClearDensity);
+            var storm = Mathf.Max(c.V(c.FogStormDensity), clear + 0.00001f);
             var t = Mathf.Clamp01((density - clear) / (storm - clear));
             var before = RenderSettings.fogDensity;
             RenderSettings.fogDensity = before * Mathf.Lerp(mult, 1f, t);
@@ -66,4 +66,10 @@ internal static class EnvManPatches
         _before = -1f;
         _after = -1f;
     }
+
+#if DEBUG
+    // Self test: density under my last write and what me wrote (-1 = nothing of mine on screen).
+    internal static float TestBefore => _before;
+    internal static float TestAfter => _after;
+#endif
 }

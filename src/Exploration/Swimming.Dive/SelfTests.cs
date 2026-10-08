@@ -31,8 +31,18 @@ namespace MC.Exploration.SwimmingDiveMod;
 //                 after; screenshots; NOTE dumps of player, camera, water and fog values (sun fog global too); travel
 //                 back
 // Me force rules only with ServerRules.TestRules / TestPending, keys with DiveInput.TestDown / TestUp, view settings
-// with Visuals.TestAllOn: never config. Rig put back controls, look, time, world stamina rate and the player's place.
-internal static class SelfTests
+// with Visuals.TestAllOn (one setting alone: TestCamera / TestFog / TestSurface / TestVisibility), another dive mod with
+// ForeignMods.TestPlugins: never config. Rig put back controls, look, time, world stamina rate and the player's place,
+// and everything a test hand it with Undo.
+// More live tests (each travel to water and back, one TESTING.md group each) live in the other SelfTests.*.cs files:
+//   SelfTests.Live.cs   shared helpers (log tap, water finders, key and dive helpers) and dive.motion, dive.stamina,
+//                       dive.rules, dive.multiplier, dive.waves, dive.bug.storm-waves, dive.keys, dive.menus,
+//                       dive.moveset
+//   SelfTests.World.cs  dive.view, dive.exits, dive.floor, dive.ceiling, dive.shallow, dive.ashlands, dive.bottom,
+//                       dive.serpent
+//   SelfTests.Mp.cs     multiplayer (tools/Test-Multiplayer.ps1): dive.mp.rules, dive.mp.diver, dive.mp.server-off and
+//                       their server steps; dive.mp.server-missing (scenario vanilla-server)
+internal static partial class SelfTests
 {
     private const string NetworkName = "dive.network";
     private const string LogicName = "dive.logic";
@@ -43,10 +53,11 @@ internal static class SelfTests
     internal static void Register()
     {
 #if DEBUG
-        SelfTest.Register(NetworkName, RunNetwork);
-        SelfTest.Register(LogicName, RunLogic);
-        SelfTest.Register(PendingName, RunPending);
-        SelfTest.Register(DiveName, RunDive);
+        foreach (var test in Tests)
+        {
+            SelfTest.Register(test.Key, test.Value);
+        }
+        RegisterMultiplayer();
 #endif
     }
 
@@ -54,15 +65,46 @@ internal static class SelfTests
     internal static void Unregister()
     {
 #if DEBUG
-        SelfTest.Unregister(NetworkName);
-        SelfTest.Unregister(LogicName);
-        SelfTest.Unregister(PendingName);
-        SelfTest.Unregister(DiveName);
-        ClearOverrides();
+        foreach (var test in Tests)
+        {
+            SelfTest.Unregister(test.Key);
+        }
+        UnregisterMultiplayer();
+        // A test that turn me off and on itself keep its overrides (it clear them at its end).
+        if (!KeepOverrides)
+        {
+            ClearOverrides();
+        }
 #endif
     }
 
 #if DEBUG
+    // Single-player tests, in run order: pure ones first, then the live ones.
+    private static readonly KeyValuePair<string, Func<IEnumerator>>[] Tests =
+    {
+        new KeyValuePair<string, Func<IEnumerator>>(NetworkName, RunNetwork),
+        new KeyValuePair<string, Func<IEnumerator>>(LogicName, RunLogic),
+        new KeyValuePair<string, Func<IEnumerator>>(PendingName, RunPending),
+        new KeyValuePair<string, Func<IEnumerator>>(DiveName, RunDive),
+        new KeyValuePair<string, Func<IEnumerator>>(MotionName, RunMotion),
+        new KeyValuePair<string, Func<IEnumerator>>(StaminaName, RunStamina),
+        new KeyValuePair<string, Func<IEnumerator>>(RulesName, RunRules),
+        new KeyValuePair<string, Func<IEnumerator>>(MultiplierName, RunMultiplier),
+        new KeyValuePair<string, Func<IEnumerator>>(WavesName, RunWaves),
+        new KeyValuePair<string, Func<IEnumerator>>(BugStormWavesName, RunBugStormWaves),
+        new KeyValuePair<string, Func<IEnumerator>>(KeysName, RunKeys),
+        new KeyValuePair<string, Func<IEnumerator>>(MenusName, RunMenus),
+        new KeyValuePair<string, Func<IEnumerator>>(MovesetName, RunMoveset),
+        new KeyValuePair<string, Func<IEnumerator>>(ViewName, RunView),
+        new KeyValuePair<string, Func<IEnumerator>>(ExitsName, RunExits),
+        new KeyValuePair<string, Func<IEnumerator>>(FloorName, RunFloor),
+        new KeyValuePair<string, Func<IEnumerator>>(CeilingName, RunCeiling),
+        new KeyValuePair<string, Func<IEnumerator>>(ShallowName, RunShallow),
+        new KeyValuePair<string, Func<IEnumerator>>(AshlandsName, RunAshlands),
+        new KeyValuePair<string, Func<IEnumerator>>(BottomName, RunBottom),
+        new KeyValuePair<string, Func<IEnumerator>>(SerpentName, RunSerpent),
+    };
+
     // Water at least this deep (m) for the live dive: 3 m dive + floor margin + wave troughs.
     private const float MinWaterDepth = 12f;
 
@@ -70,12 +112,19 @@ internal static class SelfTests
     // the probe's 120 s test timeout.
     private const float TravelTimeout = 35f;
 
+    // True while a test turn me off and on (made-up dive mod, server toggle): OnDeactivated then keep the overrides.
+    private static bool KeepOverrides;
+
     private static void ClearOverrides()
     {
         ServerRules.TestPending = false;
         ServerRules.TestRules = null;
         DiveInput.ClearTest();
         Visuals.TestAllOn = null;
+        Visuals.TestCamera = null;
+        Visuals.TestFog = null;
+        Visuals.TestSurface = null;
+        Visuals.TestVisibility = null;
     }
 
     // ---------- helpers ----------
@@ -118,6 +167,8 @@ internal static class SelfTests
     {
         internal bool Ok;
         internal string Detail = "";
+        internal float Value;
+        internal Vector3 Point;
     }
 
     private static string F(float v) => v.ToString("0.###", CultureInfo.InvariantCulture);
@@ -183,6 +234,7 @@ internal static class SelfTests
         c.Check(DiveRules.Default.DiveSpeedMultiplier == 1f && DiveRules.Default.IdleRiseSpeed == 0f
                 && DiveRules.Default.UnderwaterStaminaMultiplier == 1f,
             "defaults: speed x1, hold depth, drain x1");
+        OwnRulesFromSettings(c);
 
         // A server (this single-player world is one) never takes rules from a peer.
         var current = ServerRules.Current;
@@ -213,6 +265,50 @@ internal static class SelfTests
         c.Check(PlayerCheck.Decide(true, true, true, true, false, false) == JoinVerdict.Skip, "already being kicked -> Skip");
         c.Report();
         yield break;
+    }
+
+    // The live tests give rules in memory (ServerRules.TestRules), never through the settings. This is the link they
+    // skip: each of the three Diving settings lands in its own rule. Three scratch settings with three different values
+    // (own ConfigFile object that is never saved; no real setting is written) stand in the plugin's fields for the one
+    // call, then the real ones go back. No yield in between: nothing else runs meanwhile.
+    private static void OwnRulesFromSettings(Checks c)
+    {
+        var speed = Plugin.DiveSpeedMultiplier;
+        var idle = Plugin.IdleRiseSpeed;
+        var stamina = Plugin.UnderwaterStaminaMultiplier;
+        DiveRules own = null;
+        string problem = null;
+        try
+        {
+            var scratch = new BepInEx.Configuration.ConfigFile(
+                System.IO.Path.Combine(BepInEx.Paths.CachePath, ModInfo.Guid + ".selftest-never-saved.cfg"), false)
+            {
+                SaveOnConfigSet = false,
+            };
+            Plugin.DiveSpeedMultiplier = scratch.Bind("Diving", "DiveSpeedMultiplier", 2.5f);
+            Plugin.IdleRiseSpeed = scratch.Bind("Diving", "IdleRiseSpeed", 1.25f);
+            Plugin.UnderwaterStaminaMultiplier = scratch.Bind("Diving", "UnderwaterStaminaMultiplier", 3.5f);
+            own = DiveRules.Own();
+        }
+        catch (Exception e)
+        {
+            problem = e.Message;
+        }
+        finally
+        {
+            Plugin.DiveSpeedMultiplier = speed;
+            Plugin.IdleRiseSpeed = idle;
+            Plugin.UnderwaterStaminaMultiplier = stamina;
+        }
+        c.Check(own != null && Near(own.DiveSpeedMultiplier, 2.5f) && Near(own.IdleRiseSpeed, 1.25f)
+                && Near(own.UnderwaterStaminaMultiplier, 3.5f) && !own.IsPending,
+            "the three Diving settings give the own rules: DiveSpeedMultiplier 2.5, IdleRiseSpeed 1.25, "
+            + $"UnderwaterStaminaMultiplier 3.5 -> {(own != null ? own.Describe() : "no rules: " + problem)}");
+        c.Check(ReferenceEquals(Plugin.DiveSpeedMultiplier, speed) && ReferenceEquals(Plugin.IdleRiseSpeed, idle)
+                && ReferenceEquals(Plugin.UnderwaterStaminaMultiplier, stamina) && speed != null && idle != null && stamina != null
+                && Near(DiveRules.Own().DiveSpeedMultiplier, speed.Value) && Near(DiveRules.Own().IdleRiseSpeed, idle.Value)
+                && Near(DiveRules.Own().UnderwaterStaminaMultiplier, stamina.Value),
+            "the real Diving settings are in place again and the own rules read them");
     }
 
     // ---------- dive.logic ----------
@@ -583,13 +679,17 @@ internal static class SelfTests
 
     // ---------- dive.dive (live) ----------
 
-    // Me = what the live dive change on player and world. Restore (finally, no yield) put everything back.
+    // Me = what a live test change on player and world. Restore (finally, no yield) put everything back: what me
+    // changed myself, and what the test handed me with Undo (newest first).
     private sealed class DiveRig
     {
+        internal readonly string Name;
         internal readonly Player Player;
         internal readonly Vector3 Origin;
         internal readonly Quaternion OriginRotation;
         private readonly float _pitch;
+        private readonly Vector3 _look;
+        private readonly List<KeyValuePair<string, Action>> _undo = new List<KeyValuePair<string, Action>>();
         private PlayerController _controller;
         private bool _controllerEnabled;
         private bool _staminaTaken;
@@ -598,16 +698,23 @@ internal static class SelfTests
         private bool _envSaved;
         private bool _todOn;
         private float _tod;
+        private bool _staminaSaved;
+        private bool _healthSaved;
         internal bool Travelled;
         internal bool Back;
 
-        internal DiveRig(Player player)
+        internal DiveRig(Player player, string name = DiveName)
         {
+            Name = name;
             Player = player;
             Origin = player.transform.position;
             OriginRotation = player.transform.rotation;
             _pitch = player.m_lookPitch;
+            _look = player.GetLookDir();
         }
+
+        // Test changed something else: how to put it back (Restore run it, also when the test is cut short).
+        internal void Undo(string what, Action action) => _undo.Add(new KeyValuePair<string, Action>(what, action));
 
         // Me drive the player (no keyboard in between).
         internal void TakeControls()
@@ -626,6 +733,10 @@ internal static class SelfTests
 
         internal void Drive(Vector3 move) =>
             Player.SetControls(move, false, false, false, false, false, false, false, false, false, false);
+
+        // Like the keyboard for one physics tick: crouch / jump = key went down this tick, autoRun = key held.
+        internal void Drive(Vector3 move, bool crouch, bool jump, bool autoRun) =>
+            Player.SetControls(move, false, false, false, false, false, false, jump, crouch, false, autoRun);
 
         internal void TakeStaminaRate()
         {
@@ -652,8 +763,60 @@ internal static class SelfTests
             }
         }
 
+        // Stamina bar full again (swimmer never get stamina back: a test that drain it refill it). First call remember
+        // the value to put back.
+        internal void Refill()
+        {
+            if (!_staminaSaved)
+            {
+                _staminaSaved = true;
+                var saved = Player.m_stamina;
+                var player = Player;
+                Undo("stamina", () => player.m_stamina = Mathf.Min(saved, player.GetMaxStamina()));
+            }
+            Player.m_stamina = Player.GetMaxStamina();
+        }
+
+        // Health put back at the end (god mode only keep it above 0).
+        internal void SaveHealth()
+        {
+            if (_healthSaved)
+            {
+                return;
+            }
+            _healthSaved = true;
+            var saved = Player.GetHealth();
+            var player = Player;
+            Undo("health", () => player.SetHealth(Mathf.Min(saved, player.GetMaxHealth())));
+        }
+
+        // Skill level and progress put back at the end (skill the player never had = removed again).
+        internal Skills.Skill SaveSkill(Skills.SkillType type)
+        {
+            var skills = Player.GetSkills();
+            var had = skills.m_skillData.ContainsKey(type);
+            var skill = skills.GetSkill(type);
+            var level = skill.m_level;
+            var progress = skill.m_accumulator;
+            Undo("skill " + type, () =>
+            {
+                if (had)
+                {
+                    skill.m_level = level;
+                    skill.m_accumulator = progress;
+                }
+                else
+                {
+                    skills.m_skillData.Remove(type);
+                }
+            });
+            return skill;
+        }
+
         // Noon for the screenshots (like console "tod 0.5").
-        internal void Noon()
+        internal void Noon() => TimeOfDay(0.5f);
+
+        internal void TimeOfDay(float fraction)
         {
             var env = EnvMan.instance;
             if (!_envSaved)
@@ -663,7 +826,7 @@ internal static class SelfTests
                 _tod = env.m_debugTime;
             }
             env.m_debugTimeOfDay = true;
-            env.m_debugTime = 0.5f;
+            env.m_debugTime = fraction;
         }
 
         internal void Look(float pitch)
@@ -702,6 +865,13 @@ internal static class SelfTests
         internal void Restore()
         {
             ClearOverrides();
+            for (var i = _undo.Count - 1; i >= 0; i--)
+            {
+                Try(_undo[i].Key, _undo[i].Value);
+            }
+            _undo.Clear();
+            // An undo may have turned me on again (OnActivated): overrides stay clear after it.
+            ClearOverrides();
             Try("controls", () =>
             {
                 if (_controller != null)
@@ -710,7 +880,11 @@ internal static class SelfTests
                     _controller.enabled = _controllerEnabled;
                 }
             });
-            Try("look", () => Look(_pitch));
+            Try("look", () =>
+            {
+                Player.SetLookDir(_look);
+                Look(_pitch);
+            });
             Try("stamina rate", GiveStaminaRateBack);
             Try("time", () =>
             {
@@ -740,7 +914,7 @@ internal static class SelfTests
             });
         }
 
-        private static void Try(string what, Action action)
+        private void Try(string what, Action action)
         {
             try
             {
@@ -748,13 +922,15 @@ internal static class SelfTests
             }
             catch (Exception e)
             {
-                SelfTest.Note(DiveName, $"restore {what} failed: {e.Message}");
+                SelfTest.Note(Name, $"restore {what} failed: {e.Message}");
             }
         }
     }
 
     private static IEnumerator RunDive()
     {
+        // A live test before may still be sending the player home.
+        yield return Settle();
         var c = new Checks(DiveName);
         var player = Player.m_localPlayer;
         if (player == null || ZoneSystem.instance == null || WorldGenerator.instance == null
@@ -773,8 +949,9 @@ internal static class SelfTests
             NotePlayer(c, player);
             if (!FindDeepWater(rig.Origin, out var spot, out var waterDepth))
             {
-                c.Note($"no water {F(MinWaterDepth)} m deep within 5 km of the spawn: live dive not tested");
-                c.Report(" (live dive not tested: no deep water found)");
+                // Nothing dived = nothing proved: a fail, never a quiet pass.
+                c.Check(false, $"no water {F(MinWaterDepth)} m deep within 5 km of the spawn: live dive not tested");
+                c.Report();
                 yield break;
             }
             var level = ZoneSystem.instance.m_waterLevel;

@@ -21,15 +21,40 @@ internal static class Controls
 #if DEBUG
     // Self test hold the main-hand key without a keyboard. Null = real key.
     internal static bool? TestMainHandHeld;
+
+    // Self test bind the two keys in memory (never the config file). Null = the player's setting. Test call CacheKeys
+    // after it set or clear them.
+    internal static KeyCode? TestMainKey;
+    internal static KeyCode? TestSwapKey;
+
+    // Self test keyboard: this key is held (main-hand key read), this key went down this frame (swap key read, one
+    // shot: the read use it up). Null = real keyboard. Other key than the bound one = nothing, like a real keyboard.
+    internal static KeyCode? TestKeyHeld;
+    internal static KeyCode? TestKeyDown;
+
+    // Self test read me: last key warning, and how many were logged this session.
+    internal static string LastWarning;
+    internal static int WarningCount;
+
+    // Self test: "already warned about this key" forgotten, so the next bad key warn again (and after the test too).
+    internal static void TestForgetWarned()
+    {
+        _mainWarned = KeyCode.None;
+        _swapWarned = KeyCode.None;
+    }
 #endif
 
     // BindConfig, setting change, OnActivated. Static map: work before ZInput exist (BindConfig run early).
     internal static void CacheKeys()
     {
-        _mainKey = Validate(Plugin.MainHandKey != null ? Plugin.MainHandKey.Value : KeyCode.None, "MainHandKey",
-            ref _mainWarned, "holding it to equip a weapon in your main hand");
-        _swapKey = Validate(Plugin.SwapHandsKey != null ? Plugin.SwapHandsKey.Value : KeyCode.None, "SwapHandsKey",
-            ref _swapWarned, "swapping your weapons between your hands");
+        var main = Plugin.MainHandKey != null ? Plugin.MainHandKey.Value : KeyCode.None;
+        var swap = Plugin.SwapHandsKey != null ? Plugin.SwapHandsKey.Value : KeyCode.None;
+#if DEBUG
+        main = TestMainKey ?? main;
+        swap = TestSwapKey ?? swap;
+#endif
+        _mainKey = Validate(main, "MainHandKey", ref _mainWarned, "holding it to equip a weapon in your main hand");
+        _swapKey = Validate(swap, "SwapHandsKey", ref _swapWarned, "swapping your weapons between your hands");
     }
 
     // Main-hand key held right now (equip request in progress).
@@ -40,12 +65,27 @@ internal static class Controls
         {
             return TestMainHandHeld.Value;
         }
+        if (TestKeyHeld.HasValue)
+        {
+            return _mainKey != KeyCode.None && TestKeyHeld.Value == _mainKey;
+        }
 #endif
         return _mainKey != KeyCode.None && ZInput.GetKey(_mainKey, false);
     }
 
     // Swap key went down this frame.
-    internal static bool SwapPressed() => _swapKey != KeyCode.None && ZInput.GetKeyDown(_swapKey, false);
+    internal static bool SwapPressed()
+    {
+#if DEBUG
+        if (TestKeyDown.HasValue)
+        {
+            var down = TestKeyDown.Value;
+            TestKeyDown = null;
+            return _swapKey != KeyCode.None && down == _swapKey;
+        }
+#endif
+        return _swapKey != KeyCode.None && ZInput.GetKeyDown(_swapKey, false);
+    }
 
     // Player-facing key name for messages ("Left Alt", "H"). None = null.
     internal static string KeyName(KeyCode key)
@@ -80,11 +120,16 @@ internal static class Controls
         if (warned != key)
         {
             warned = key;
-            Log.Warning(IsGamepadButton(key)
+            var text = IsGamepadButton(key)
                 ? $"Controls.{setting} = {key}: gamepad buttons are not supported yet, so {what} is off. "
                   + "Pick a keyboard key or a mouse button."
                 : $"Controls.{setting} = {key}: the game cannot read this key, so {what} is off. "
-                  + "Pick another key (keyboard or mouse).");
+                  + "Pick another key (keyboard or mouse).";
+#if DEBUG
+            LastWarning = text;
+            WarningCount++;
+#endif
+            Log.Warning(text);
         }
         return KeyCode.None;
     }

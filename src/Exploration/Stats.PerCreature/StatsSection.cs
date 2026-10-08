@@ -62,10 +62,10 @@ internal static class StatsSection
                 }
             }
 
-            var order = Plugin.SortBy != null && Plugin.SortBy.Value == SortOrder.Name ? ByName : ByMostKilled;
+            Plugin.ReadDisplaySettings(out var sortBy, out var showWeaponTypes);
+            var order = sortBy == SortOrder.Name ? ByName : ByMostKilled;
             Creatures.Sort(order);
             OtherNames.Sort(order);
-            var showWeaponTypes = Plugin.ShowWeaponTypes == null || Plugin.ShowWeaponTypes.Value;
 
             Text.Append("<color=orange>Creatures</color>\n");
             Text.Append(GreyOpen)

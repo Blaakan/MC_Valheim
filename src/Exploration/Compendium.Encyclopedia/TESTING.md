@@ -10,6 +10,11 @@ Debug and Release build without warnings; smoke test (`./tools/Test-Smoke.ps1`, 
 in-world self-tests (T00, `./tools/Test-InWorld.ps1`) passed on the same code at 2560x1440: all 6 `compendium.*` tests
 (17/17 tests of the run). No hands-on in-game test yet.
 
+**Automated checks (2026-10-08):** 51 of 52 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
+"FAILED: automated test" names the self-test that fails.
+
 **Setup:** a **new character in a new world** for T05-T08, T13, T21, T25 and T32-T34 (everything starts as "???"), and a
 **mid-game character** for T09. Open the Encyclopedia: inventory (Tab) → the game's **Valheim Compendium** button
 (raven) → the **Encyclopedia** tab at the dialog's top left (next to **Texts**). The Valheim Compendium reopens on the
@@ -70,7 +75,7 @@ Log lines (Debug level unless noted):
 
 ## 0.1.0 — single player
 
-- [ ] **T00 Automated in-world self tests:** `./tools/Test-InWorld.ps1 -Mod Compendium -Only compendium.` (Debug
+- [x] **T00 Automated in-world self tests:** `./tools/Test-InWorld.ps1 -Mod Compendium -Only compendium.` (Debug
   build; the game must be closed). Expected: `[selftest] PASS` for `compendium.catalog` (every tab filled, no
   duplicate entry, every entry named and grouped, Wood / Bronze Sword / Boar Trophy / Workbench / Forge / Boar
   present, Forge has recipes and upgrades, every item a creature gives birth to has a "laid by" source),
@@ -117,15 +122,23 @@ Log lines (Debug level unless noted):
   notes, and look at the screenshots in the run folder (`side-panel`, `texts-tabs`, `window`, one per tab,
   `undiscovered`, `discovered-item`, `creature`, `texts-again`, `disabled`, `reactivated-texts`, `reactivated`,
   `default-off`, `opt-in`, `gave-up`, `refused-window`).
-- [ ] **T01 Optional side button:** with `SideButton = true`, the Encyclopedia button sits in the row of the vanilla
+  *Partly automated (`compendium.catalog`, `compendium.details`, `compendium.knowledge`, `compendium.ui`,
+  `compendium.toggle`, `compendium.siderow`); by hand: Paste the NOTE lines of the run in the test notes and look at
+  the screenshots in the run folder.*
+- [x] **T01 Optional side button:** with `SideButton = true`, the Encyclopedia button sits in the row of the vanilla
   side controls, right after the Valheim Compendium button (raven) and before Skills, with a gold book icon in the same
   style as the others and the tooltip "Encyclopedia"; hovering shows the tooltip text; the six buttons are evenly
   spaced inside the wood panel; clicking it opens the Encyclopedia; the Debug side panel dump and the "Encyclopedia
   button placed ... Row: 6 controls ..." line are in the log (G1).
-- [ ] **T02 Placement (optional button):** with `SideButton = true`, at 1920x1080 and 2560x1440, with and without
+  *Partly automated (`compendium.siderow`, `compendium.sidebutton`, `compendium.sidecount`); by hand: That the book
+  icon looks gold and in the same style as the other side icons, and that hovering the button with the real mouse
+  shows the tooltip.*
+- [x] **T02 Placement (optional button):** with `SideButton = true`, at 1920x1080 and 2560x1440, with and without
   extra inventory rows: the six buttons stay inside the panel, evenly spaced, nothing overlaps, everything on screen
   (G1).
-- [ ] **T03 Window:** the Encyclopedia tab of the Valheim Compendium opens the Encyclopedia in the vanilla style, in
+  *Partly automated (`compendium.siderow`, `compendium.sidebutton`, `compendium.sidecount`); by hand: The other
+  resolution (1920x1080 or 2560x1440, whichever the run did not use) and an inventory with extra rows.*
+- [x] **T03 Window:** the Encyclopedia tab of the Valheim Compendium opens the Encyclopedia in the vanilla style, in
   the dialog's place and size, title "Encyclopedia", "Discovered N / M" on the title line. With the optional button
   on: while a vanilla side dialog is open, the side row is locked as it is for the game's own side buttons: with the
   Valheim Compendium open, a click where the Encyclopedia button is only closes the Valheim Compendium (its
@@ -133,25 +146,32 @@ Log lines (Debug level unless noted):
   does what a click on a vanilla side button does there (nothing, or it only closes that dialog), never opening ours on
   top of it; with a controller, View/Select does nothing while any of them is open. Once the dialog is closed, one
   click opens ours (G2).
-- [ ] **T04 Close paths:** Esc and B close only the Encyclopedia, the next press closes the inventory (no
+  *Partly automated (`compendium.ui`, `compendium.window`, `compendium.sidelock`); by hand: That the window looks like
+  the game's own dialog (the "vanilla style").*
+- [x] **T04 Close paths:** Esc and B close only the Encyclopedia, the next press closes the inventory (no
   "InventoryGui.Update changed" warning in the log); the Close button and a left click outside it close it only; Tab,
   E and Y close both; death and teleport close it (G2).
-- [ ] **T05 Everything listed:** every tab has entries; the Info "catalog built" line gives the counts; crafting
+  *Partly automated (`compendium.ui`, `compendium.close`); by hand: Real Esc and B presses (and that the next press
+  closes the inventory), real Tab / E / Y presses, and death.*
+- [x] **T05 Everything listed:** every tab has entries; the Info "catalog built" line gives the counts; crafting
   stations and their upgrades are under Building. New character: Megingjord, Fishing Rod, Dverger Circlet and Blue
   Tied Headscarf are listed as "???" rows (count the "???" rows of their groups, or check with `RevealAll = true`);
   Piggy and Hen are creature rows. Not listed: `Abomination_attack1`, `bjorn_bite`, `PlayerUnarmed`, `CapeTest`,
   `SwordCheat`, `SledgeCheat`, `DvergerTest`, hair and beards. `spawn BeltStrength` and pick it up: Megingjord is
   discovered and its details say "Where to get it: Sold by a trader" (the self tests found the 3 traders). Paste both
   Debug lists (hidden until known, no source found) in the test notes (G3).
-- [ ] **T06 Undiscovered = "???":** new character: undiscovered rows show a "?" mark and "???"; no real name or icon
+  *Automated: `compendium.catalog`, `compendium.listed`.*
+- [x] **T06 Undiscovered = "???":** new character: undiscovered rows show a "?" mark and "???"; no real name or icon
   in rows, details or tooltips; undiscovered rows come after the discovered ones of their group, not alphabetical;
   their details say "Not discovered yet." plus a hint. `spawn Boar`, then turn away so it is never under your
   crosshair, and stay near it (within 30 m): the Boar stays "???" (its name plate never showed). Then aim at it (its
   name plate appears) without killing it: at the next open the Boar row and title show the paw print icon (light grey,
   not a red "!"), not the Boar Trophy; the Boar Trophy stays "???" in the Trophies tab and in the Boar's drops (G4).
-- [ ] **T07 Item discovery:** pick up Raspberries: discovered at the next open. Hold Wood: the Club is discovered by
+  *Automated: `compendium.ui`, `compendium.details`, `compendium.undiscovered`, `compendium.aim`.*
+- [x] **T07 Item discovery:** pick up Raspberries: discovered at the next open. Hold Wood: the Club is discovered by
   its recipe before you ever hold one (G5).
-- [ ] **T08 Piece and creature discovery:** Workbench after carrying a Hammer and Wood; Forge after standing next to
+  *Automated: `compendium.knowledge`, `compendium.pickup`.*
+- [x] **T08 Piece and creature discovery:** Workbench after carrying a Hammer and Wood; Forge after standing next to
   one; Greyling after aiming at one within 30 m without killing it (its name plate shows); a Greyling (or any
   creature) behind a wall, a tree trunk or a rock, aimed at through it, stays "???" (the crosshair ray stops at the
   first thing it hits, no name plate, no Debug `Met ...` line); a Neck after a kill with a bow from more than 30 m
@@ -160,48 +180,66 @@ Log lines (Debug level unless noted):
   health bar appears at the top of the screen (a boss's plate shows when it is alerted within 100 m); open the
   Encyclopedia before killing it: Eikthyr is discovered with "Killed: 0" (Debug `Met Eikthyr` line); then
   `killenemies` (G5).
-- [ ] **T09 Existing character:** the mid-game character's first open shows its materials, recipes, trophies, known
+  *Automated: `compendium.knowledge`, `compendium.discover`, `compendium.aim-greyling`, `compendium.farkill`,
+  `compendium.boss`.*
+- [x] **T09 Existing character:** the mid-game character's first open shows its materials, recipes, trophies, known
   pieces and killed creatures at once (G5).
-- [ ] **T10 Item details:** Bronze Sword: stats text, recipe "At Forge (level N)" with exactly the ingredients and
+  *Automated: `compendium.knowledge`, `compendium.midgame`.*
+- [x] **T10 Item details:** Bronze Sword: stats text, recipe "At Forge (level N)" with exactly the ingredients and
   amounts the game's crafting panel shows for it (no "At an upgrade station:" line under the recipe), upgrade costs per
   quality as the Upgrade tab shows them; when the recipe also takes an item at an upgrade station, that item appears
   only in the quality rows, followed by "Beyond quality N: at an upgrade station only" (which items carry such a
   requirement is prefab data). Wood: where it is chopped (with biomes), "Used in" list. Raspberries: picked in
   Meadows. Your records (picked up, crafted, eaten) match what you did (G6).
-- [ ] **T11 Piece details:** Workbench: build cost, comfort if any; Forge: "Needs a ..." line where relevant, its
+  *Automated: `compendium.details`, `compendium.item-details`.*
+- [x] **T11 Piece details:** Workbench: build cost, comfort if any; Forge: "Needs a ..." line where relevant, its
   upgrades, "Recipes at this station" (G6).
-- [ ] **T12 Creature details:** Boar: habitat Meadows, drops with amounts and chances, taming food; health and damage
+  *Automated: `compendium.catalog`, `compendium.details`, `compendium.piece-details`.*
+- [x] **T12 Creature details:** Boar: habitat Meadows, drops with amounts and chances, taming food; health and damage
   modifiers appear only after your first kill. A creature spawning only after a boss says "Appears after defeating
   ..." (G6).
-- [ ] **T13 Obfuscated details:** an unknown drop, station, biome and boss show "???" with numbers kept; "Used in"
+  *Automated: `compendium.details`, `compendium.creature-details`, `compendium.afterboss`.*
+- [x] **T13 Obfuscated details:** an unknown drop, station, biome and boss show "???" with numbers kept; "Used in"
   folds unknown targets into "??? ×N not discovered yet". New character: build a Workbench and stand next to it, then
   hold a Hammer, Stone and Surtling Cores so the Smelter becomes buildable (it needs a known Workbench, prefab data),
   without holding any ore or metal: its details show one folded conversions line and no ore or bar name; pick up
   Copper Ore: "Turns Copper Ore into ???" appears. `spawn Lox` and aim at it (met, not killed): it says "Can wear:
   ???" and never names the saddle (G7).
-- [ ] **T14 Kill count:** on a new character, kill three Boars (kills made with `god` on count too; the game only keeps
+  *Automated: `compendium.details`, `compendium.obfuscated`, `compendium.smelter`, `compendium.afterboss`.*
+- [x] **T14 Kill count:** on a new character, kill three Boars (kills made with `god` on count too; the game only keeps
   them out of achievements): "Killed: 3" in the Boar's details, and +1 after one more kill and reopening; "Killed: 0" for a
   met-only creature. With Creature Kill and Tame Counts installed, the same number as its Boar line in the Valheim
   Compendium's Player Statistics (Texts tab; the game's own Player Statistics page has no per-creature kill count) (G8).
+  *Automated: `compendium.knowledge`, `compendium.ui`, `compendium.kills`, `compendium.x.tamecounts`.*
 - [ ] **T15 Controller:** in the Encyclopedia, D-pad and left stick move with rumble; LB and RB change the category
   tab; the right stick scrolls the details; B closes; the inventory does not react while it is open; no button glyph
   on tabs or rows; the key hints at the bottom of the screen (key hints on in the game settings) disappear while it is
   open, as for the game's own side dialogs, and come back as soon as it closes (also after closing it with the mouse).
   With the optional button on: View/Select opens it from the side panel; View/Select with the player grid or the
   crafting panel selected does nothing of ours.
-- [ ] **T16 Search:** typing never walks, closes the Encyclopedia or triggers a key; Esc leaves the field first;
+  *Partly automated (`compendium.ui`, `compendium.pad`); by hand: Everything with a real controller: D-pad and left
+  stick move with rumble, LB / RB, right stick, B closes, View/Select opens from the side panel, and that no button
+  glyph is drawn.*
+- [x] **T16 Search:** typing never walks, closes the Encyclopedia or triggers a key; Esc leaves the field first;
   results come from every tab, discovered entries only.
-- [ ] **T17 Links:** clicking a discovered ingredient in the details opens its entry; "???" references do nothing.
-- [ ] **T18 Settings:** `ShowUndiscovered = false` lists only discovered entries; `RevealAll = true` shows every
+  *Partly automated (`compendium.details`, `compendium.search`); by hand: Real typing in the field (letters, E, Tab do
+  nothing else) and that the first Esc only leaves the field.*
+- [x] **T17 Links:** clicking a discovered ingredient in the details opens its entry; "???" references do nothing.
+  *Automated: `compendium.links`.*
+- [x] **T18 Settings:** `ShowUndiscovered = false` lists only discovered entries; `RevealAll = true` shows every
   entry and detail; both apply at once to an open Encyclopedia.
-- [ ] **T19 Language switch:** names and their order follow the new language; biomes visited before stay known.
-- [ ] **T20 Relog and new world:** the Encyclopedia works after logging out and in, and in another world; the Info
+  *Automated: `compendium.details`, `compendium.settings`.*
+- [x] **T19 Language switch:** names and their order follow the new language; biomes visited before stay known.
+  *Partly automated (`compendium.language`); by hand: A real language switch in the game's settings (the test changes
+  two translations in memory instead).*
+- [x] **T20 Relog and new world:** the Encyclopedia works after logging out and in, and in another world; the Info
   "catalog built" line appears again; note the build time and counts.
-- [ ] **T21 Resets:** on a character with a killed Boar, a met-only Greyling, a placed Workbench and a Deer known only
+- [x] **T21 Resets:** on a character with a killed Boar, a met-only Greyling, a placed Workbench and a Deer known only
   by its trophy. `resetknownitems`: items "???"; Workbench still discovered (placed); Deer "???"; Boar, Greyling and
   biomes still discovered. Then `resetcharacter`: items and the met-only Greyling "???"; biomes "???" except the one
   you stand in (after reopening); Boar still discovered with its kill count; Workbench still discovered.
-- [ ] **T22 Live toggle:** (a) with the Encyclopedia open, set `Enabled = false` by editing
+  *Automated: `compendium.resets`.*
+- [x] **T22 Live toggle:** (a) with the Encyclopedia open, set `Enabled = false` by editing
   `BepInEx/config/MC.Exploration.Compendium.Encyclopedia.cfg` (alt-tab; the game reloads the file while it runs), or
   with ConfigurationManager (F1) if installed (a click in its window may also land on the Encyclopedia's click-outside
   area and close it first: then use the file). Not through Esc → MC Mods: Esc closes the Encyclopedia, then the
@@ -213,49 +251,71 @@ Log lines (Debug level unless noted):
   exactly where the game puts them; back on: the button appears at once in the re-spaced row. (b) MC Mods panel:
   close the inventory, Esc → MC Mods → untick the Encyclopedia, open the inventory and the Valheim Compendium: no tabs;
   tick it again: the tabs are back (G9).
-- [ ] **T23 Enabled = false + restart:** no tabs, no button, the game's Valheim Compendium and side panel unchanged, no
+  *Partly automated (`compendium.toggle`, `compendium.siderow`); by hand: Turning it off the real ways (editing the
+  .cfg while the game runs, ConfigurationManager, the MC Mods panel) and the comparison with a screenshot taken
+  without the mod.*
+- [x] **T23 Enabled = false + restart:** no tabs, no button, the game's Valheim Compendium and side panel unchanged, no
   error (G9).
-- [ ] **T24 Clean log:** a normal session with the Encyclopedia opened in several tabs logs no error or warning from
+- [x] **T24 Clean log:** a normal session with the Encyclopedia opened in several tabs logs no error or warning from
   the mod (only the Info "catalog built" line and Debug lines).
-- [ ] **T25 Build interrupted:** the automated `compendium.toggle` (T00) closes the window during a fresh catalog build
+  *Automated: `compendium.cleanlog`.*
+- [x] **T25 Build interrupted:** the automated `compendium.toggle` (T00) closes the window during a fresh catalog build
   and checks the next open lists rows at once. By hand: log out and back in (the catalog is built once per world
   session, so only the first open of a session shows "Preparing entries..."), open the inventory, the Valheim
   Compendium, click the Encyclopedia tab and press Esc at once. The build takes about 0.1-0.2 s (the Info "catalog
   built" line gives the time), so the list may already be filled when Esc lands: the case is hit only when the window
   closed while it still said "Preparing entries...". Reopen: the list is there (or fills while you watch), no error.
   Log out and in again and repeat with Tab instead of Esc. One Info "catalog built" line per world session (G2).
-- [ ] **T26 View/Select outside the side panel (optional button on):** with the inventory closed, press View/Select
+  *Partly automated (`compendium.toggle`, `compendium.buildclose`); by hand: The same after a real logout and login
+  (first open of a session shows "Preparing entries..."), with real Esc and Tab presses, and one "catalog built" line
+  per world session.*
+- [x] **T26 View/Select outside the side panel (optional button on):** with the inventory closed, press View/Select
   ten times: the map opens and closes as usual and the Encyclopedia never opens (G2).
-- [ ] **T27 Mouse modality:** with the Encyclopedia open, right-click a food item in a visible inventory slot: nothing
+  *Partly automated (`compendium.pad`); by hand: Press View/Select ten times with the inventory closed: the map opens
+  and closes as usual.*
+- [x] **T27 Mouse modality:** with the Encyclopedia open, right-click a food item in a visible inventory slot: nothing
   happens (not eaten). Then, reopening it before each: left-click an inventory slot, drag an item, shift-drag a stack,
   left-click a vanilla side button: each one only closes the Encyclopedia (like a click outside the game's Valheim
   Compendium); no item is picked up, moved, used or split (no split dialog) and the side button does not open its
   dialog. After closing, everything works again (G2).
-- [ ] **T28 Window layout:** at 1920x1080 and 2560x1440: the screen behind is dimmed; the Texts / Encyclopedia tabs
+  *Partly automated (`compendium.ui`, `compendium.mouse`); by hand: Dragging an item and shift-dragging a stack with
+  the real mouse.*
+- [x] **T28 Window layout:** at 1920x1080 and 2560x1440: the screen behind is dimmed; the Texts / Encyclopedia tabs
   sit on the title line at the left, the 8 category tabs fit in one row under them above the list and the details,
   the search field sits at the top of the list box, "Discovered N / M" sits on the title line at the right and is
   readable (not cut), rows show icon and name without overlap, header rows are orange text with no background, detail
   rows have the same text size as the paragraphs, long detail texts wrap and scroll; the Debug window dump has no
   `OVERLAP:` line. Open the console (F5) with the Encyclopedia open: it draws above it.
-- [ ] **T29 Session memory:** pick a category tab and an entry, close the Encyclopedia and reopen: the same tab and
+  *Partly automated (`compendium.ui`, `compendium.window`); by hand: The other resolution, and a look at the screen:
+  dimmed background, readable rows, the console really drawn above.*
+- [x] **T29 Session memory:** pick a category tab and an entry, close the Encyclopedia and reopen: the same tab and
   entry come back (each tab remembers its own entry); type a search, close and reopen: the search and its results come
   back; after logging out and in, the Encyclopedia starts on the first tab with an empty search.
-- [ ] **T30 Side row with a controller (optional button on):** side panel focused: the D-pad walks Valheim
+  *Partly automated (`compendium.ui`, `compendium.memory`); by hand: After logging out and in: the Encyclopedia starts
+  on the first tab with an empty search.*
+- [x] **T30 Side row with a controller (optional button on):** side panel focused: the D-pad walks Valheim
   Compendium → Encyclopedia → Skills → Trophies → Achievements → PvP and back, in that order; View/Select on any of
   them opens the Encyclopedia (G1).
-- [ ] **T31 Side row after a logout (optional button on):** log out and back in (or join another world), open the
+  *Partly automated (`compendium.siderow`, `compendium.pad`); by hand: Walking the row with a real D-pad and pressing
+  View/Select on each button.*
+- [x] **T31 Side row after a logout (optional button on):** log out and back in (or join another world), open the
   inventory: the row is re-spaced with the button in it again; turn the mod off: the vanilla row is exact again (G1).
-- [ ] **T32 Unlock modes:** new character, `devcommands`, then `nocost`: at the next open every craftable item (with
+  *Partly automated (`compendium.siderow`); by hand: Everything after a real logout and login (or another world): the
+  row re-spaced with the button again, then the mod turned off.*
+- [x] **T32 Unlock modes:** new character, `devcommands`, then `nocost`: at the next open every craftable item (with
   a recipe the crafting panel offers) and every building piece is discovered, seasonal items out of season are not;
   `nocost` again: they are "???" again. Same with `setkey AllRecipesUnlocked` (items) and `setkey AllPiecesUnlocked`
   (pieces), then `removekey` for each (G5).
-- [ ] **T33 Eggs:** hold a Chicken Egg (`spawn ChickenEgg`): its details say "Laid by a tamed ???" until the Hen is
+  *Automated: `compendium.knowledge`, `compendium.unlocks`.*
+- [x] **T33 Eggs:** hold a Chicken Egg (`spawn ChickenEgg`): its details say "Laid by a tamed ???" until the Hen is
   discovered, then "Laid by a tamed Hen" (G6).
-- [ ] **T34 Reading changes nothing:** new character with no Fishing skill yet: set `RevealAll = true` and open the
+  *Automated: `compendium.catalog`, `compendium.eggs`.*
+- [x] **T34 Reading changes nothing:** new character with no Fishing skill yet: set `RevealAll = true` and open the
   Fishing Rod's details (without hovering a real rod anywhere): the game's Skills dialog still has no Fishing line (the
   item's tooltip used to add "Fishing 0"; that the Fishing Rod uses the Fishing skill is prefab data). Set
   `RevealAll = false` again.
-- [ ] **T35 Tabs in the Valheim Compendium (mouse):** at 1920x1080 and 2560x1440, open the Valheim Compendium (raven):
+  *Automated: `compendium.details`, `compendium.fishing`.*
+- [x] **T35 Tabs in the Valheim Compendium (mouse):** at 1920x1080 and 2560x1440, open the Valheim Compendium (raven):
   two tabs sit at its top left on the title line, **Texts** (current, lighter, not clickable) and **Encyclopedia**, in
   the style of the crafting panel's Craft tab, inside the wood frame, clear of the title "Valheim Compendium", the list
   and the text pane; the rest of the dialog looks exactly as without the mod. Click Encyclopedia: the Encyclopedia
@@ -263,56 +323,96 @@ Log lines (Debug level unless noted):
   switching tabs (no flicker, the screen stays dimmed). Click Texts: the Valheim Compendium is back, its list filled
   again (a lore text or message picked up meanwhile is there). Hover and click feel the same as the crafting panel's
   tabs (G2).
-- [ ] **T36 Remembered tab:** leave the Valheim Compendium on the Encyclopedia tab (Esc, B, Close, a click outside or
+  *Partly automated (`compendium.ui`, `compendium.toggle`, `compendium.texts`); by hand: The other resolution, the
+  look of the tabs (Craft tab style, lighter current tab), no flicker when switching, hover and click feel.*
+- [x] **T36 Remembered tab:** leave the Valheim Compendium on the Encyclopedia tab (Esc, B, Close, a click outside or
   Tab), then click the raven again: the Encyclopedia opens directly. Switch to Texts, close, click the raven: Texts.
   Log out and back in: the raven opens Texts first, like the game. With the optional button on, opening the
   Encyclopedia from it does not change which tab the raven reopens (G2).
+  *Partly automated (`compendium.ui`, `compendium.close`, `compendium.sidebutton`); by hand: After logging out and in
+  the raven opens Texts first; the closes done with real key presses.*
 - [ ] **T37 Controller tabs:** controller only. Valheim Compendium open: RT shows the Encyclopedia, LT the Texts; in
   the Encyclopedia: LT back to Texts, RT does nothing. Pressing LT on Texts, or RT on the Encyclopedia, changes
   nothing. In both, LT and RT never do anything else: the game's list selection and text scrolling in Texts (D-pad,
   sticks) keep working, the Encyclopedia's LB/RB still change its category tab, the crafting panel's Craft / Upgrade
   tabs behind do not change, and B closes whichever one is shown. With Sort Chest, Loot Pickup Filter and Crafting
   Search and Sort installed, none of their controller shortcuts fires from LT or RT here (G2).
-- [ ] **T38 Optional button setting live:** default (`SideButton = false`): the inventory's side panel is exactly the
+  *Partly automated (`compendium.ui`, `compendium.pad`); by hand: Everything with a real controller: LT / RT presses,
+  list and text scrolling in Texts, LB / RB in the Encyclopedia, B, and the other mods' shortcuts.*
+- [x] **T38 Optional button setting live:** default (`SideButton = false`): the inventory's side panel is exactly the
   game's (five buttons at their places; compare with a screenshot without the mod). Set `SideButton = true` with the
   inventory open: the book button appears at once right after the raven, the six buttons evenly spaced; set it back
   to `false`: the button vanishes at once and the five buttons are exactly back where the game puts them (G1).
+  *Automated: `compendium.siderow`, `compendium.sidecount`.*
+- [!] **T39 Live toggle after a refused window:** the automated `compendium.bug.refused-toggle` plays it. With
+  `SideButton = true`, on an inventory screen where the Encyclopedia window could not be built (as with a UI mod: one
+  "Encyclopedia window cannot be built" warning, no tab, no button), set `Enabled = false`, then `true` again without
+  logging out. Expected: the window stays refused until you log out: no Encyclopedia button comes back in the side
+  panel (the five vanilla buttons stay exactly where the game puts them), the Valheim Compendium still has no Texts /
+  Encyclopedia tabs, and the log gets no new warning.
+  **FAILED:** automated test: A live toggle (Enabled off and on) forgets that the window was refused: the optional
+  side button comes back and the side row is re-spaced (self-test `compendium.bug.refused-toggle`)
+- [x] **T40 Unlock modes and recipes the crafting panel never offers:** the automated `compendium.unlocks-dlc`
+  compares with the game's own list (`Player.GetAvailableRecipes` in `nocost` mode). With `nocost` on, or with
+  `setkey AllRecipesUnlocked`: every item the unlock mode discovers is one the crafting panel offers in `nocost` mode;
+  an item whose only recipes the panel does not offer even then (a recipe for an item of a DLC that is not installed;
+  which items those are is prefab data) is never discovered by an unlock mode: it stays "???", or it is not listed at
+  all (the Encyclopedia leaves out the items of a DLC that is not installed).
+  *Automated: `compendium.unlocks-dlc`.*
 
 ## 0.1.0 — multiplayer
 
-- [ ] **M01 Dedicated server without the mod:** everything works; a creature controlled by another player's game and
+- [x] **M01 Dedicated server without the mod:** everything works; a creature controlled by another player's game and
   killed together counts in your "Killed: N".
-- [ ] **M02 Hand-off, friend without the mod:** nothing changes for them (their Valheim Compendium has no tabs), no
+  *Partly automated (`compendium.mp.server`, `probe.mp.baseline`); by hand: A creature controlled by another player's
+  game and killed together (needs a second player).*
+- [x] **M02 Hand-off, friend without the mod:** nothing changes for them (their Valheim Compendium has no tabs), no
   error on either side; their tames and the creatures their game controls near you are recorded as met by you once you
   aim at them (Debug `Met ...` line).
-- [ ] **M03 Two players with the mod:** each has their own discoveries; one player's discoveries do not show for the
+  *Partly automated (`compendium.mp.met`); by hand: A real friend without the mod: nothing changes for them (no tabs),
+  no error on their side, and their own tames and creatures.*
+- [x] **M03 Two players with the mod:** each has their own discoveries; one player's discoveries do not show for the
   other.
 
 ## 0.1.0 — with other mods
 
-- [ ] **X01 Creature Kill and Tame Counts (MC):** same kill numbers in both; "Tamed: N" shows in the creature details
+- [x] **X01 Creature Kill and Tame Counts (MC):** same kill numbers in both; "Tamed: N" shows in the creature details
   after a tame; its Player Statistics section is still in the Valheim Compendium's Texts tab, not in the Encyclopedia.
   A tame alone discovers a creature: on a new character (Boar never met, killed or held as a trophy), look straight up,
   `spawn Boar`, keep looking up and run `tame` (it tames the creatures around you): no Debug `Met Boar` line; at the
   next open the Boar is discovered, with "Tamed: 1" and "Killed: 0".
-- [ ] **X02 Crafting Search and Sort (MC):** its search field lets go of the keyboard when the Encyclopedia opens; its F
+  *Automated: `compendium.x.tamecounts`.*
+- [x] **X02 Crafting Search and Sort (MC):** its search field lets go of the keyboard when the Encyclopedia opens; its F
   key does not focus its field while the Encyclopedia is open; typing in our search never triggers its keys.
-- [ ] **X03 Loot Pickup Filter (MC):** R3 and middle click do nothing through the Encyclopedia; its Auto pickup button
+  *Partly automated (`compendium.x.craftsearch`); by hand: With a real keyboard: its F key does not focus its field
+  while the Encyclopedia is open, and typing in our search never triggers its keys.*
+- [x] **X03 Loot Pickup Filter (MC):** R3 and middle click do nothing through the Encyclopedia; its Auto pickup button
   cannot be clicked while the Encyclopedia is open; with its lists panel open, the Encyclopedia draws over it.
-- [ ] **X04 Sort Chest (MC):** chest open, chest grid selected (optional button on): View/Select sorts every time (ten
+  *Partly automated (`compendium.x.lootfilter`); by hand: R3 and middle click through the Encyclopedia, and the lists
+  panel under the Encyclopedia if the NOTE says it was not checked.*
+- [x] **X04 Sort Chest (MC):** chest open, chest grid selected (optional button on): View/Select sorts every time (ten
   presses) and never opens the Encyclopedia; with the Encyclopedia open, its buttons and controller shortcuts do
   nothing.
+  *Partly automated (`compendium.x.sortchest`); by hand: With a real controller: View/Select on the chest grid sorts
+  every time (ten presses), and its buttons and shortcuts do nothing while the Encyclopedia is open.*
 - [ ] **X05 Almanac:** the Trophies button is still Almanac's; the Encyclopedia tab is in the Valheim Compendium; Esc
   behaviour unchanged.
 - [ ] **X06 Jewelcrafting or EquipmentAndQuickSlots:** their additions to the Valheim Compendium are on its Texts tab
   as usual, and the Encyclopedia carries none of them.
 - [ ] **X07 AugaLite or Veneer:** no tab (and no button with the optional setting on), at most one warning in the log,
   no error.
-- [ ] **X08 A content mod (Jotunn items or creatures):** its entries are listed and can be discovered.
+  *Partly automated (`compendium.siderow`); by hand: Everything with a real AugaLite or Veneer: no tab, no button, at
+  most one warning, no error.*
+- [x] **X08 A content mod (Jotunn items or creatures):** its entries are listed and can be discovered.
+  *Partly automated (`compendium.x.content`); by hand: A Jotunn content mod: its items and creatures are listed and
+  can be discovered.*
 - [ ] **X09 ExtraSlots (optional button on):** no overlap with our button (or the placement warning in the log).
 - [ ] **X10 A mod that moves or adds side panel buttons (optional button on)** (if one is available): its buttons keep
   their places, an added button joins the even spacing; a mod that keeps moving them gets one "Another mod keeps
   moving ..." warning and our button after the last control; nothing flickers back and forth.
+  *Partly automated (`compendium.siderow`); by hand: A real mod that moves or adds side panel buttons, and that an
+  added button joins the even spacing.*
 - [ ] **X11 A mod that copies the Valheim Compendium (PraetorisClient Server Guide)** (if available): its window never
   shows the Texts / Encyclopedia tabs; opening the Encyclopedia does not close it and it does not close the
   Encyclopedia.
+  *Partly automated (`compendium.x.copy`); by hand: The real PraetorisClient Server Guide.*

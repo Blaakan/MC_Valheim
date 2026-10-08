@@ -123,6 +123,16 @@ internal static class Performance
     internal static Emitter LocalEmitter => _emitter;
     internal static int PerformanceId => _performanceId;
     internal static int BatchesSent;
+    // Self test: right mouse button without a mouse (read once by RightClick).
+    internal static bool TestRightClick;
+    // Notes a song playing by itself scheduled / skipped as too late (game stalled); notes rhythm game hits played.
+    internal static int NotesPlayed;
+    internal static int NotesSkippedLate;
+    internal static int ChartNotesPlayed;
+    // Notes of the song loaded now (arranged for the instrument in hand).
+    internal static Note[] TestNotes => _notes;
+    // Performance clock: seconds since this performance started (song playing by itself: all passes).
+    internal static float TestClock => _clock;
 #endif
 
     // Activation / new world: nothing playing.
@@ -261,7 +271,7 @@ internal static class Performance
 
         if (_windowOpen)
         {
-            if (ZInput.GetKeyDown(KeyCode.Mouse1, false))
+            if (RightClick())
             {
                 SwallowClicks();
                 CloseWindow();
@@ -307,7 +317,7 @@ internal static class Performance
             Stop(_stopReason);
             return;
         }
-        if (LiveInput && (GameScreens.AnyOpen() || ZInput.GetKeyDown(KeyCode.Mouse1, false)))
+        if (LiveInput && (GameScreens.AnyOpen() || RightClick()))
         {
             SwallowClicks();
             Stop(null);
@@ -333,6 +343,19 @@ internal static class Performance
         }
         RunPulses(player);
         _weight = Mathf.Min(1f, _weight + dt / WeightIn);
+    }
+
+    // Right mouse button went down this frame (raw read: closes the window, stops the rhythm game and free play).
+    private static bool RightClick()
+    {
+#if DEBUG
+        if (TestRightClick)
+        {
+            TestRightClick = false;
+            return true;
+        }
+#endif
+        return ZInput.GetKeyDown(KeyCode.Mouse1, false);
     }
 
     // Single player pause: the mini-game clock freezes (anchor moves along); a song that plays by itself plays on
@@ -588,6 +611,9 @@ internal static class Performance
             if (t < _clock - Listeners.LateDrop)
             {
                 _next++;
+#if DEBUG
+                NotesSkippedLate++;
+#endif
                 continue;
             }
             PlayNote(t, n);
@@ -622,6 +648,9 @@ internal static class Performance
             Flush();
         }
         Batch.Notes.Add(new Note(t, n.Length, n.Pitch, Math.Max((byte)1, n.Velocity))); // 0 = note off on the wire
+#if DEBUG
+        NotesPlayed++;
+#endif
         if (Pulses.Count < 256)
         {
             Pulses.Add(new Pulse { At = start, Pitch = n.Pitch, Velocity = n.Velocity });
@@ -707,6 +736,9 @@ internal static class Performance
                 Flush();
             }
             Batch.Notes.Add(new Note(_clock + offset, n.Length, n.Pitch, Math.Max((byte)1, n.Velocity)));
+#if DEBUG
+            ChartNotesPlayed++;
+#endif
             if (Pulses.Count < 256)
             {
                 Pulses.Add(new Pulse { At = start, Pitch = n.Pitch, Velocity = n.Velocity });

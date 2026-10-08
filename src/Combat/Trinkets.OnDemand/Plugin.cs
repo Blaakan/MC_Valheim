@@ -125,7 +125,44 @@ internal sealed partial class Plugin : ModPlugin
         // Every rule setting (all sections but General and the personal ones): new own snapshot, server send it again.
         Config.SettingChanged += OnSettingChanged;
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
+        // Debug build only (call vanish in Release): the one self test that must run while me inactive.
+        SelfTests.RegisterInactive();
     }
+
+#if DEBUG
+    // Self test (trinkets.toggle, trinkets.vanilla-parity): feature off and on again the way ModPlugin.Refresh do it
+    // (OnDeactivated, then patches gone; patches back, then OnActivated), with no setting written. Framework state stay
+    // Active meanwhile: only for a few seconds inside one test, put back in its finally.
+    internal bool TestOff { get; private set; }
+
+    internal void TestTurnOff()
+    {
+        if (TestOff || !IsActive)
+        {
+            return;
+        }
+        TestOff = true;
+        try
+        {
+            OnDeactivated();
+        }
+        finally
+        {
+            Harmony.UnpatchSelf();
+        }
+    }
+
+    internal void TestTurnOn()
+    {
+        if (!TestOff)
+        {
+            return;
+        }
+        TestOff = false;
+        ApplyPatches(Harmony);
+        OnActivated();
+    }
+#endif
 
     protected override void OnActivated()
     {

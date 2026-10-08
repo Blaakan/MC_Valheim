@@ -96,8 +96,8 @@ internal static class FilterState
     {
         Ignored.Clear();
         Selected.Clear();
-        ParseList(Plugin.DefaultIgnored != null ? Plugin.DefaultIgnored.Value : null, Ignored, resolve: true);
-        ParseList(Plugin.DefaultSelected != null ? Plugin.DefaultSelected.Value : null, Selected, resolve: true);
+        ParseList(Plugin.DefaultIgnoredText, Ignored, resolve: true);
+        ParseList(Plugin.DefaultSelectedText, Selected, resolve: true);
     }
 
     private static FilterMode ParseMode(string text)
@@ -323,7 +323,7 @@ internal static class FilterState
         {
             return false;
         }
-        return !Plugin.ExemptHarvest.Value || !HarvestGrace.IsTagged(drop);
+        return !Plugin.ExemptHarvestOn || !HarvestGrace.IsTagged(drop);
     }
 
     // Slot badge: item type in active list (nothing in Everything mode).

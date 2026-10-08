@@ -46,6 +46,23 @@ internal static class PlayerCheck
 
     internal static bool HasWork => Queue.Count > 0;
 
+#if DEBUG
+    // Self test force the server setting AllowPlayersWithoutMod (never the config file). Null = normal.
+    internal static bool? TestAllowWithoutMod { get; set; }
+#endif
+
+    // Server setting, read in one place.
+    private static bool AllowWithoutMod()
+    {
+#if DEBUG
+        if (TestAllowWithoutMod.HasValue)
+        {
+            return TestAllowWithoutMod.Value;
+        }
+#endif
+        return Plugin.AllowPlayersWithoutMod != null && Plugin.AllowPlayersWithoutMod.Value;
+    }
+
     // Pure: self test hammer it.
     internal static JoinVerdict Decide(bool isServer, bool connected, bool ready, bool beingKicked, bool compatible,
         bool allowWithoutMod)
@@ -151,7 +168,7 @@ internal static class PlayerCheck
         var ready = connected && peer.IsReady();
         var kicked = connected && ZNet.PeersToDisconnectAfterKick.ContainsKey(peer);
         var compatible = connected && NetworkGate.PeerCompatible(peer);
-        var allow = Plugin.AllowPlayersWithoutMod != null && Plugin.AllowPlayersWithoutMod.Value;
+        var allow = AllowWithoutMod();
         switch (Decide(isServer, connected, ready, kicked, compatible, allow))
         {
             case JoinVerdict.Compatible:

@@ -8,6 +8,26 @@ internal static class IdolChoice
 {
     private static readonly Dictionary<string, int> Picked = new Dictionary<string, int>();
 
+#if DEBUG
+    // Self test force the IdolChoice setting (never the config file). Null = normal.
+    internal static IdolPick? TestPick;
+#endif
+
+    // The player's IdolChoice setting. Only place that read it.
+    private static IdolPick Setting
+    {
+        get
+        {
+#if DEBUG
+            if (TestPick.HasValue)
+            {
+                return TestPick.Value;
+            }
+#endif
+            return Plugin.Pick.Value;
+        }
+    }
+
     internal static void Clear() => Picked.Clear();
 
     // Level (0..3) to spend for `amount` idols of this name, or -1 when no level has enough.
@@ -22,7 +42,7 @@ internal static class IdolChoice
 
     internal static int Default(Inventory inventory, string idolName, int amount)
     {
-        if (Plugin.Pick.Value == IdolPick.Lowest)
+        if (Setting == IdolPick.Lowest)
         {
             for (var level = 0; level <= IdolLevels.Max; level++)
             {

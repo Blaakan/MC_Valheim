@@ -99,9 +99,21 @@ internal sealed class MoveRules
         return kind == MoveKind.Jump ? JumpTriggers[f] : kind == MoveKind.Roll ? RollTriggers[f] : null;
     }
 
+#if DEBUG
+    // Self test: own settings in memory (never the config file). Null = the config. Test put a NEW object here per
+    // change, then call ServerRules.OwnChanged() like a real settings change (new snapshot, trigger cache, push).
+    internal static MoveRules TestOwn { get; set; }
+#endif
+
     // This game's own config.
     internal static MoveRules Own()
     {
+#if DEBUG
+        if (TestOwn != null)
+        {
+            return TestOwn;
+        }
+#endif
         var r = new MoveRules
         {
             JumpAttack = Plugin.JumpAttack.Value,

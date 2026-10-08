@@ -389,8 +389,8 @@ internal static class FilterUi
         {
             return; // keep dirty, try next frame
         }
-        var offX = Plugin.ButtonOffsetX.Value;
-        var offY = Plugin.ButtonOffsetY.Value;
+        var offX = Plugin.ButtonOffsetXNow;
+        var offY = Plugin.ButtonOffsetYNow;
         var before = _buttonRT.position;
         if (_worldPlaced)
         {
@@ -476,9 +476,9 @@ internal static class FilterUi
             return;
         }
         var on = Player.m_enableAutoPickup;
-        var pad = ZInput.IsGamepadActive();
+        var pad = PadActive();
         // Controller alone: lists panel speak controller only (mouse touched = mouse words back). Rebuilt only on flip.
-        var padOnly = pad && Plugin.GamepadControls.Value && ZInput.IsExclusiveGamepadActive();
+        var padOnly = pad && Plugin.GamepadControlsOn && PadOnly();
         if (!force && FilterState.Version == _shownVersion && on == _shownOn && pad == _shownPad && padOnly == _shownPadOnly)
         {
             return;
@@ -539,7 +539,7 @@ internal static class FilterUi
                 sb.Append("Hover an item in your inventory or a chest and press ").Append(_markGesture)
                     .Append(" to add it to or remove it from the list of the current mode.\n");
             }
-            if (Plugin.GamepadControls.Value && pad)
+            if (Plugin.GamepadControlsOn && pad)
             {
                 sb.Append("Controller (your inventory focused): right stick click = mark the item, LT + right stick click = "
                           + "change the mode, RT + right stick click = show the lists.\n");
@@ -560,7 +560,7 @@ internal static class FilterUi
 
         sb.Append('\n').Append(on ? "Auto pickup is on" : "Auto pickup is off")
             .Append(": turn it on or off with $KEY_AutoPickup. ")
-            .Append(Plugin.ExemptHarvest.Value
+            .Append(Plugin.ExemptHarvestOn
                 ? "Picking up or harvesting with $KEY_Use is never filtered."
                 : "Picking up with $KEY_Use is never filtered.");
         return sb.ToString();
@@ -807,37 +807,43 @@ internal static class FilterUi
         {
             return;
         }
-        try
+#if DEBUG
+        // Self test press the mark key for me this frame (TestHooks): only the key read is skipped.
+        if (!TestHooks.MarkPressedNow)
+#endif
         {
-            if (!ZInput.GetKeyDown(_markMain, logWarning: false))
+            try
             {
-                return;
-            }
-            for (var i = 0; i < _markMods.Length; i++)
-            {
-                if (!ZInput.GetKey(_markMods[i], logWarning: false))
+                if (!ZInput.GetKeyDown(_markMain, logWarning: false))
                 {
                     return;
                 }
+                for (var i = 0; i < _markMods.Length; i++)
+                {
+                    if (!ZInput.GetKey(_markMods[i], logWarning: false))
+                    {
+                        return;
+                    }
+                }
             }
-        }
-        catch (ArgumentException)
-        {
-            // Key the check above missed (Keyboard.current[Key.None] throw ArgumentOutOfRangeException): off, once.
-            MarkKeyUnusable(Plugin.MarkKey.Value.ToString(), KeyCode.None);
-            return;
+            catch (ArgumentException)
+            {
+                // Key the check above missed (Keyboard.current[Key.None] throw ArgumentOutOfRangeException): off, once.
+                MarkKeyUnusable(Plugin.MarkKeyNow.ToString(), KeyCode.None);
+                return;
+            }
         }
         if (Blocked(gui, keyboard: !_markIsMouse))
         {
             return;
         }
         var grid = gui.m_playerGrid;
-        var element = grid != null ? grid.GetHoveredElement() : null;
+        var element = grid != null ? HoveredSlot(grid) : null;
         if (element == null && gui.IsContainerOpen() && gui.m_container != null && gui.m_container.gameObject.activeInHierarchy
             && gui.ContainerGrid != null)
         {
             grid = gui.ContainerGrid;
-            element = grid.GetHoveredElement();
+            element = HoveredSlot(grid);
         }
         if (element == null || !IsSlotOnTop(element))
         {
@@ -855,12 +861,12 @@ internal static class FilterUi
     // nobody read R3 there.
     private static void HandleGamepad(InventoryGui gui)
     {
-        if (!Plugin.GamepadControls.Value || !ZInput.IsExclusiveGamepadActive())
+        if (!Plugin.GamepadControlsOn || !PadOnly())
         {
             return;
         }
         var grid = gui.m_playerGrid;
-        if (grid == null || grid.m_uiGroup == null || !grid.m_uiGroup.IsActive || !ZInput.GetButtonDown("JoyRStick"))
+        if (grid == null || grid.m_uiGroup == null || !grid.m_uiGroup.IsActive || !StickPressed())
         {
             return;
         }
@@ -868,12 +874,12 @@ internal static class FilterUi
         {
             return;
         }
-        if (ZInput.GetButton("JoyLTrigger"))
+        if (LeftTriggerHeld())
         {
             CycleModeWithMessage();
             return;
         }
-        if (ZInput.GetButton("JoyRTrigger"))
+        if (RightTriggerHeld())
         {
             ToggleListsPanel(gui);
             return;
@@ -934,7 +940,7 @@ internal static class FilterUi
             _ped = new PointerEventData(es);
             _pedOwner = es;
         }
-        _ped.position = ZInput.pointerPosition;
+        _ped.position = Pointer();
         Hits.Clear();
         es.RaycastAll(_ped, Hits);
         var tooltip = VanillaTooltipInstance();
@@ -969,6 +975,103 @@ internal static class FilterUi
         return _tooltipInstanceField != null ? _tooltipInstanceField.GetValue(null) as GameObject : null;
     }
 
+    // ---------------------------------------------------------------- input (one accessor each)
+    // Release build: plain ZInput / vanilla read. Debug build: self test may play the input in memory (TestHooks).
+
+    private static bool PadActive()
+    {
+#if DEBUG
+        if (TestHooks.PadActive.HasValue)
+        {
+            return TestHooks.PadActive.Value;
+        }
+#endif
+        return ZInput.IsGamepadActive();
+    }
+
+    private static bool PadOnly()
+    {
+#if DEBUG
+        if (TestHooks.PadOnly.HasValue)
+        {
+            return TestHooks.PadOnly.Value;
+        }
+#endif
+        return ZInput.IsExclusiveGamepadActive();
+    }
+
+    // Right stick clicked this frame.
+    private static bool StickPressed()
+    {
+#if DEBUG
+        if (TestHooks.StickPressedNow)
+        {
+            return true;
+        }
+#endif
+        return ZInput.GetButtonDown("JoyRStick");
+    }
+
+    private static bool LeftTriggerHeld()
+    {
+#if DEBUG
+        if (TestHooks.LeftTrigger)
+        {
+            return true;
+        }
+#endif
+        return ZInput.GetButton("JoyLTrigger");
+    }
+
+    private static bool RightTriggerHeld()
+    {
+#if DEBUG
+        if (TestHooks.RightTrigger)
+        {
+            return true;
+        }
+#endif
+        return ZInput.GetButton("JoyRTrigger");
+    }
+
+    private static Vector3 Pointer()
+    {
+#if DEBUG
+        if (TestHooks.Pointer.HasValue)
+        {
+            return TestHooks.Pointer.Value;
+        }
+#endif
+        return ZInput.pointerPosition;
+    }
+
+    // Slot under the pointer (pure geometry, vanilla GetHoveredElement).
+    private static InventoryElement HoveredSlot(InventoryGrid grid)
+    {
+#if DEBUG
+        if (TestHooks.Pointer.HasValue)
+        {
+            // Vanilla method read the real pointer: same geometry here with the test pointer.
+            Vector3 point = TestHooks.Pointer.Value;
+            foreach (var element in grid.m_elements)
+            {
+                var rt = element.GetElementRectTransform();
+                if (rt.rect.Contains(rt.InverseTransformPoint(point)))
+                {
+                    return element;
+                }
+            }
+            return null;
+        }
+#endif
+        return grid.GetHoveredElement();
+    }
+
+#if DEBUG
+    // Self test only: next mark message not dropped by the 1 s limit (test no wait a second between marks).
+    internal static void TestForgetMarkMessageTime() => _lastMarkMessage = -10f;
+#endif
+
     // ---------------------------------------------------------------- actions + messages
 
     internal static void ToggleMark(ItemDrop.ItemData item)
@@ -995,7 +1098,7 @@ internal static class FilterUi
                     : "No longer selected: " + name, icon);
                 break;
             default:
-                SendMarkMessage(ZInput.IsExclusiveGamepadActive() && Plugin.GamepadControls.Value
+                SendMarkMessage(PadOnly() && Plugin.GamepadControlsOn
                     ? "Choose Skip ignored or Only selected first: hold LT and click the right stick."
                     : "Choose Skip ignored or Only selected on the Auto pickup button first.", icon);
                 break;

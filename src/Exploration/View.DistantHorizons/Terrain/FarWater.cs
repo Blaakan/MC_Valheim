@@ -20,7 +20,7 @@ internal sealed class FarWater
     // ZoneSystem.m_waterLevel (30, also hard-coded in Heightmap.UpdateCornerDepths); world mods can move it.
     public static float WaterLevel => ZoneSystem.instance != null ? ZoneSystem.instance.m_waterLevel : 30f;
     // Shader discard LOD water past this radius from world origin: the world edge, WorldRadius.
-    public static float WorldEdge => Plugin.Cfg != null ? Plugin.Cfg.WorldRadius.Value : 10500f;
+    public static float WorldEdge => Plugin.Cfg != null ? Plugin.Cfg.V(Plugin.Cfg.WorldRadius) : 10500f;
 
     private Mesh _mesh;
     private Material _material;
@@ -105,7 +105,7 @@ internal sealed class FarWater
     public bool Prepare(Camera cam)
     {
         DHConfig cfg = Plugin.Cfg;
-        if (cfg == null || !cfg.FarWater.Value || cam == null || ZNet.instance == null) return false;
+        if (cfg == null || !cfg.V(cfg.FarWater) || cam == null || ZNet.instance == null) return false;
 
         // Game's own material, used direct, not cloned: game retint water per environment and biome, and clone taken
         // once at startup drift away from near water as weather change. Our own settings ride on per-draw property
@@ -123,7 +123,7 @@ internal sealed class FarWater
         if (_pass < 0) return false;
 
         float inner = cfg.FarWaterInnerRadius.Value > 0f ? cfg.FarWaterInnerRadius.Value : AutoInnerRadius();
-        float outer = Mathf.Max(inner + 256f, Mathf.Min(cfg.ViewDistance.Value, WorldEdge * 1.5f));
+        float outer = Mathf.Max(inner + 256f, Mathf.Min(cfg.V(cfg.ViewDistance), WorldEdge * 1.5f));
         EnsureMesh(inner, outer);
 
         Vector3 p = cam.transform.position;

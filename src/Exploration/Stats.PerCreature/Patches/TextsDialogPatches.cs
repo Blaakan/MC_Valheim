@@ -13,6 +13,11 @@ internal static class TextsDialogPatches
 {
     private static bool _missingLogged;
 
+#if DEBUG
+    // Self test only (Debug build): "entry not found" line may come once more, so test can count it.
+    internal static void TestResetMissingLogged() => _missingLogged = false;
+#endif
+
     [HarmonyPostfix]
     [HarmonyPatch(typeof(TextsDialog), nameof(TextsDialog.AddStats))]
     private static void AddStats_Postfix(TextsDialog __instance)

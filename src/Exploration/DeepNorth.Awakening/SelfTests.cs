@@ -34,7 +34,11 @@ namespace MC.Exploration.DeepNorthAwakeningMod;
 //   dn.morkhalla  live: travel to a Morkhalla, count its Malicious Ice, detection see it intact; travel back
 // Me force state only with ServerRules.TestRules / TestPending and WorldState.TestStones / TestKall, never config.
 // Real key mc_dn_stones and the persistent events list are put back after dn.stones and dn.detect.
-internal static class SelfTests
+// More tests live beside me (same class, registered from here): SelfTestsMore.cs (at the spawn: real stone breaks, star
+// rolls, console command, map paint...), SelfTestsNorth.cs (travel to the Deep North: dormant, stage 1, storms, bands,
+// after Kall, old world, live toggle), SelfTestsMp.cs (multiplayer client tests and their server halves); their tools
+// in SelfTestsTools.cs.
+internal static partial class SelfTests
 {
     private const string LogicName = "dn.logic";
     private const string NetworkName = "dn.network";
@@ -61,6 +65,7 @@ internal static class SelfTests
         SelfTest.Register(MapName, RunMap);
         SelfTest.Register(AreaName, RunArea);
         SelfTest.Register(MorkhallaName, RunMorkhalla);
+        RegisterMore();
 #endif
     }
 
@@ -78,6 +83,7 @@ internal static class SelfTests
         SelfTest.Unregister(MapName);
         SelfTest.Unregister(AreaName);
         SelfTest.Unregister(MorkhallaName);
+        UnregisterMore();
         ClearOverrides();
 #endif
     }
@@ -99,6 +105,8 @@ internal static class SelfTests
         WorldState.TestStones = null;
         WorldState.TestKall = null;
         Stones.TestInvasionsAtThirdStone = null;
+        // Entries built from forced rules never stay for the next test.
+        AreaSpawns.TestInvalidate();
         WorldState.Refresh();
     }
 
@@ -891,10 +899,26 @@ internal static class SelfTests
             WorldState.TestStones = 0;
             WorldState.Refresh();
             c.Check(!BaseAI.IsEnemy(k, t) && !BaseAI.IsEnemy(t, k), "dormant north: Krigen and Gammeltroll are friends (vanilla)");
+            // The Moose with each of them, all four ways, as the normal game has it (compared when awake, below).
+            var mooseDormant = new[] { BaseAI.IsEnemy(k, m), BaseAI.IsEnemy(m, k), BaseAI.IsEnemy(t, m), BaseAI.IsEnemy(m, t) };
+            // Live too: face to face for 3 s, neither picks the other (awake they do within a second or two, below).
+            var kai = k.GetComponent<MonsterAI>();
+            var tai = t.GetComponent<MonsterAI>();
+            var picked = false;
+            var quietUntil = Time.time + 3f;
+            while (Time.time < quietUntil && k != null && t != null)
+            {
+                picked |= (kai != null && kai.m_targetCreature == t) || (tai != null && tai.m_targetCreature == k);
+                yield return new WaitForSeconds(0.25f);
+            }
+            c.Check(!picked && k != null && t != null, "dormant north, live: for 3 s the Krigen and the Gammeltroll ignore each other");
             WorldState.TestStones = 1;
             WorldState.Refresh();
             c.Check(BaseAI.IsEnemy(k, t) && BaseAI.IsEnemy(t, k), "awake north: Krigen and Gammeltroll are foes, both ways");
             c.Check(!BaseAI.IsEnemy(k, m) && !BaseAI.IsEnemy(m, t), "awake north: the Moose stays friends with both");
+            c.Check(m != null && BaseAI.IsEnemy(k, m) == mooseDormant[0] && BaseAI.IsEnemy(m, k) == mooseDormant[1]
+                    && BaseAI.IsEnemy(t, m) == mooseDormant[2] && BaseAI.IsEnemy(m, t) == mooseDormant[3],
+                "awake north: nothing changes between the Moose and either of them, all four ways (the Moose stays out of it)");
             c.Check(BaseAI.IsEnemy(k, player) && BaseAI.IsEnemy(t, player), "both still attack players");
             ServerRules.TestRules = Rules(r => r.NatureFightsBack = false);
             WorldState.Refresh();
@@ -903,8 +927,6 @@ internal static class SelfTests
             WorldState.Refresh();
 
             // Live: they pick each other (the player is 45 m away, they are 6 m apart and face each other).
-            var kai = k.GetComponent<MonsterAI>();
-            var tai = t.GetComponent<MonsterAI>();
             var until = Time.time + 15f;
             var fought = false;
             while (Time.time < until && !fought)

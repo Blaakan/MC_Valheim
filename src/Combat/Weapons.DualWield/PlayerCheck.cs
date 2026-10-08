@@ -153,7 +153,13 @@ internal static class PlayerCheck
         var kicked = connected && ZNet.PeersToDisconnectAfterKick.ContainsKey(peer);
         var compatible = connected && NetworkGate.PeerCompatible(peer);
         var allow = Plugin.AllowPlayersWithoutMod != null && Plugin.AllowPlayersWithoutMod.Value;
-        switch (Decide(isServer, connected, ready, kicked, compatible, allow))
+        var verdict = Decide(isServer, connected, ready, kicked, compatible, allow);
+#if DEBUG
+        LastVerdict = verdict;
+        VerdictCount++;
+        LastText = "";
+#endif
+        switch (verdict)
         {
             case JoinVerdict.Compatible:
                 Log.Debug($"{Who(peer)} runs {ModInfo.Name}: allowed.");
@@ -161,9 +167,11 @@ internal static class PlayerCheck
             case JoinVerdict.Allowed:
                 // Copy off because of another dual wield mod report "turned off" too: that mod may still give them
                 // pairs, by its own rules. Text say so, never "cannot dual wield".
-                Log.Warning($"{Who(peer)} plays without {ModInfo.Name}: their game {Problem(peer)}. "
-                            + "AllowPlayersWithoutMod is on, so they may play, without this mod's rules (with another "
-                            + "dual wield mod installed they may still dual wield, by that mod's rules).");
+                var text = AllowedText(Who(peer), Problem(peer));
+#if DEBUG
+                LastText = text;
+#endif
+                Log.Warning(text);
                 break;
             case JoinVerdict.Refuse:
                 Refuse(peer);
@@ -171,11 +179,33 @@ internal static class PlayerCheck
         }
     }
 
+#if DEBUG
+    // Self test (server half) read me: verdict of the last join check, how many checks ran this session, and the
+    // warning the last check logged ("" = none).
+    internal static JoinVerdict LastVerdict;
+    internal static int VerdictCount;
+    internal static string LastText = "";
+#endif
+
+    // Pure (self test check the wording): server log line for a player let in although their game no run me.
+    internal static string AllowedText(string who, string problem) =>
+        $"{who} plays without {ModInfo.Name}: their game {problem}. "
+        + "AllowPlayersWithoutMod is on, so they may play, without this mod's rules (with another "
+        + "dual wield mod installed they may still dual wield, by that mod's rules).";
+
+    // Pure (self test check the wording): server log line for a refused player.
+    internal static string RefusedText(string who, string problem) =>
+        $"Refused {who}: their game {problem}. This server requires {ModInfo.Name} on every "
+        + "player (everyone fights with the same rules). Their game shows \"Incompatible version\". "
+        + "To let such players in, set AllowPlayersWithoutMod = true.";
+
     private static void Refuse(ZNetPeer peer)
     {
-        Log.Warning($"Refused {Who(peer)}: their game {Problem(peer)}. This server requires {ModInfo.Name} on every "
-                    + "player (everyone fights with the same rules). Their game shows \"Incompatible version\". "
-                    + "To let such players in, set AllowPlayersWithoutMod = true.");
+        var text = RefusedText(Who(peer), Problem(peer));
+#if DEBUG
+        LastText = text;
+#endif
+        Log.Warning(text);
         // Vanilla client: RPC_Error set connection status, Game.FixedUpdate log out, main menu show the text. Me cut
         // socket only DisconnectDelay s later (vanilla kick use 1 s): client read Error first, even on slow loading.
         peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorVersion);

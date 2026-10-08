@@ -42,6 +42,8 @@ internal static class SelfTests
         SelfTest.Register(CatalogName, RunCatalog);
         SelfTest.Register(DetailsName, RunDetails);
         SelfTest.Register(KnowledgeName, RunKnowledge);
+        // One small test per TESTING.md item (SelfTests.More.cs).
+        MoreSelfTests.Register();
 #endif
     }
 
@@ -52,6 +54,7 @@ internal static class SelfTests
         SelfTest.Unregister(CatalogName);
         SelfTest.Unregister(DetailsName);
         SelfTest.Unregister(KnowledgeName);
+        MoreSelfTests.Unregister();
 #endif
     }
 

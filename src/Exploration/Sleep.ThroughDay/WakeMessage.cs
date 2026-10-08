@@ -55,12 +55,19 @@ internal static class WakeMessage
         {
             return;
         }
-        var text = (Plugin.WakeUpMessage.Value ?? "").Trim();
+        var text = Plugin.ReadWakeUpMessage().Trim();
         if (text.Length > 0)
         {
             SwapText = text;
         }
     }
+
+#if DEBUG
+    // Debug build only: self test read what me remember of sleep start.
+    internal static bool HaveStart => _haveStart;
+    internal static int StartDay => _startDay;
+    internal static bool StartedAfterDawn => _startedAfterDawn;
+#endif
 
     // Player.Message prefix, only while armed: vanilla "Good morning" of this wake become WakeUpMessage (MessageHud
     // localize $tokens). Once per wake.

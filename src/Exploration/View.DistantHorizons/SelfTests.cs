@@ -21,7 +21,13 @@ namespace MC.Exploration.ViewDistantHorizonsMod;
 //   horizons.detach   turn-off path (TerrainLink.Detach, same code OnDeactivated run): managers and their objects
 //                     gone, vanilla 3x3 back, no buffer left on camera, far clip back, game's distant water plane
 //                     back; then TerrainLink.AttachIfInWorld (turn-on-in-a-world path) and far tiles back
-// Me never write config (framework rule): detach test call same code the toggle call, without the toggle.
+// More tests in own files, registered here: WorldTests (SelfTestsWorld.cs: what get drawn), LifeTests
+// (SelfTestsLife.cs: off-on, settings, console), ObjectTests (SelfTestsObjects.cs: far objects, simulation distance,
+// spyglass), EdgeTests (SelfTestsEdge.cs: one small test per edge case believed wrong today), MpTests (SelfTestsMp.cs:
+// client on a dedicated server), NearGroundTests (horizons.near). Shared tools: SelfTestKit.cs. horizons.cleanlog go
+// last: it look back at the whole session.
+// Me never write config (framework rule): detach test call same code the toggle call, without the toggle; tests that
+// need the framework's own off-on use Plugin.TestBlocker, settings are forced in memory (DHConfig.SetForTest).
 internal static class SelfTests
 {
     private const string LogicName = "horizons.logic";
@@ -40,6 +46,13 @@ internal static class SelfTests
         SelfTest.Register(BoostName, RunBoost);
         SelfTest.Register(DetachName, RunDetach);
         NearGroundTests.Register();
+        ErrorWatch.Install();
+        WorldTests.Register();
+        LifeTests.Register();
+        ObjectTests.Register();
+        EdgeTests.Register();
+        MpTests.Register();
+        SelfTest.Register(LifeTests.CleanLogName, LifeTests.RunCleanLog);
 #endif
     }
 
@@ -54,6 +67,14 @@ internal static class SelfTests
         ViewBoost.TestSlot = null;
         SelfTest.Unregister(DetachName);
         NearGroundTests.Unregister();
+        // Forced settings and Plugin.TestBlocker stay: test that turn me off through the framework
+        // still run and put them back itself (Kit.PutBack).
+        WorldTests.Unregister();
+        LifeTests.Unregister();
+        ObjectTests.Unregister();
+        EdgeTests.Unregister();
+        MpTests.Unregister();
+        SelfTest.Unregister(LifeTests.CleanLogName);
 #endif
     }
 

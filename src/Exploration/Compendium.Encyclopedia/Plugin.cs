@@ -88,11 +88,50 @@ internal sealed partial class Plugin : ModPlugin
 
     /// <summary>SideButton forced by self tests, in memory only (then SideButton.Sync). Null = the real setting.</summary>
     internal static bool? TestSideButton;
+
+    /// <summary>Self tests turn the feature off live with me, in memory only (never the Enabled entry). Read by LocalBlocker.</summary>
+    internal static bool TestOff { get; private set; }
+
+    /// <summary>
+    /// Self tests: feature off (true) or back on (false) at once, the same way a live Enabled change does it
+    /// (FeatureRegistry.RefreshAll: OnDeactivated + patches off, or patches on + OnActivated). The .cfg Enabled line
+    /// is never written.
+    /// </summary>
+    internal static void SetOffForTest(bool off)
+    {
+        if (TestOff == off)
+        {
+            return;
+        }
+        TestOff = off;
+        FeatureRegistry.RefreshAll();
+    }
+
+    /// <summary>Self tests force the display settings in memory and tell the window, like a setting change does.</summary>
+    internal static void SetTestDisplay(DisplayOverride? display)
+    {
+        TestDisplay = display;
+        RaiseDisplaySettingsChanged();
+    }
+
+    /// <summary>Self tests force the SideButton setting in memory and run what its setting change runs.</summary>
+    internal static void SetTestSideButton(bool? on)
+    {
+        TestSideButton = on;
+        OnSideButtonSettingChanged();
+    }
+
+    // Debug build only: self tests say "off" through the framework's own blocker door. Release build has no override.
+    protected override string LocalBlocker() => TestOff ? "Inactive: turned off by a self test (in memory only)." : null;
 #endif
 
     protected override void BindConfig()
     {
         Instance = this;
+#if DEBUG
+        // Me count own warning and error lines from the very start (self test compendium.cleanlog read them).
+        LogWatch.Install(Logger);
+#endif
         ShowUndiscovered = Config.Bind("Display", "ShowUndiscovered", true, new ConfigDescription(
             "Show entries you have not discovered yet as \"???\". Turn off to list only what you have discovered.",
             null, new ConfigurationManagerAttributes { Order = 100 }));

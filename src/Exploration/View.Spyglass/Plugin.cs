@@ -50,6 +50,30 @@ internal sealed partial class Plugin : ModPlugin
 #if DEBUG
     // Self test play "feature off" without the toggle. Never in release.
     internal static bool TestInactive { get; set; }
+
+    // Self test turn feature off and on again like the framework do on a live toggle (off: OnDeactivated, then
+    // feature patches removed; on: patches applied, then OnActivated), without the Enabled setting: single-player
+    // test must never write player's config. Framework still think feature is on, so it never patch twice.
+    // False = plugin not found or already in that state. Never in release.
+    internal static bool TestLiveToggle(bool on)
+    {
+        if (!BepInEx.Bootstrap.Chainloader.PluginInfos.TryGetValue(ModInfo.Guid, out var info)
+            || !(info.Instance is Plugin plugin) || on == _featureActive)
+        {
+            return false;
+        }
+        if (on)
+        {
+            plugin.ApplyPatches(plugin.Harmony);
+            plugin.OnActivated();
+        }
+        else
+        {
+            plugin.OnDeactivated();
+            plugin.Harmony.UnpatchSelf();
+        }
+        return true;
+    }
 #endif
 
     // Feature on (patches applied) and not faked off by a self test. Always-on code (registration) read this: its

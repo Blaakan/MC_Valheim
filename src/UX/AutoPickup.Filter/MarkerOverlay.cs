@@ -79,7 +79,7 @@ internal static class MarkerOverlay
             marks.Grid = grid;
         }
 
-        if (!Plugin.ShowMarkers.Value || !FilterState.EnsureLocal() || FilterState.Mode == FilterMode.Everything)
+        if (!Plugin.ShowMarkersOn || !FilterState.EnsureLocal() || FilterState.Mode == FilterMode.Everything)
         {
             HideAll(marks);
             return;

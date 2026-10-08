@@ -613,10 +613,25 @@ internal static class DualSwing
         internal readonly int Objects;         // objects the sweep of this DoMeleeAttack call touched (0 = unknown)
         internal readonly string ObjectNames;
         internal readonly float Split;         // vanilla's multi-object factor for this hit (1 = none)
+        // Damage by type as the attacker dealt it (before the victim's resistances), and the backstab bonus the hit
+        // carried: each tell which weapon struck (frost sword, poison axe, knife backstab).
+        internal readonly float Slash;
+        internal readonly float Frost;
+        internal readonly float Poison;
+        internal readonly float Lightning;
+        internal readonly float Backstab;
+        internal readonly float Time;
 
         internal DamageRecord(int swing, string trigger, int eventIndex, Hand hand, float total,
-            Skills.SkillType skill, string target, float skillFactor, int objects, string objectNames, float split)
+            Skills.SkillType skill, string target, float skillFactor, int objects, string objectNames, float split,
+            HitData hit)
         {
+            Slash = hit.m_damage.m_slash;
+            Frost = hit.m_damage.m_frost;
+            Poison = hit.m_damage.m_poison;
+            Lightning = hit.m_damage.m_lightning;
+            Backstab = hit.m_backstabBonus;
+            Time = UnityEngine.Time.time;
             Swing = swing;
             Trigger = trigger;
             Event = eventIndex;
@@ -692,7 +707,7 @@ internal static class DualSwing
         // Vanilla: num5 /= list.Count * 0.75 when m_multiHit, m_lowerDamagePerHit and more than one object.
         var split = _hitPointsSplit && objects > 1 ? 1f / (objects * 0.75f) : 1f;
         Damages.Add(new DamageRecord(Swings.Count - 1, _trigger, _index - 1, CurrentHand, hit.GetTotalDamage(), hit.m_skill,
-            target != null ? target.name : "?", _skillFactor, objects, names, split));
+            target != null ? target.name : "?", _skillFactor, objects, names, split, hit));
         // One roll per hit: a later Damage with no roll of its own (not melee) must not reuse it.
         _skillFactor = -1f;
     }

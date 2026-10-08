@@ -66,6 +66,16 @@ internal static class TopTabs
 #if DEBUG
     /// <summary>Self tests put the remembered tab back after them (never saved anywhere).</summary>
     internal static void SetLastForTest(Choice c) => _last = c;
+
+    /// <summary>Self tests play a refused window on this InventoryGui (strip gone), then put the flag back.</summary>
+    internal static void SetRefusedForTest(bool refused)
+    {
+        _refused = refused;
+        if (refused)
+        {
+            DestroyStrip(hideNow: true);
+        }
+    }
 #endif
 
     // ---------------------------------------------------------------- session

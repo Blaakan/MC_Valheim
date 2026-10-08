@@ -90,8 +90,7 @@ internal static class ScopeCamera
         {
             // Once per raise (the registry state string allocate): Distant Horizons on and running here?
             _dhChecked = true;
-            var dh = FeatureRegistry.Find(DistantHorizonsGuid);
-            _dhActive = dh.HasValue && dh.Value.IsActive;
+            _dhActive = DistantHorizonsActive();
         }
         _applied = true;
         cam.m_distance = savedDistance;
@@ -132,6 +131,19 @@ internal static class ScopeCamera
         var rules = ServerRules.Current;
         ApplyFog(_dhActive && !rules.IsPending ? o * rules.FogClearing : 0f);
         ViewBoost.Write(m, o, t.forward, fov, cam.m_camera.aspect);
+    }
+
+    // Distant Horizons installed, on and running in this game? (Self test may say otherwise.)
+    private static bool DistantHorizonsActive()
+    {
+#if DEBUG
+        if (TestDistantHorizons.HasValue)
+        {
+            return TestDistantHorizons.Value;
+        }
+#endif
+        var dh = FeatureRegistry.Find(DistantHorizonsGuid);
+        return dh.HasValue && dh.Value.IsActive;
     }
 
     // Field of view showing things m times bigger (on the vertical field of view, like a lens).
@@ -226,5 +238,22 @@ internal static class ScopeCamera
     internal static bool TestPoseView;
     internal static Vector3 TestCameraPosition;
     internal static Quaternion TestCameraRotation = Quaternion.identity;
+
+    // Self test: play "Distant Horizons run" (true) or "not" (false) for next raise; null = ask the registry.
+    internal static bool? TestDistantHorizons;
+
+    // Self test: metres vanilla wheel zoom move the camera distance on next camera update (stand-in for the wheel
+    // vanilla UpdateCamera read by itself). Used once.
+    internal static float TestWheelNudge;
+
+    // UpdateCamera prefix, after the distance was saved.
+    internal static void TestNudge(GameCamera cam)
+    {
+        if (TestWheelNudge != 0f)
+        {
+            cam.m_distance += TestWheelNudge;
+            TestWheelNudge = 0f;
+        }
+    }
 #endif
 }

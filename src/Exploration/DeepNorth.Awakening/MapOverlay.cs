@@ -396,6 +396,155 @@ internal static class MapOverlay
         return true;
     }
 
+    // Self test: colour the game's map texture holds now at a world position, read from the texture itself (works after
+    // Restore and Forget too). False = no map texture or outside it.
+    internal static bool TestRawColor(Vector3 position, out Color32 color)
+    {
+        color = default;
+        var map = Minimap.instance;
+        var tex = map != null ? map.m_mapTexture : null;
+        if (tex == null || !tex.isReadable || tex.format != TextureFormat.RGB24)
+        {
+            return false;
+        }
+        var size = map.m_textureSize;
+        var pixel = map.m_pixelSize;
+        var i = Mathf.FloorToInt((position.z - pixel / 2f) / pixel) + size / 2;
+        var j = Mathf.FloorToInt((position.x - pixel / 2f) / pixel) + size / 2;
+        var raw = tex.GetRawTextureData<byte>();
+        if (i < 0 || i >= size || j < 0 || j >= size || raw.Length < size * size * 3)
+        {
+            return false;
+        }
+        var t = (i * size + j) * 3;
+        color = new Color32(raw[t], raw[t + 1], raw[t + 2], 255);
+        return true;
+    }
+
+    // Self test: own colour the scan kept for the pixel at a world position (also for sea pixels). False = not scanned
+    // or outside the band.
+    internal static bool TestOwnColor(Vector3 position, out Color32 color)
+    {
+        color = default;
+        if (!_ready || _base == null)
+        {
+            return false;
+        }
+        var bi = Row(position.z) - _r0;
+        var bj = Row(position.x) - _c0;
+        if (bi < 0 || bi >= _bh || bj < 0 || bj >= _bw)
+        {
+            return false;
+        }
+        var k = (bi * _bw + bj) * 3;
+        color = new Color32(_base[k], _base[k + 1], _base[k + 2], 255);
+        return true;
+    }
+
+    // Self test: pixels of the band whose colour is not their own now (land or sea).
+    internal static int TestChangedPixels(bool landOnly)
+    {
+        if (!_ready || _tex == null)
+        {
+            return -1;
+        }
+        var raw = _tex.GetRawTextureData<byte>();
+        var n = 0;
+        var total = _bw * _bh;
+        for (var k = 0; k < total; k++)
+        {
+            if (landOnly && _cells[k] == NoCell)
+            {
+                continue;
+            }
+            var t = ((_r0 + k / _bw) * _size + _c0 + k % _bw) * 3;
+            if (raw[t] != _base[k * 3] || raw[t + 1] != _base[k * 3 + 1] || raw[t + 2] != _base[k * 3 + 2])
+            {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    // Self test: kinds of pixel for the paint checks, at a coverage (before Kall: no cleared area).
+    internal const int TestSpotEdge = 1; // shown land next to Deep North land of another area that is not shown
+    internal const int TestSpotSeam = 2; // shown land next to land of another shown area, no hidden land around
+    internal const int TestSpotSea = 3;  // sea (no land) inside the Deep North line, in an awake area
+
+    // Self test: centre of a pixel of that kind; false = none on this map.
+    internal static bool TestFindSpot(float coverage, int kind, out Vector3 position)
+    {
+        position = Vector3.zero;
+        if (!_ready || _cells == null)
+        {
+            return false;
+        }
+        var seed = WorldState.Seed;
+        var awake = new Dictionary<int, bool>();
+        bool AwakeCell(int cell)
+        {
+            if (!awake.TryGetValue(cell, out var a))
+            {
+                a = Cells.IsAwake(seed, cell, coverage);
+                awake[cell] = a;
+            }
+            return a;
+        }
+        var total = _bw * _bh;
+        for (var k = 0; k < total; k++)
+        {
+            var bi = k / _bw;
+            var bj = k - bi * _bw;
+            var wx = (float)(_c0 + bj - _half) * _pixel + _halfPixel;
+            var wz = (float)(_r0 + bi - _half) * _pixel + _halfPixel;
+            var cell = _cells[k];
+            if (kind == TestSpotSea)
+            {
+                if (cell != NoCell || wx * wx + wz * wz > WorldGenerator.waterEdgeSqr || !WorldGenerator.IsDeepnorth(wx, wz)
+                    || !AwakeCell(Cells.At(seed, wx, wz)))
+                {
+                    continue;
+                }
+                position = new Vector3(wx, 0f, wz);
+                return true;
+            }
+            if (cell == NoCell || !AwakeCell(cell))
+            {
+                continue;
+            }
+            var hidden = false;
+            var otherShown = false;
+            for (var d = 0; d < 4; d++)
+            {
+                var ni = bi + (d == 0 ? -1 : d == 1 ? 1 : 0);
+                var nj = bj + (d == 2 ? -1 : d == 3 ? 1 : 0);
+                if (ni < 0 || ni >= _bh || nj < 0 || nj >= _bw)
+                {
+                    continue;
+                }
+                var n = _cells[ni * _bw + nj];
+                if (n == NoCell || n == cell)
+                {
+                    continue;
+                }
+                if (AwakeCell(n))
+                {
+                    otherShown = true;
+                }
+                else
+                {
+                    hidden = true;
+                }
+            }
+            if (kind == TestSpotEdge ? hidden : otherShown && !hidden)
+            {
+                position = new Vector3(wx, 0f, wz);
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Self test: Deep North land pixels found by the scan.
     internal static int TestLandPixels()
     {

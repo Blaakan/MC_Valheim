@@ -450,6 +450,12 @@ internal static class AreaSpawns
         }
         Log.Debug($"Nature fights back: a band of {roll.Greydwarfs} frost Greydwarfs, {roll.Shamans} shaman(s), "
                   + $"{roll.Gammeltrolls} Gammeltroll and {roll.Barkas} Barka ({spawned} spawned).");
+#if DEBUG
+        TestLastBand = roll;
+        TestLastBandSpawned = spawned;
+        TestLastBandCenter = center;
+        TestBands++;
+#endif
         return spawned;
     }
 
@@ -642,5 +648,69 @@ internal static class AreaSpawns
     }
 
     internal static void TestBuild() => EnsureBuilt(ServerRules.Current);
+
+    // Self test: forced rules changed (no new rules version): entries are built again at the next use.
+    internal static void TestInvalidate() => _builtRules = int.MinValue;
+
+    // Self test: the last nature band (what was rolled, how many really spawned, where) and how many bands so far.
+    internal static BandRoll TestLastBand { get; private set; }
+
+    internal static int TestLastBandSpawned { get; private set; }
+
+    internal static Vector3 TestLastBandCenter { get; private set; }
+
+    internal static int TestBands { get; private set; }
+
+    // Self test: area timers of this zone back to "never ran" (stamp 0 on its zone control, like a zone nobody visited):
+    // Jotun and meteor entries, the band check. Keys made like Add and the band key, from the specs (works with no
+    // entries built too).
+    internal static void TestResetTimers(SpawnSystem ss, bool spawns, bool band)
+    {
+        var nview = ss != null ? ss.m_nview : null;
+        var zdo = nview != null && nview.IsValid() ? nview.GetZDO() : null;
+        if (zdo == null)
+        {
+            return;
+        }
+        if (spawns)
+        {
+            for (var i = 0; i < JotunSpecs.Length; i++)
+            {
+                zdo.Set((SaltPrefix + i + "_" + JotunSpecs[i].Prefab + 1).GetStableHashCode(), 0L);
+            }
+            zdo.Set((SaltPrefix + JotunSpecs.Length + "_" + MeteorPrefab + 1).GetStableHashCode(), 0L);
+        }
+        if (band)
+        {
+            zdo.Set(BandTimerKey, 0L);
+        }
+    }
+
+    // Self test: caps of the Jotun entries by prefab at density 100 (design 2.3 table).
+    internal static int TestBaseCap(string prefab)
+    {
+        foreach (var s in JotunSpecs)
+        {
+            if (s.Prefab == prefab)
+            {
+                return s.Max;
+            }
+        }
+        return 0;
+    }
+
+    // Self test: biggest group of a Jotun entry by prefab (design 2.3 table). The game size the last group of a pass
+    // against the count from before the pass: one pass can end at cap + group - 1.
+    internal static int TestGroupMax(string prefab)
+    {
+        foreach (var s in JotunSpecs)
+        {
+            if (s.Prefab == prefab)
+            {
+                return s.GroupMax;
+            }
+        }
+        return 1;
+    }
 #endif
 }

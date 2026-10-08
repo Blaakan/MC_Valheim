@@ -29,7 +29,7 @@ internal enum BiomeRank : byte
 //   3. derivation: recipe / smelter / cooking / fermenter output = latest of its inputs and of its station's build
 //      materials (bronze sword need bronze need copper + tin, forge need copper...).
 // Debug log show every item and where its biome come from.
-internal static class BiomeIndex
+internal static partial class BiomeIndex
 {
     private enum Source : byte
     {
@@ -106,7 +106,11 @@ internal static class BiomeIndex
         watch.Stop();
         var ms = watch.ElapsedMilliseconds;
         Stage("log", () => LogResult(db, ms));
+        TestBuilt(ms);
     }
+
+    // Debug build: self-tests count the builds and read their time (TestHooks.cs). Release: no body, call dropped.
+    static partial void TestBuilt(long ms);
 
     // One stage blow up = log it, other stages still run.
     private static void Stage(string what, Action step)

@@ -134,7 +134,23 @@ internal sealed partial class Plugin : ModPlugin
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
     }
 
-    protected override string LocalBlocker() => ForeignMods.BlockerText();
+#if DEBUG
+    // Self test: this game's copy blocked (real OnDeactivated / OnActivated through the framework, Enabled never
+    // written; a connected server is told "off" like a real turn-off, so single-player tests only). Test set it, then
+    // FeatureRegistry.RefreshAll(). Not cleared with the other overrides (turning off clear those): the test clear it.
+    internal static bool TestBlocked { get; set; }
+#endif
+
+    protected override string LocalBlocker()
+    {
+#if DEBUG
+        if (TestBlocked)
+        {
+            return "Inactive: turned off by a self-test.";
+        }
+#endif
+        return ForeignMods.BlockerText();
+    }
 
     protected override void OnActivated()
     {

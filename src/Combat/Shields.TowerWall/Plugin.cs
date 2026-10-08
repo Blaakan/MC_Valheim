@@ -178,7 +178,59 @@ internal sealed partial class Plugin : ModPlugin
         Config.SettingChanged += OnSettingChanged;
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
         Application.quitting += OnQuitting;
+#if DEBUG
+        _self = this;
+#endif
+        SelfTests.RegisterAlways(); // Debug build only: call vanish in Release
     }
+
+#if DEBUG
+    private static Plugin _self;
+
+    // True between DebugSwitch(false) and DebugSwitch(true).
+    internal static bool DebugOff { get; private set; }
+
+    // This game's own settings file (multiplayer self test read it before and after: server rules never touch it).
+    internal static string DebugConfigPath => _self != null ? _self.Config.ConfigFilePath : null;
+
+    // Self test: what the framework do when the feature go off and on (ModPlugin.Refresh: OnDeactivated then patches
+    // off; patches on then OnActivated), with no Enabled write (config file untouched, Status line too). Framework
+    // state stay Active meanwhile. False = nothing done (not active, or already there).
+    internal static bool DebugSwitch(bool on)
+    {
+        var self = _self;
+        if (self == null)
+        {
+            return false;
+        }
+        if (!on)
+        {
+            if (DebugOff || !self.IsActive)
+            {
+                return false;
+            }
+            DebugOff = true;
+            try
+            {
+                self.OnDeactivated();
+            }
+            catch (Exception e)
+            {
+                Log.Error($"OnDeactivated failed; patches removed anyway. {e}");
+            }
+            self.Harmony.UnpatchSelf();
+            return true;
+        }
+        if (!DebugOff)
+        {
+            return false;
+        }
+        DebugOff = false;
+        self.ApplyPatches(self.Harmony);
+        self.OnActivated();
+        return true;
+    }
+#endif
 
     // Design 7.3. Patches already on. Rules in force (vanilla while a client waits for the server's) onto prefabs and
     // live items, hands fixed, Braced ensured: TowerSync. Then network part, then foreign-mod warning.

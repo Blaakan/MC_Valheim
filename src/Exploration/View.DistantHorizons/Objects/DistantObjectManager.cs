@@ -51,6 +51,15 @@ internal sealed class DistantObjectManager : MonoBehaviour
         public float RetiredAt;
         public int Instances;
         public int Vertices;
+#if DEBUG
+        // Self test: what last build placed (trees, buildings, rocks) and where a few of its trees stand.
+        public int TestTrees;
+        public int TestPieces;
+        public int TestRocks;
+        public readonly List<Vector3> TestTreeAt = new List<Vector3>();
+        // Self test: trees of last build inside the watched square (TestWatchOn), where me stood them.
+        public readonly List<Vector3> TestWatchAt = new List<Vector3>();
+#endif
     }
 
     private struct ZoneRef
@@ -207,6 +216,9 @@ internal sealed class DistantObjectManager : MonoBehaviour
 
     public void ClearAll()
     {
+#if DEBUG
+        TestClears++;
+#endif
         // Each part alone: throw while freeing tiles must never keep ZDO hook or bake rig alive.
         Step("tiles", () =>
         {
@@ -278,7 +290,7 @@ internal sealed class DistantObjectManager : MonoBehaviour
     private void Tick()
     {
         DHConfig cfg = Cfg;
-        if (cfg == null || !cfg.ObjectsEnabled.Value)
+        if (cfg == null || !cfg.V(cfg.ObjectsEnabled))
         {
             _pendingReset = PendingReset.None;
             if (_tiles.Count > 0 || _retiring.Count > 0 || _atlas != null) ClearAll();
@@ -316,7 +328,7 @@ internal sealed class DistantObjectManager : MonoBehaviour
             _dirty = true;
         }
 
-        _boost = ViewBoost.Read(cfg.SpyglassDetail.Value, cfg.SpyglassMaxBoost.Value);
+        _boost = ViewBoost.Read(cfg.V(cfg.SpyglassDetail), cfg.V(cfg.SpyglassMaxBoost));
         if (ViewBoost.Poll(ref _boostApplied, _boost, Time.unscaledTime)) _dirty = true;
 
         _timer += Time.deltaTime;
@@ -564,7 +576,7 @@ internal sealed class DistantObjectManager : MonoBehaviour
         DHConfig cfg = Cfg;
         int size = TileSizes[key.Level];
         float minX = key.X * size, minZ = key.Y * size, maxX = minX + size, maxZ = minZ + size;
-        if (AabbDist(0f, 0f, minX, minZ, maxX, maxZ) > cfg.WorldRadius.Value)
+        if (AabbDist(0f, 0f, minX, minZ, maxX, maxZ) > cfg.V(cfg.WorldRadius))
         {
             ForgetTile(key);
             return;
@@ -588,7 +600,7 @@ internal sealed class DistantObjectManager : MonoBehaviour
             return;
         }
 
-        bool piecesOn = cfg.DrawPieces.Value && WithinHyst(_tilePieces, key, d, cfg.PieceDistance.Value);
+        bool piecesOn = cfg.V(cfg.DrawPieces) && WithinHyst(_tilePieces, key, d, cfg.PieceDistance.Value);
         bool rocksOn = cfg.DrawRocks.Value && WithinHyst(_tileRocks, key, d, cfg.RockDistance.Value);
 
         int sig = 17;
@@ -838,6 +850,11 @@ internal sealed class DistantObjectManager : MonoBehaviour
         LodTile hint = null;
 
         _placements.Clear();
+#if DEBUG
+        int testTrees = 0, testPieces = 0, testRocks = 0;
+        s_testTreeAt.Clear();
+        s_testWatchAt.Clear();
+#endif
         foreach (ZoneRef r in tile.Zones)
         {
             if (!_source.TryGetCached(r.X, r.Y, out ZoneObjects zo)) continue;
@@ -850,7 +867,7 @@ internal sealed class DistantObjectManager : MonoBehaviour
                 if (r.DistantOwned && info.Distant) continue; // vanilla draw real one
                 bool isTree = info.Kind == ObjectKind.Tree;
                 bool bigTree = isTree && info.Height >= cfg.BigTreeHeight.Value;
-                bool cardTree = isTree && cfg.DrawTrees.Value && (bigTree || cfg.SmallTreeCards.Value);
+                bool cardTree = isTree && cfg.V(cfg.DrawTrees) && (bigTree || cfg.SmallTreeCards.Value);
                 bool bigRock = info.Kind == ObjectKind.Rock && Mathf.Max(info.Height, info.Radius * 2f) >= cfg.BigRockSize.Value;
 
                 // Decide first; sample terrain only for what really get drawn.
@@ -898,6 +915,16 @@ internal sealed class DistantObjectManager : MonoBehaviour
                         o.Position.y += groundDelta;
                 }
                 _placements.Add(new Placement { Info = info, Position = o.Position, Rotation = o.Rotation, Scale = o.Scale, ScaleMul = mul, Card = card });
+#if DEBUG
+                if (isTree)
+                {
+                    testTrees++;
+                    if (terrain != null && s_testTreeAt.Count < 8) s_testTreeAt.Add(o.Position);
+                    if (terrain != null && TestWatchOn && s_testWatchAt.Count < 128 && TestWatched(o.Position)) s_testWatchAt.Add(o.Position);
+                }
+                else if (info.Kind == ObjectKind.Piece) testPieces++;
+                else if (info.Kind == ObjectKind.Rock) testRocks++;
+#endif
             }
         }
 
@@ -908,6 +935,15 @@ internal sealed class DistantObjectManager : MonoBehaviour
             return false;
         }
 
+#if DEBUG
+        tile.TestTrees = testTrees;
+        tile.TestPieces = testPieces;
+        tile.TestRocks = testRocks;
+        tile.TestTreeAt.Clear();
+        tile.TestTreeAt.AddRange(s_testTreeAt);
+        tile.TestWatchAt.Clear();
+        tile.TestWatchAt.AddRange(s_testWatchAt);
+#endif
         EnsureRoot();
         DestroyMeshes(tile);
         if (tile.Go == null)
@@ -974,10 +1010,10 @@ internal sealed class DistantObjectManager : MonoBehaviour
     {
         switch (kind)
         {
-            case ObjectKind.Tree: return cfg.DrawTrees.Value;
+            case ObjectKind.Tree: return cfg.V(cfg.DrawTrees);
             case ObjectKind.Bush: return cfg.DrawBushes.Value;
             case ObjectKind.Rock: return cfg.DrawRocks.Value;
-            case ObjectKind.Piece: return cfg.DrawPieces.Value;
+            case ObjectKind.Piece: return cfg.V(cfg.DrawPieces);
             case ObjectKind.Log: return cfg.DrawLogs.Value;
             case ObjectKind.Other: return cfg.DrawBushes.Value;
             default: return false;
@@ -1053,4 +1089,244 @@ internal sealed class DistantObjectManager : MonoBehaviour
           .Append(" totalBuilds=").Append(TotalBuilds);
         return sb.ToString();
     }
+
+#if DEBUG
+    // ------------------------------------------------------------------ self test windows (Debug build only)
+
+    private static readonly List<Vector3> s_testTreeAt = new List<Vector3>();
+    private static readonly List<Vector3> s_testWatchAt = new List<Vector3>();
+
+    // Self test (horizons.bug.tree-reseat): square of the world (XZ) whose trees every tile build remember
+    // (Tile.TestWatchAt, at most 128 per tile). Off = nothing remembered. Only looked at, never change what is drawn.
+    internal static bool TestWatchOn;
+    internal static float TestWatchMinX, TestWatchMinZ, TestWatchMaxX, TestWatchMaxZ;
+
+    private static bool TestWatched(Vector3 p) => p.x >= TestWatchMinX && p.x < TestWatchMaxX && p.z >= TestWatchMinZ && p.z < TestWatchMaxZ;
+
+    // How many times everything got thrown away (ClearAll): settings that start over, rebuild command, objects off.
+    internal int TestClears { get; private set; }
+    // Terrain surface me last looked at (LodTerrainManager.SurfaceVersion at that moment).
+    internal int TestSurfaceVersion => _surfaceVersion;
+    internal ImpostorAtlas TestAtlas => _atlas;
+    // Still work to do: recompute asked, tiles waiting to build, old tiles waiting to go, setting still settling.
+    internal bool TestBusy => _dirty || _scanBudgetHit || _queue.Count > 0 || _retiring.Count > 0 || _pendingReset != PendingReset.None;
+
+    internal void TestTotals(out int tiles, out int built, out int instances, out int trees, out int pieces, out int rocks)
+    {
+        tiles = 0;
+        built = 0;
+        instances = 0;
+        trees = 0;
+        pieces = 0;
+        rocks = 0;
+        foreach (Tile t in _tiles.Values)
+        {
+            tiles++;
+            if (!t.Built) continue;
+            built++;
+            instances += t.Instances;
+            trees += t.TestTrees;
+            pieces += t.TestPieces;
+            rocks += t.TestRocks;
+        }
+    }
+
+    // Object tile that draw the things standing at (x, z), finest first. band: 1 mesh, 2 full, 3 thin, 4 far.
+    // Tile own the zones whose CENTRE lie in it (Visit), so what it draw reach 32 m past its west and south edge:
+    // me look up by the centre of the zone that hold the point, never by the point (else a point in that 32 m strip
+    // give the neighbour tile).
+    internal bool TestTileAt(float x, float z, out int band, out bool built, out int trees, out int pieces)
+    {
+        int zx = Mathf.FloorToInt((x + 32f) / 64f), zy = Mathf.FloorToInt((z + 32f) / 64f);
+        Tile found = null;
+        // Zone with things in it: the tile that listed it at the last look.
+        if (_zoneTile.TryGetValue(ZoneObjectSource.ZoneKey(zx, zy), out TileKey owner)) _tiles.TryGetValue(owner, out found);
+        for (int level = 0; found == null && level <= TopLevel; level++)
+        {
+            int size = TileSizes[level];
+            _tiles.TryGetValue(new TileKey(level, FloorDiv(zx * 64f, size), FloorDiv(zy * 64f, size)), out found);
+        }
+        if (found != null)
+        {
+            band = (int)found.Band;
+            built = found.Built;
+            trees = found.TestTrees;
+            pieces = found.TestPieces;
+            return true;
+        }
+        band = 0;
+        built = false;
+        trees = 0;
+        pieces = 0;
+        return false;
+    }
+
+    // Things of a zone the far objects could draw, counted in the world data now with the rules of the zone scan
+    // (ZoneObjectSource.Scan). For zones me never scanned: real objects own them, so they are not in my cache.
+    private int TestLiveItems(int zx, int zy)
+    {
+        IReadOnlyList<ZDO> list = _source.EnumerateSector(zx, zy);
+        int n = 0;
+        for (int i = 0; i < list.Count; i++)
+        {
+            ZDO zdo = list[i];
+            if (zdo == null || !zdo.IsValid() || !zdo.Persistent) continue;
+            int prefab = zdo.GetPrefab();
+            if (prefab == PrefabCatalog.ZoneCtrlHash) continue;
+            if (PrefabCatalog.Get(prefab).Kind == ObjectKind.Skip) continue;
+            n++;
+        }
+        return n;
+    }
+
+    // Where trees of built near tiles (mesh and full band: they follow the terrain under them) were stood.
+    internal void TestNearTreeSamples(List<Vector3> into)
+    {
+        foreach (Tile t in _tiles.Values)
+            if (t.Built && (t.Band == Band.Mesh || t.Band == Band.Full)) into.AddRange(t.TestTreeAt);
+    }
+
+    // Same trees, in two heaps: inside = stand in own square of tile that draw them (me watch far terrain there),
+    // strip = stand in the 32 m past its west / south edge (tile draw zones whose CENTRE lie in it, see Visit).
+    internal void TestNearTreeSplit(List<Vector3> inside, List<Vector3> strip)
+    {
+        foreach (Tile t in _tiles.Values)
+        {
+            if (!t.Built || (t.Band != Band.Mesh && t.Band != Band.Full)) continue;
+            int size = TileSizes[t.Key.Level];
+            float minX = t.Key.X * size, minZ = t.Key.Y * size;
+            foreach (Vector3 p in t.TestTreeAt)
+            {
+                if (p.x < minX || p.z < minZ) strip.Add(p);
+                else inside.Add(p);
+            }
+        }
+    }
+
+    // Trees of built near tiles that stand in the watched square (TestWatchOn), where their tile stood them.
+    internal void TestWatchSamples(List<Vector3> into)
+    {
+        foreach (Tile t in _tiles.Values)
+            if (t.Built && (t.Band == Band.Mesh || t.Band == Band.Full)) into.AddRange(t.TestWatchAt);
+    }
+
+    // Wanted tiles whose nearest edge is really farther than distance from cam; piecesOn = of those, with buildings on.
+    internal void TestTilesBeyond(Vector3 cam, float distance, out int tiles, out int piecesOn)
+    {
+        tiles = 0;
+        piecesOn = 0;
+        foreach (Tile t in _tiles.Values)
+        {
+            int size = TileSizes[t.Key.Level];
+            float minX = t.Key.X * size, minZ = t.Key.Y * size;
+            if (AabbDist(cam.x, cam.z, minX, minZ, minX + size, minZ + size) <= distance) continue;
+            tiles++;
+            if (t.PiecesOn) piecesOn++;
+        }
+    }
+
+    private static bool ListsZone(Tile t, int zx, int zy)
+    {
+        foreach (ZoneRef z in t.Zones)
+            if (z.X == zx && z.Y == zy) return true;
+        return false;
+    }
+
+    // Zones with drawable objects within radius (zones) of the player's zone. far = drawn by a built (or retiring)
+    // far tile; real = in the game's near set NOW (the game's distance of this moment, not the one of my last look)
+    // and its real objects are there (ZoneReady, or handed over at my last look).
+    // holes = neither real nor far objects; doubled = both.
+    // Zones me never scanned count too (things counted in the world data): zones real objects own are not in my
+    // cache, and a zone that just lost its real objects is exactly the one that must not be missed.
+    internal void TestZoneReport(int radius, out int withItems, out int far, out int real, out int holes, out int doubled, out string firstHole, out string firstDouble)
+    {
+        withItems = 0;
+        far = 0;
+        real = 0;
+        holes = 0;
+        doubled = 0;
+        firstHole = "";
+        firstDouble = "";
+        if (ZNet.instance == null) return;
+        Vector2s refZone = ZoneSystem.GetZone(ZNet.instance.GetReferencePosition());
+        SimulationDistance sim = ZNet.instance.GetSyncedSimulationDistance();
+        for (int zy = refZone.y - radius; zy <= refZone.y + radius; zy++)
+        {
+            for (int zx = refZone.x - radius; zx <= refZone.x + radius; zx++)
+            {
+                bool hasItems = _source.TryGetCached(zx, zy, out ZoneObjects zo) ? zo.Items.Count > 0 : TestLiveItems(zx, zy) > 0;
+                if (!hasItems) continue;
+                withItems++;
+                int key = ZoneObjectSource.ZoneKey(zx, zy);
+                bool isFar = _zoneTile.TryGetValue(key, out TileKey tk) && _tiles.TryGetValue(tk, out Tile owner) && owner.Built && ListsZone(owner, zx, zy);
+                if (!isFar)
+                {
+                    foreach (Tile t in _retiring)
+                    {
+                        if (!t.Built || !ListsZone(t, zx, zy)) continue;
+                        isFar = true;
+                        break;
+                    }
+                }
+                bool isReal = InNearSet(new Vector2s(zx, zy), refZone, sim) && (_handedOver.Contains(key) || ZoneReady(zx, zy));
+                if (isFar) far++;
+                if (isReal) real++;
+                if (!isFar && !isReal)
+                {
+                    holes++;
+                    if (firstHole.Length == 0) firstHole = $"zone ({zx},{zy})";
+                }
+                if (isFar && isReal)
+                {
+                    doubled++;
+                    if (firstDouble.Length == 0) firstDouble = $"zone ({zx},{zy})";
+                }
+            }
+        }
+    }
+
+    // Zones a built far tile draw objects for: farthest one from (x, z) in metres (zone centre), and how many.
+    internal void TestFarZones(float x, float z, out int zones, out float farthest)
+    {
+        zones = 0;
+        farthest = 0f;
+        foreach (Tile t in _tiles.Values)
+        {
+            if (!t.Built || t.Instances == 0) continue;
+            foreach (ZoneRef r in t.Zones)
+            {
+                zones++;
+                float dx = r.X * 64f - x, dz = r.Y * 64f - z;
+                float d = Mathf.Sqrt(dx * dx + dz * dz);
+                if (d > farthest) farthest = d;
+            }
+        }
+    }
+
+    // Zones a built far tile with something in it draw objects for (zone coordinates).
+    internal void TestFarZoneCoords(List<Vector2> into)
+    {
+        foreach (Tile t in _tiles.Values)
+        {
+            if (!t.Built || t.Instances == 0) continue;
+            foreach (ZoneRef r in t.Zones) into.Add(new Vector2(r.X, r.Y));
+        }
+    }
+
+    // Far zones (drawn by a built tile with something in it) whose centre lie within radius of (x, z).
+    internal int TestFarZonesNear(float x, float z, float radius)
+    {
+        int n = 0;
+        foreach (Tile t in _tiles.Values)
+        {
+            if (!t.Built || t.Instances == 0) continue;
+            foreach (ZoneRef r in t.Zones)
+            {
+                float dx = r.X * 64f - x, dz = r.Y * 64f - z;
+                if (dx * dx + dz * dz <= radius * radius) n++;
+            }
+        }
+        return n;
+    }
+#endif
 }

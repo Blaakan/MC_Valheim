@@ -151,8 +151,7 @@ internal static class PlayerCheck
         var ready = connected && peer.IsReady();
         var kicked = connected && ZNet.PeersToDisconnectAfterKick.ContainsKey(peer);
         var compatible = connected && NetworkGate.PeerCompatible(peer);
-        var allow = Plugin.AllowPlayersWithoutMod != null && Plugin.AllowPlayersWithoutMod.Value;
-        switch (Decide(isServer, connected, ready, kicked, compatible, allow))
+        switch (Decide(isServer, connected, ready, kicked, compatible, AllowWithoutMod()))
         {
             case JoinVerdict.Compatible:
                 Log.Debug($"{Who(peer)} has {ModInfo.Name} turned on: allowed.");
@@ -166,6 +165,24 @@ internal static class PlayerCheck
                 Refuse(peer);
                 break;
         }
+    }
+
+#if DEBUG
+    // Self test (server half): players that are not compatible are let in until this Time.realtimeSinceStartup, as
+    // with AllowPlayersWithoutMod on (setting never written). Runs out alone: a test that die leave nothing behind.
+    internal static float TestAllowUntil { get; set; } = -1f;
+#endif
+
+    // Server setting AllowPlayersWithoutMod, read here only.
+    private static bool AllowWithoutMod()
+    {
+#if DEBUG
+        if (Time.realtimeSinceStartup < TestAllowUntil)
+        {
+            return true;
+        }
+#endif
+        return Plugin.AllowPlayersWithoutMod != null && Plugin.AllowPlayersWithoutMod.Value;
     }
 
     private static void Refuse(ZNetPeer peer)

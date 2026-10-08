@@ -43,6 +43,56 @@ internal static class NoteRelay
     internal static int SentCount;
     internal static int RelayedCount;
     internal static int ReceivedCount;
+
+    // Self test, server side: what the server took from players' games after its checks (stamped, cleaned), just
+    // before it passes it on. Counted since start.
+    internal static int SrvBatches;
+    internal static int SrvNotes;      // note ons
+    internal static int SrvNoteOffs;   // velocity 0
+    internal static int SrvLive;       // batches flagged Live
+    internal static int SrvEncores;    // batches whose Encore flag passed the server's rules
+    internal static int SrvEnds;
+    internal static int SrvEmpty;      // batches with no note (keep-alive, End)
+    internal static ZDOID SrvPerformer;
+    internal static Vector3 SrvPosition;
+    internal static InstrumentKind SrvInstrument;
+
+    private static void CountServer(NoteBatch batch)
+    {
+        SrvBatches++;
+        var ons = 0;
+        foreach (var n in batch.Notes)
+        {
+            if (n.Velocity == 0)
+            {
+                SrvNoteOffs++;
+            }
+            else
+            {
+                ons++;
+            }
+        }
+        SrvNotes += ons;
+        if (batch.Notes.Count == 0)
+        {
+            SrvEmpty++;
+        }
+        if (batch.Live)
+        {
+            SrvLive++;
+        }
+        if (batch.IsEncore)
+        {
+            SrvEncores++;
+        }
+        if (batch.IsEnd)
+        {
+            SrvEnds++;
+        }
+        SrvPerformer = batch.Performer;
+        SrvPosition = batch.Position;
+        SrvInstrument = batch.Instrument;
+    }
 #endif
 
     internal static void Start()
@@ -147,6 +197,9 @@ internal static class NoteRelay
                 Incoming.Performer = sender.m_characterID;
                 Incoming.Position = zdo.GetPosition();
                 Sanitize(sender, Incoming);
+#if DEBUG
+                CountServer(Incoming);
+#endif
                 Forward(sender, Incoming);
                 return;
             }

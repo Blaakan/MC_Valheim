@@ -31,10 +31,88 @@ internal sealed partial class Plugin : ModPlugin
             null, new ConfigurationManagerAttributes { Order = 80 }));
     }
 
+    // Sort and button code read the two settings only through these. Debug build: self-test can force a value in
+    // memory (never the config file). Release: plain config read, same as before.
+    internal static SortCriterion ReadSortBy()
+    {
+#if DEBUG
+        if (TestSortBy.HasValue)
+        {
+            return TestSortBy.Value;
+        }
+#endif
+        return SortBy.Value;
+    }
+
+    internal static bool ReadMergeStacks()
+    {
+#if DEBUG
+        if (TestMergeStacks.HasValue)
+        {
+            return TestMergeStacks.Value;
+        }
+#endif
+        return MergeStacks.Value;
+    }
+
+    // Sort order button write here. Debug build with a forced value: only the forced value change, config file stay.
+    internal static void WriteSortBy(SortCriterion next)
+    {
+#if DEBUG
+        if (TestSortBy.HasValue)
+        {
+            TestSortBy = next;
+            return;
+        }
+#endif
+        SortBy.Value = next; // BepInEx save the file; SettingChanged refresh texts too
+    }
+
+#if DEBUG
+    // Self-test only (SelfTests.cs). Null = use config.
+    internal static SortCriterion? TestSortBy;
+    internal static bool? TestMergeStacks;
+
+    private bool _testOff;
+
+    // Self-test only: same steps framework do on a live toggle (OnDeactivated then patches off / patches on then
+    // OnActivated), but no setting written. Framework still think me on: test must turn me back on in finally.
+    internal bool TestTurnOff()
+    {
+        if (_testOff || !IsActive)
+        {
+            return false;
+        }
+        _testOff = true;
+        try
+        {
+            OnDeactivated();
+        }
+        finally
+        {
+            Harmony.UnpatchSelf();
+        }
+        return true;
+    }
+
+    internal bool TestTurnOn()
+    {
+        if (!_testOff)
+        {
+            return false;
+        }
+        _testOff = false;
+        ApplyPatches(Harmony);
+        OnActivated();
+        return true;
+    }
+#endif
+
     // Me just turned on (game start, or live with a chest open: buttons show at once).
     protected override void OnActivated()
     {
         SortBy.SettingChanged += OnSortByChanged;
+        SelfTests.Register(); // Debug build only
         var gui = InventoryGui.instance;
         if (gui == null)
         {
@@ -55,6 +133,7 @@ internal sealed partial class Plugin : ModPlugin
     protected override void OnDeactivated()
     {
         SortBy.SettingChanged -= OnSortByChanged;
+        SelfTests.Unregister(); // Debug build only
         Safe(SortChestUi.Destroy, "buttons");
         BiomeIndex.Clear();
         ItemPrefab.Clear();

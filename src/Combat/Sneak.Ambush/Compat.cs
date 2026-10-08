@@ -42,11 +42,23 @@ internal static class Compat
         }
     }
 
+#if DEBUG
+    // Self test play "SecondaryAttacks or SmartSkills installed" (stand-down of our XP) without them, or "none
+    // installed" on a game that has one. Null = real look. Memory only, never in release.
+    internal static bool? TestOtherModPays { get; set; }
+#endif
+
     // Some other mod on this game pay sneak-attack XP.
     internal static bool OtherModPaysSneakXp
     {
         get
         {
+#if DEBUG
+            if (TestOtherModPays.HasValue)
+            {
+                return TestOtherModPays.Value;
+            }
+#endif
             Ensure();
             return _secondaryAttacks || _smartSkills;
         }

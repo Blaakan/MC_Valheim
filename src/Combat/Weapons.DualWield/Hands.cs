@@ -94,6 +94,13 @@ internal static class Hands
 #if DEBUG
     // Self test: throw inside the apply step once (hands must stay consistent).
     internal static bool TestThrowInApply;
+
+    // Self test read and set the "first pairing message shown" flag of this session (it put the old value back).
+    internal static bool TestFirstPairShown
+    {
+        get => _firstPairShown;
+        set => _firstPairShown = value;
+    }
 #endif
 
     // OnActivated / OnDeactivated: first frame after activation see "all changed" and check everything.

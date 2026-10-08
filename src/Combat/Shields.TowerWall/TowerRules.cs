@@ -130,9 +130,21 @@ internal sealed class TowerRules
     // server's once they came, null (vanilla towers) while waiting. Debug: self test override.
     internal static TowerRules InForce => ServerRules.InForce;
 
+#if DEBUG
+    // Self test: play "own settings now say this" with no config write (test then call ServerRules.OwnChanged, what
+    // the settings handler call). Null = the config. Read only here.
+    internal static TowerRules DebugOwn;
+#endif
+
     // This game's own config.
     internal static TowerRules Own()
     {
+#if DEBUG
+        if (DebugOwn != null)
+        {
+            return DebugOwn;
+        }
+#endif
         var r = new TowerRules
         {
             Towers = Plugin.Towers.Value,

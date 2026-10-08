@@ -155,6 +155,11 @@ internal static class MouseCapturePatches
 [HarmonyPatch(typeof(GameCamera), nameof(GameCamera.OnDestroy))]
 internal static class GameCameraDestroyPatches
 {
+#if DEBUG
+    // Self test: what me do when the world camera goes (logout), without leaving the world.
+    internal static void TestRun() => Postfix();
+#endif
+
     [HarmonyPostfix]
     private static void Postfix()
     {

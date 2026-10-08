@@ -86,7 +86,7 @@ internal static class ItemDropPatches
         }
         try
         {
-            if (!Plugin.ShowInHoverText.Value || !FilterState.EnsureLocal() || FilterState.Mode == FilterMode.Everything
+            if (!Plugin.ShowInHoverTextOn || !FilterState.EnsureLocal() || FilterState.Mode == FilterMode.Everything
                 || __instance.IsPiece() || !FilterState.Blocks(__instance))
             {
                 return;

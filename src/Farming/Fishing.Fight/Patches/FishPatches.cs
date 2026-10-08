@@ -141,7 +141,7 @@ internal static class FishPatches
         if (ahead < fish.m_minDepth && fight.OtherRunDir != Vector3.zero)
         {
             var other = fish.GetPointDepth(pos + fight.OtherRunDir * 2f);
-            if (other >= fish.m_minDepth || other > ahead + 0.25f)
+            if (FightLogic.TurnFromShallows(ahead, other, fish.m_minDepth))
             {
                 fight.RequestFlip();
             }

@@ -19,19 +19,22 @@ namespace MC.Exploration.ViewSpyglassMod;
 //   spyglass.item     item and recipe registered (database, network list, not in the weapon achievement list),
 //                     item data (tool like the hammer, no build pieces, no attack, no durability, icon), equip
 //                     takes both hands (a torch put away, a torch next replaces it), a click never punches,
-//                     hand copy carries the model; screenshots held and dropped; NOTE build report
+//                     hand copy carries the model; screenshots held and dropped; the player's own drop and
+//                     picking it up again; NOTE build report
 //   spyglass.view     live: raise (state, zoom, camera at the eye, own body hidden, overlay, crosshair off, ZDO flag),
 //                     feet locked, aim slowed by the zoom, wheel zoom cap, Distant Horizons slot and fog (when it
 //                     runs), lower (everything back), pending rules = no raise, unequip = instant drop; screenshots
 //   spyglass.pose     live: arm pose seen from outside (camera parked), eyepiece at the eye, also the way other
-//                     players' games pose it; screenshots
+//                     players' games pose it, arm down again after lowering; screenshots
 //   spyglass.far      live: travel to the highest ground near the spawn, look over open land, raise x8 and x3;
 //                     screenshots (far land and objects come from Distant Horizons when it runs), travel back
 //   spyglass.export   writes the item and package icons (PNG) next to the screenshots; NOTE dumps of rig, camera,
 //                     canvases
+// More tests in SelfTestsInput.cs (clicks, keys, wheel, what lowers it), SelfTestsWorld.cs (recipe, hands, round view,
+// fog, live toggle, other MC mods, log) and SelfTestsMultiplayer.cs (real dedicated server).
 // Me force rules only with ServerRules.TestRules / TestPending and drive the spyglass with Scope.Test*: never config.
-// Rig put back controls, look, time, inventory and equipment.
-internal static class SelfTests
+// Rig put back controls, look, time, inventory and equipment, zoom pick, and whatever a test told it to (OnRestore).
+internal static partial class SelfTests
 {
     private const string NetworkName = "spyglass.network";
     private const string ItemName = "spyglass.item";
@@ -50,6 +53,7 @@ internal static class SelfTests
         SelfTest.Register(PoseName, RunPose);
         SelfTest.Register(FarName, RunFar);
         SelfTest.Register(ExportName, RunExport);
+        RegisterMore();
 #endif
     }
 
@@ -63,6 +67,7 @@ internal static class SelfTests
         SelfTest.Unregister(PoseName);
         SelfTest.Unregister(FarName);
         SelfTest.Unregister(ExportName);
+        UnregisterMore();
         ClearOverrides();
 #endif
     }
@@ -75,6 +80,16 @@ internal static class SelfTests
         ScopeCamera.TestPoseView = false;
         ArmPose.TestAsRemote = false;
         Plugin.TestInactive = false;
+        ServerRules.TestHoldAnswers = false;
+        Scope.TestHoldToLook = null;
+        Scope.TestAimSensitivity = null;
+        Scope.TestStartMagnification = null;
+        Scope.TestScroll = 0f;
+        ScopeOverlay.TestClearViewSize = null;
+        ScopeOverlay.TestEdgeBlur = null;
+        ScopeOverlay.TestEdgeDarkness = null;
+        ScopeCamera.TestDistantHorizons = null;
+        ScopeCamera.TestWheelNudge = 0f;
     }
 
     // ---------- helpers ----------
@@ -135,6 +150,9 @@ internal static class SelfTests
         private readonly string _name;
         private readonly Quaternion _originRotation;
         private string _debugEnv;
+        private readonly float _zoomPick;
+        private readonly bool _ghost;
+        private readonly List<KeyValuePair<string, Action>> _undo = new List<KeyValuePair<string, Action>>();
 
         internal SpyRig(Player player, string name)
         {
@@ -146,6 +164,17 @@ internal static class SelfTests
             _yaw = player.m_lookYaw;
             _right = player.GetRightItem();
             _left = player.GetLeftItem();
+            _zoomPick = Scope.TestRawMagnification;
+            // Wild monster at the test player (a Greyling spawned in the night of one run) hit it every few seconds:
+            // each hit lower the spyglass and push the player, in god mode too. Me take away the ones near or after
+            // the player, and no monster see or hear the player while the test runs (like console "ghost").
+            _ghost = player.InGhostMode();
+            player.SetGhostMode(true);
+            var gone = SendAwayEnemies(player);
+            if (gone.Length > 0)
+            {
+                SelfTest.Note(name, "hostile creature(s) at the test player removed before the test: " + gone);
+            }
         }
 
         internal ItemDrop.ItemData Give(string prefab)
@@ -156,6 +185,51 @@ internal static class SelfTests
                 _added.Add(item);
             }
             return item;
+        }
+
+        // Item made or picked up during the test: removed by Restore like a given one.
+        internal void Track(ItemDrop.ItemData item)
+        {
+            if (item != null && !_added.Contains(item))
+            {
+                _added.Add(item);
+            }
+        }
+
+        // One more thing to put back; Restore runs these first, last added first.
+        internal void OnRestore(string what, Action undo) => _undo.Add(new KeyValuePair<string, Action>(what, undo));
+
+        // Test moves the player (walk, auto-run, a seat): back to where it stood at the end.
+        internal void KeepPlace()
+        {
+            OnRestore("place", () =>
+            {
+                if (Player.IsAttached())
+                {
+                    Player.AttachStop();
+                }
+                Player.m_autoRun = false;
+                Player.m_moveDir = Vector3.zero;
+                Player.transform.position = Origin;
+                Player.transform.rotation = _originRotation;
+                var body = Player.m_body;
+                if (body != null)
+                {
+                    body.position = Origin;
+                    body.linearVelocity = Vector3.zero;
+                }
+            });
+        }
+
+        // Weather by name (like console "env <name>"); put back by Restore.
+        internal void Weather(string env)
+        {
+            var man = EnvMan.instance;
+            if (_debugEnv == null)
+            {
+                _debugEnv = man.m_debugEnv ?? "";
+            }
+            man.m_debugEnv = env;
         }
 
         // Me drive the player (no keyboard in between).
@@ -242,8 +316,15 @@ internal static class SelfTests
 
         internal void Restore()
         {
+            for (var i = _undo.Count - 1; i >= 0; i--)
+            {
+                Try(_undo[i].Key, _undo[i].Value);
+            }
+            _undo.Clear();
             ClearOverrides();
             Try("spyglass down", Scope.Abort);
+            Try("zoom pick", () => Scope.TestRawMagnification = _zoomPick);
+            Try("ghost mode", () => Player.SetGhostMode(_ghost));
             Try("controls", () =>
             {
                 if (_controller != null)
@@ -278,10 +359,8 @@ internal static class SelfTests
                 var inv = Player.GetInventory();
                 foreach (var item in _added)
                 {
-                    if (Player.IsItemEquiped(item))
-                    {
-                        Player.UnequipItem(item, false);
-                    }
+                    // Also when it hangs on the back (R, swimming): the game forgets it there too.
+                    Player.UnequipItem(item, false);
                     inv.RemoveItem(item);
                 }
                 if (_right != null && inv.ContainsItem(_right) && !Player.IsItemEquiped(_right))
@@ -333,6 +412,45 @@ internal static class SelfTests
                 SelfTest.Note(_name, $"restore {what} failed: {e.Message}");
             }
         }
+    }
+
+    // Wild monsters (not tamed, enemy of the player) within 30 m, or within 80 m when alerted or after the player:
+    // removed from the world (no death, no drops). Names and distances of the removed ones, "" = none.
+    private static string SendAwayEnemies(Player player)
+    {
+        var gone = new List<string>();
+        var scene = ZNetScene.instance;
+        if (player == null || scene == null)
+        {
+            return "";
+        }
+        foreach (var creature in new List<Character>(Character.GetAllCharacters()))
+        {
+            if (creature == null || creature.IsPlayer() || creature.IsTamed() || creature.IsDead())
+            {
+                continue;
+            }
+            var ai = creature.GetBaseAI() as MonsterAI;
+            if (ai == null || !BaseAI.IsEnemy(creature, player))
+            {
+                continue;
+            }
+            var far = Vector3.Distance(creature.transform.position, player.transform.position);
+            var after = ai.IsAlerted() || ReferenceEquals(ai.GetTargetCreature(), player);
+            if (far > 80f || (far > 30f && !after))
+            {
+                continue;
+            }
+            var view = creature.m_nview;
+            if (view == null || !view.IsValid())
+            {
+                continue;
+            }
+            gone.Add($"{creature.gameObject.name} {F(far)} m{(after ? " (after the player)" : "")}");
+            view.ClaimOwnership();
+            scene.Destroy(creature.gameObject);
+        }
+        return string.Join(", ", gone.ToArray());
     }
 
     private static IEnumerator WaitFor(Func<bool> done, float timeout)
@@ -440,7 +558,8 @@ internal static class SelfTests
         }
         c.Note("build: " + SpyglassContent.BuildReport);
         c.Check(SpyglassContent.Built, "item built");
-        c.Check(!SpyglassContent.MissingReported, "no missing-knife error");
+        // "No missing-knife error" has own test (spyglass.bug.missing-knife-error): with some other mods the main
+        // menu log it although the item is built fine afterwards.
         var prefab = db.GetItemPrefab(SpyglassContent.ItemName);
         c.Check(prefab != null && ReferenceEquals(prefab, SpyglassContent.ItemPrefab), "in the item database");
         c.Check(ZNetScene.instance.GetPrefab(SpyglassContent.ItemHash) != null, "in the network prefab list");
@@ -499,6 +618,7 @@ internal static class SelfTests
 
         var rig = new SpyRig(player, ItemName);
         GameObject dropped = null;
+        GameObject thrown = null;
         bool? autoPickup = null;
         try
         {
@@ -567,6 +687,57 @@ internal static class SelfTests
                 SelfTest.Screenshot(ItemName, "dropped");
                 yield return Frames(2);
                 ScopeCamera.TestPoseView = false;
+
+                // The player's own drop (what the inventory window does), then picked up again (T14).
+                var inv = player.GetInventory();
+                var onGround = new HashSet<ItemDrop>(ItemDrop.s_instances);
+                var mine = new HashSet<ItemDrop.ItemData>();
+                foreach (var item in inv.GetAllItems())
+                {
+                    if (SpyglassContent.IsSpyglass(item))
+                    {
+                        mine.Add(item);
+                    }
+                }
+                var count = CountSpyglasses(inv);
+                c.Check(player.DropItem(inv, spy, 1), "dropped from the inventory");
+                yield return new WaitForSeconds(1f);
+                ItemDrop own = null;
+                foreach (var d in ItemDrop.s_instances)
+                {
+                    if (d != null && !onGround.Contains(d) && SpyglassContent.IsSpyglass(d.m_itemData))
+                    {
+                        own = d;
+                    }
+                }
+                thrown = own != null ? own.gameObject : null;
+                c.Check(own != null && CountSpyglasses(inv) == count - 1 && !inv.ContainsItem(spy) && player.GetRightItem() != spy,
+                    "it left the hand and the inventory and lies on the ground");
+                if (own != null)
+                {
+                    c.Check(FindDeep(own.transform, SpyglassModel.ModelName) != null && own.GetComponentInChildren<MeshRenderer>() != null,
+                        "the player's dropped copy shows the spyglass model");
+                    var picked = player.Pickup(own.gameObject, false, false);
+                    yield return Frames(3);
+                    ItemDrop.ItemData back = null;
+                    foreach (var item in inv.GetAllItems())
+                    {
+                        if (SpyglassContent.IsSpyglass(item) && !mine.Contains(item))
+                        {
+                            back = item;
+                        }
+                    }
+                    rig.Track(back);
+                    c.Check(picked && back != null && CountSpyglasses(inv) == count, "picked up again: back in the inventory");
+                    c.Check(thrown == null, "the ground copy is gone after the pickup");
+                    c.Check(back != null && !back.m_shared.m_useDurability && back.m_stack == 1 && back.m_quality == 1,
+                        "the picked up spyglass has no durability, one item, quality 1");
+                    if (back != null)
+                    {
+                        player.EquipItem(back, false);
+                        c.Check(player.GetRightItem() == back, "and it goes back into the right hand");
+                    }
+                }
             }
             c.Report();
         }
@@ -575,6 +746,10 @@ internal static class SelfTests
             if (dropped != null && ZNetScene.instance != null)
             {
                 ZNetScene.instance.Destroy(dropped);
+            }
+            if (thrown != null && ZNetScene.instance != null)
+            {
+                ZNetScene.instance.Destroy(thrown);
             }
             if (autoPickup.HasValue)
             {
@@ -816,6 +991,7 @@ internal static class SelfTests
             yield return new WaitForEndOfFrame();
             gap = ArmPose.EyepieceGap(player);
             c.Note("as another player: " + ArmPose.EyepieceOffset(player));
+            c.Check(Scope.State == ScopeState.Raised, $"other players: spyglass still up for the look ({Scope.State})");
             c.Check(gap >= 0f && gap < 0.12f, $"other players: eyepiece at the eye ({F(gap)} m)");
             c.Check(ArmPose.TubeAlignment(player) > 0.97f, $"other players: tube along the head look ({F(ArmPose.TubeAlignment(player))})");
             SelfTest.Screenshot(PoseName, "remote-side");
@@ -825,6 +1001,11 @@ internal static class SelfTests
             yield return WaitFor(() => Scope.State == ScopeState.Idle, 3f);
             yield return Frames(3);
             c.Check(Scope.State == ScopeState.Idle, "lowered");
+            // Arm down again (T07): eyepiece far from the eyes, like before the raise.
+            yield return new WaitForSeconds(0.5f);
+            yield return new WaitForEndOfFrame();
+            gap = ArmPose.EyepieceGap(player);
+            c.Check(gap > 0.2f, $"arm down again after lowering (eyepiece {F(gap)} m from the eyes)");
             c.Report();
         }
         finally

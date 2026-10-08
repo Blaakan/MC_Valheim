@@ -57,7 +57,8 @@ namespace MC.Combat.ShieldsTowerWallMod;
 // config. Me put back god mode, StaminaRate and WorldLevel keys, stamina, health, hands, the player's place and facing
 // (bash steps and lane turns: next test start where this one did); take back every item me give; destroy what me
 // spawn. Creatures me spawn have their AI off (stand still, never attack).
-internal static class SelfTests
+// More tests live in SelfTests.Play.cs and SelfTests.Bash.cs (single player), SelfTests.Mp.cs (dedicated server).
+internal static partial class SelfTests
 {
     private const string DataName = "tower.data";
     private const string RulesName = "tower.rules";
@@ -83,6 +84,16 @@ internal static class SelfTests
         SelfTest.Register(LockName, RunLock);
         SelfTest.Register(NgName, RunNg);
         SelfTest.Register(ToggleName, RunToggle);
+        RegisterMore();
+#endif
+    }
+
+    // Plugin.BindConfig: tests that must run while the mod is NOT active (server without the mod). Never removed.
+    [Conditional("DEBUG")]
+    internal static void RegisterAlways()
+    {
+#if DEBUG
+        RegisterInactive();
 #endif
     }
 
@@ -100,8 +111,10 @@ internal static class SelfTests
         SelfTest.Unregister(LockName);
         SelfTest.Unregister(NgName);
         SelfTest.Unregister(ToggleName);
+        UnregisterMore();
         SelfTestHooks.Clear();
         ServerRules.TestRules = null;
+        ClearOwn();
 #endif
     }
 
@@ -169,6 +182,13 @@ internal static class SelfTests
         private readonly Vector3 _pos;
         private readonly Quaternion _rot;
         private readonly Quaternion _yaw;
+        private readonly Dictionary<Skills.SkillType, KeyValuePair<float, float>> _skills =
+            new Dictionary<Skills.SkillType, KeyValuePair<float, float>>();
+        private readonly List<ItemDrop.ItemData> _worn = new List<ItemDrop.ItemData>();
+        private readonly bool _walk;
+        private readonly bool _pvp;
+        private readonly float _maxAdrenaline;
+        private readonly float _adrenaline;
 
         internal Rig(string test)
         {
@@ -181,8 +201,26 @@ internal static class SelfTests
             _pos = P.transform.position;
             _rot = P.transform.rotation;
             _yaw = P.m_lookYaw;
+            // Skills (blocks, bashes, runs and dodges train them), worn armor, walk toggle, PvP, adrenaline: as found.
+            foreach (var pair in P.m_skills.m_skillData)
+            {
+                _skills[pair.Key] = new KeyValuePair<float, float>(pair.Value.m_level, pair.Value.m_accumulator);
+            }
+            foreach (var item in new[] { P.m_helmetItem, P.m_chestItem, P.m_legItem, P.m_shoulderItem })
+            {
+                if (item != null)
+                {
+                    _worn.Add(item);
+                }
+            }
+            _walk = P.m_walk;
+            _pvp = P.IsPVPEnabled();
+            _maxAdrenaline = P.m_maxAdrenaline;
+            _adrenaline = P.m_adrenaline;
             EmptyHands();
         }
+
+        internal bool IsTracked(ItemDrop.ItemData item) => item != null && _items.Contains(item);
 
         internal void EmptyHands()
         {
@@ -317,6 +355,7 @@ internal static class SelfTests
             {
                 SelfTestHooks.Clear();
                 ServerRules.TestRules = null;
+                ClearOwn();
             });
             Try("items", () =>
             {
@@ -374,12 +413,30 @@ internal static class SelfTests
                     return;
                 }
                 P.GetSEMan().RemoveStatusEffect(SEMan.s_statusEffectPoison, true);
+                P.GetSEMan().RemoveStatusEffect(SEMan.s_statusEffectBurning, true);
                 P.m_stamina = P.GetMaxStamina();
                 P.m_staminaRegenTimer = 0f;
                 P.m_staggerDamage = 0f;
                 P.m_pushForce = Vector3.zero;
                 P.SetHealth(P.GetMaxHealth());
                 P.SetGodMode(_god);
+                P.SetCrouch(false);
+                P.m_walk = _walk;
+                if (P.IsPVPEnabled() != _pvp)
+                {
+                    P.SetPVP(_pvp);
+                }
+                P.m_maxAdrenaline = _maxAdrenaline;
+                P.m_adrenaline = _adrenaline;
+                P.m_queuedAttackTimer = 0f;
+                P.m_queuedDodgeTimer = 0f;
+                foreach (var item in _worn)
+                {
+                    if (item != null && Inv.ContainsItem(item) && !P.IsItemEquiped(item))
+                    {
+                        P.EquipItem(item, false);
+                    }
+                }
                 if (_right != null && Inv.ContainsItem(_right) && !P.IsItemEquiped(_right))
                 {
                     P.EquipItem(_right, false);
@@ -387,6 +444,26 @@ internal static class SelfTests
                 if (_left != null && Inv.ContainsItem(_left) && !P.IsItemEquiped(_left))
                 {
                     P.EquipItem(_left, false);
+                }
+            });
+            Try("skills", () =>
+            {
+                if (P == null)
+                {
+                    return;
+                }
+                var data = P.m_skills.m_skillData;
+                foreach (var key in data.Keys.ToList())
+                {
+                    if (_skills.TryGetValue(key, out var was))
+                    {
+                        data[key].m_level = was.Key;
+                        data[key].m_accumulator = was.Value;
+                    }
+                    else
+                    {
+                        data.Remove(key);
+                    }
                 }
             });
             Try("place", () =>
@@ -450,6 +527,8 @@ internal static class SelfTests
         internal float SpeedAfter = float.NaN; // animator speed two fixed steps after the swing
         internal float StaminaUsed;           // stamina before the press minus the lowest seen during the swing
         internal string Blocker = "";         // Hit event but target took nothing: what stand in the lane after the swing
+        internal bool StaggeringBefore;       // target was in its stagger animation the frame before the hit
+        internal float HitTime = -1f;         // Time.time of the first Hit event, -1 = none
 
         // Bash Hit event came (animation side).
         internal bool Hit => Events > 0 && !float.IsNaN(Gained);
@@ -839,7 +918,9 @@ internal static class SelfTests
     // cooldown. Me watch frame by frame until the swing ends: attack state, first Hit event, clip names and speeds at
     // 0.2 s, one screenshot at 0.25 s, target's stagger gained at the hit (drain since then put back), health lost,
     // stamina spent, speed after the swing.
-    private static IEnumerator Press(Player p, Character target, Swing s, string test, string shot, bool resetBar = true)
+    // refill false = target's health left alone: Character.SetHealth(max) also write the creature's "killed with" note
+    // back to "mixed" (ZDOVars.s_modifiers 0), and vanilla RPC_Damage then never note this hit's kind.
+    private static IEnumerator Press(Player p, Character target, Swing s, string test, string shot, bool resetBar = true, bool refill = true)
     {
         yield return WaitIdle(p);
         yield return WaitCooldown(p);
@@ -849,7 +930,10 @@ internal static class SelfTests
         {
             target.m_staggerDamage = 0f;
         }
-        target.SetHealth(target.GetMaxHealth());
+        if (refill)
+        {
+            target.SetHealth(target.GetMaxHealth());
+        }
         yield return Fixed;
         var drain = Drain(target);
         s.Drain = drain;
@@ -874,12 +958,19 @@ internal static class SelfTests
         s.Trigger = attack.m_attackAnimation;
         var clipsTaken = false;
         var shotTaken = shot == null;
+        var staggering = target.IsStaggering();
         // Slow swing: kick at 0.3 is about 5 s.
         var watch = 3.5f / Mathf.Min(1f, s.Factor);
         while (Time.time - t0 < watch)
         {
             yield return null;
             var t = Time.time - t0;
+            if (s.HitAt < 0f && BashWatch.DebugHitEvents > events0)
+            {
+                s.StaggeringBefore = staggering; // read the frame before: this hit's own stagger not in it
+                s.HitTime = BashWatch.DebugFirstHitTime;
+            }
+            staggering = target.IsStaggering();
             staminaLow = Mathf.Min(staminaLow, p.GetStamina());
             if (s.InAttackAt < 0f && p.InAttack())
             {
@@ -1903,8 +1994,10 @@ internal static class SelfTests
             var se = Brace.Clone;
             var hud = new List<StatusEffect>();
             p.GetSEMan().GetHUDStatusEffects(hud);
-            c.Check(se != null && !se.m_hidden && se.m_name == Brace.BracedText && se.m_icon != null && hud.Contains(se),
-                "blocking: 'Braced' shows on the HUD with the tower's icon");
+            var towerIcons = tower.m_shared.m_icons;
+            c.Check(se != null && !se.m_hidden && se.m_name == Brace.BracedText && se.m_icon != null && hud.Contains(se)
+                    && towerIcons != null && towerIcons.Length > 0 && ReferenceEquals(se.m_icon, towerIcons[0]) && Brace.BracedText == "Braced",
+                $"blocking: 'Braced' shows on the HUD with the tower shield's own picture (name '{(se != null ? se.m_name : "none")}')");
             SelfTest.Screenshot(BlockName, "braced");
             yield return null;
             yield return null;
@@ -2006,8 +2099,11 @@ internal static class SelfTests
             c.Check(Near(se.m_staggerModifier, -0.8f), $"the other effect gone: Braced gives {F(se.m_staggerModifier)} again (-0.80)");
 
             yield return Ready(p, 8f);
-            c.Check(se.m_name == Brace.ExhaustedText && se.m_flashIcon && !se.m_hidden && Near(se.m_staggerModifier, 0f),
-                $"stamina 8 (one block or less): 'Braced (exhausted)', icon flashing, no resistance ('{se.m_name}')");
+            hud.Clear();
+            p.GetSEMan().GetHUDStatusEffects(hud);
+            c.Check(se.m_name == Brace.ExhaustedText && Brace.ExhaustedText == "Braced (exhausted)" && se.m_flashIcon && !se.m_hidden && hud.Contains(se)
+                    && Near(se.m_staggerModifier, 0f),
+                $"stamina 8 (one block or less): 'Braced (exhausted)' on the HUD, icon flashing, no resistance ('{se.m_name}')");
             SelfTest.Screenshot(BlockName, "exhausted");
             yield return null;
             yield return null;
@@ -2055,8 +2151,10 @@ internal static class SelfTests
             yield return Fixed;
             yield return Fixed;
             se = Brace.Clone;
-            c.Check(se != null && se.m_hidden && Near(se.m_speedModifier, 0f) && Near(se.m_staggerModifier, 0f),
-                "block released: Braced hidden, speed and stagger modifiers 0");
+            hud.Clear();
+            p.GetSEMan().GetHUDStatusEffects(hud);
+            c.Check(se != null && se.m_hidden && !hud.Contains(se) && Near(se.m_speedModifier, 0f) && Near(se.m_staggerModifier, 0f),
+                "block released: the Braced icon is off the HUD, speed and stagger modifiers 0");
             SelfTestHooks.HoldBlock = true;
             yield return Until(() => p.IsBlocking() && Brace.Clone != null && !Brace.Clone.m_hidden, 3f);
             p.UnequipItem(tower);

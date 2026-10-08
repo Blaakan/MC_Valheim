@@ -70,30 +70,49 @@ internal static class ForeignMods
             {
                 continue;
             }
-            var guid = info.Metadata.GUID;
-            var name = string.IsNullOrEmpty(info.Metadata.Name) ? guid : info.Metadata.Name;
-            if (string.Equals(guid, StandaloneGuid, StringComparison.OrdinalIgnoreCase))
-            {
-                name = "The standalone Distant Horizons (BepInEx/plugins/DistantHorizons)"; // same name as me: say which
-            }
-            switch (Classify(guid))
-            {
-                case ForeignKind.Blocks:
-                    if (Logged.Add(guid))
-                    {
-                        Log.Warning($"{name} also draws the distant terrain, so {ModInfo.Name} stays off. Remove one of them.");
-                    }
-                    blocker ??= name;
-                    break;
-                case ForeignKind.Composes:
-                    if (Logged.Add(guid))
-                    {
-                        Log.Info($"{name} is installed: its distant terrain option also thins the fog, so with both the fog "
-                                 + $"is thinned twice. Set one of the two fog settings back to 1 if the fog looks too thin.");
-                    }
-                    break;
-            }
+            Consider(info.Metadata.GUID, info.Metadata.Name, ref blocker);
         }
+#if DEBUG
+        foreach (var fake in TestPlugins)
+        {
+            Consider(fake.Key, fake.Value, ref blocker);
+        }
+#endif
         return blocker == null ? null : $"Inactive: {blocker} also draws the distant terrain. Remove one of them.";
     }
+
+    // One loaded plugin: log once what me do about it, first blocking one give the Status text.
+    private static void Consider(string guid, string pluginName, ref string blocker)
+    {
+        var name = string.IsNullOrEmpty(pluginName) ? guid : pluginName;
+        if (string.Equals(guid, StandaloneGuid, StringComparison.OrdinalIgnoreCase))
+        {
+            name = "The standalone Distant Horizons (BepInEx/plugins/DistantHorizons)"; // same name as me: say which
+        }
+        switch (Classify(guid))
+        {
+            case ForeignKind.Blocks:
+                if (Logged.Add(guid))
+                {
+                    Log.Warning($"{name} also draws the distant terrain, so {ModInfo.Name} stays off. Remove one of them.");
+                }
+                blocker ??= name;
+                break;
+            case ForeignKind.Composes:
+                if (Logged.Add(guid))
+                {
+                    Log.Info($"{name} is installed: its distant terrain option also thins the fog, so with both the fog "
+                             + $"is thinned twice. Set one of the two fog settings back to 1 if the fog looks too thin.");
+                }
+                break;
+        }
+    }
+
+#if DEBUG
+    // Self test: plugins that count as loaded here though they are not (GUID, name). In memory only.
+    internal static readonly List<KeyValuePair<string, string>> TestPlugins = new List<KeyValuePair<string, string>>();
+
+    // Self test: log line for this GUID may come again (it come once per game session).
+    internal static void ForgetLoggedForTest(string guid) => Logged.Remove(guid);
+#endif
 }

@@ -24,6 +24,13 @@ internal static class CharacterPatches
         __state = false;
         try
         {
+#if DEBUG
+            // Debug build only: self test play a thrower without me (owner side stay on). Finalizer still run.
+            if (TestSwitches.ThrowerSideOff)
+            {
+                return true;
+            }
+#endif
             // Every hit in game come here. Scope check = plain ref compare; then hash (most hits: 0).
             if (HitScope.IsNestedHit(__instance, hit))
             {
@@ -96,6 +103,13 @@ internal static class CharacterRpcDamagePatches
         __state = null;
         try
         {
+#if DEBUG
+            // Debug build only: self test play a tame owner without me (friend's game, vanilla server).
+            if (TestSwitches.OwnerSideOff)
+            {
+                return;
+            }
+#endif
             // Cheap hash check first: this run for every hit on the owner.
             if (hit == null || !HarpoonEffect.IsHarpoon(hit.m_statusEffectHash))
             {

@@ -61,6 +61,32 @@ internal static class FightHud
 #if DEBUG
     // Self test: arrow on or off without touching the config. Null = config.
     internal static bool? TestArrow;
+
+    // Self test: bar size and place without touching the config (x = BarScale, y = BarOffsetX, z = BarOffsetY).
+    // Null = config.
+    internal static Vector3? TestDisplay;
+
+    // Self test read what the last frame put on screen (never write). Objects not built yet = false / zero / null.
+    internal const float TestTrackHeight = TrackHeight;
+    internal static Transform TestRoot => _root != null ? _root.transform : null;
+    internal static bool TestBarOnScreen => _bar != null && _bar.gameObject.activeInHierarchy;
+    internal static Vector2 TestBarPosition => _bar != null ? _bar.anchoredPosition : Vector2.zero;
+    internal static Vector3 TestBarScale => _bar != null ? _bar.localScale : Vector3.zero;
+    internal static Vector2 TestBarSize => _bar != null ? _bar.sizeDelta : Vector2.zero;
+    internal static Vector3 TestBarWorld => _bar != null ? _bar.position : Vector3.zero;
+    internal static float TestZoneBottom => _zone != null ? _zone.anchoredPosition.y : -1f;
+    internal static float TestZoneHeight => _zone != null ? _zone.sizeDelta.y : -1f;
+    internal static bool TestZoneGreen => _zoneImage != null && _zoneImage.color == ZoneInColor;
+    internal static bool TestZoneOrange => _zoneImage != null && _zoneImage.color == ZoneOutColor;
+    internal static float TestFishHeight => _fish != null ? _fish.anchoredPosition.y : -1f;
+    internal static Sprite TestFishSprite => _fishImage != null ? _fishImage.sprite : null;
+    internal static bool TestMeterOnScreen => _meterFill != null && _meterFill.gameObject.activeInHierarchy;
+    internal static float TestMeterHeight => _meterFill != null ? _meterFill.sizeDelta.y : -1f;
+    internal static bool TestArrowOnScreen => _arrow != null && _arrow.gameObject.activeInHierarchy;
+    internal static Vector2 TestArrowPosition => _arrow != null ? _arrow.anchoredPosition : Vector2.zero;
+    internal static Vector3 TestArrowScale => _arrow != null ? _arrow.localScale : Vector3.zero;
+    internal static bool TestArrowGreen => _arrowImage != null && _arrowImage.color == ArrowGood;
+    internal static bool TestArrowRed => _arrowImage != null && _arrowImage.color == ArrowWrong;
 #endif
 
     internal static void Tick()
@@ -86,15 +112,27 @@ internal static class FightHud
         Draw(fight);
     }
 
-    private static void Draw(Fight fight)
+    // Display settings (each player's own). Only reader of them: self test put its values here, never in the config.
+    private static void ReadDisplay(out float scale, out float offsetX, out float offsetY, out bool showArrow)
     {
-        var scale = Plugin.BarScale != null ? Plugin.BarScale.Value : 1f;
-        var offsetX = Plugin.BarOffsetX != null ? Plugin.BarOffsetX.Value : 260f;
-        var offsetY = Plugin.BarOffsetY != null ? Plugin.BarOffsetY.Value : 0f;
-        var showArrow = Plugin.ShowStruggleArrow != null && Plugin.ShowStruggleArrow.Value;
+        scale = Plugin.BarScale != null ? Plugin.BarScale.Value : 1f;
+        offsetX = Plugin.BarOffsetX != null ? Plugin.BarOffsetX.Value : 260f;
+        offsetY = Plugin.BarOffsetY != null ? Plugin.BarOffsetY.Value : 0f;
+        showArrow = Plugin.ShowStruggleArrow != null && Plugin.ShowStruggleArrow.Value;
 #if DEBUG
         showArrow = TestArrow ?? showArrow;
+        if (TestDisplay.HasValue)
+        {
+            scale = TestDisplay.Value.x;
+            offsetX = TestDisplay.Value.y;
+            offsetY = TestDisplay.Value.z;
+        }
 #endif
+    }
+
+    private static void Draw(Fight fight)
+    {
+        ReadDisplay(out var scale, out var offsetX, out var offsetY, out var showArrow);
 
         if (!_root.activeSelf)
         {

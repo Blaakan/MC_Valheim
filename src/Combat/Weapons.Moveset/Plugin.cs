@@ -140,7 +140,18 @@ internal sealed partial class Plugin : ModPlugin
         // the new snapshot by reference.
         Config.SettingChanged += OnSettingChanged;
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
+        // Debug build only (call vanish in Release): log tap from the start, and the self test that run while me
+        // inactive (server without the mod: tests of OnActivated are gone then).
+        SelfTests.RegisterAlways();
     }
+
+#if DEBUG
+    // Self test: turn me off in memory, like the Enabled switch (never the config file). Null = normal. Test set it,
+    // call FeatureRegistry.RefreshAll(), and clear it + refresh again in its finally.
+    internal static string TestBlocker;
+
+    protected override string LocalBlocker() => TestBlocker;
+#endif
 
     protected override void OnActivated()
     {

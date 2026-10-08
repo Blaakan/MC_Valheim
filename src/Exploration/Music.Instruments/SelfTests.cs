@@ -32,7 +32,9 @@ namespace MC.Exploration.MusicInstrumentsMod;
 //   music.export    item, effect and package icons written as PNG next to the screenshots
 // Me force rules with ServerRules.TestRules, songs folder with SongLibrary.ConfiguredFolder (memory only), presses with
 // LaneKeys.TestPress: never the config file. Rig put back controls, look, time, inventory, equipment, effects.
-internal static class SelfTests
+// More tests, one per item of TESTING.md where the game state can show it (SelfTests.Solo.cs, tools in
+// SelfTests.Kit.cs), and the tests of a multiplayer run with their server halves (SelfTests.Multi.cs).
+internal static partial class SelfTests
 {
 #if DEBUG
     private const string NetworkName = "music.network";
@@ -71,6 +73,9 @@ internal static class SelfTests
         SelfTest.Register(FreePlayName, RunFreePlay);
         SelfTest.Register(PoseName, RunPose);
         SelfTest.Register(ExportName, RunExport);
+        LogTap.Install();
+        RegisterSolo();
+        RegisterMulti();
 #endif
     }
 
@@ -82,6 +87,8 @@ internal static class SelfTests
         {
             SelfTest.Unregister(name);
         }
+        UnregisterSolo();
+        UnregisterMulti();
         ClearOverrides();
 #endif
     }
@@ -94,11 +101,20 @@ internal static class SelfTests
         InstrumentPose.TestAsRemote = false;
         TestCamera.Active = false;
         Plugin.TestInactive = false;
+        Plugin.TestVolume = null;
+        Plugin.TestGameMusicVolume = null;
+        Plugin.TestNoteSpeed = null;
+        PadInput.Test = null;
+        SongWindow.TestHeldKey = KeyCode.None;
+        SongWindow.TestDownKey = KeyCode.None;
+        Performance.TestRightClick = false;
         FreePlayKeys.ClearTest();
         for (var i = 0; i < LaneKeys.TestPress.Length; i++)
         {
             LaneKeys.TestPress[i] = false;
         }
+        // Lane keys a test gave: the player's own again.
+        LaneKeys.Cache();
     }
 
     // ---------- helpers ----------

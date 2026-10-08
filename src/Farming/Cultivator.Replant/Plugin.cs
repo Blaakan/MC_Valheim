@@ -40,7 +40,67 @@ internal sealed partial class Plugin : ModPlugin
 #if DEBUG
     // Self test play "feature off" without the toggle. Never in release.
     internal static bool TestInactive { get; set; }
+
+    // Self test (multiplayer run, server): players who cannot play by my rules may stay until this
+    // Time.realtimeSinceStartup, like AllowPlayersWithoutMod on. Own end time: test that die never leave server open.
+    // 0 = normal. Never in release.
+    internal static float TestAllowUntil { get; set; }
+
+    // Self test turned me off the real way (TestTurnOff) and not on again yet.
+    internal static bool TestTurnedOff { get; private set; }
+
+    // Self test: real turn off, same two steps as framework Refresh (OnDeactivated, then every feature patch away).
+    // No Enabled write (config file stay as is), no state or Status change, server not told. Single player tests.
+    internal static void TestTurnOff()
+    {
+        var self = TestSelf();
+        if (self == null || TestTurnedOff)
+        {
+            return;
+        }
+        TestTurnedOff = true;
+        self.OnDeactivated();
+        self.Harmony.UnpatchSelf();
+    }
+
+    // Self test: on again, same two steps as framework Refresh (feature patches on, then OnActivated).
+    internal static void TestTurnOn()
+    {
+        var self = TestSelf();
+        if (self == null || !TestTurnedOff)
+        {
+            return;
+        }
+        TestTurnedOff = false;
+        self.ApplyPatches(self.Harmony);
+        self.OnActivated();
+    }
+
+    // Enabled entry of this plugin (multiplayer self tests only: their config files are throwaway).
+    internal static ConfigEntry<bool> TestEnabledEntry => TestSelf()?.Enabled;
+
+    private static Plugin TestSelf()
+    {
+        return BepInEx.Bootstrap.Chainloader.PluginInfos.TryGetValue(ModInfo.Guid, out var info)
+            ? info.Instance as Plugin
+            : null;
+    }
 #endif
+
+    // AllowPlayersWithoutMod as the join check read it (one place). Entry not bound = refuse.
+    internal static bool AllowsPlayersWithoutMod
+    {
+        get
+        {
+#if DEBUG
+            if (TestAllowUntil > 0f && UnityEngine.Time.realtimeSinceStartup < TestAllowUntil)
+            {
+                return true;
+            }
+#endif
+            return AllowPlayersWithoutMod != null && AllowPlayersWithoutMod.Value;
+        }
+    }
 
     // Feature on (patches applied) and not faked off by a self test. Always-on code (registration) read this: its
     // patches stay while the feature is off.
@@ -60,6 +120,10 @@ internal sealed partial class Plugin : ModPlugin
 
     protected override void BindConfig()
     {
+#if DEBUG
+        // Self test log watch (replant.log): keep my own log lines from the start.
+        SelfTestLog.Install(Logger);
+#endif
         // Me pin ItemData.GetIcon as not inlined first (tier gem postfix must always run).
         IconInlineGuard.Apply();
 

@@ -151,7 +151,7 @@ internal static class PlayerCheck
         var ready = connected && peer.IsReady();
         var kicked = connected && ZNet.PeersToDisconnectAfterKick.ContainsKey(peer);
         var compatible = connected && NetworkGate.PeerCompatible(peer);
-        var allow = Plugin.AllowPlayersWithoutMod != null && Plugin.AllowPlayersWithoutMod.Value;
+        var allow = Plugin.AllowsPlayersWithoutMod;
         switch (Decide(isServer, connected, ready, kicked, compatible, allow))
         {
             case JoinVerdict.Compatible:

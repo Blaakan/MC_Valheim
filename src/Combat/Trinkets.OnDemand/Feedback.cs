@@ -30,9 +30,45 @@ internal static class Feedback
     internal static int FlashCount;
     internal static int FullMessageCount;
 
+    // Self test read text of last full-bar message me sent to game's message HUD.
+    internal static string LastFullMessage;
+
     // Self test: next full bar may show its message at once.
     internal static void ClearMessageCooldown() => _lastMessageAt = float.NegativeInfinity;
+
+    // Self test force two personal feedback settings in memory (never config file). Null = player's own.
+    internal static bool? TestShowFullMessage;
+    internal static float? TestFlashInterval;
 #endif
+
+    // Player's own feedback settings. One place: Tick read them only through these two.
+    private static bool ShowMessageSetting
+    {
+        get
+        {
+#if DEBUG
+            if (TestShowFullMessage.HasValue)
+            {
+                return TestShowFullMessage.Value;
+            }
+#endif
+            return Plugin.ShowFullMessage == null || Plugin.ShowFullMessage.Value;
+        }
+    }
+
+    private static float FlashIntervalSetting
+    {
+        get
+        {
+#if DEBUG
+            if (TestFlashInterval.HasValue)
+            {
+                return TestFlashInterval.Value;
+            }
+#endif
+            return Plugin.FullFlashInterval != null ? Plugin.FullFlashInterval.Value : 4f;
+        }
+    }
 
     internal static void Reset()
     {
@@ -50,13 +86,13 @@ internal static class Feedback
             return;
         }
         var now = Time.time;
-        var interval = Plugin.FullFlashInterval != null ? Plugin.FullFlashInterval.Value : 4f;
+        var interval = FlashIntervalSetting;
         if (!_wasFull)
         {
             _wasFull = true;
             Flash();
             _nextFlashAt = now + interval;
-            if ((Plugin.ShowFullMessage == null || Plugin.ShowFullMessage.Value) && now - _lastMessageAt >= MessageCooldown)
+            if (ShowMessageSetting && now - _lastMessageAt >= MessageCooldown)
             {
                 _lastMessageAt = now;
                 ShowFullMessage(player);
@@ -123,6 +159,7 @@ internal static class Feedback
         player.Message(MessageHud.MessageType.TopLeft, text);
 #if DEBUG
         FullMessageCount++;
+        LastFullMessage = text;
 #endif
     }
 

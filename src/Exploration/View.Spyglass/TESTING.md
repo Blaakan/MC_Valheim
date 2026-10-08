@@ -19,6 +19,11 @@ Horizons near-ground update: smoke test of all 25 MC mods passed, framework test
 both hands (like the hammer; no punch on click): smoke test of all 25 MC mods passed (Spyglass JitCheck 525 methods,
 0 failures), in-world run 12/12 (`spyglass.*` 6/6, `horizons.*` 6/6) on 2026-10-02. No hands-on in-game test yet.
 
+**Automated checks (2026-10-08):** 37 of 39 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
+"FAILED: automated test" names the self-test that fails.
+
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina, `killall` removes nearby creatures.
 Items: `spawn MC_Spyglass` drops a spyglass at your feet, `spawn Bronze 2` and `spawn Crystal 2` the default materials,
@@ -40,105 +45,190 @@ changed one back afterwards.
 
 ## 0.1.0 — single player
 
-- [ ] **T01 Recipe (G1):** new character (or one that never saw Crystal): `spawn Bronze 2`, `spawn forge`, pick the
+- [x] **T01 Recipe (G1):** new character (or one that never saw Crystal): `spawn Bronze 2`, `spawn forge`, pick the
   bronze up. Expected: no spyglass recipe yet. `spawn Crystal 2`, pick it up. Expected: "New recipe" Spyglass with its
   icon; at the Forge the Spyglass costs 2 Bronze and 2 Crystal and makes one spyglass; the tooltip says two-handed
   (like the hammer), shows no damage, and the description explains the controls.
-- [ ] **T02 A tool like the hammer (G2):** equip a torch, then the spyglass. Expected: the spyglass is in the right
+  *Automated: `spyglass.recipe`.*
+- [x] **T02 A tool like the hammer (G2):** equip a torch, then the spyglass. Expected: the spyglass is in the right
   hand and the torch is put away (both hands taken, as with the hammer). Same with a shield in the left hand. Equip the
   torch, a sword or an axe: the spyglass is put away. Press R: the spyglass hangs where the hammer does.
+  *Automated: `spyglass.hands`.*
 - [ ] **T03 Raise (G3):** hold the spyglass, look at a far hill, left click. Expected: in about half a second your arm
   lifts the spyglass to your right eye while the camera slides forward into your head and zooms in, and the view
   closes in to the round spyglass view. No jerk, no view of the inside of your head; the arm is seen rising only at
   the start.
+  *Partly automated (`spyglass.click`, `spyglass.pose`); by hand: Watch one raise: it must look smooth (no jerk),
+  never show the inside of your head, the arm must be seen rising only at the start, and the round view must be seen
+  closing in.*
 - [ ] **T04 Spyglass view (G4):** while looking. Expected: a sharp round view in the middle (about 70% of the screen
   height), blurred and darker outside it, round on any window shape; no crosshair and no name of what you point at;
   health, hotbar and map still on screen; the zoom is x4 (things look 4 times bigger than before).
-- [ ] **T05 Aim, no walking (G5):** while looking, move the mouse, then press W, A, S, D, Shift, Space, Ctrl and the
+  *Partly automated (`spyglass.overlay`); by hand: Look through it once: the inside of the circle must be sharp, the
+  outside blurred and darker, and the circle must look round (also on a wide or narrow window).*
+- [x] **T05 Aim, no walking (G5):** while looking, move the mouse, then press W, A, S, D, Shift, Space, Ctrl and the
   dodge key. Expected: the view turns, slower than usual (an object crosses the screen about as fast as without
   zoom), your body turns to face the aim; you do not move, jump, crouch, dodge or run. Auto-run started before raising
   stops when you raise.
-- [ ] **T06 Wheel zoom:** while looking, scroll up and down. Expected: the zoom goes up by steps to x8 and down to
+  *Automated: `spyglass.feet`.*
+- [x] **T06 Wheel zoom:** while looking, scroll up and down. Expected: the zoom goes up by steps to x8 and down to
   x1.5; the aim speed follows the zoom; the camera distance (third person) is the same as before once you lower it.
   Lower and raise again: the zoom you picked is kept.
-- [ ] **T07 Lower:** while looking, left click. Expected: the view opens up, the camera slides back to third person,
+  *Automated: `spyglass.wheel`.*
+- [x] **T07 Lower:** while looking, left click. Expected: the view opens up, the camera slides back to third person,
   the arm comes down; you can walk again at once. Raise again and press Block (right mouse button): same.
-- [ ] **T08 Hold to look:** set HoldToLook = true. Expected: hold left mouse = up, release = down; Block still lowers.
+  *Automated: `spyglass.click`, `spyglass.pose`.*
+- [x] **T08 Hold to look:** set HoldToLook = true. Expected: hold left mouse = up, release = down; Block still lowers.
   Put it back to false.
-- [ ] **T09 Lowers by itself:** while looking: (a) `spawn Greyling` next to you and let it hit you, `god` off: lowered
+  *Automated: `spyglass.hold`, `spyglass.mp.settings`.*
+- [x] **T09 Lowers by itself:** while looking: (a) `spawn Greyling` next to you and let it hit you, `god` off: lowered
   when hit; (b) stand in fire for a moment: not lowered by the burning; (c) open the inventory (Tab), the map (M), the
   menu (Esc) and the chat (Enter): lowered each time; (d) press R: view back at once, spyglass put away; (e) equip
   another weapon from the hotbar: view back at once.
+  *Automated: `spyglass.lowers`, `spyglass.lowers-chat`.*
 - [ ] **T10 Cannot raise:** sitting on a chair, at a ship's helm, swimming, in build mode (hammer) or during the
   equip animation, left click with the spyglass (where it is held). Expected: nothing happens (sitting: the click
   stands you up as in the normal game).
+  *Partly automated (`spyglass.cannot-raise`, `spyglass.compat.swim`, `spyglass.helm`); by hand: The item text is
+  wrong for the helm: it says "nothing happens", but the click lets go of the helm as in the normal game (new item
+  T24, asserted by spyglass.helm). Everything else in the item is asserted; someone has to reword or accept the helm
+  part before this box can be ticked.*
 - [ ] **T11 Far view without Distant Horizons (G6):** Distant Horizons off (or not installed). On a hill in clear
   weather, raise and look at the horizon at x8. Expected: trees and buildings within about 300-500 m are seen big and
   clear; beyond, the land fades into the normal fog (unchanged by the spyglass). No error in the log.
+  *Partly automated (`spyglass.no-horizons`); by hand: With Distant Horizons really off or not installed, look at the
+  horizon at x8: trees and buildings within about 300-500 m must be big and clear and the land beyond must fade into
+  the normal fog.*
 - [ ] **T12 Far view with Distant Horizons (G6):** Distant Horizons on, clear weather (`env Clear`), noon, on a high
   point. Raise and look across the land at x8, wait a few seconds. Expected: far land to the horizon, with less haze
   than without the spyglass; far forests, big rocks and buildings (yours or ruins) several kilometres away; the land
   in the looked-at direction gets finer within a few seconds; turning to a new direction refines it too. Lower:
   detail and haze back as before within a second or two.
-- [ ] **T13 Rain keeps its fog:** with Distant Horizons on, `env Rain` (or any storm), raise. Expected: the fog is not
+  *Partly automated (`spyglass.horizons`, `spyglass.far`); by hand: Look from a high point: far land to the horizon
+  with less haze, far forests, rocks and buildings several kilometres away, the looked-at direction getting finer
+  within a few seconds (also after turning), and detail and haze back within a second or two after lowering.*
+- [x] **T13 Rain keeps its fog:** with Distant Horizons on, `env Rain` (or any storm), raise. Expected: the fog is not
   cleared (only clear weather is). `resetenv`.
-- [ ] **T14 Dropped spyglass:** drop the spyglass from the inventory. Expected: it lies on the ground as the spyglass
+  *Automated: `spyglass.rain`.*
+- [x] **T14 Dropped spyglass:** drop the spyglass from the inventory. Expected: it lies on the ground as the spyglass
   model (not a knife), can be picked up again, and keeps no durability.
-- [ ] **T15 Never punches:** stand next to a tree with the spyglass in hand. Left click raises it and never punches;
+  *Automated: `spyglass.item`.*
+- [x] **T15 Never punches:** stand next to a tree with the spyglass in hand. Left click raises it and never punches;
   middle click does nothing; Block blocks with the fists as with the hammer. Turn the mod off (MC Mods panel), left
   click and middle click: nothing happens (no punch, no stamina used). Turn it back on.
-- [ ] **T16 Settings live:** while looking, change ClearViewSize (0.4, then 1), EdgeBlur (off), EdgeDarkness (0, then
+  *Automated: `spyglass.click`, `spyglass.toggle`, `spyglass.mp.toggle`.*
+- [x] **T16 Settings live:** while looking, change ClearViewSize (0.4, then 1), EdgeBlur (off), EdgeDarkness (0, then
   1), AimSensitivity (0.5) and MaxMagnification (3). Expected: each change shows at once; with MaxMagnification 3 the
   zoom is capped at x3. Put them back.
+  *Automated: `spyglass.settings`, `spyglass.mp.settings`.*
 - [ ] **T17 Render scale:** Settings → Graphics → render scale below 100% (if your game has it). Expected: the round
   view, blur and dark edge still line up with the picture.
-- [ ] **T18 Live toggle off while looking:** raise, then untick Spyglass in the MC Mods panel (or set Enabled = false).
+  *Partly automated (`spyglass.overlay`); by hand: Set the render scale below 100% and look: the round view, the blur
+  and the dark edge must line up with the picture.*
+- [x] **T18 Live toggle off while looking:** raise, then untick Spyglass in the MC Mods panel (or set Enabled = false).
   Expected: the normal view comes back at once (camera, zoom, fog, crosshair, your body); the spyglass stays in your
   hand; left click does nothing; the recipe is gone from the Forge. Tick it again: everything works again.
+  *Automated: `spyglass.toggle`, `spyglass.mp.toggle`.*
 - [ ] **T19 Enabled = false + restart:** set Enabled = false, restart the game and load the character. Expected: the
   spyglass is still in the inventory (not lost); no recipe; Status says off. Set it back to true.
+  *Partly automated (`spyglass.toggle`, `spyglass.mp.toggle`); by hand: Really restart the game with Enabled = false
+  and load the character: the spyglass must still be in the inventory, no recipe, Status off.*
 - [ ] **T20 Close walls and roofs:** walk face first into a wall, raise the spyglass and look at it; then stand under a
   low sloped roof or a beam (or a rock overhang) touching your head and raise it toward the roof. Expected: the wall and
   the roof are drawn (you never see through them into the room or sky behind).
+  *Partly automated (`spyglass.close`); by hand: Stand face first at a real wall and under a low roof and look: you
+  must never see through them.*
 - [ ] **T21 No body flash:** look up steeply (the camera comes close to you), raise and lower; then stand indoors with
   your back about 1 m from a wall, raise and lower. Expected: your own body or the back of your head never pops into
   view during the raise or the lowering.
+  *Partly automated (`spyglass.close`, `spyglass.click`); by hand: Watch a raise and a lowering in both places: your
+  body or the back of your head must never pop into view.*
 - [ ] **T22 Logout while looking:** single player, raise the spyglass, Esc (the spyglass comes down behind the menu
   even though the game is paused), Logout, Yes. Expected: the main menu and the character select show no round view,
   blur or dark ring. Load the world again: normal view, the spyglass can be raised.
-- [ ] **T23 Clean log:** after T01-T22, the log has no error or warning from Spyglass (`./tools/Watch-Log.ps1 -Mine`).
+  *Partly automated (`spyglass.lowers`); by hand: Do the logout: the main menu and the character select must show no
+  round view, blur or dark ring, and after loading the world again the view must be normal and the spyglass must
+  raise.*
+- [!] **T23 Clean log:** after T01-T22, the log has no error or warning from Spyglass (`./tools/Watch-Log.ps1 -Mine`).
+  **FAILED:** automated test: False error at the main menu: 'The vanilla Flint Knife (KnifeFlint) is missing from the
+  item database' (self-test `spyglass.bug.missing-knife-error`)
+- [x] **T24 Click at a ship's helm:** hold the spyglass, take the helm of a ship (`spawn Karve` on water) and left
+  click. Expected: the click lets go of the helm, as in the normal game, and the spyglass does not go up (this is the
+  right result for the helm, where T10 says "nothing happens").
+  *Automated: `spyglass.helm`.*
+- [!] **T25 Zoom kept after a lower limit:** StartMagnification 4, do not touch the wheel. Set MaxMagnification = 3,
+  raise (the view shows x3), lower. Set MaxMagnification back to 8 and raise again. Expected: x4 again: a lower limit
+  only limits the view, it does not change the zoom you picked. If you used the wheel while the limit was 3, the zoom
+  it reached is kept instead.
+  **FAILED:** automated test: A lower zoom limit overwrites the zoom the player picked (self-test
+  `spyglass.bug.zoom-pick-lost`)
+- [ ] **T26 Death while looking:** `god` off, low health; stand in a fire, raise the spyglass while burning and die
+  from the burning without lowering it. Expected: at death the normal view comes back at once (no round view, blur,
+  dark ring, cleared fog or missing body on the death camera) and the log has no error; after you respawn the view is
+  normal and the spyglass is down (it is on the tombstone); once picked up again it can be raised.
+  *Partly automated (`spyglass.aborts`); by hand: A real death is only played with the dead flag: die for real while
+  burning with the spyglass up and check the death camera, the log, the respawn and raising again after picking it up
+  from the tombstone.*
+- [x] **T27 Click while it comes down:** raise, left click to lower, and click again before it is fully down.
+  Expected: it goes back up from where it was (the camera and the round view do not jump), and the next click lowers
+  it as usual.
+  *Automated: `spyglass.click`.*
 
 ### Cross-mod (MC)
 
 - [ ] **X01 Distant Horizons settings:** with Distant Horizons on, set its SpyglassDetail = false and raise. Expected:
   no extra detail in the looked-at direction (the haze is still cleared). SpyglassMaxBoost 1: same. Put them back.
+  *Partly automated (`spyglass.horizons`); by hand: Set SpyglassDetail = false, then SpyglassMaxBoost = 1, raise and
+  look: no extra detail in the looked-at direction, haze still cleared.*
 - [ ] **X02 Sort Chest / Crafting Search and Sort:** put a spyglass, a hammer and a sword in a chest and sort it, and
   look at the crafting list grouping. Expected: the spyglass is grouped with the tools (hammer, hoe), not the weapons.
+  *Partly automated (`spyglass.compat.sort`); by hand: Sort a chest holding a spyglass, a hammer and a sword, and look
+  at the crafting list groups: the spyglass must sit with the tools.*
 - [ ] **X03 Dual Wielding:** with a dual-wield pair in hand, equip the spyglass, then try the dual-wield keys.
   Expected: the pair is put away (the spyglass takes both hands, like the hammer) and the spyglass is never paired.
-- [ ] **X04 Tower Shield Wall:** a tower shield in hand, equip the spyglass. Expected: the shield is put away (as with
+  *Partly automated (`spyglass.compat.dualwield`); by hand: With the spyglass in hand press the Dual Wielding keys
+  (swap H, main-hand Left Alt while equipping): nothing odd may happen.*
+- [x] **X04 Tower Shield Wall:** a tower shield in hand, equip the spyglass. Expected: the shield is put away (as with
   the hammer); no error.
+  *Automated: `spyglass.compat.towershield`.*
 - [ ] **X05 Swim Dive:** walk into deep water with the spyglass up. Expected: the view comes back at once when you
   start swimming (the game puts the spyglass away); diving works as usual.
+  *Partly automated (`spyglass.compat.swim`); by hand: After the view came back, dive with Swim Dive: it must work as
+  usual (Swim Dive's own tests cover diving, but not right after this).*
 
 ## 0.1.0 — multiplayer
 
-- [ ] **M01 Server rules:** host (or dedicated server) with MaxMagnification 3 and RecipeResources Bronze:1; a friend
+- [x] **M01 Server rules:** host (or dedicated server) with MaxMagnification 3 and RecipeResources Bronze:1; a friend
   with the mod joins. Expected: their log says "Using the server's rules: recipe Bronze:1 at forge level 1, zoom up to
   x3..."; their Forge recipe costs 1 Bronze; their wheel zoom stops at x3.
+  *Automated: `spyglass.mp.rules`.*
 - [ ] **M02 Others see the pose:** your friend raises the spyglass. Expected: on your screen their arm lifts the
   spyglass to their eye and comes down when they lower it; their head follows where they look.
+  *Partly automated (`spyglass.mp.pose`, `spyglass.pose`); by hand: With a real second player: on your screen their
+  arm must lift the spyglass to their eye and come down again, and their head must follow where they look.*
 - [ ] **M03 Refused without the mod:** a friend without the mod joins a server with it (AllowPlayersWithoutMod false).
   Expected: about a second after loading in, their game shows "Incompatible version"; the server log names them.
+  *Partly automated (`probe.mp.refused`, `probe.mp.off.MC.Exploration.View.Spyglass`); by hand: Nothing reads the
+  Spyglass line itself: check the dedicated server's log for the Spyglass warning "Refused <player name> ..." (in the
+  vanilla-client run another mod may be the one that logs it), and that the refusal comes about a second after loading
+  in.*
 - [ ] **M04 Hand-off to a player without the mod:** AllowPlayersWithoutMod = true, a friend without the mod joins.
   (a) Drop a spyglass next to them. Expected: they see nothing there and cannot pick it up ("Missing prefab hash" in
   their log); it stays on the ground for you. (b) Hold a spyglass in front of them. Expected: they see an empty right
   hand; nothing else breaks. (c) Put a spyglass and some wood in a chest; they open the chest (no spyglass shown,
   "Failed to find item prefab" in their log) and take the wood; you open the chest again. Expected: the spyglass is
   gone from the chest, as the README warns.
-- [ ] **M05 Pending rules:** join a server with the mod and click with the spyglass in the first second after loading
+- [x] **M05 Pending rules:** join a server with the mod and click with the spyglass in the first second after loading
   (hard to time; or watch the log). Expected: "The server has not sent the spyglass settings yet." until the rules
   arrive; afterwards it works.
+  *Automated: `spyglass.mp.pending`, `spyglass.pending`.*
 - [ ] **M06 Dedicated server:** start a dedicated server with the mod. Expected: it loads without errors (no graphics
   device: the item is registered without its look), players with the mod can craft and use spyglasses, and dropped
   spyglasses stay on the ground after a server restart.
+  *Partly automated (`spyglass.mp.server`); by hand: Restart the dedicated server with a spyglass on the ground and
+  check it is still there (the run cannot restart the server).*
+- [x] **M07 Recalled while looking:** your friend raises the spyglass; as the host, run `devcommands` and then `recall`
+  (it teleports every other player to you). Expected: on their game the normal view comes back the moment the
+  teleport starts (no round view, blur, dark ring, cleared fog or missing body during it), the spyglass is still down
+  after they arrive, and they can raise it again.
+  *Automated: `spyglass.mp.recall`, `spyglass.aborts`.*

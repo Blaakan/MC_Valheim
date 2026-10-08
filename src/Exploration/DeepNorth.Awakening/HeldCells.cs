@@ -946,6 +946,11 @@ internal static class HeldCells
 
     internal static void TestRescan() => ResetServer();
 
+    // Self test: this game holds the server's area lists of this session.
+    internal static bool TestKnown => KnownHere;
+
+    internal static bool TestServerCleared(int cell) => ServerCleared.Contains(cell);
+
     internal static bool TestServerEngaged(int cell) => ServerEngaged.ContainsKey(cell);
 
     internal static int TestKills(int cell) => Kills.TryGetValue(cell, out var n) ? n : 0;

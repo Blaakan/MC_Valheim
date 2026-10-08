@@ -73,4 +73,9 @@ internal static class PlayerPatches
             PatchGuard.Report("Player.OnSpawned postfix", e);
         }
     }
+
+#if DEBUG
+    // Self test only (Debug build): run what me do at each spawn, without a real spawn (other mods' spawn code stay out).
+    internal static void TestSpawned(Player player) => OnSpawned_Postfix(player);
+#endif
 }

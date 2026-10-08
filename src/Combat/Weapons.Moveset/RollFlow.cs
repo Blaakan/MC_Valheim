@@ -84,6 +84,7 @@ internal static class RollFlow
     internal static int RemoteCuts;
     internal static StateSource LastSource;
     internal static int LastHash;
+    internal static float LastBlend = -1f; // seconds given to the last cross-fade
 
     internal static string ClipOf(string trigger) =>
         trigger != null && Clips.TryGetValue(trigger, out var clip) ? clip : null;
@@ -187,6 +188,7 @@ internal static class RollFlow
         CrossFades++;
         LastSource = source;
         LastHash = hash;
+        LastBlend = blend > 0f ? blend : 0f;
 #endif
         return FlowResult.CrossFade;
     }

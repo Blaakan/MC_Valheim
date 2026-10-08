@@ -50,7 +50,9 @@ namespace MC.Combat.WeaponsMovesetMod;
 // Jump and roll tests each split in two (families / input cases): one test must end inside the 120 s timeout.
 // Me force rules only through ServerRules.TestRules (never config). Me put back place, look, hands, frame rate,
 // controller, god mode, stamina modifier; me destroy dummy and take back every item me gave (Rig.Restore).
-internal static class SelfTests
+// More tests in the other SelfTests.*.cs files (same class): Taps (log tap, hit tap, foes, jump helper), Moves (hits,
+// numbers, settings, stamina, facing, flow, toggle...), Cross (other mods, ranged items), Mp (dedicated server).
+internal static partial class SelfTests
 {
     private const string TriggersName = "moveset.triggers";
     private const string RulesName = "moveset.rules";
@@ -79,6 +81,21 @@ internal static class SelfTests
         SelfTest.Register(ExclusionsName, RunExclusions);
         SelfTest.Register(WatchdogName, RunWatchdog);
         SelfTest.Register(OrderName, RunOrder);
+        RegisterMoves();
+        RegisterCross();
+        RegisterLog(); // last single-player test: it look at the log of every test before it
+        RegisterMp();
+#endif
+    }
+
+    // Plugin.BindConfig (every start, also when me never activate): log tap from the first line, and the multiplayer
+    // test of a server without the mod (me inactive there, so OnDeactivated must not take it away).
+    [Conditional("DEBUG")]
+    internal static void RegisterAlways()
+    {
+#if DEBUG
+        LogTap.Install();
+        RegisterMpInactive();
 #endif
     }
 
@@ -86,6 +103,20 @@ internal static class SelfTests
     internal static void Unregister()
     {
 #if DEBUG
+        UnregisterMoves();
+        UnregisterCross();
+        UnregisterLog();
+        UnregisterMp();
+        if (MoveRules.TestOwn != null)
+        {
+            MoveRules.TestOwn = null;
+            ServerRules.OwnChanged(); // own snapshot was made from the test object: make it again from the config
+        }
+        if (Compat.TestGco.HasValue)
+        {
+            Compat.TestGco = null;
+            Compat.Reset();
+        }
         SelfTest.Unregister(TriggersName);
         SelfTest.Unregister(RulesName);
         SelfTest.Unregister(JumpName);
@@ -135,6 +166,7 @@ internal static class SelfTests
     {
         new Row("SwordIron", WeaponFamily.Swords),
         new Row("MaceIron", WeaponFamily.Maces),
+        new Row("Club", WeaponFamily.Maces),
         new Row("AxeIron", WeaponFamily.Axes),
         new Row("Battleaxe", WeaponFamily.Battleaxes),
         new Row("AxeBerzerkr", WeaponFamily.DualAxes),
@@ -261,14 +293,23 @@ internal static class SelfTests
             }
         }
 
-        internal Dummy SpawnDummy()
+        // Me destroy this object in Restore too (foes of the other test files).
+        internal void Track(GameObject go)
+        {
+            if (go != null && !_spawned.Contains(go))
+            {
+                _spawned.Add(go);
+            }
+        }
+
+        internal Dummy SpawnDummy(float distance = DummyDistance)
         {
             var prefab = ZNetScene.instance.GetPrefab("piece_TrainingDummy");
             if (prefab == null)
             {
                 return null;
             }
-            var go = Object.Instantiate(prefab, DummySpot(), Quaternion.LookRotation(-Forward));
+            var go = Object.Instantiate(prefab, DummySpot(distance), Quaternion.LookRotation(-Forward));
             _spawned.Add(go);
             var dummy = new Dummy
             {
@@ -285,13 +326,13 @@ internal static class SelfTests
         }
 
         // Hit push dummy away: me put it back on its spot before each try.
-        internal void PlaceDummy(Dummy dummy)
+        internal void PlaceDummy(Dummy dummy, float distance = DummyDistance)
         {
             if (dummy == null || dummy.Go == null)
             {
                 return;
             }
-            var pos = DummySpot();
+            var pos = DummySpot(distance);
             dummy.Go.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(-Forward));
             var body = dummy.Body.m_body;
             if (body != null)
@@ -304,9 +345,9 @@ internal static class SelfTests
             }
         }
 
-        private Vector3 DummySpot()
+        private Vector3 DummySpot(float distance)
         {
-            var pos = Home + Forward * DummyDistance;
+            var pos = Home + Forward * distance;
             pos.y = ZoneSystem.instance.GetGroundHeight(pos);
             return pos;
         }
@@ -763,14 +804,22 @@ internal static class SelfTests
         internal string Clip;               // layer 0 clip at entry
         internal int Refusals;              // attacks our gate refused inside the roll
         internal int Skips;                 // presses inside the roll for which the gate stayed shut
+        // Caller set it when the button stay held after the roll (controller off, nobody let go). Vanilla then start a
+        // normal swing AGAIN on every tick of the stand-up (Animator not in the attack yet, so StartAttack pass: the
+        // restart gap of design 1.2), each time a new Attack object, until one is in its animation. Started = the
+        // newest one (the one that play and hit), StartAt stay the first start. First run: moveset.x.dualwield-off
+        // kept the first object, which never played: no hit event of it, and "next" was a later combo step.
+        internal bool Held;
+        internal int Restarts;              // Held: starts after the first one, before the swing was in its animation
 
         internal float Cut => StartAt >= 0f && RollStart >= 0f ? StartAt - RollStart : -1f;
         internal float Gap => GapTicks * Time.fixedDeltaTime;
     }
 
     // Me roll along rig.Forward; press every tick while rolling (buffered press) when press; follow until first new
-    // attack is in its state (or me give up). Caller put and face the player first.
-    private static IEnumerator Roll(Rig rig, RollRun run, bool press = true)
+    // attack is in its state (or me give up). Caller put and face the player first. how: other press than the
+    // buffered primary one (secondary press, held button...), called every tick while rolling until an attack start.
+    private static IEnumerator Roll(Rig rig, RollRun run, bool press = true, Action<Player> how = null)
     {
         var p = rig.P;
         var animator = p.m_zanim.m_animator;
@@ -805,9 +854,22 @@ internal static class SelfTests
                 run.StartedInRoll = inDodge;
                 run.CutNorm = DodgeNormalized(animator);
             }
+            else if (run.Held && run.Started != null && current != null && !ReferenceEquals(current, run.Started)
+                     && !run.Started.m_wasInAttack)
+            {
+                run.Started = current; // held button restarted the swing in the stand-up: me follow the newest one
+                run.Restarts++;
+            }
             if (inDodge && press && run.Started == null)
             {
-                Press(p); // buffered press: vanilla keeps it 0.5 s. Stop once started: no stray combo step after.
+                if (how != null)
+                {
+                    how(p);
+                }
+                else
+                {
+                    Press(p); // buffered press: vanilla keeps it 0.5 s. Stop once started: no stray combo step after.
+                }
             }
             if (run.Clone == null && !ReferenceEquals(MoveTracker.LastMove.Clone, before))
             {
@@ -844,6 +906,23 @@ internal static class SelfTests
         }
         run.Refusals = MoveTracker.GateRefusals - refusals;
         run.Skips = MoveTracker.GateSkips - skips;
+    }
+
+    // What a roll + attack gave, with its numbers (check and NOTE text: a failed check must say what happened).
+    private static string RollWhat(RollRun run)
+    {
+        var roll = $"the roll (m_inDodge) lasted {Span(run.RollStart, run.RollEnd)} s";
+        if (run.Started == null)
+        {
+            return "no attack; " + roll;
+        }
+        if (run.Clone == null || !ReferenceEquals(run.Started, run.Clone))
+        {
+            return $"normal swing {Fired(run.Started)} {Span(run.RollStart, run.StartAt)} s after the roll started; {roll}";
+        }
+        var where = run.Move.Cut ? $"cut into the roll {S(run.Cut)} s after it started" : $"{S(run.Move.RollAge)} s after the roll ended";
+        return $"{run.Move.Kind} attack {run.Move.Trigger}, {where}, flow {run.Move.Flow}, {run.GapTicks} idle tick(s) before its animation, "
+               + $"in it {Span(run.StartAt, run.EnteredAt)} s after its start; {roll}";
     }
 
     // Step after a move that play step k of an n-level chain (design 2.5); -1 = not a chain step.
@@ -1651,6 +1730,7 @@ internal static class SelfTests
         c.Check(DummyInert(dummy), $"{row.Label}: the dummy's AI is still off and the dummy never attacked");
         c.Check(!p.IsKnockedBack() && !p.IsStaggering(), $"{row.Label}: player free before the press");
 
+        var mark = LogTap.Mark;
         var before = MoveTracker.LastMove.Clone;
         var prev = p.m_currentAttack;
         var health = dummy != null ? dummy.Body.GetHealth() : 0f;
@@ -1785,6 +1865,22 @@ internal static class SelfTests
                 + $"(got {(normal != null ? normal.m_attackAnimation + normal.m_currentAttackCainLevel : "no attack")})");
             yield return WaitIdle(p, 4f);
         }
+        // Debug lines (TESTING T02): one "Jump attack: <item> (<type>) plays <animation>" for a move and its "started
+        // after" line, none for an Off type (also not from the ground press after); never a "did not start" warning.
+        if (on)
+        {
+            var head = $"Jump attack: {MoveEdit.ItemName(weapon)} ({Families.Key(row.Family)}) plays {trigger};";
+            c.Check(LogTap.Count(mark, Dbg, "Jump attack: ") == 1 && LogTap.Count(mark, Dbg, head) == 1,
+                $"{row.Label}: exactly one Debug line \"{head} ...\" ({LogTap.Count(mark, Dbg, "Jump attack: ")} jump attack lines)");
+            var entry = LogTap.First(mark, Dbg, $"Jump attack {trigger} started after ");
+            c.Check(clone == null || !entered || (entry != null && entry.EndsWith(EntryTail(move), StringComparison.Ordinal)),
+                $"{row.Label}: Debug line \"Jump attack {trigger} started after ...; {EntryTail(move)}\" (got \"{entry ?? "none"}\")");
+        }
+        else
+        {
+            c.Check(LogTap.Count(mark, Dbg, "Jump attack") == 0, $"{row.Label}: no \"Jump attack\" Debug line for an Off weapon type");
+        }
+        c.Check(LogTap.Count(mark, Wrn, "did not start") == 0, $"{row.Label}: no \"did not start\" warning");
         rig.TakeBack(weapon);
     }
 
@@ -1870,6 +1966,7 @@ internal static class SelfTests
             yield return WaitIdle(p, 4f);
 
             // 2. Jump, land without attacking, then press: no move.
+            var quiet = LogTap.Mark;
             Put(p, rig.Home);
             Face(p, rig.Forward);
             yield return Fixed;
@@ -1902,6 +1999,8 @@ internal static class SelfTests
             c.Check(box.Value != null && ReferenceEquals(MoveTracker.LastMove.Clone, before)
                     && box.Value.m_attackAnimation == shared.m_attackAnimation,
                 "falling without a jump, press in the air: a normal swing");
+            c.Check(LogTap.Count(quiet, Dbg, "Jump attack") == 0,
+                "jump, land, press and falling without a jump: no \"Jump attack\" Debug line (TESTING T04)");
             yield return WaitLanded(p, 4f);
             yield return WaitIdle(p, 4f);
 
@@ -1997,6 +2096,7 @@ internal static class SelfTests
         var on = trigger != MoveTriggers.Off;
         var dt = Time.fixedDeltaTime;
 
+        var mark = LogTap.Mark;
         var run = new RollRun();
         var fades = RollFlow.CrossFades;
         yield return Roll(rig, run);
@@ -2057,10 +2157,32 @@ internal static class SelfTests
                 c.Check(!entered || next < 0 || (clone.m_attackAnimation == move.BaseName && clone.m_nextAttackChainLevel == next),
                     $"{row.Label}: after entry the clone is {move.BaseName} with next step {next} (is {clone.m_attackAnimation}, {clone.m_nextAttackChainLevel})");
                 c.Check(run.Refusals == 0, $"{row.Label}: nothing refused inside the roll ({run.Refusals})");
+                // Debug lines (TESTING T06, T07, T10 c, T23): the move line with where it cut in and how it left the
+                // roll, the entry line with what the combo does next, and on a first use the controller probe's
+                // line, logged when the roll started (not on the cut tick).
+                var head = $"Roll attack: {MoveEdit.ItemName(weapon)} ({Families.Key(row.Family)}) plays {trigger}; ";
+                var line = LogTap.First(mark, Dbg, "Roll attack: ");
+                c.Check(LogTap.Count(mark, Dbg, "Roll attack: ") == 1 && line != null && line.StartsWith(head, StringComparison.Ordinal)
+                        && line.Contains("; cut into the roll ") && line.Contains(" s after it started (cross-fade from the roll, "),
+                    $"{row.Label}: one Debug line \"{head}...; cut into the roll ... (cross-fade from the roll, ...)\" (got \"{line ?? "none"}\")");
+                var entry = LogTap.First(mark, Dbg, $"Roll attack {trigger} started after ");
+                c.Check(!entered || (entry != null && entry.EndsWith(EntryTail(move), StringComparison.Ordinal)),
+                    $"{row.Label}: Debug line \"Roll attack {trigger} started after ...; {EntryTail(move)}\" (got \"{entry ?? "none"}\")");
+                if (firstUse)
+                {
+                    var found = LogTap.Since(mark, Dbg, $"Found the animation state of {trigger} in the animation controller (");
+                    c.Check(found.Count == 1 && found[0].At <= run.RollStart + 1.5f * dt,
+                        $"{row.Label}: first use: Debug \"Found the animation state of {trigger} in the animation controller\" once, when the roll started ({found.Count} lines)");
+                    c.Check(line != null && line.Contains("state from the animation controller"),
+                        $"{row.Label}: first use: the move line says \"state from the animation controller\"");
+                }
             }
         }
         else
         {
+            c.Check(run.GapTicks > 0,
+                $"{row.Label}: the usual stand-up between the roll and the swing stays (gap {S(run.Gap)} s)");
+            c.Check(LogTap.Count(mark, Dbg, "Roll attack") == 0, $"{row.Label}: no \"Roll attack\" Debug line for an Off weapon type");
             c.Check(clone == null, $"{row.Label}: roll attack Off, no move");
             c.Check(started != null && !run.StartedInRoll && run.RollEnd >= 0f && Mathf.Abs(run.StartAt - run.RollEnd - dt) < 0.5f * dt,
                 $"{row.Label}: no attack inside the roll; the normal swing started on the tick after the roll ended ({Span(run.RollEnd, run.StartAt)} s)");
@@ -2123,6 +2245,9 @@ internal static class SelfTests
               + $"in its state {Span(run.StartAt, run.EnteredAt)} s after its start, clip {run.Clip ?? "n/a"}";
         SelfTest.Note(RollName, $"{row.Label}: {(on ? trigger : "Off")}; press to roll {Span(run.DodgeAt, run.RollStart)} s, roll "
                                 + $"(m_inDodge) {Span(run.RollStart, run.RollEnd)} s, i-frames {iframesText}; {flowText}; next: {nextText}");
+        var bad = LogTap.Since(mark, Wrn | Err);
+        c.Check(bad.Count == 0,
+            $"{row.Label}: no warning and no error from the mod during the row ({bad.Count}{(bad.Count > 0 ? ", first: " + bad[0].Text : "")})");
         yield return WaitIdle(p, 4f);
         rig.TakeBack(weapon);
     }
@@ -2160,7 +2285,11 @@ internal static class SelfTests
             yield return Window(rig, c, rules, 0.06f, WindowWant.Flow, shared);
             yield return Window(rig, c, rules, 0.2f, WindowWant.FlowOrSwing, shared);
             yield return Window(rig, c, rules, 0.3f, WindowWant.FlowOrSwing, shared);
+            // TESTING T22 as written: "about a third of a second after the roll ends, once the character has stood up"
+            // = a normal swing (first run: the Animator was out of the roll's blend from 0.2 s on).
+            yield return Window(rig, c, rules, 0.34f, WindowWant.Swing, shared);
             yield return Window(rig, c, rules, rules.Window + 0.2f, WindowWant.Swing, shared);
+            yield return Window(rig, c, rules, 1f, WindowWant.Swing, shared); // TESTING T08, first half as written
             // A long Window never brings back "roll, stand-up, roll attack": after a normal roll it must flow.
             var wide = MoveRules.Defaults();
             wide.Cooldown = 0f;
@@ -2346,6 +2475,7 @@ internal static class SelfTests
         Face(p, rig.Forward);
         yield return Fixed;
         var animator = p.m_zanim.m_animator;
+        var mark = LogTap.Mark;
         var before = MoveTracker.LastMove.Clone;
         var last = p.m_currentAttack;
         var edge = new Box<float>();
@@ -2393,6 +2523,13 @@ internal static class SelfTests
             c.Check(inRollBlend && flow == FlowResult.CrossFade
                     && MoveTracker.LastEntryDelay >= 0f && MoveTracker.LastEntryDelay <= 3f * Time.fixedDeltaTime + 0.001f,
                 $"{what}: the roll attack cross-faded out of the roll's blend (flow {flow}), entered after {S(MoveTracker.LastEntryDelay)} s");
+            var line = LogTap.First(mark, Dbg, "Roll attack: ");
+            c.Check(line != null && line.Contains(" s after the roll ended (cross-fade from the roll, "),
+                $"{what}: Debug line \"Roll attack: ... s after the roll ended (cross-fade from the roll, ...)\" (got \"{line ?? "none"}\")");
+        }
+        else if (swing)
+        {
+            c.Check(LogTap.Count(mark, Dbg, "Roll attack") == 0, $"{what}: no \"Roll attack\" Debug line for the normal swing");
         }
         SelfTest.Note(RollInputName, $"{what}: Animator {(inRollBlend ? "still in" : "out of")} the roll's blend at the press, "
                                      + (roll ? $"roll attack, flow {MoveTracker.LastMove.Flow}, entry after {S(MoveTracker.LastEntryDelay)} s"
@@ -2967,7 +3104,9 @@ internal static class SelfTests
             {
                 if (Prefab(name) == null)
                 {
+                    // Only Sneak Ambush's item may be missing (TESTING T11: "if installed"); a game item must be there.
                     SelfTest.Note(ExclusionsName, $"{name} not registered: SKIP");
+                    c.Check(name == "MC_SmokeScreen", $"{name} exists in this game");
                     continue;
                 }
                 yield return ExclusionRow(rig, c, name);
@@ -3008,6 +3147,7 @@ internal static class SelfTests
             var shared = item.m_shared.m_attack;
             var before = MoveTracker.LastMove.Clone;
             var last = p.m_currentAttack;
+            var mark = LogTap.Mark;
             if (roll == 0)
             {
                 p.Jump();
@@ -3024,11 +3164,11 @@ internal static class SelfTests
             }
             yield return WaitNewAttack(p, last, 0.6f, box);
             var a = box.Value;
-            if (a == null)
-            {
-                SelfTest.Note(ExclusionsName, $"{name} {what}: the game started no attack (nothing to check)");
-            }
-            else
+            // The item's attack must start (first run: it did for every item, 6 checks each): a row with no attack
+            // would have looked at nothing and still passed.
+            c.Check(a != null, $"{name} {what}: its attack started");
+            c.Check(LogTap.Count(mark, Dbg, " attack: ") == 0, $"{name} {what}: no move Debug line");
+            if (a != null)
             {
                 c.Check(ReferenceEquals(MoveTracker.LastMove.Clone, before) && a.m_attackAnimation == shared.m_attackAnimation
                         && a.m_attackChainLevels == shared.m_attackChainLevels && Near(a.m_damageMultiplier, shared.m_damageMultiplier),

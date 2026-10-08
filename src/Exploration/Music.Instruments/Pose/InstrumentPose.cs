@@ -1565,5 +1565,13 @@ internal static class InstrumentPose
 
     internal static bool InstanceMoved(Player player) =>
         player != null && Rigs.TryGetValue(player.GetInstanceID(), out var rig) && rig.InstanceMoved;
+
+    // Seated blend of the pose: 0 standing .. 1 seated (lyre on the lap); -1 = not posed.
+    internal static float Seat(Player player) =>
+        player != null && Rigs.TryGetValue(player.GetInstanceID(), out var rig) ? rig.Seat : -1f;
+
+    // Seconds since the last note pulse moved this player's pose (big = never).
+    internal static float PulseAge(Player player) =>
+        player != null && Rigs.TryGetValue(player.GetInstanceID(), out var rig) ? Time.time - rig.PulseAt : 9999f;
 #endif
 }

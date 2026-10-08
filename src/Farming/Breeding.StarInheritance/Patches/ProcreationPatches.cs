@@ -196,8 +196,14 @@ internal static class ProcreationPatches
         st.Settings = settings.Source;
         st.FarmerKnown = FarmerSkill.FindBest(proc.transform.position, settings.FarmerRange,
             out st.Farmer, out st.FarmingLevel, out st.FarmerLocal);
+#if DEBUG
+        // Debug build only: self test may force the roll. Release keep the old call below, word for word.
+        st.Decision = BirthRule.Decide(own, st.Partner, proc.m_minOffspringLevel, settings.Rule,
+            st.FarmerKnown, st.FarmingLevel, SelfTests.TestRoll(UnityEngine.Random.value));
+#else
         st.Decision = BirthRule.Decide(own, st.Partner, proc.m_minOffspringLevel, settings.Rule,
             st.FarmerKnown, st.FarmingLevel, UnityEngine.Random.value);
+#endif
         st.OriginalLevel = own;
         st.Decided = true;
         if (st.Decision.Level != own)
@@ -211,6 +217,9 @@ internal static class ProcreationPatches
     private static void OnBirth(Procreation proc, ZDO zdo, in BirthState st)
     {
         BirthRecord.Clear(zdo);
+#if DEBUG
+        SelfTests.NoteBirth(proc, st); // self test read what me decided without parsing the log
+#endif
         if (!st.Decided)
         {
             return; // prefix failed (already reported): vanilla level, nothing true to tell
@@ -278,11 +287,17 @@ internal static class ProcreationPatches
         {
             var level = partner.GetLevel();
             BirthRecord.Write(zdo, level, stamp);
+#if DEBUG
+            SelfTests.NoteConception(SelfTests.ConceptionKind.Partner, character.m_level, level, distance);
+#endif
             Log.Debug($"Conceived: {name} (level {character.m_level}) with partner level {level} at {Metres(distance)} m.");
         }
         else if (proc.m_noPartnerOffspring != null)
         {
             BirthRecord.Write(zdo, BirthRule.NoPartner, stamp);
+#if DEBUG
+            SelfTests.NoteConception(SelfTests.ConceptionKind.BredAlone, character.m_level, BirthRule.NoPartner, 0f);
+#endif
             Log.Debug($"Conceived: {name} (level {character.m_level}): no ready partner {Within(range)}, bred alone.");
         }
         else
@@ -290,6 +305,9 @@ internal static class ProcreationPatches
             // Vanilla counted partner me cannot see (prefab without BaseAI, or mate added by other mod's count).
             // Old note (if any) cleared; its stamp never match anyway.
             BirthRecord.Clear(zdo);
+#if DEBUG
+            SelfTests.NoteConception(SelfTests.ConceptionKind.Unseen, character.m_level, BirthRule.NoPartner, 0f);
+#endif
             Log.Debug($"Conceived: {name} (level {character.m_level}): the game counted a partner this mod cannot see; "
                       + "the partner will be looked for at birth.");
         }

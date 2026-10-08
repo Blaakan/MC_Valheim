@@ -22,6 +22,12 @@ internal static class Compat
     private static bool _detected;
     private static bool _gco;
 
+#if DEBUG
+    // Self test: pretend GCO is here (true) or not here (false), never a real plugin. Null = look at loaded plugins.
+    // Test set it, call Reset(), and clear it + Reset() again in its finally.
+    internal static bool? TestGco { get; set; }
+#endif
+
     // First read after activation look at loaded plugins (Info line once per activation when GCO found).
     internal static bool GcoLoaded
     {
@@ -59,6 +65,12 @@ internal static class Compat
     // By GUID, else by name (GUID unverified): name has "Goo" and "Combat Overhaul".
     private static bool FindGco()
     {
+#if DEBUG
+        if (TestGco.HasValue)
+        {
+            return TestGco.Value;
+        }
+#endif
         if (Chainloader.PluginInfos.ContainsKey(GcoGuid))
         {
             return true;

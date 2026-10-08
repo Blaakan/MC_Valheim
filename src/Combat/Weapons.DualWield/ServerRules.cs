@@ -33,6 +33,10 @@ internal static class ServerRules
 #if DEBUG
     // Self test force rules (never the config file). Null = normal.
     internal static DualRules TestRules;
+
+    // Self test read me: rules text of the last "Using the server's dual wielding rules" line (null = none logged on
+    // this session, or since the feature went off).
+    internal static string LastLogged => _lastLogged;
 #endif
 
     // Rules in force. Hot path (every equip, every swing, Player.Update compare): cached objects only, so same rules =

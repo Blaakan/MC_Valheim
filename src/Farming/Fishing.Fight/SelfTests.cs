@@ -25,10 +25,18 @@ namespace MC.Farming.FishingFightMod;
 //                    flip the verdict; calm again = bar back; reel to the end = fish in the bag, float gone; second
 //                    fish at 0 stamina = lost, fish let go, float stay; screenshots of the bar and the arrow; travel
 //                    back
-// Me force rules only with ServerRules.TestRules / TestPending, phase and marker with Fight.TestPhase / TestPin, the
-// arrow with FightHud.TestArrow: never config. Rig put back controls, look, items, stamina, world stamina rate, time
+// More live tests in SelfTests.Live.cs (same rig): fishing.cast (real cast, nibble, hook, empty reel), fishing.phases
+// (own phase timer, side switches, stars and skill), fishing.exits (line break, attack, bow, rod away, float or fish
+// gone, hooked fish picked up), fishing.swim (full bag, deep water), fishing.toggle (feature off and on mid-fight),
+// fishing.input (bar settings, Toggle block, inventory, pause, hidden HUD), fishing.dual (rod from a weapon pair,
+// dodge), fishing.harpoon (harpoon line let go by a cast), and two that fail until the mod is fixed:
+// fishing.bug.struggle-reel (reel in a fight to the catch) and fishing.bug.stranded (fish out of the water).
+// Multiplayer tests in SelfTests.Mp.cs (real dedicated server).
+// Me force rules only with ServerRules.TestRules / TestPending, phase and marker with Fight.TestPhase / TestPin /
+// TestSide / TestSwitchRate, the arrow and the bar place with FightHud.TestArrow / TestDisplay, feature off with
+// Plugin.TestBlocked: never config. Rig put back controls, look, items, skill, stamina, world stamina rate, time
 // and the player's place.
-internal static class SelfTests
+internal static partial class SelfTests
 {
     private const string NetworkName = "fishing.network";
     private const string LogicName = "fishing.logic";
@@ -43,6 +51,8 @@ internal static class SelfTests
         SelfTest.Register(LogicName, RunLogic);
         SelfTest.Register(PendingName, RunPending);
         SelfTest.Register(FightName, RunFight);
+        RegisterLive();
+        RegisterMultiplayer();
 #endif
     }
 
@@ -54,6 +64,8 @@ internal static class SelfTests
         SelfTest.Unregister(LogicName);
         SelfTest.Unregister(PendingName);
         SelfTest.Unregister(FightName);
+        UnregisterLive();
+        UnregisterMultiplayer();
         ClearOverrides();
 #endif
     }
@@ -62,12 +74,14 @@ internal static class SelfTests
     // Each trip (vanilla distant teleport: 8 s minimum, then area ready and floor found).
     private const float TravelTimeout = 35f;
 
+    // Not Plugin.TestBlocked: turning the feature off run this (Unregister), the toggle test clear its own flag.
     private static void ClearOverrides()
     {
         ServerRules.TestPending = false;
         ServerRules.TestRules = null;
         Fight.ClearTest();
         FightHud.TestArrow = null;
+        FightHud.TestDisplay = null;
     }
 
     // ---------- helpers ----------
@@ -244,6 +258,26 @@ internal static class SelfTests
         c.Check(bounced && Near(bar.ZonePos, 0f, 0.0001f) && Near(bar.ZoneSpeed, 0f),
             $"release long: zone back on the bottom and settled ({F(bar.ZonePos)}, {F(bar.ZoneSpeed)})");
 
+        // Fish inside the zone: zone rise and fall softer (x0.6). Difficulty 0 = the marker never move by itself.
+        var still = new FishProfile(0f, FishMotion.Mixed);
+        var soft = new CatchBar(still, 0.3f, new System.Random(1));
+        var plainBar = new CatchBar(still, 0.3f, new System.Random(1));
+        soft.ZonePos = 0.3f;
+        plainBar.ZonePos = 0.3f;
+        soft.FishPos = 0.45f;
+        plainBar.FishPos = 0.95f;
+        soft.Step(dt, true);
+        plainBar.Step(dt, true);
+        var softUp = plainBar.ZoneSpeed > 0f ? soft.ZoneSpeed / plainBar.ZoneSpeed : 0f;
+        soft.ZoneSpeed = 0f;
+        plainBar.ZoneSpeed = 0f;
+        soft.Step(dt, false);
+        plainBar.Step(dt, false);
+        var softDown = plainBar.ZoneSpeed < 0f ? soft.ZoneSpeed / plainBar.ZoneSpeed : 0f;
+        c.Check(soft.InZone && !plainBar.InZone && Near(CatchBar.InZoneAccelScale, 0.6f)
+                && Near(softUp, CatchBar.InZoneAccelScale, 0.01f) && Near(softDown, CatchBar.InZoneAccelScale, 0.01f),
+            $"fish inside the zone: the zone rises and falls x0.6 as hard (up x{F(softUp)}, down x{F(softDown)})");
+
         // Fish marker: every motion stays on the track; in-zone test matches the positions.
         var motionsOk = true;
         var inZoneOk = true;
@@ -264,6 +298,7 @@ internal static class SelfTests
         var calm = Travel(15f, 11);
         var wildTravel = Travel(85f, 11);
         c.Check(wildTravel > calm * 1.5f, $"hard fish move more than easy ones (85: {F(wildTravel)}, 15: {F(calm)})");
+        c.Check(calm > 0.3f, $"a plain Perch's marker (difficulty 15) moves in the bar by itself ({F(calm)} tracks in 60 s)");
         c.Note($"marker travel over 60 s: difficulty 15 = {F(calm)} tracks, 85 = {F(wildTravel)} tracks");
 
         // Sinker drift down, floater drift up (no targets: difficulty 0 never pick one).
@@ -324,6 +359,19 @@ internal static class SelfTests
         c.Check(calmOk, "calm time stays within the rule's +-40 % and the difficulty factor");
         c.Check(fightOk, "fight time stays within +-33 %, the difficulty factor and +0.5 s per star");
         c.Check(FightLogic.SwitchRate(1f) > FightLogic.SwitchRate(0f), "hard fish switch sides more often");
+        c.Check(Near(FightLogic.SwitchRate(0f), 0.1f) && Near(FightLogic.SwitchRate(1f), 0.5f)
+                && Near(FightLogic.MinSecondsPerSide, 1f),
+            "side switch: 0.1 to 0.5 times a second by difficulty, never in the first second on a side");
+
+        // Shallow water ahead of the run (FishPatches): turn only when the other way is deeper.
+        c.Check(!FightLogic.TurnFromShallows(1.5f, 0.2f, 1f), "deep enough ahead: no turn");
+        c.Check(FightLogic.TurnFromShallows(0.5f, 1.2f, 1f), "shallow ahead, deep enough the other way: turn");
+        c.Check(FightLogic.TurnFromShallows(0.3f, 0.6f, 1f), "both ways shallow, the other clearly deeper: turn");
+        c.Check(!FightLogic.TurnFromShallows(0.5f, 0.5f, 1f) && !FightLogic.TurnFromShallows(0.5f, 0.7f, 1f)
+                && !FightLogic.TurnFromShallows(0.5f, 0.2f, 1f),
+            "both ways shallow and alike (or the other shallower): keep the side");
+        c.Check(FightLogic.TurnFromShallows(0.3f, 0.6f, 1f) && !FightLogic.TurnFromShallows(0.6f, 0.3f, 1f),
+            "after a turn the fish does not turn straight back (no swap every second)");
         c.Check(Near(FightLogic.ZoneSize(rules, 0f), 0.24f) && Near(FightLogic.ZoneSize(rules, 1f), 0.38f)
                 && Near(FightLogic.ZoneSize(rules, 0.5f), 0.31f), "bar size follows the skill");
         c.Check(Near(FightLogic.ReelCost(10f, 1f, 1, 0.2f, 0f), 11f) && Near(FightLogic.ReelCost(10f, 2f, 3, 0.2f, 1f), 3.2f)
@@ -342,6 +390,40 @@ internal static class SelfTests
         var maxed = FishProfile.For("Fish10", 5, Heightmap.Biome.DeepNorth, 2f);
         c.Check(Near(perch.Difficulty, 15f) && perch.Motion == FishMotion.Mixed, $"perch = 15 mixed ({F(perch.Difficulty)})");
         c.Check(Near(perch3.Difficulty, 15f + 2f * FishProfile.StarStep), "two stars add two steps");
+
+        // Perch, default rules: calm about 5 to 11 s, takes about 1 m of line a second in a fight.
+        var pr = new System.Random(9);
+        var calmLow = float.MaxValue;
+        var calmHigh = 0f;
+        for (var i = 0; i < 2000; i++)
+        {
+            var cd = FightLogic.CalmDuration(rules, perch.D01, pr);
+            calmLow = Mathf.Min(calmLow, cd);
+            calmHigh = Mathf.Max(calmHigh, cd);
+        }
+        c.Check(calmLow >= 4.7f && calmLow < 5.3f && calmHigh > 10.6f && calmHigh <= 11.3f,
+            $"a Perch stays calm about 5 to 11 s with the default rules ({F(calmLow)} to {F(calmHigh)} s)");
+        c.Check(Near(FightLogic.LineRunSpeed(rules, perch.D01), 1.08f, 0.01f),
+            $"a fighting Perch takes about 1 m of line a second ({F(FightLogic.LineRunSpeed(rules, perch.D01))})");
+
+        // Two stars: the marker moves more, fights last longer (+0.5 s per star and the higher difficulty).
+        var plainRng = new System.Random(21);
+        var starRng = new System.Random(21);
+        var plainFight = 0f;
+        var starFight = 0f;
+        for (var i = 0; i < 1000; i++)
+        {
+            plainFight += FightLogic.StruggleDuration(rules, perch.D01, 1, plainRng);
+            starFight += FightLogic.StruggleDuration(rules, perch3.D01, 3, starRng);
+        }
+        plainFight /= 1000f;
+        starFight /= 1000f;
+        c.Check(starFight > plainFight + 0.9f,
+            $"a two-star Perch fights longer than a plain one ({F(starFight)} s vs {F(plainFight)} s on average)");
+        var plainTravel = Travel(perch.Difficulty, 31);
+        var starTravel = Travel(perch3.Difficulty, 31);
+        c.Check(starTravel > plainTravel * 1.3f,
+            $"a two-star Perch moves more in the bar ({F(starTravel)} vs {F(plainTravel)} tracks in 60 s)");
         c.Check(salmon.Difficulty > perch.Difficulty, "later biome fish are harder");
         c.Check(Near(modFish.Difficulty, FishProfile.BiomeDifficulty(Heightmap.Biome.Plains)), "unknown fish: biome difficulty");
         c.Check(Near(maxed.Difficulty, FishProfile.MaxDifficulty), "difficulty capped at 100");
@@ -448,26 +530,51 @@ internal static class SelfTests
         private bool _envSaved;
         private bool _todOn;
         private float _tod;
+        private readonly string _test;
+        private readonly bool _toggleBlock;
+        private bool _skillSaved;
+        private bool _hadSkill;
+        private float _skillLevel;
+        private float _skillPoints;
+        private bool _pickupTaken;
+        private bool _pickup;
+        private bool _pitchSaved;
+        private float _pitch;
         internal bool Travelled;
         internal bool Back;
 
-        internal FishRig(Player player)
+        // What a test turned on and must be off again at the end (Restore).
+        internal bool MenuOpen;
+        internal bool InventoryOpen;
+        internal bool HudHidden;
+        internal bool Blocked;
+        internal bool Keys;
+
+        internal FishRig(Player player, string test)
         {
             P = player;
+            _test = test;
             Inv = player.GetInventory();
             Origin = player.transform.position;
             OriginRotation = player.transform.rotation;
             _yaw = player.m_lookYaw;
             _right = player.m_rightItem;
             _left = player.m_leftItem;
+            _toggleBlock = player.ToggleBlock;
         }
 
         // Count of an item before the test (caught fish taken out again at the end).
-        internal void Remember(string itemName) => _counts[itemName] = Inv.CountItems(itemName);
-
-        internal ItemDrop.ItemData Give(string prefab)
+        internal void Remember(string itemName)
         {
-            var item = Inv.AddItem(prefab, 1, 1, 0, 0L, "", false);
+            if (!_counts.ContainsKey(itemName))
+            {
+                _counts[itemName] = Inv.CountItems(itemName);
+            }
+        }
+
+        internal ItemDrop.ItemData Give(string prefab, int stack = 1)
+        {
+            var item = Inv.AddItem(prefab, stack, 1, 0, 0L, "", false);
             if (item != null)
             {
                 _items.Add(item);
@@ -483,6 +590,8 @@ internal static class SelfTests
             }
         }
 
+        // Test drive the player itself: no keyboard, no mouse, the game's Toggle block option off (memory only, the
+        // saved option is not touched; Restore put the player's value back).
         internal void TakeControls()
         {
             if (_controller == null)
@@ -494,7 +603,57 @@ internal static class SelfTests
                     _controller.enabled = false;
                 }
             }
+            P.ToggleBlock = false;
             Reel(false);
+        }
+
+        // Keyboard path back on (PlayerController read ZInput and call SetControls every tick): tests that fake a held
+        // button (HeldKeys) need it. Off again = the test drive SetControls itself.
+        internal void Keyboard(bool on)
+        {
+            if (_controller != null)
+            {
+                _controller.enabled = on;
+            }
+            if (!on)
+            {
+                Reel(false);
+            }
+        }
+
+        // Fishing skill of the player for this test (memory only). First call remember what it was.
+        internal Skills.Skill Fishing()
+        {
+            var skills = P.m_skills;
+            if (!_skillSaved)
+            {
+                _skillSaved = true;
+                _hadSkill = skills.m_skillData.TryGetValue(Skills.SkillType.Fishing, out var old);
+                if (_hadSkill)
+                {
+                    _skillLevel = old.m_level;
+                    _skillPoints = old.m_accumulator;
+                }
+            }
+            return skills.GetSkill(Skills.SkillType.Fishing);
+        }
+
+        internal void SetFishing(float level)
+        {
+            var skill = Fishing();
+            skill.m_level = level;
+            skill.m_accumulator = 0f;
+        }
+
+        // Dry land rig: a fish lying next to the player must not jump into the bag by itself.
+        internal void NoAutoPickup()
+        {
+            if (!_pickupTaken)
+            {
+                _pickupTaken = true;
+                _pickup = Player.m_enableAutoPickup;
+            }
+            Player.m_enableAutoPickup = false;
         }
 
         // Block held (vanilla reel input) or not; no other control. m_blocking set too: with the game's ToggleBlock
@@ -548,6 +707,17 @@ internal static class SelfTests
             P.SetLookDir(dir.normalized);
         }
 
+        // Look straight ahead, a little down (camera follows the look): remember the player's own pitch first.
+        internal void LookLevel()
+        {
+            if (!_pitchSaved)
+            {
+                _pitchSaved = true;
+                _pitch = P.m_lookPitch;
+            }
+            P.m_lookPitch = 5f;
+        }
+
         internal void Fill(float stamina)
         {
             P.m_stamina = Mathf.Min(stamina, P.GetMaxStamina());
@@ -583,13 +753,94 @@ internal static class SelfTests
         internal void Restore()
         {
             ClearOverrides();
+            Try("pause", () =>
+            {
+                if (MenuOpen)
+                {
+                    MenuOpen = false;
+                    if (Menu.instance != null && Menu.IsVisible())
+                    {
+                        Menu.instance.Hide();
+                    }
+                    Game.Unpause();
+                }
+            });
+            Try("inventory", () =>
+            {
+                if (InventoryOpen)
+                {
+                    InventoryOpen = false;
+                    if (InventoryGui.instance != null && InventoryGui.IsVisible())
+                    {
+                        InventoryGui.instance.Hide();
+                    }
+                }
+            });
+            Try("hud", () =>
+            {
+                if (HudHidden)
+                {
+                    HudHidden = false;
+                    if (Hud.instance != null)
+                    {
+                        Hud.instance.m_userHidden = false;
+                    }
+                }
+            });
+            Try("keys", () =>
+            {
+                if (Keys)
+                {
+                    Keys = false;
+                    HeldKeys.Remove();
+                }
+            });
+            Try("feature", () =>
+            {
+                if (Blocked || Plugin.TestBlocked)
+                {
+                    Blocked = false;
+                    Plugin.TestBlocked = false;
+                    FeatureRegistry.RefreshAll();
+                    // Turning back on cleared nothing, turning off did: same clean state either way.
+                    ClearOverrides();
+                }
+            });
             Try("fight", Fight.Shutdown);
             Try("controls", () =>
             {
+                P.ToggleBlock = _toggleBlock;
                 if (_controller != null)
                 {
                     Reel(false);
                     _controller.enabled = _controllerEnabled;
+                }
+            });
+            Try("pickup", () =>
+            {
+                if (_pickupTaken)
+                {
+                    _pickupTaken = false;
+                    Player.m_enableAutoPickup = _pickup;
+                }
+            });
+            Try("skill", () =>
+            {
+                if (!_skillSaved)
+                {
+                    return;
+                }
+                _skillSaved = false;
+                var skills = P.m_skills;
+                if (_hadSkill)
+                {
+                    var skill = skills.GetSkill(Skills.SkillType.Fishing);
+                    skill.m_level = _skillLevel;
+                    skill.m_accumulator = _skillPoints;
+                }
+                else
+                {
+                    skills.m_skillData.Remove(Skills.SkillType.Fishing);
                 }
             });
             Try("spawned", DestroySpawned);
@@ -601,7 +852,9 @@ internal static class SelfTests
                     {
                         continue;
                     }
-                    if (P.IsItemEquiped(item))
+                    // Also an item put away by the test or by swimming (hidden hand): vanilla forget it too.
+                    if (P.IsItemEquiped(item) || ReferenceEquals(P.m_hiddenRightItem, item)
+                        || ReferenceEquals(P.m_hiddenLeftItem, item))
                     {
                         P.UnequipItem(item, false);
                     }
@@ -644,6 +897,11 @@ internal static class SelfTests
             Try("look", () =>
             {
                 P.m_lookYaw = _yaw;
+                if (_pitchSaved)
+                {
+                    _pitchSaved = false;
+                    P.m_lookPitch = _pitch;
+                }
             });
             Try("time", () =>
             {
@@ -651,6 +909,22 @@ internal static class SelfTests
                 {
                     EnvMan.instance.m_debugTimeOfDay = _todOn;
                     EnvMan.instance.m_debugTime = _tod;
+                }
+            });
+            Try("place", () =>
+            {
+                // No trip (dry land test): a dodge roll or a pull moved the player a few metres: back to the start.
+                if (Travelled || P == null || Vector3.Distance(P.transform.position, Origin) < 0.3f)
+                {
+                    return;
+                }
+                P.transform.position = Origin;
+                P.transform.rotation = OriginRotation;
+                if (P.m_body != null)
+                {
+                    P.m_body.position = Origin;
+                    P.m_body.rotation = OriginRotation;
+                    P.m_body.linearVelocity = Vector3.zero;
                 }
             });
             Try("travel back", () =>
@@ -682,6 +956,11 @@ internal static class SelfTests
                     var nview = go.GetComponent<ZNetView>();
                     if (nview != null && nview.IsValid())
                     {
+                        // Only the owner's destroy reach the other games (multiplayer test gave one away).
+                        if (!nview.IsOwner())
+                        {
+                            nview.ClaimOwnership();
+                        }
                         ZNetScene.instance.Destroy(go);
                     }
                     else
@@ -693,7 +972,7 @@ internal static class SelfTests
             _spawned.Clear();
         }
 
-        private static void Try(string what, Action action)
+        private void Try(string what, Action action)
         {
             try
             {
@@ -701,152 +980,23 @@ internal static class SelfTests
             }
             catch (Exception e)
             {
-                SelfTest.Note(FightName, $"restore {what} failed: {e.Message}");
+                SelfTest.Note(_test, $"restore {what} failed: {e.Message}");
             }
         }
     }
 
-    private static IEnumerator RunFight()
-    {
-        var c = new Checks(FightName);
-        var player = Player.m_localPlayer;
-        if (player == null || ZoneSystem.instance == null || WorldGenerator.instance == null || ZNetScene.instance == null
-            || ObjectDB.instance == null || EnvMan.instance == null)
-        {
-            SelfTest.Fail(FightName, "no local player or world");
-            yield break;
-        }
-        var shores = FindShores(player.transform.position, MaxShores);
-        if (shores.Count == 0)
-        {
-            c.Note("no shore with deep water within 4 km of the spawn: live fight not tested");
-            c.Report(" (live fight not tested: no shore found)");
-            yield break;
-        }
-        var rig = new FishRig(player);
-        try
-        {
-            yield return FightBody(c, rig, shores);
-            ClearOverrides();
-            Fight.Shutdown();
-            rig.DestroySpawned();
-            if (rig.Travelled)
-            {
-                var back = new Box();
-                yield return rig.Travel(rig.Origin, rig.OriginRotation, back, TravelTimeout);
-                rig.Back = back.Ok;
-                c.Check(back.Ok, "travel back to the spawn: " + back.Detail);
-            }
-        }
-        finally
-        {
-            // Probe time-out or throw: SafeRunner dispose every level, this run (no yield here).
-            rig.Restore();
-        }
-        c.Report();
-    }
+    private static IEnumerator RunFight() => RunLive(FightName, true, FightBody);
 
-    private static IEnumerator FightBody(Checks c, FishRig rig, List<KeyValuePair<Vector3, Vector3>> shores)
+    private static IEnumerator FightBody(Checks c, FishRig rig, Stage st, LogTap tap)
     {
         var p = rig.P;
-        var level = ZoneSystem.instance.m_waterLevel;
-        var stand = Vector3.zero;
-        var waterDir = Vector3.forward;
-        var found = false;
-        // WorldGenerator heights miss rivers, rocks and locations: try the spots in turn until one is real (dry
-        // ground under the player, deep water where the float goes).
-        for (var s = 0; s < shores.Count && !found; s++)
-        {
-            stand = shores[s].Key;
-            waterDir = shores[s].Value;
-            var trip = new Box();
-            rig.Travelled = true;
-            yield return rig.Travel(stand, Quaternion.LookRotation(waterDir), trip, TravelTimeout);
-            if (!trip.Ok)
-            {
-                c.Note($"shore {s + 1} at {F(stand)}: travel failed ({trip.Detail})");
-                continue;
-            }
-            // Let the area settle (water volumes, terrain).
-            for (var i = 0; i < 60; i++)
-            {
-                yield return new WaitForFixedUpdate();
-            }
-            var spotCheck = p.transform.position + waterDir * 10f;
-            var floor = ZoneSystem.instance.GetGroundHeight(spotCheck);
-            if (p.IsSwimming() || p.transform.position.y < level + 0.2f || floor > level - 2f)
-            {
-                c.Note($"shore {s + 1} at {F(stand)} not usable (swimming {p.IsSwimming()}, player y "
-                       + $"{F(p.transform.position.y)}, floor 10 m out {F(floor)}, water {F(level)})");
-                continue;
-            }
-            stand = p.transform.position;
-            found = true;
-            c.Note($"shore {s + 1} at {F(stand)}, water toward {F(waterDir)}, floor 10 m out {F(floor)}, travel "
-                   + trip.Detail);
-        }
-        if (!c.Check(found, $"a usable shore among {shores.Count} candidates"))
-        {
-            yield break;
-        }
-        rig.Noon();
-        rig.TakeStaminaRate();
-        rig.TakeControls();
-        rig.Face(waterDir);
+        var rodTop = st.RodTop;
+        var fishName = st.FishName;
 
-        // Rod in hand, bait as ammo data, float and Fish1 in the water.
-        var rod = rig.Give("FishingRod");
-        if (!c.Check(rod != null, "FishingRod given"))
-        {
-            yield break;
-        }
-        p.EquipItem(rod, false);
-        Transform rodTop = null;
-        for (var i = 0; i < 100 && rodTop == null; i++)
-        {
-            yield return null;
-            rodTop = Utils.FindChild(p.transform, "_RodTop");
-        }
-        if (!c.Check(rodTop != null, "rod top (_RodTop) shows after equipping the rod"))
-        {
-            yield break;
-        }
-        var floatPrefab = ZNetScene.instance.GetPrefab("FishingRodFloat");
-        if (floatPrefab == null)
-        {
-            var attack = rod.m_shared.m_attack;
-            var projectile = attack != null && attack.m_attackProjectile != null
-                ? attack.m_attackProjectile.GetComponent<Projectile>()
-                : null;
-            floatPrefab = projectile != null ? projectile.m_spawnOnHit : null;
-            c.Note("no prefab named FishingRodFloat; float from the rod's projectile: "
-                   + (floatPrefab != null ? floatPrefab.name : "none"));
-        }
-        else
-        {
-            c.Note("float prefab FishingRodFloat found");
-        }
-        var baitPrefab = ObjectDB.instance.GetItemPrefab("FishingBait");
-        var fishPrefab = ZNetScene.instance.GetPrefab("Fish1");
-        if (!c.Check(floatPrefab != null && baitPrefab != null && fishPrefab != null, "float, bait and Fish1 prefabs exist"))
-        {
-            yield break;
-        }
-        var fishItem = fishPrefab.GetComponent<ItemDrop>();
-        var fishName = fishItem != null ? fishItem.m_itemData.m_shared.m_name : "$animal_fish1";
-        rig.Remember(fishName);
-        var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
-        bait.m_dropPrefab = baitPrefab;
-
-        var spot = stand + waterDir * 10f;
-        var floatPos = new Vector3(spot.x, level + 0.2f, spot.z);
-        var ffGo = UnityEngine.Object.Instantiate(floatPrefab, floatPos, Quaternion.identity);
-        rig.Track(ffGo);
-        var ff = ffGo.GetComponent<FishingFloat>();
-        ff.Setup(p, Vector3.zero, 0f, null, rod, bait);
-        var fishGo = UnityEngine.Object.Instantiate(fishPrefab, new Vector3(spot.x, level - 1.5f, spot.z), Quaternion.identity);
-        rig.Track(fishGo);
-        var fish = fishGo.GetComponent<Fish>();
+        // Float and Fish1 in the water (no real cast here: fishing.cast does that).
+        var ff = SpawnFloat(rig, st);
+        var ffGo = ff.gameObject;
+        var fish = SpawnFish(rig, st, 1);
         for (var i = 0; i < 10; i++)
         {
             yield return new WaitForFixedUpdate();
@@ -855,8 +1005,13 @@ internal static class SelfTests
         {
             yield break;
         }
+        var fishIcon = fish.m_itemDrop != null ? fish.m_itemDrop.m_itemData.GetIcon() : null;
+        var caughtText = Localization.instance.Localize("$msg_fishing_catched " + fish.GetHoverName());
+        var caughtBefore = Stat(PlayerStatType.FishCaught);
+        var skill = rig.Fishing();
 
-        // Pending rules: hooked fish stay vanilla (no fight).
+        // Pending rules: hooked fish stay vanilla (no fight), and stay hooked (the left-hook cleaner of FishPatches
+        // only touch a fish with no float).
         ServerRules.TestPending = true;
         ff.SetCatch(fish);
         for (var i = 0; i < 5; i++)
@@ -864,10 +1019,15 @@ internal static class SelfTests
             yield return new WaitForFixedUpdate();
         }
         c.Check(Fight.Current == null, "pending rules: hooked fish, no take-over");
+        c.Check(fish.IsHooked() && fish.m_nview.GetZDO().GetInt(ZDOVars.s_hooked) == 1 && ReferenceEquals(ff.GetCatch(), fish),
+            "pending rules: the fish stays on the hook (hooked flag kept)");
         ServerRules.TestPending = false;
         // Defaults for the whole live fight (the tester's own config never decide the expected numbers).
         ServerRules.TestRules = new FightRules();
+        FightHud.TestDisplay = DefaultDisplay;
+        FightHud.TestArrow = true;
         var turn = FightRules.Default.RodAngle + 15f;
+        var h = FightHud.TestTrackHeight;
 
         // Calm, fish pinned inside the bar: line in, no stamina used, regen on.
         Fight.TestPhase = FightPhase.Calm;
@@ -884,12 +1044,107 @@ internal static class SelfTests
         }
         c.Note($"fight: difficulty {F(fight.Profile.Difficulty)} ({fight.Profile.Motion}), quality {fight.Quality}, "
                + $"line {F(ff.m_lineLength)} m, float prefab {Utils.GetPrefabName(ffGo)}");
+        c.Check(fight.Quality == 1 && Near(fight.Profile.Difficulty, 15f) && fight.Profile.Motion == FishMotion.Mixed,
+            $"a plain Perch: quality 1, difficulty 15, Mixed (got quality {fight.Quality}, {F(fight.Profile.Difficulty)}, {fight.Profile.Motion})");
+        c.Check(tap.Has("Fight started: Fish1 quality 1, difficulty 15 (Mixed), line "),
+            "Debug line \"Fight started: Fish1 quality 1, difficulty 15 (Mixed), line ... m.\"");
         yield return null;
         yield return null;
         c.Check(FightHud.BarShown, "calm: catch bar on screen");
+        c.Check(!FightHud.ArrowShown && !FightHud.TestArrowOnScreen, "calm: no arrow, also with the arrow setting on");
+
+        // The bar as drawn (T02): right of the crosshair, upright, Perch icon in a green zone at the bottom, meter.
+        var hudRoot = Hud.instance != null ? Hud.instance.m_rootObject : null;
+        c.Check(FightHud.TestBarOnScreen && hudRoot != null && Hud.instance.IsVisible() && FightHud.TestRoot != null
+                && FightHud.TestRoot.IsChildOf(hudRoot.transform),
+            "the bar is drawn inside the game's HUD and the HUD is visible");
+        var barPos = FightHud.TestBarPosition;
+        var barSize = FightHud.TestBarSize;
+        c.Check(Near(barPos.x, 260f, 0.5f) && Near(barPos.y, 0f, 0.5f) && barSize.y > barSize.x * 3f
+                && Near(FightHud.TestBarScale.x, 1f) && Near(FightHud.TestBarScale.y, 1f),
+            $"upright bar 260 units right of the screen centre at normal size (at {F(barPos.x)}, {F(barPos.y)}, "
+            + $"{F(barSize.x)} x {F(barSize.y)}, scale {F(FightHud.TestBarScale.x)})");
+        c.Check(fishIcon != null && FightHud.TestFishSprite == fishIcon && fight.Icon == fishIcon,
+            "the marker is the Perch's own item icon");
+        c.Check(FightHud.TestZoneGreen && FightHud.TestZoneBottom < 0.2f * h
+                && Near(FightHud.TestZoneHeight, fight.Bar.ZoneSize * h, 1f) && Near(fight.Bar.ZoneSize, 0.24f, 0.01f),
+            $"green zone at the bottom, 24 % of the bar at Fishing 0 (bottom {F(FightHud.TestZoneBottom)}, height "
+            + $"{F(FightHud.TestZoneHeight)} of {F(h)}, zone {F(fight.Bar.ZoneSize)})");
+        c.Check(FightHud.TestFishHeight >= FightHud.TestZoneBottom - 1f
+                && FightHud.TestFishHeight <= FightHud.TestZoneBottom + FightHud.TestZoneHeight + 1f,
+            $"the icon sits inside the zone (icon {F(FightHud.TestFishHeight)}, zone from {F(FightHud.TestZoneBottom)})");
+        var meter0 = FightHud.TestMeterHeight;
+        c.Check(FightHud.TestMeterOnScreen && Near(meter0, Progress(fight) * h, 10f) && meter0 < 0.25f * h,
+            $"line meter beside the track, nearly empty at the start ({F(meter0)} of {F(h)})");
         SelfTest.Screenshot(FightName, "calm-bar");
         yield return null;
 
+        // Zone follows Block (T03): from rest at the bottom, 5 ticks of Block with the fish inside, then outside.
+        rig.Reel(false);
+        var wait = Time.time;
+        while ((fight.Bar.ZonePos > 0f || fight.Bar.ZoneSpeed != 0f) && Time.time - wait < 6f)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        rig.Reel(true);
+        for (var i = 0; i < 5; i++)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        var riseInside = fight.Bar.ZoneSpeed;
+        rig.Reel(false);
+        Fight.TestPin = FishPin.Away;
+        wait = Time.time;
+        yield return new WaitForFixedUpdate();
+        while ((fight.Bar.ZonePos > 0f || fight.Bar.ZoneSpeed != 0f) && Time.time - wait < 6f)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        rig.Fill(p.GetMaxStamina());
+        rig.Reel(true);
+        for (var i = 0; i < 5; i++)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        var riseOutside = fight.Bar.ZoneSpeed;
+        var posEarly = fight.Bar.ZonePos;
+        for (var i = 0; i < 5; i++)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        var riseLater = fight.Bar.ZoneSpeed;
+        c.Check(riseOutside > 0f && riseLater > riseOutside && fight.Bar.ZonePos > posEarly,
+            $"Block held: the zone speeds up toward the top ({F(riseOutside)} then {F(riseLater)} tracks/s)");
+        var softer = riseOutside > 0f ? riseInside / riseOutside : 0f;
+        c.Check(softer > 0.55f && softer < 0.65f,
+            $"with the fish inside, the zone rises x0.6 as hard (x{F(softer)}: {F(riseInside)} vs {F(riseOutside)} after 5 ticks)");
+        wait = Time.time;
+        var top = 1f - fight.Bar.ZoneSize;
+        while ((fight.Bar.ZonePos < top - 0.0005f || fight.Bar.ZoneSpeed != 0f) && Time.time - wait < 3f)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        c.Check(Near(fight.Bar.ZonePos, top, 0.001f) && Near(fight.Bar.ZoneSpeed, 0f) && p.IsBlocking(),
+            $"Block held: the zone stops at the top ({F(fight.Bar.ZonePos)} of {F(top)}, {F(Time.time - wait)} s)");
+        yield return null;
+        c.Check(Near(FightHud.TestZoneBottom, top * h, 2f) && FightHud.TestZoneBottom > 0.5f * h,
+            $"Block held: the zone is drawn at the top of the track (bottom edge at {F(FightHud.TestZoneBottom)} of {F(h)})");
+        rig.Reel(false);
+        var fell = false;
+        var bounced = false;
+        wait = Time.time;
+        while (!bounced && Time.time - wait < 3f)
+        {
+            yield return new WaitForFixedUpdate();
+            fell |= fight.Bar.ZoneSpeed < 0f;
+            bounced |= fell && fight.Bar.ZonePos <= 0.0001f && fight.Bar.ZoneSpeed > 0f;
+        }
+        c.Check(fell && bounced, $"Block let go: the zone falls and bounces on the bottom (fell {fell}, bounced {bounced})");
+        rig.Fill(p.GetMaxStamina());
+
+        // Fish in the zone (T04): line in, shown mid-screen, meter fills, no stamina used, stamina comes back.
+        Fight.TestPin = FishPin.InZone;
+        yield return new WaitForFixedUpdate();
         p.m_stamina = p.GetMaxStamina() * 0.5f;
         p.m_staminaRegenTimer = 0f;
         var line0 = ff.m_lineLength;
@@ -898,16 +1153,36 @@ internal static class SelfTests
         rig.Reel(true);
         yield return new WaitForSeconds(1.5f);
         var line1 = ff.m_lineLength;
-        c.Note($"calm reel speed {F((line0 - line1) / Mathf.Max(0.01f, Time.time - t0))} m/s at Fishing "
+        var calmRate = (line0 - line1) / Mathf.Max(0.01f, Time.time - t0);
+        c.Note($"calm reel speed {F(calmRate)} m/s at Fishing "
                + $"{F(p.GetSkillFactor(Skills.SkillType.Fishing) * 100f)} (float pull speed {F(ff.m_pullLineSpeed)} to "
                + $"{F(ff.m_pullLineSpeedMaxSkill)}, pull cost {F(ff.m_pullStaminaUse)}, x{F(ff.m_pullStaminaUseMaxSkillMultiplier)} "
                + $"at 100; fish cost calm {F(fish.m_staminaUse)}, fighting {F(fish.m_escapeStaminaUse)}; break distance "
                + $"{F(ff.m_breakDistance)}, max {F(ff.m_maxDistance)})");
         c.Check(line1 < line0 - 0.5f, $"fish in the bar: line comes in ({F(line0)} -> {F(line1)} m)");
+        var reelMax = FightLogic.ReelSpeed(ff.m_pullLineSpeed, ff.m_pullLineSpeedMaxSkill,
+            p.GetSkillFactor(Skills.SkillType.Fishing), ServerRules.Current.ReelSpeed);
+        c.Check(calmRate > 0.3f && calmRate <= reelMax * 1.1f,
+            $"fish in the bar: the line comes in at the rod's reel speed or a bit under ({F(calmRate)} m/s, rod {F(reelMax)} m/s)");
         c.Check(p.GetStamina() >= stamina0 - 0.01f && p.m_staminaRegenTimer <= 0f,
             $"fish in the bar: no stamina used, regen on ({F(stamina0)} -> {F(p.GetStamina())}, regen timer {F(p.m_staminaRegenTimer)})");
+        c.Check(p.GetStamina() > stamina0 + 1f,
+            $"fish in the bar: spent stamina comes back ({F(stamina0)} -> {F(p.GetStamina())} in 1.5 s)");
+        yield return null;
+        c.Check(FightHud.TestZoneGreen, "fish in the bar: the zone is green");
+        var meter1 = FightHud.TestMeterHeight;
+        c.Check(meter1 > meter0 + 5f && Near(meter1, Progress(fight) * h, 10f),
+            $"fish in the bar: the meter fills ({F(meter0)} -> {F(meter1)} of {F(h)}, line {F(fight.LineLength)} of {F(fight.StartLine)} m)");
+        yield return new WaitForSeconds(1.5f);
+        yield return null;
+        var shown = CenterText();
+        var shownOk = Metres(shown, out var shownMetres);
+        c.Check(shownOk && shownMetres <= Mathf.RoundToInt(fight.StartLine) - 1 && shownMetres >= ff.m_lineLength - 0.6f,
+            $"the line length shows mid-screen and goes down (\"{shown}\", line {F(ff.m_lineLength)} m, cast {F(fight.StartLine)} m)");
+        c.Check(skill.m_level > 0f || skill.m_accumulator > 0f,
+            $"Fishing skill rises while the line comes in (level {F(skill.m_level)}, progress {F(skill.m_accumulator)})");
 
-        // Calm, fish away from the bar: line hold, stamina drain.
+        // Fish out of the zone (T05): line hold, stamina drain at the normal game's reel cost, zone orange.
         Fight.TestPin = FishPin.Away;
         rig.Reel(false);
         yield return new WaitForFixedUpdate();
@@ -915,36 +1190,70 @@ internal static class SelfTests
         var line2 = ff.m_lineLength;
         var stamina2 = p.GetStamina();
         var t2 = Time.time;
-        yield return new WaitForSeconds(0.5f);
-        c.Note($"off-bar drain {F((stamina2 - p.GetStamina()) / Mathf.Max(0.01f, Time.time - t2))} stamina/s");
+        yield return new WaitForSeconds(1f);
+        var awayRate = (stamina2 - p.GetStamina()) / Mathf.Max(0.01f, Time.time - t2);
+        var awayCost = FightLogic.ReelCost(ff.m_pullStaminaUse, fish.m_staminaUse, fight.Quality,
+            ff.m_pullStaminaUseMaxSkillMultiplier, p.GetSkillFactor(Skills.SkillType.Fishing));
+        c.Note($"off-bar drain {F(awayRate)} stamina/s (normal game reel cost {F(awayCost)}/s)");
         c.Check(Mathf.Abs(ff.m_lineLength - line2) < 0.05f, $"fish out of the bar: line holds ({F(line2)} -> {F(ff.m_lineLength)} m)");
         c.Check(p.GetStamina() < stamina2 - 1f, $"fish out of the bar: stamina drains ({F(stamina2)} -> {F(p.GetStamina())})");
+        c.Check(awayCost > 0.1f && Mathf.Abs(awayRate - awayCost) <= awayCost * 0.3f,
+            $"fish out of the bar: drain = the normal game's reel cost ({F(awayRate)}/s, expected {F(awayCost)}/s)");
         c.Check(!fight.Bar.InZone, "pinned away: fish outside the zone");
+        yield return null;
+        c.Check(FightHud.TestZoneOrange, "fish out of the bar: the zone is orange");
+        // The icon is drawn where the marker is: it sat inside the zone before, now it is at the marker's new place.
+        var iconAway = FightHud.TestFishHeight;
+        c.Check(Near(iconAway, fight.Bar.FishPos * h, 1.5f)
+                && (iconAway < FightHud.TestZoneBottom - 1f || iconAway > FightHud.TestZoneBottom + FightHud.TestZoneHeight + 1f),
+            $"the icon follows the marker out of the zone (icon at {F(iconAway)}, marker {F(fight.Bar.FishPos * h)}, zone "
+            + $"{F(FightHud.TestZoneBottom)} to {F(FightHud.TestZoneBottom + FightHud.TestZoneHeight)} of {F(h)})");
 
-        // Struggle to the right.
+        // OffBarStamina 0: free (no stamina call at all: the regen delay keeps counting down).
+        ServerRules.TestRules = new FightRules { OffBarStamina = 0f };
+        rig.Fill(p.GetMaxStamina());
+        var staminaFree = p.GetStamina();
+        yield return new WaitForSeconds(0.5f);
+        c.Check(Near(p.GetStamina(), staminaFree, 0.01f) && p.m_staminaRegenTimer > 4f && p.m_staminaRegenTimer < 4.8f,
+            $"OffBarStamina 0: nothing used off the bar ({F(staminaFree)} -> {F(p.GetStamina())}, regen delay {F(p.m_staminaRegenTimer)})");
+        ServerRules.TestRules = new FightRules();
+
+        // Struggle to the right. Rod along the line first (wrong side for either run).
         Fight.TestPin = null;
         Fight.TestSide = FightLogic.Right;
         Fight.TestPhase = FightPhase.Struggle;
-        FightHud.TestArrow = true;
+        rig.Face(Flat(ff.transform.position - p.transform.position));
         rig.Fill(p.GetMaxStamina());
         yield return new WaitForFixedUpdate();
         yield return null;
         yield return null;
-        c.Check(fight.Phase == FightPhase.Struggle && !FightHud.BarShown, "struggle: catch bar gone");
+        c.Check(fight.Phase == FightPhase.Struggle && !FightHud.BarShown && !FightHud.TestBarOnScreen, "struggle: catch bar gone");
         c.Check(fish.m_nview.GetZDO().GetFloat(ZDOVars.s_escape) > 0f, "struggle: splash key (s_escape float) on for other games");
-        c.Check(FightHud.ArrowShown, "struggle: arrow shows when turned on");
+        c.Check(FightHud.ArrowShown && FightHud.TestArrowOnScreen, "struggle: arrow shows when turned on");
+        c.Check(FightHud.TestArrowPosition.x < 0f && FightHud.TestArrowScale.x < 0f,
+            $"fish runs right: the arrow sits left of the crosshair and points left (x {F(FightHud.TestArrowPosition.x)}, "
+            + $"scale {F(FightHud.TestArrowScale.x)})");
+        c.Check(fight.Verdict == RodVerdict.Wrong && FightHud.TestArrowRed, "rod along the line: the arrow is red");
 
-        // No reel: fish take line and swim to its right.
+        // No reel: fish take line and swim to its right; no stamina call (T09).
         rig.Reel(false);
+        rig.Fill(p.GetMaxStamina());
+        var staminaRun = p.GetStamina();
         var playerPos = p.transform.position;
         var fishStartDir = Flat(fish.transform.position - playerPos);
         var line3 = ff.m_lineLength;
         var t3 = Time.time;
         yield return new WaitForSeconds(1f);
-        c.Note($"fish takes line at {F((ff.m_lineLength - line3) / Mathf.Max(0.01f, Time.time - t3))} m/s");
+        var runRate = (ff.m_lineLength - line3) / Mathf.Max(0.01f, Time.time - t3);
+        var wantRun = FightLogic.LineRunSpeed(ServerRules.Current, fight.Profile.D01);
+        c.Note($"fish takes line at {F(runRate)} m/s (rule {F(wantRun)} m/s)");
         var fishNowDir = Flat(fish.transform.position - playerPos);
         var turned = FightLogic.SignedYaw(fishStartDir, fishNowDir);
         c.Check(ff.m_lineLength > line3 + 0.3f, $"struggle, no reel: fish takes line ({F(line3)} -> {F(ff.m_lineLength)} m)");
+        c.Check(Mathf.Abs(runRate - wantRun) <= wantRun * 0.35f,
+            $"struggle, no reel: about 1 m of line a second for a Perch ({F(runRate)} m/s, rule {F(wantRun)})");
+        c.Check(Near(p.GetStamina(), staminaRun, 0.01f) && p.m_staminaRegenTimer > 3.5f,
+            $"struggle, no reel: no stamina used ({F(staminaRun)} -> {F(p.GetStamina())}, regen delay {F(p.m_staminaRegenTimer)})");
         c.Check(turned > 2f, $"struggle right: fish swims to the fisher's right ({F(turned)} deg around the fisher)");
         c.Note($"fish speed {F(fish.m_body.linearVelocity.magnitude)} m/s, run {F(fight.RunDir)}");
         SelfTest.Screenshot(FightName, "struggle-right");
@@ -979,42 +1288,117 @@ internal static class SelfTests
         var t5 = Time.time;
         yield return new WaitForSeconds(0.4f);
         var goodRate = (stamina5 - p.GetStamina()) / Mathf.Max(0.01f, Time.time - t5);
+        var goodCost = FightLogic.ReelCost(ff.m_pullStaminaUse, fish.m_escapeStaminaUse, fight.Quality,
+            ff.m_pullStaminaUseMaxSkillMultiplier, p.GetSkillFactor(Skills.SkillType.Fishing));
         c.Note($"struggle: right side reel {F((line5 - ff.m_lineLength) / Mathf.Max(0.01f, Time.time - t5))} m/s for "
-               + $"{F(goodRate)} stamina/s; wrong side {F(wrongRate)} stamina/s");
+               + $"{F(goodRate)} stamina/s (normal game cost of a fighting fish {F(goodCost)}/s); wrong side {F(wrongRate)} stamina/s");
         c.Check(verdictGood == RodVerdict.Good, $"fish right, rod {F(turn)} deg left: right side");
         c.Check(ff.m_lineLength < line5 - 0.05f, $"right side reel: line comes in ({F(line5)} -> {F(ff.m_lineLength)} m)");
+        c.Check(goodCost > 0.1f && Mathf.Abs(goodRate - goodCost) <= goodCost * 0.3f,
+            $"right side reel: the normal game's cost of reeling a fighting fish ({F(goodRate)}/s, expected {F(goodCost)}/s)");
         c.Note($"right side reel: float {F(Vector3.Distance(rodTop.position, ff.transform.position) - ff.m_lineLength)} m "
                + $"past the line (the reel works up to {F(FightLogic.StruggleDrag)} m in a fight)");
         var ratio = goodRate > 0.01f ? wrongRate / goodRate : 0f;
         var wantRatio = FightRules.Default.WrongSideStamina;
         c.Check(goodRate > 0.5f && ratio > wantRatio - 1f && ratio < wantRatio + 1f,
             $"wrong side costs about x{F(wantRatio)} ({F(wrongRate)}/s vs {F(goodRate)}/s, x{F(ratio)})");
+        yield return null;
+        c.Check(FightHud.TestArrowGreen, "rod on the right side: the arrow is green");
         SelfTest.Screenshot(FightName, "struggle-arrow");
         yield return null;
 
-        // Fish turn left: same rod now wrong.
+        // Float still on screen with the rod turned away (T07): the camera follows the look. Facing left of the
+        // line, the float is in the right half of the picture.
+        rig.Reel(false);
+        lineDir = Flat(ff.transform.position - p.transform.position);
+        rig.Face(Quaternion.Euler(0f, -turn, 0f) * lineDir);
+        rig.LookLevel();
+        yield return new WaitForFixedUpdate();
+        yield return new WaitForFixedUpdate();
+        yield return null;
+        yield return null;
+        var cam = GameCamera.instance != null ? GameCamera.instance.m_camera : null;
+        var view = cam != null ? cam.WorldToViewportPoint(ff.transform.position) : Vector3.zero;
+        c.Check(cam != null && fight.Verdict == RodVerdict.Good && view.z > 0f && view.x > 0.5f && view.x < 0.99f
+                && view.y > 0.01f && view.y < 0.99f,
+            $"rod {F(turn)} deg left of the line (right side): the float stays on screen, toward the right edge "
+            + $"(viewport {F(view.x)}, {F(view.y)}, depth {F(view.z)}, picture {Screen.width} x {Screen.height})");
+
+        // Straight at the float, Block 2 s (T08): wrong side, no line, about four times the cost.
+        var holdStart = ff.m_lineLength;
+        var holdUsed = 0f;
+        var holdTime = 0f;
+        var holdWrong = true;
+        rig.Reel(true);
+        for (var window = 0; window < 4; window++)
+        {
+            rig.Fill(p.GetMaxStamina());
+            rig.Face(Flat(ff.transform.position - p.transform.position));
+            yield return new WaitForFixedUpdate();
+            var s0 = p.GetStamina();
+            var w0 = Time.time;
+            while (Time.time - w0 < 0.5f)
+            {
+                rig.Face(Flat(ff.transform.position - p.transform.position));
+                yield return new WaitForFixedUpdate();
+                holdWrong &= fight.Verdict == RodVerdict.Wrong;
+            }
+            holdUsed += s0 - p.GetStamina();
+            holdTime += Time.time - w0;
+        }
+        var holdRate = holdUsed / Mathf.Max(0.01f, holdTime);
+        var holdRatio = goodRate > 0.01f ? holdRate / goodRate : 0f;
+        c.Check(holdWrong, "rod straight at the float: wrong side for the whole 2 s");
+        c.Check(ff != null && ff.m_lineLength <= holdStart + 0.001f && ff.m_lineLength > holdStart - 0.05f,
+            $"rod straight at the float, Block 2 s: no line in ({F(holdStart)} -> {F(ff != null ? ff.m_lineLength : -1f)} m)");
+        c.Check(holdRatio > wantRatio - 1f && holdRatio < wantRatio + 1f,
+            $"rod straight at the float: about x{F(wantRatio)} the right-side cost ({F(holdRate)}/s vs {F(goodRate)}/s, x{F(holdRatio)})");
+
+        // Fish turn left: same rod now wrong; mirrored right side (rod to the right of the line).
         Fight.TestSide = FightLogic.Left;
+        lineDir = Flat(ff.transform.position - p.transform.position);
+        rig.Face(Quaternion.Euler(0f, -turn, 0f) * lineDir);
+        rig.Fill(p.GetMaxStamina());
         yield return new WaitForFixedUpdate();
         yield return new WaitForFixedUpdate();
         c.Check(fight.Verdict == RodVerdict.Wrong, "fish switch to the left: rod on the left is now wrong");
+        yield return null;
+        yield return null;
+        c.Check(FightHud.TestArrowPosition.x > 0f && FightHud.TestArrowScale.x > 0f && FightHud.TestArrowRed,
+            $"fish runs left: the arrow flips to the right of the crosshair, pointing right, red (x {F(FightHud.TestArrowPosition.x)})");
         lineDir = Flat(ff.transform.position - p.transform.position);
         rig.Face(Quaternion.Euler(0f, turn, 0f) * lineDir);
         rig.Fill(p.GetMaxStamina());
         yield return new WaitForFixedUpdate();
         yield return new WaitForFixedUpdate();
         c.Check(fight.Verdict == RodVerdict.Good, "turned the rod right: right side again");
+        var line6 = ff.m_lineLength;
+        var stamina6 = p.GetStamina();
+        var t6 = Time.time;
+        yield return new WaitForSeconds(0.4f);
+        var leftRate = (stamina6 - p.GetStamina()) / Mathf.Max(0.01f, Time.time - t6);
+        c.Check(ff.m_lineLength < line6 - 0.05f && Mathf.Abs(leftRate - goodCost) <= goodCost * 0.3f,
+            $"fish left, rod {F(turn)} deg right: line comes in at the normal cost ({F(line6)} -> {F(ff.m_lineLength)} m, {F(leftRate)}/s)");
 
-        // Calm again: bar back, splash key off.
+        // Arrow setting off: no arrow in a fight.
+        FightHud.TestArrow = false;
+        yield return null;
+        yield return null;
+        c.Check(!FightHud.ArrowShown && !FightHud.TestArrowOnScreen, "arrow setting off: no arrow in a fight");
+        FightHud.TestArrow = true;
+
+        // Calm again: bar back, splash key off, no arrow.
         Fight.TestPhase = FightPhase.Calm;
-        FightHud.TestArrow = null;
         rig.Reel(false);
         yield return new WaitForFixedUpdate();
         yield return null;
         yield return null;
         c.Check(fight.Phase == FightPhase.Calm && FightHud.BarShown, "fight over: catch bar back");
+        c.Check(!FightHud.ArrowShown && !FightHud.TestArrowOnScreen, "fight over: arrow gone");
         c.Check(Near(fish.m_nview.GetZDO().GetFloat(ZDOVars.s_escape), 0f), "fight over: splash key off");
+        FightHud.TestArrow = null;
 
-        // Reel to the end (fast test rules): fish in the bag, float gone, fight over.
+        // Reel to the end (fast test rules): "Caught", fish in the bag, float gone, fight over (T12).
         ServerRules.TestRules = new FightRules { ReelSpeed = FightRules.ReelSpeedMax };
         Fight.TestPin = FishPin.InZone;
         rig.Face(Flat(ff.transform.position - p.transform.position));
@@ -1029,40 +1413,60 @@ internal static class SelfTests
         c.Check(ff == null, $"reeled in: float gone ({F(Time.time - start)} s)");
         c.Check(Fight.Current == null, "reeled in: fight over");
         c.Check(rig.Inv.CountItems(fishName) == before + 1, $"reeled in: {fishName} in the inventory");
+        c.Check(CenterText().StartsWith(caughtText, StringComparison.Ordinal),
+            $"reeled in: the game's catch message shows (\"{CenterText()}\", expected \"{caughtText}\")");
+        c.Check(Near(Stat(PlayerStatType.FishCaught), caughtBefore + 1f), "reeled in: counted as a caught fish");
+        c.Check(tap.Has("Fight ended: caught."), "Debug line \"Fight ended: caught.\"");
         yield return null;
-        c.Check(!FightHud.BarShown, "reeled in: bar gone");
+        c.Check(!FightHud.BarShown && !FightHud.Shown, "reeled in: bar gone");
         ServerRules.TestRules = new FightRules();
         Fight.TestPin = null;
         Fight.TestPhase = null;
 
-        // Second fish, stamina at 0: lost, fish let go, float stay (vanilla loss).
-        var ff2Go = UnityEngine.Object.Instantiate(floatPrefab, floatPos, Quaternion.identity);
-        rig.Track(ff2Go);
-        var ff2 = ff2Go.GetComponent<FishingFloat>();
-        ff2.Setup(p, Vector3.zero, 0f, null, rod, bait);
-        var fish2Go = UnityEngine.Object.Instantiate(fishPrefab, new Vector3(spot.x, level - 1.5f, spot.z), Quaternion.identity);
-        rig.Track(fish2Go);
-        var fish2 = fish2Go.GetComponent<Fish>();
+        // Second fish kept out of the zone until the stamina is gone (T13): lost, fish let go, float stay.
+        var ff2 = SpawnFloat(rig, st);
+        var fish2 = SpawnFish(rig, st, 1);
         for (var i = 0; i < 10; i++)
         {
             yield return new WaitForFixedUpdate();
         }
+        Fight.TestPhase = FightPhase.Calm;
+        Fight.TestPin = FishPin.Away;
+        rig.Fill(p.GetMaxStamina());
+        var startedBefore = tap.Count("Fight started:");
         ff2.SetCatch(fish2);
         for (var i = 0; i < 5 && Fight.Current == null; i++)
         {
             yield return new WaitForFixedUpdate();
         }
         c.Check(Fight.Current != null && ReferenceEquals(Fight.Current.Fish, fish2), "second fish: fight starts");
-        p.m_stamina = 0f;
+        var lostText = Localization.instance.Localize("$msg_fishing_lost");
+        var lostBefore = Stat(PlayerStatType.FishLost);
+        p.m_stamina = 2f;
         p.m_staminaRegenTimer = 5f;
-        for (var i = 0; i < 3; i++)
+        start = Time.time;
+        while (Fight.Current != null && Time.time - start < 4f)
         {
             yield return new WaitForFixedUpdate();
         }
-        c.Check(Fight.Current == null, "0 stamina: fight over");
+        c.Check(Fight.Current == null && p.GetStamina() <= 0.01f,
+            $"fish kept out of the zone: the stamina runs out and the fight ends ({F(Time.time - start)} s, stamina {F(p.GetStamina())})");
         c.Check(ff2 != null && ff2.GetCatch() == null, "0 stamina: float stays, empty (vanilla loss)");
-        c.Check(fish2 != null && !fish2.IsHooked(), "0 stamina: the fish is let go (vanilla forgets this)");
+        c.Check(fish2 != null && !fish2.IsHooked() && fish2.m_nview.GetZDO().GetInt(ZDOVars.s_hooked) == 0,
+            "0 stamina: the fish is let go (vanilla forgets this)");
+        c.Check(tap.Has("Fight ended: out of stamina."), "Debug line \"Fight ended: out of stamina.\"");
+        yield return null;
+        yield return null;
+        c.Check(CenterText() == lostText, $"0 stamina: the game's loss message shows (\"{CenterText()}\", expected \"{lostText}\")");
+        c.Check(Near(Stat(PlayerStatType.FishLost), lostBefore + 1f), "0 stamina: counted as a lost fish");
+        c.Check(!FightHud.BarShown && !FightHud.Shown, "0 stamina: bar gone");
         rig.Fill(p.GetMaxStamina());
+        yield return new WaitForSeconds(2f);
+        c.Check(Fight.Current == null && tap.Count("Fight started:") == startedBefore + 1 && ff2 != null && ff2.GetCatch() == null,
+            "stamina back: no new fight on the empty float");
+        c.Check(fish2 != null && FishingFloat.FindFloat(fish2) == null && !fish2.IsHooked() && !fish2.IsEscaping()
+                && Near(fish2.m_nview.GetZDO().GetFloat(ZDOVars.s_escape), 0f),
+            "the lost fish is free: not tied to the float, not fighting it");
     }
 
     // Shore spots tried by the live test (each a trip of about 8 s).

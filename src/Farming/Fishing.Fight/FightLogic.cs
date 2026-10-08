@@ -86,6 +86,14 @@ internal static class FightLogic
 
     internal const float MinSecondsPerSide = 1f;
 
+    // Shore or shallows ahead of the run (water less deep than the fish want): turn to the other side only when that
+    // way is deeper: deep enough, or clearly deeper than ahead. Both ways shallow and alike (near a beach): keep the
+    // side, the player's rule must not swap every second. Depths in m, 2 m along each run (FishPatches).
+    internal const float ShallowTurnMargin = 0.25f;
+
+    internal static bool TurnFromShallows(float ahead, float other, float minDepth) =>
+        ahead < minDepth && (other >= minDepth || other > ahead + ShallowTurnMargin);
+
     // Catch bar height at this skill (0..1).
     internal static float ZoneSize(FightRules rules, float skill) =>
         Mathf.Lerp(rules.BarSize, rules.BarSizeAtMaxSkill, Mathf.Clamp01(skill));

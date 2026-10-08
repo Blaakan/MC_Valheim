@@ -39,7 +39,7 @@ internal sealed class MiniGame
         Meter = new SuccessMeter { Seconds = successSeconds, Accuracy = successAccuracy };
     }
 
-    internal float NoteSpeed => Plugin.NoteSpeed != null ? Mathf.Clamp(Plugin.NoteSpeed.Value, 0.5f, 2f) : 1f;
+    internal float NoteSpeed => Plugin.NoteSpeedNow;
 
     // Seconds of notes shown above the hit line (faster notes = shorter window: same screen distance per second).
     internal float LookAhead => LookAheadBase / NoteSpeed;

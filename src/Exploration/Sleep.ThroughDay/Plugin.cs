@@ -61,6 +61,38 @@ internal sealed partial class Plugin : ModPlugin
         wakeHour = DayClock.WakeHour(hour);
     }
 
+    // WakeUpMessage as written by player (not trimmed, never null). Only door to its value.
+    // Debug build: self test may force it in memory (SleepSelfTests override), never in config file.
+    internal static string ReadWakeUpMessage()
+    {
+#if DEBUG
+        if (SleepSelfTests.WakeUpMessageOverride != null)
+        {
+            return SleepSelfTests.WakeUpMessageOverride;
+        }
+#endif
+        return WakeUpMessage.Value ?? "";
+    }
+
+#if DEBUG
+    // Debug build only: self test take feature down and up in memory, with the same two steps framework do when
+    // Enabled change (OnDeactivated + patches gone / patches on + OnActivated). Nothing written: not Enabled, not
+    // even framework's Status line in config file. Release build no have this.
+    internal void TestSetPatched(bool on)
+    {
+        if (on)
+        {
+            ApplyPatches(Harmony);
+            OnActivated();
+        }
+        else
+        {
+            OnDeactivated();
+            Harmony.UnpatchSelf();
+        }
+    }
+#endif
+
     // Me just turned on. Nothing to build: patches do all. Debug build: in-world self tests join the list.
     protected override void OnActivated()
     {

@@ -86,6 +86,15 @@ internal sealed partial class Plugin : ModPlugin
         return effective;
     }
 
+#if DEBUG
+    // Debug build only: self test turn me off and on live without touching config file (SelfTests.ForceOff, then
+    // FeatureRegistry.RefreshAll). Framework remove patches and call OnDeactivated like for a real off.
+    protected override string LocalBlocker()
+    {
+        return SelfTests.ForceOff ? SelfTests.ForceOffText : null;
+    }
+#endif
+
     // Turned on (game start, or live): look for Star Level System again at next use, publish Farming now if in world,
     // start network part (server: check players already in, send numbers; client: ask numbers).
     protected override void OnActivated()

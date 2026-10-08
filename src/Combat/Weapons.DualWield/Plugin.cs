@@ -175,7 +175,29 @@ internal sealed partial class Plugin : ModPlugin
             }
         };
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
+#if DEBUG
+        // Debug build only: self test that must run while the feature is off (server without the mod) register here.
+        SelfTests.RegisterAlways();
+#endif
     }
+
+#if DEBUG
+    // Debug build only, self test: feature off and on in memory, the two steps the framework take when the player
+    // untick and tick the mod (OnDeactivated then patches gone; patches back then OnActivated). The Enabled setting
+    // and the config file stay untouched, so the framework still call the feature Active meanwhile: the test put it
+    // back on in its finally.
+    internal void TestSwitchOff()
+    {
+        OnDeactivated();
+        Harmony.UnpatchSelf();
+    }
+
+    internal void TestSwitchOn()
+    {
+        ApplyPatches(Harmony);
+        OnActivated();
+    }
+#endif
 
     // Other dual wield mod in this game = me cannot run: framework unpatch me, show text, tell server "off".
     protected override string LocalBlocker() => ForeignMods.BlockerText();
@@ -257,6 +279,10 @@ internal sealed partial class Plugin : ModPlugin
         Hands.TestThrowInApply = false;
         ServerRules.TestRules = null;
         Controls.TestMainHandHeld = null;
+        Controls.TestKeyHeld = null;
+        Controls.TestKeyDown = null;
+        Controls.TestMainKey = null;
+        Controls.TestSwapKey = null;
         LeftTrails.TestLeftHandTrails = null;
         BackCross.TestEnabled = null;
         BackCross.ResetRecord();

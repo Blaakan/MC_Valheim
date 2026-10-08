@@ -16,6 +16,11 @@ internal static class DaySleep
 
     internal static void Reset() => _outsideWindowLogged = false;
 
+#if DEBUG
+    // Debug build only: self test read it (forced time of day case).
+    internal static bool OutsideWindowLogged => _outsideWindowLogged;
+#endif
+
     // Prefix part. Stop due this tick (sleep run, skip done) = send final time now. NetTime go over same ZRpc as
     // SleepStop that follow, ZRpc keep order: every client wake up with right clock (right date for message).
     internal static void BeforeTick(Game game)

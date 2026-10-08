@@ -36,6 +36,14 @@ internal static class LaneKeys
 #if DEBUG
     // Self test press a lane without a keyboard (next read). Consumed by Down.
     internal static readonly bool[] TestPress = new bool[Count];
+
+    // Self test give a lane another key like a changed setting would (same check, same warning, label made again):
+    // never the config file. Cache() put the player's own keys back.
+    internal static void TestSet(int lane, KeyCode key)
+    {
+        Keys[lane] = Validate(lane, key);
+        Labels[lane] = null;
+    }
 #endif
 
     internal static void Cache()
@@ -138,6 +146,30 @@ internal static class LaneKeys
             return true;
         }
         return ZInput.TryKeyCodeToKey(k, out _);
+    }
+}
+
+// Me = "the player use a gamepad now" for our window and HUD (which keys to read, which hints to show). One place, so
+// a self test can play gamepad without one (Debug build only).
+internal static class PadInput
+{
+#if DEBUG
+    // Self test: true / false = say so, null = ask the game.
+    internal static bool? Test;
+#endif
+
+    internal static bool Active
+    {
+        get
+        {
+#if DEBUG
+            if (Test.HasValue)
+            {
+                return Test.Value;
+            }
+#endif
+            return ZInput.IsGamepadActive();
+        }
     }
 }
 

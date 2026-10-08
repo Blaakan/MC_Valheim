@@ -41,6 +41,12 @@ internal static class CraftSearch
 
     private static bool _languageHooked;
 
+#if DEBUG
+    // Self test read only: focus key as me hold it now ("None" = off), modifiers after '+'.
+    internal static string DebugFocusKey =>
+        _focusMods.Length == 0 ? _focusMain.ToString() : _focusMain + "+" + string.Join("+", _focusMods.Select(m => m.ToString()).ToArray());
+#endif
+
     internal static void ReadFocusKey(KeyboardShortcut shortcut)
     {
         _focusMain = shortcut.MainKey;
@@ -64,6 +70,14 @@ internal static class CraftSearch
         {
             return false;
         }
+#if DEBUG
+        // Self test stand in for the keyboard: "focus key went down" on one frame. After the "no key set" check on
+        // purpose: empty or unreadable key stay off for the test too.
+        if (SelfTests.FocusKeyFrame == Time.frameCount)
+        {
+            return true;
+        }
+#endif
         try
         {
             if (!ZInput.GetKeyDown(_focusMain, logWarning: false))
@@ -199,7 +213,7 @@ internal static class CraftSearch
         }
         _player = player;
         _stationKey = key;
-        Option = Plugin.RememberSort.Value ? SortMemory.Load(player, key) : RecipeCategory.Default;
+        Option = Plugin.ReadRememberSort() ? SortMemory.Load(player, key) : RecipeCategory.Default;
         ClearText();
         SearchUi.CloseMenu();
     }
@@ -214,7 +228,7 @@ internal static class CraftSearch
             {
                 return; // no station yet: next list build load right sort anyway
             }
-            var option = Plugin.RememberSort.Value ? SortMemory.Load(_player, _stationKey) : RecipeCategory.Default;
+            var option = Plugin.ReadRememberSort() ? SortMemory.Load(_player, _stationKey) : RecipeCategory.Default;
             if (option == Option)
             {
                 return;
@@ -309,7 +323,7 @@ internal static class CraftSearch
         try
         {
             Option = option;
-            if (Plugin.RememberSort.Value)
+            if (Plugin.ReadRememberSort())
             {
                 SortMemory.Save(Player.m_localPlayer, StationKey, option);
             }
@@ -359,8 +373,8 @@ internal static class CraftSearch
         {
             return;
         }
-        var clearText = _hasText && !Plugin.KeepSearchText.Value;
-        var resetSort = Option != RecipeCategory.Default && !Plugin.RememberSort.Value;
+        var clearText = _hasText && !Plugin.ReadKeepSearchText();
+        var resetSort = Option != RecipeCategory.Default && !Plugin.ReadRememberSort();
         if (!SearchUi.MenuOpen && !SearchUi.FieldFocused && !Pending && !ScrollTopRequested && !ApplyNowRequested
             && !clearText && !resetSort)
         {

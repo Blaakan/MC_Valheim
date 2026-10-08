@@ -34,6 +34,11 @@ the wire, legato, same-frame tap, Space octave up, tambourine keys and sound, no
 freed after End); offline harness 5406 checks (piano map, note off in the synth); same two errors from Sneak Ambush
 and Spyglass only.
 
+**Automated checks (2026-10-08):** 60 of 60 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
+"FAILED: automated test" names the self-test that fails.
+
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina. Items: `spawn MC_Flute`,
 `spawn MC_Lyre`, `spawn MC_Tambourine` drop an instrument at your feet; materials `spawn FineWood 10`,
@@ -54,72 +59,103 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
 
 ## 0.1.0 — single player
 
-- [ ] **T01 Recipes (G1):** new character (or one that never had these materials), workbench nearby: pick up Fine
+- [x] **T01 Recipes (G1):** new character (or one that never had these materials), workbench nearby: pick up Fine
   Wood. Expected: "New recipe" Wooden Flute (4 Fine Wood, workbench level 1). Pick up Leather Scraps, upgrade the
   workbench to level 2: Tambourine (3 Fine Wood, 4 Leather Scraps). Pick up Silver and Linen Thread: Silver Lyre
   (2 Silver, 8 Linen Thread, level 2). Each has its own icon; the tooltip says two-handed, shows no damage, and its
   orange line shows the Attack and Block keys.
+  *Automated: `music.recipes`.*
 - [ ] **T02 Models and icons (G6):** hold each instrument (third person), then drop each on the ground. Expected: a
   wooden flute with finger holes, a silver lyre with strings, a tambourine with a skin and jingles, sized like real
   instruments in the hand; dropped ones lie on the ground, can be picked up, and look the same; the inventory icons
   match the models.
-- [ ] **T03 Tools:** equip a torch, then an instrument. Expected: both hands taken (the torch is put away); a weapon or
+  *Partly automated (`music.drop`, `music.item`, `music.export`); by hand: Look at them: a wooden flute with finger
+  holes, a silver lyre with strings, a tambourine with a skin and jingles, sized like real instruments in the hand,
+  the same when dropped, and inventory icons that match the models (the screenshots of music.item and the PNG files of
+  music.export can be used). Also watch the dropped flute: it is round (capsule collider) and in the automated run it
+  was still rolling at about 0.1 m/s 6 s after the drop on almost level ground; check that it comes to rest and does
+  not roll away.*
+- [x] **T03 Tools:** equip a torch, then an instrument. Expected: both hands taken (the torch is put away); a weapon or
   torch puts the instrument away; R hangs it at the hip like the hammer.
-- [ ] **T04 Song window (G2):** hold the flute, left click. Expected: the Songs window opens with the cursor; the eight
+  *Automated: `music.hands`.*
+- [x] **T04 Song window (G2):** hold the flute, left click. Expected: the Songs window opens with the cursor; the eight
   built-in songs, then "Your MIDI songs" with your files (or a hint naming the folder when it is empty); the camera and
   your character do not move while it is open; Esc closes it without opening the menu; Close and the right mouse
   button do too.
+  *Automated: `music.songwindow`, `music.keys`.*
 - [ ] **T05 Play a built-in song (G2):** pick Greensleeves, Play. Expected: the window closes, the flute plays the tune
   (a breathy wooden flute, in tune, steady tempo); your arms hold the flute to your mouth; a small status line shows the
   title and the time. The game's music fades. Walk around while it plays: it keeps playing; Shift does not run, Space
   does not jump. Left click (or right click): it stops, the arms come down, the game music comes back; the click does
   not punch or raise your block. Repeat on: the song starts again after its end (the time in the status line starts
   over at 0:00 then, not before); off: it stops by itself at the end.
+  *Partly automated (`music.play`, `music.autoplay`, `music.pose`, `music.synth`); by hand: Listen: the flute sounds
+  like a breathy wooden flute, in tune and at a steady tempo. Look: the arms hold the flute to the mouth and come down
+  on stop.*
 - [ ] **T06 Each instrument:** play Mead Hall Reel on the lyre and on the tambourine. Expected: the lyre plucks the
   tune with strummed chords under it; the tambourine plays a steady rhythm of thumps, hits and jingles; each has its
   pose (lyre against the chest, tambourine raised and shaking with the beats).
+  *Partly automated (`music.instruments`, `music.pose`, `music.synth`); by hand: Listen to both (plucked lyre with
+  strummed chords under the tune, tambourine rhythm) and look at the two poses (lyre against the chest, tambourine
+  raised and shaking with the beats).*
 - [ ] **T07 MIDI files (G2):** with your files in the songs folder, open the window. Expected: each file is listed;
   picking one shows its parts and length; Play on the flute plays a recognizable tune of it; on the lyre the tune with
   a bass line; on the tambourine the drums (or the tune's rhythm). Pick another part with the part chooser: that part
   plays. A broken file (rename any non-MIDI file to .mid) shows why it cannot play and nothing breaks.
+  *Partly automated (`music.midi`, `music.songs`); by hand: With real MIDI files from the internet (a simple one and a
+  busy one with drums): by ear, the flute plays a recognizable tune, the lyre the tune with a bass line, the
+  tambourine the drums or the tune's rhythm.*
 - [ ] **T08 Rhythm game (G2, G3):** hold any instrument, pick Kjerringa med staven, Perform. Expected: a countdown, then
   notes fall in four lanes toward the line; pressing D F J K on time plays the notes (hits show "Perfect"/"Good"),
   missing shows "Miss" and plays nothing; you cannot walk, open the inventory or use the hotbar while it runs; the song
   repeats. Right click or Esc stops it (Esc also opens the menu).
-- [ ] **T09 Encore and comfort (G3):** in a shelter (roof and walls) with a burning fire: sit (X) and play the rhythm
+  *Partly automated (`music.rhythm`, `music.keys`); by hand: Look at one run: the notes are drawn falling down the
+  four lanes toward the line (the tests check note timing, lanes, texts and keys, not the drawing of the falling
+  notes).*
+- [x] **T09 Encore and comfort (G3):** in a shelter (roof and walls) with a burning fire: sit (X) and play the rhythm
   game for 20 seconds, hitting at least half the notes. Expected: the meter fills (it waits when you miss more),
   "Encore! +3 comfort", the Music icon appears with "+3" and 10:00 counting down; as soon as the Encore comes, the
   Resting icon shows comfort 3 higher and the Rested timer jumps 3 minutes higher (no new "You feel rested" message
   if Rested was already running).
   Keep playing well: each further 20 s renews Music to 10:00.
-- [ ] **T10 Outdoors:** outdoors by a campfire or a bonfire (no roof), sit (X), open the window and perform. Expected:
+  *Automated: `music.encore`, `music.rest`, `music.encore.easy`.*
+- [x] **T10 Outdoors:** outdoors by a campfire or a bonfire (no roof), sit (X), open the window and perform. Expected:
   Resting shows comfort 1 and after about 20 s Rested starts at 8:00 (or keeps running if you were already Rested).
   When the Encore comes, the Resting icon shows comfort 4 (the game's 1 + 3) and the Rested timer jumps to 11:00 and
   stays there while you rest. No new "You feel rested" message: the game shows it only when Rested starts. Optional,
   when you are not Rested: get the Encore first (standing), then sit by the fire: after about 20 s "You feel rested
   (Comfort: 4)" and 11:00. (Changed after the first in-game test: with a bonfire and Music, Rested was 8 minutes.)
-- [ ] **T11 Autoplay gives no comfort:** let a song play by itself for a minute. Expected: no meter, no Encore, no Music.
+  *Automated: `music.rest`, `music.encore`.*
+- [x] **T11 Autoplay gives no comfort:** let a song play by itself for a minute. Expected: no meter, no Encore, no Music.
+  *Automated: `music.nocomfort`.*
 - [ ] **T12 Seated (E3):** sit on a chair (or press X), open the window and play, then perform. Expected: you stay
   seated the whole time (the clicks do not stand you up); stopping with a left or a right click, and closing the window
   with the right mouse button, do not stand you up either and never leave you blocking. Again with Settings →
   Accessibility → Toggle block on: after each right click you are not left in the block stance. With the lyre: when
   you sit down mid-song (X or a chair), the lyre moves onto your left thigh, its top leaning back toward your chest,
   both hands still on it; stand up (walk) mid-song: it moves back against your body.
-- [ ] **T13 Stops by itself:** while a song plays: (a) `spawn Greyling`, `god` off, let it hit you: the song stops
+  *Partly automated (`music.seated`, `music.pose`); by hand: Look at the seated lyre: its top leans back toward the
+  chest and both hands are on it. Try a chair or bench once (the test sits with X only).*
+- [x] **T13 Stops by itself:** while a song plays: (a) `spawn Greyling`, `god` off, let it hit you: the song stops
   ("The hit cut your song short."); (b) stand in fire: it keeps playing; (c) press R: it stops at once; (d) equip a
   weapon from the hotbar: stops at once; (e) walk into deep water until you swim: stops at once. While performing:
   open the map, the inventory, the chat: not possible (keys held back); Esc stops it.
-- [ ] **T14 Never punches:** stand next to a tree with an instrument in hand. Left click opens the window and never
+  *Automated: `music.stops`.*
+- [x] **T14 Never punches:** stand next to a tree with an instrument in hand. Left click opens the window and never
   punches; Block blocks with the fists as with the hammer. Turn the mod off (MC Mods panel): left click does nothing
   (no punch, no stamina used). Turn it back on.
-- [ ] **T15 Settings live:** change Volume (0.2), GameMusicVolume (1), NoteSpeed (2), Lane1Key (A) while playing or
+  *Automated: `music.click`.*
+- [x] **T15 Settings live:** change Volume (0.2), GameMusicVolume (1), NoteSpeed (2), Lane1Key (A) while playing or
   performing. Expected: each change applies at once (lane 1 now on A; with A the game does not walk left during the
   rhythm game), and the key shown under lane 1 changes to A at once (also while performing). A key the game cannot
   read (for example F15), Escape or Mouse1 turns that lane off with one warning in the log. Lane1Key = F5 (the console
   key): during the rhythm game F5 plays lane 1 and the console does not open. Put them back.
+  *Automated: `music.settings`, `music.mp.settings`, `music.keys`.*
 - [ ] **T16 Volume sliders:** Settings → Audio: lower the Sound effects slider while a song plays. Expected: the
   instrument gets quieter with it; Master too.
-- [ ] **T17 Live toggle off while playing:** the pause menu itself ends the rhythm game and closes the window, so turn
+  *Partly automated (`music.play`, `music.listen.more`, `music.synth`); by hand: Move the Sound effects slider, then
+  Master, while a song plays and hear the instrument get quieter (the tests measure the sound before the mixer).*
+- [x] **T17 Live toggle off while playing:** the pause menu itself ends the rhythm game and closes the window, so turn
   the mod off without it: (a) while a song plays by itself, untick Music Instruments in the MC Mods panel (Esc); (b)
   while performing, and (c) with the song window open, set `Enabled = false` in
   `BepInEx/config/MC.Exploration.Music.Instruments.cfg` from outside the game (or untick Enabled in ConfigurationManager,
@@ -128,80 +164,145 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   nothing (no punch); the recipes are gone. With Music running (get an Encore first, single player): its icon keeps
   counting down but shows no "+3", its tooltip says "Music heard nearby.", and the Resting comfort drops by 3. Turn it
   back on: everything works again and "+3" returns.
+  *Automated: `music.toggle`.*
 - [ ] **T18 Enabled = false + restart:** set Enabled = false, restart the game and load the character. Expected: the
   instruments are still in the inventory (not lost); no recipes; Status says off. Set it back to true.
+  *Partly automated (`music.toggle`); by hand: Set Enabled = false, restart the game and load the character: the
+  instruments are still in the inventory, there are no recipes, and Status says off.*
 - [ ] **T19 Logout while playing:** play a song, Esc, Logout, Yes. Expected: no sound, window or HUD left in the main
   menu. Load the world again: everything works.
-- [ ] **T20 Pause:** single player. (a) Perform, then Esc. Expected: the rhythm game stops (the menu pauses the game)
+  *Partly automated (`music.logout`); by hand: A real Logout to the main menu while a song plays (no sound, window or
+  HUD there), then load the world again.*
+- [x] **T20 Pause:** single player. (a) Perform, then Esc. Expected: the rhythm game stops (the menu pauses the game)
   and no note keeps sounding. (b) Let a song play by itself, then Esc. Expected: it plays on behind the menu, like the
   game's music; close the menu: it goes on in time.
+  *Automated: `music.pause`.*
 - [ ] **T21 Clean log:** after the other items, the log has no error or warning from Music Instruments
   (`./tools/Watch-Log.ps1 -Mine`), except the warning of T15's bad key.
+  *Partly automated (`music.cleanlog`, `music.mp.server`); by hand: The log after the items done by hand.*
 - [ ] **T22 Window keys:** open the song window while holding W (or the stick forward): the selection does not run up
   the list. Up/Down choose a song, Left/Right cycle a MIDI file's part, Enter plays (the chat does not open); with a
   gamepad: D-pad up/down choose, A plays, Y toggles Repeat, B closes; X starts nothing and says the rhythm game is
   played on the keyboard (the gamepad help line does not offer it). Double-click a row: it plays.
+  *Partly automated (`music.windowkeys`, `music.pad`, `music.keys`); by hand: With a real gamepad: stick held forward
+  while opening the window, D-pad, A, Y, B and X. And holding W while opening the window (the test holds an arrow
+  key).*
 - [ ] **T23 HUD:** perform: the lanes sit to the right of your character (it stays visible), a 3-2-1 countdown, key
   labels under the line, "Perfect"/"Good"/"Miss" near the line, the meter beside the lanes (gold "In tune: the meter
   fills", red "Hit more notes: the meter waits", grey during rests), "Encore! +3 comfort" when it fills. Hide the
   HUD (Ctrl+F3): the rhythm game stays visible. While a song plays by itself: a small line with the title and time.
   Check at your usual GUI scale and once at a different one (Settings). The stop hint under the lanes says "Right click or Esc: stop", and "Start or right
   click: stop" once you touch a gamepad.
-- [ ] **T24 Instrument swap:** play a song on the flute, then press the hotbar key of the lyre. Expected: the flute song
+  *Partly automated (`music.hud`, `music.pad`, `music.encore`); by hand: Look at the HUD at your usual GUI scale and
+  once at another (no test changes the scale): key labels under the line, judgements near the line, meter beside the
+  lanes. And the stop hint switching when a real gamepad is touched.*
+- [x] **T24 Instrument swap:** play a song on the flute, then press the hotbar key of the lyre. Expected: the flute song
   stops at once (no flute song on the lyre), nothing stays posed.
-- [ ] **T25 Freeze:** in windowed mode, let a busy song play by itself (Mead Hall Reel on the lyre), then hold the
+  *Automated: `music.swap`.*
+- [x] **T25 Freeze:** in windowed mode, let a busy song play by itself (Mead Hall Reel on the lyre), then hold the
   window's title bar for about two seconds (the game freezes) and let go. Expected: the song carries on in time; no
   burst of piled-up notes when the game comes back.
+  *Automated: `music.freeze`.*
+- [ ] **T37 Death while playing:** `god` off, `spawn Greyling` (or several) and let it kill you (a) while a song plays
+  by itself, (b) while performing, (c) with the song window open. Expected each time: the music stops, the rhythm
+  game, its HUD and the window close, and the game's keys work on the death screen; after you respawn nothing is left
+  on the new body (no sound, no playing pose, no HUD, no frozen keys). The instrument is in your tombstone with your
+  other items; taken back, it plays as before.
+- [x] **T38 ComfortBonus 0:** set ComfortBonus = 0 and perform until the meter is full. Expected: the meter still
+  fills and the banner says "Encore!" (no "+0 comfort"); no Music icon, no message, comfort unchanged, also for a
+  player nearby who hears the Encore. With Music already running when ComfortBonus goes to 0: its icon shows the time
+  left but no "+", its tooltip says "Music heard nearby.", and comfort is not raised. Put it back.
+  *Automated: `music.nobonus`, `music.mp.rules`.*
+- [x] **T39 Recipe typos:** set FluteRecipe = `Nonsense:3,FineWood:2`, LyreRecipe = `Nonsense:1` and
+  TambourineStation = `not_a_station`. Expected: the flute costs 2 Fine Wood only; the lyre and the tambourine
+  recipes are hidden; the log has one warning for each mistake (the unknown material, the lyre left without a valid
+  material, the unknown station) and does not repeat them; instruments you already have still play. FluteRecipe =
+  `FineWood:x`: skipped with a warning, recipe hidden. FluteStation empty: the flute is crafted by hand, without a
+  station. Put them back.
+  *Automated: `music.badrecipe`, `music.mp.rules`.*
 
 ### Cross-mod (MC)
 
 - [ ] **X01 Spyglass:** hold the spyglass, raise it; equip an instrument and play; equip the spyglass again. Expected:
   each acts only while it is in your hand; no stuck pose, view or sound.
-- [ ] **X02 Sleep Through the Day:** with Music on (get an Encore), not Rested, sleep in a bed and wake up. Expected:
+  *Partly automated (`music.spyglass`); by hand: Raise the spyglass for real before swapping (the test holds Block but
+  does not check that the view zoomed) and see the view go back to normal with the instrument in hand.*
+- [x] **X02 Sleep Through the Day:** with Music on (get an Encore), not Rested, sleep in a bed and wake up. Expected:
   "You feel rested (Comfort: N)" includes the +3.
+  *Automated: `music.sleep`.*
 - [ ] **X03 Encyclopedia / Crafting Search and Sort:** open the Encyclopedia (Valheim Compendium, Encyclopedia tab) and
   type in its search, or type in the crafting search, then close it and perform. Expected: keys behave normally in
   each (no stuck capture).
+  *Partly automated (`music.crossmod`); by hand: Type in the Encyclopedia search and in the crafting search, close
+  them and perform: keys behave normally in each.*
 - [ ] **X04 Sort Chest / Crafting Search and Sort:** sort a chest with instruments, a hammer and a sword. Expected: the
   instruments are grouped with the tools.
+  *Partly automated (`music.crossmod`); by hand: Sort a real chest holding instruments, a hammer and a sword: the
+  instruments end up with the tools.*
 - [ ] **X05 Dual Wielding:** with a dual-wield pair in hand, equip an instrument. Expected: the pair is put away, the
   instrument is never paired.
+  *Partly automated (`music.hands`, `music.crossmod`); by hand: With Dual Wielding active and a real pair in hand:
+  equip an instrument (the pair is put away) and try to pair a weapon with the instrument (never paired).*
 
 ## 0.1.0 — multiplayer
 
-- [ ] **M01 Server rules:** host (or dedicated server) with ComfortBonus 5, HearingRange 20 and FluteRecipe Wood:1; a
+- [x] **M01 Server rules:** host (or dedicated server) with ComfortBonus 5, HearingRange 20 and FluteRecipe Wood:1; a
   friend with the mod joins. Expected: their log says "Using the server's rules: flute Wood:1..."; their workbench
   flute costs 1 Wood; their Encore gives +5.
+  *Automated: `music.mp.rules`.*
 - [ ] **M02 Others hear you (G4):** play a song next to your friend. Expected: they hear it from your position (louder
   close, softer and to the side as they walk around you), a fraction of a second after you, in time; they see your
   playing pose. At about 20 m (HearingRange 20) or more they hear nothing. On their screen: your hands move in time
   with what they hear (the lyre hand plucks, the flute bobs, the tambourine shakes); when you stop, swap instrument or
   die, your arms come down; sitting, you hold the lyre on your lap; a friend who arrives (or walks into range) while
   you already play sees you posed at once.
+  *Partly automated (`music.mp.relay`, `music.listen.more`, `music.listen`, `music.pose`); by hand: With a real
+  friend: they hear you from your position and in time, see the pose with the hands moving in time, see the arms come
+  down when you stop, swap or die and the lyre on your lap when seated, and a friend arriving later sees you posed at
+  once.*
 - [ ] **M03 Rhythm game heard:** perform next to your friend. Expected: they hear the notes you hit (not the ones you
   miss), steady, about a quarter of a second after you.
+  *Partly automated (`music.mp.relay`, `music.send`, `music.listen`); by hand: A real friend next to you hears the
+  notes you hit and not the missed ones, steady, about a quarter of a second after you.*
 - [ ] **M04 Shared comfort (G5):** your friend sits near you (within 20 m); you get an Encore. Expected: they also get
   Music ("The music warms you: +3 comfort."), and resting by the fire their comfort is 3 higher (also outdoors); a
   third player farther than 20 m does not.
+  *Partly automated (`music.listen.more`, `music.mp.relay`, `music.listen`); by hand: With real friends: the one
+  within 20 m gets Music and 3 more comfort while resting by the fire (also outdoors); a third one farther away does
+  not.*
 - [ ] **M05 MIDI without the file:** play one of your MIDI files. Expected: your friend (who does not have the file)
   hears it.
+  *Partly automated (`music.mp.relay`, `music.send`); by hand: A friend without the file hears it.*
 - [ ] **M06 Refused without the mod:** a friend without the mod joins a server with it (AllowPlayersWithoutMod false).
   Expected: about a second after loading in, their game shows "Incompatible version"; the server log names them.
+  *Partly automated (`probe.mp.refused`, `probe.mp.off.MC.Exploration.Music.Instruments`); by hand: Read the server
+  log: the "Refused <player> ..." line written by Music Instruments names the player (in the run the first MC mod to
+  refuse writes it), about a second after they load in.*
 - [ ] **M07 Hand-off to a player without the mod:** AllowPlayersWithoutMod = true, a friend without the mod joins.
   (a) Drop an instrument next to them: they see nothing there and cannot pick it up; it stays for you. (b) Hold an
   instrument and play: they see an empty hand, hear nothing, and nothing breaks for them. (c) Put an instrument and
   some wood in a chest; they open it (no instrument shown) and take the wood; you open the chest again: the instrument
   is gone, as the README warns.
-- [ ] **M08 Pending rules:** join a server with the mod and left click with an instrument in the first second after
+  *Partly automated (`scenario:open-server`); by hand: All three parts with a real player without the mod: (a) a
+  dropped instrument is invisible to them and stays for you, (b) they see an empty hand, hear nothing and nothing
+  breaks, (c) the chest has lost the instrument after they used it.*
+- [x] **M08 Pending rules:** join a server with the mod and left click with an instrument in the first second after
   loading (or watch the log). Expected: "The server has not sent the instrument settings yet." until the rules arrive.
+  *Automated: `music.mp.rules`.*
 - [ ] **M09 Dedicated server:** start a dedicated server with the mod (BepInEx installed there). Expected: it loads
   without errors (no graphics device: no models, no sound), players hear each other's music and share Encores, and
   dropped instruments stay on the ground after a server restart.
+  *Partly automated (`music.mp.server`, `music.mp.relay`); by hand: Two players on the dedicated server hear each
+  other and share an Encore; restart the server and find the dropped instrument still on the ground.*
 - [ ] **M10 Crossplay or a slow connection:** play with a friend over crossplay (or a laggy connection). Expected: the
   music they hear may skip a note now and then after a network hiccup, but never plays a burst of piled-up notes.
+  *Partly automated (`music.listen.more`, `music.listen`); by hand: With a friend over crossplay or a laggy
+  connection: a skipped note now and then, never a burst of piled-up notes.*
 - [ ] **M11 Long notes and rests:** play a MIDI song with notes held for several seconds (a slow string or organ part,
   on the flute) and one with a long rest in it. Expected: your friend hears each long note to its end (never cut after
   about 3 seconds) and the song goes on after the rest.
+  *Partly automated (`music.send`, `music.listen.more`, `music.mp.relay`); by hand: A real friend hears each long note
+  to its end and the song going on after the rest.*
 
 ## 0.2.0 — server songs
 
@@ -209,17 +310,20 @@ Setup: on the server (or host), set ShareSongs = true (ServerSongs section) and 
 `BepInEx/config/MC_Valheim/ServerSongs` (the window's hint names the folder; a dedicated server uses its own BepInEx
 config folder). The friend's own songs folder should not have these files.
 
-- [ ] **T26 Server songs as host (G7):** single player or hosting, ShareSongs on, two files in the server songs folder,
+- [x] **T26 Server songs as host (G7):** single player or hosting, ShareSongs on, two files in the server songs folder,
   open the song window. Expected: a "Server songs" section between the built-in songs and "Your MIDI songs" lists both;
   picking one shows its parts and length at once (your game is the server: no download); Play and Perform work. Copy
   another file in with the window closed and open it again: it is listed. ShareSongs off: the section is gone.
-- [ ] **T27 AllowPlayerSongs off:** set AllowPlayerSongs = false, open the window. Expected: under "Your MIDI songs" only
+  *Automated: `music.hostsongs`, `music.mp.sharesetting`.*
+- [x] **T27 AllowPlayerSongs off:** set AllowPlayerSongs = false, open the window. Expected: under "Your MIDI songs" only
   "This server allows only the built-in songs and its own songs." (no own files); built-in and server songs still play.
   Put it back.
-- [ ] **T28 Folder problems:** in the server songs folder, a file larger than 2 MB is not listed (one warning in the
+  *Automated: `music.playersongs`, `music.mp.playersongs`.*
+- [x] **T28 Folder problems:** in the server songs folder, a file larger than 2 MB is not listed (one warning in the
   log); a text file renamed to `.mid` is listed but shows why it cannot play when picked; the same file twice under two
   names is listed once. With ShareSongs on and the folder deleted, restart (or turn ShareSongs off and on): the folder
   is made again (log line "Made the server songs folder").
+  *Automated: `music.sharefolder`, `music.mp.sharesetting`.*
 
 ### 0.2.0 — multiplayer
 
@@ -231,25 +335,33 @@ config folder). The friend's own songs folder should not have these files.
   everyone nearby hears it, split into a part per instrument (flute melody, lyre tune and bass, tambourine drums or
   rhythm). Press Play on another server song not downloaded yet: it starts by itself when it is here. With ShareSongs
   off on the server, the friend sees no "Server songs" section.
-- [ ] **M13 Cache and changes:** the friend picks the same song again: no download (at once). The host replaces a file
+  *Partly automated (`music.mp.songs`, `music.mp.sharesetting`); by hand: Everyone nearby hears the downloaded song
+  (needs a second player).*
+- [x] **M13 Cache and changes:** the friend picks the same song again: no download (at once). The host replaces a file
   with another version (same name); a few seconds later the friend opens the window again and picks it: the new
   version downloads. The host deletes a song the friend has not picked yet this session, while the friend's window
   lists it: picking it says "The server no longer shares this song" (a song already downloaded keeps playing until the
   friend leaves the world). The host turns ShareSongs off while the friend downloads the big file: the friend sees "no
   longer shares" at once.
+  *Automated: `music.mp.songs.changes`.*
 - [ ] **M14 Big file:** share a 1 to 2 MB MIDI file; the friend picks it while others move around. Expected: the
   progress goes up to the end (it can take a minute or more) and the song plays; the world keeps loading normally for
   everyone during the download, also for the friend downloading (no lag or rubber-banding from it).
-- [ ] **M15 AllowPlayerSongs off on the server:** the friend's window shows the hint instead of their own MIDI files;
+  *Partly automated (`music.mp.songs`); by hand: With other players moving around and a real (not local) connection:
+  no lag or rubber-banding for anyone during the download.*
+- [x] **M15 AllowPlayerSongs off on the server:** the friend's window shows the hint instead of their own MIDI files;
   server songs and built-in songs play.
+  *Automated: `music.mp.playersongs`, `music.mp.songs.changes`.*
 - [ ] **M16 Hand-off to a player without the mod:** AllowPlayersWithoutMod = true, a friend without the mod joins a
   sharing server. Expected: nothing breaks for them, and nothing is sent to them (no "Sending server song" line for
   them in the server log with Debug logging).
+  *Partly automated (`scenario:open-server`); by hand: The same with ShareSongs on and files in the folder: nothing
+  breaks for that player, and the server log (Debug logging) has no "Sending server song" line for them.*
 - [ ] **M17 Crossplay:** a friend on crossplay downloads a server song. Expected: it completes and plays.
 
 ## 0.3.0 — easier Encore
 
-- [ ] **T29 Easier Encore (user rule: 50 % for 20 s):** perform and hit about every other note, on time or a bit off
+- [x] **T29 Easier Encore (user rule: 50 % for 20 s):** perform and hit about every other note, on time or a bit off
   (a "Good" counts as much as a "Perfect"). Expected: the Accuracy beside the lanes shows about 50 %, the meter fills
   (red "Hit more notes" now and then, it waits but never goes down) and the Encore comes after about 20 to 40 seconds
   (up to a minute if your hits come in uneven bunches).
@@ -257,39 +369,55 @@ config folder). The friend's own songs folder should not have these files.
   the meter is red almost all the time and no Encore comes in a minute or two (a lucky start can fill a sliver, which
   stays because the meter never drains). With a config file from an
   older version, RequiredAccuracy appears with 0.5 (the old SuccessAccuracy line is ignored).
+  *Automated: `music.encore.easy`, `music.mp.oldconfig`.*
 
 ## 0.4.0 — free play
 
-- [ ] **T30 Free play on the flute:** hold the flute, open the song window: "Free play" is the first entry; pick it,
+- [x] **T30 Free play on the flute:** hold the flute, open the song window: "Free play" is the first entry; pick it,
   Play. Expected: a piano right of your character (17 white keys, black keys between them like a real piano), each key
   showing your keyboard key, white keys also the note (C4 to E6), title "Free play: Wooden Flute"; you cannot walk,
   jump or use the hotbar. Press and hold Q: a steady C5 that lasts while the key is down and stops when you let go (up
   to 8 seconds); its piano key lights up. Press Q then E while Q is still down: the note moves to E5 without a gap
   (one note at a time). Tap a key as fast as you can, many times: each tap sounds briefly, none keeps droning.
-- [ ] **T31 Lyre and tambourine:** free play on the lyre: each key plucks a string that rings on, several at once make a
+  *Automated: `music.freeplay.piano`, `music.freeplay`, `music.keys`.*
+- [x] **T31 Lyre and tambourine:** free play on the lyre: each key plucks a string that rings on, several at once make a
   chord (C3 to E5). On the tambourine: only Z X C V light and sound (thump, hit, jingle, shake); the other piano keys
   are greyed and do nothing.
-- [ ] **T32 Piano layout and Space:** Z X C V B N M play C D E F G A B; S D G H J play the black keys between them
+  *Automated: `music.freeplay.more`, `music.keys`.*
+- [x] **T32 Piano layout and Space:** Z X C V B N M play C D E F G A B; S D G H J play the black keys between them
   (C# D# F# G# A#); Q to P and 2 3 5 6 7 9 0 the same an octave higher, up to E. Hold Space: everything plays an
   octave higher, the piano's note names and title show it ("octave up"); a flute note held while Space is let go keeps
   its pitch.
-- [ ] **T33 Keys held back:** while free playing, press Tab, I, M, E, R, the number keys, Space, Enter, F5 (console on):
+  *Automated: `music.freeplay.more`, `music.keys`.*
+- [x] **T33 Keys held back:** while free playing, press Tab, I, M, E, R, the number keys, Space, Enter, F5 (console on):
   no inventory, map, use, hotbar, jump, chat or console; only notes play. Right click or Esc stops (Esc also opens the
   menu); the game's keys work again after. Hold Q and Space (and E), then right click: the character neither starts
   auto-running nor jumps nor uses anything; press the keys again: they work normally.
+  *Automated: `music.freeplay.keys`, `music.keys`.*
 - [ ] **T34 AZERTY (or another layout):** with a French keyboard, the keys used are the ones at the same places (bottom
   row W X C V B N ,), the piano shows those letters, and the window's Free play line names them too ("W to , and A to
   P").
+  *Partly automated (`music.freeplay.more`, `music.freeplay.piano`); by hand: Switch to a French (AZERTY) keyboard:
+  the keys at the same places play, the piano shows W X C V B N , and A to P, and the window's Free play line names
+  them.*
 - [ ] **T36 Gamepad:** with a gamepad in use, open the song window: the first song is selected, not Free play. Pick Free
   play and press A: "Free play is played on the keyboard." and nothing starts. Start free play with the mouse, then
   touch the pad: the hint under the piano says "Start or right click: stop".
-- [ ] **T35 No comfort, stops:** free play for a minute by a fire: no meter, no Encore, no Music effect. Put the
+  *Partly automated (`music.pad`); by hand: Once with a real gamepad: the game reports it as in use when touched, and
+  the same three things happen.*
+- [x] **T35 No comfort, stops:** free play for a minute by a fire: no meter, no Encore, no Music effect. Put the
   instrument away, swim or get hit: free play stops at once and nothing keeps sounding.
+  *Automated: `music.freeplay.stops`.*
 
 ### 0.4.0 — multiplayer
 
 - [ ] **M18 Others hear free play (G4):** free play next to a friend. Expected: they hear your notes a quarter of a
   second after you, from your position; a held flute note lasts as long as you hold it, also for them (never stuck
   sounding, never cut after a few seconds); they see your playing pose move with the notes.
+  *Partly automated (`music.mp.relay`, `music.listen.more`, `music.freeplay`); by hand: A real friend hears your notes
+  a quarter of a second later from your position, held notes for as long as you hold them, and sees the pose move with
+  the notes.*
 - [ ] **M19 Two players and a player without the mod:** two friends free play at once: both are heard, nothing mixes up.
   A friend without the mod (AllowPlayersWithoutMod = true) hears nothing and nothing breaks for them.
+  *Partly automated (`music.listen.more`, `scenario:open-server`); by hand: Two real friends free play at once without
+  mix-ups; a friend without the mod (AllowPlayersWithoutMod = true) hears nothing and nothing breaks for them.*

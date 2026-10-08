@@ -27,7 +27,68 @@ internal static class ScopeOverlay
 #if DEBUG
     internal static int SortingOrder => _canvas != null ? _canvas.sortingOrder : int.MinValue;
     internal static string Placement { get; private set; } = "";
+
+    // Self tests: view settings forced in memory (null = config), and what overlay draw now: built at all, blur ring
+    // drawn with a picture, numbers of each ring (x = circle size as share of screen height, y = iris, 1 when fully
+    // closed in, z = strength 0..1), screen rectangle the rings fill.
+    internal static float? TestClearViewSize;
+    internal static bool? TestEdgeBlur;
+    internal static float? TestEdgeDarkness;
+    internal static bool TestBuilt => _root != null;
+    internal static bool TestBlurOn => _blur != null && _blur.enabled && _blur.texture != null;
+    internal static Vector3 TestDark => _dark != null ? _dark.TestState : -Vector3.one;
+    internal static Vector3 TestBlur => _blur != null ? _blur.TestState : -Vector3.one;
+    internal static Rect TestRect => _dark != null ? _dark.TestRect : default;
+
+    // Self tests: mesh builds of the dark ring and of the blur ring so far (-1 = no overlay). A setting that shows
+    // on screen = a new build with the new numbers.
+    internal static int TestDarkBuilds => _dark != null ? _dark.TestBuilds : -1;
+    internal static int TestBlurBuilds => _blur != null ? _blur.TestBuilds : -1;
 #endif
+
+    // Personal settings (section View), each read in one place: self test may force them in memory, never the
+    // config file.
+    private static float ClearViewSize
+    {
+        get
+        {
+#if DEBUG
+            if (TestClearViewSize.HasValue)
+            {
+                return TestClearViewSize.Value;
+            }
+#endif
+            return Plugin.ClearViewSize != null ? Plugin.ClearViewSize.Value : DefaultClearSize;
+        }
+    }
+
+    private static float EdgeDarkness
+    {
+        get
+        {
+#if DEBUG
+            if (TestEdgeDarkness.HasValue)
+            {
+                return TestEdgeDarkness.Value;
+            }
+#endif
+            return Plugin.EdgeDarkness != null ? Plugin.EdgeDarkness.Value : DefaultEdgeDarkness;
+        }
+    }
+
+    private static bool EdgeBlur
+    {
+        get
+        {
+#if DEBUG
+            if (TestEdgeBlur.HasValue)
+            {
+                return TestEdgeBlur.Value;
+            }
+#endif
+            return Plugin.EdgeBlur == null || Plugin.EdgeBlur.Value;
+        }
+    }
 
     // o: 0 (nothing) .. 1 (full scope view). The circle starts bigger than the screen and closes to its size.
     internal static void Show(float o)
@@ -41,9 +102,9 @@ internal static class ScopeOverlay
         {
             return;
         }
-        var clear = Plugin.ClearViewSize != null ? Plugin.ClearViewSize.Value : DefaultClearSize;
-        var dark = Plugin.EdgeDarkness != null ? Plugin.EdgeDarkness.Value : DefaultEdgeDarkness;
-        var blurOn = Plugin.EdgeBlur == null || Plugin.EdgeBlur.Value;
+        var clear = ClearViewSize;
+        var dark = EdgeDarkness;
+        var blurOn = EdgeBlur;
         var iris = Mathf.Lerp(3.2f, 1f, o);
         if (!_shown)
         {
@@ -247,7 +308,17 @@ internal sealed class BlurRing : RawImage
         var rect = GetPixelAdjustedRect();
         var r = rect.height * 0.5f * _clear * _iris;
         RingMesh.Fill(vh, rect, new Color32(255, 255, 255, 255), r, r * 1.3f, _alpha, true);
+#if DEBUG
+        TestBuilds++;
+#endif
     }
+
+#if DEBUG
+    internal Vector3 TestState => new Vector3(_clear, _iris, _alpha);
+
+    // Self test: how many times Unity built the ring mesh (a change that shows on screen = a new build).
+    internal int TestBuilds;
+#endif
 }
 
 // Dark edge: black, from a bit outside the circle to the screen edge.
@@ -274,7 +345,18 @@ internal sealed class DarkRing : MaskableGraphic
         var rect = GetPixelAdjustedRect();
         var r = rect.height * 0.5f * _clear * _iris;
         RingMesh.Fill(vh, rect, new Color32(0, 0, 0, 255), r * 1.02f, r * 1.7f, _alpha, false);
+#if DEBUG
+        TestBuilds++;
+#endif
     }
+
+#if DEBUG
+    internal Vector3 TestState => new Vector3(_clear, _iris, _alpha);
+    internal Rect TestRect => GetPixelAdjustedRect();
+
+    // Self test: how many times Unity built the ring mesh (a change that shows on screen = a new build).
+    internal int TestBuilds;
+#endif
 }
 
 // Me = small blurred copy of what the main camera drew this frame (after its image effects, before any UI), for
@@ -287,6 +369,12 @@ internal sealed class ScopeCapture : MonoBehaviour
     private static RenderTextureFormat _format;
     private static bool _formatChosen;
     private RenderTexture _result;
+
+#if DEBUG
+    // Self tests: me on the camera at all, and me copying frames now.
+    internal static bool TestExists => _instance != null;
+    internal static bool TestOn => _instance != null && _instance.enabled;
+#endif
 
     // Turn on (adding me to the main camera if needed); the texture the UI shows, null when no camera.
     internal static Texture Enable()

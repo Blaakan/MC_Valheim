@@ -43,10 +43,14 @@ namespace MC.Farming.CultivatorReplantMod;
 //   replant.icons    transplant icons painted, sprout in upper right (stack text band untouched), tier gems 4-7,
 //                    GetIcon gem; PNG export (package icon); inventory: level 4-7 no level number, 3 keep it, number
 //                    back with grid patch off; screenshot with every transplant and cultivators level 3-7
+// Newer tests live in SelfTestsKeys / Plant / Forge / Off / Far / Mp .cs (same class, helpers in SelfTestsHelpers.cs):
+// real button presses, placing through the vanilla ghost, growth on the clock, real Forge upgrades of every level, the
+// mod really turned off and on, far biomes, and multiplayer tests against a dedicated server. Registered from here
+// (RegisterMore).
 // Me force rules only with ServerRules.TestRules / TestPending and feature off with Plugin.TestInactive: never config.
 // Rig put back controls, look, time, auto pickup, crafting station, known recipe, inventory and equipment, and destroy
 // all spawned things and new item drops.
-internal static class SelfTests
+internal static partial class SelfTests
 {
     private const string NetworkName = "replant.network";
     private const string ContentName = "replant.content";
@@ -67,6 +71,7 @@ internal static class SelfTests
         SelfTest.Register(GrowName, RunGrow);
         SelfTest.Register(RootName, RunRoot);
         SelfTest.Register(IconsName, RunIcons);
+        RegisterMore();
 #endif
     }
 
@@ -81,6 +86,7 @@ internal static class SelfTests
         SelfTest.Unregister(GrowName);
         SelfTest.Unregister(RootName);
         SelfTest.Unregister(IconsName);
+        UnregisterMore();
         ClearOverrides();
 #endif
     }
@@ -165,9 +171,10 @@ internal static class SelfTests
 
     // Free spot on land near center: tries each distance, 24 directions starting at forward. Free = nothing in the grow
     // space layers within clear of the ground point, open sky, not under water, not a cliff, not near a spot already
-    // used (taken). accept = extra test (root reach). Same biome as the centre ground: Meadows here.
+    // used (taken). accept = extra test (root reach). Same biome as the centre ground: Meadows here. maxRise = how
+    // much higher or lower than the centre the spot may lie (far spots on a mountain: more).
     private static bool FindSpot(Vector3 center, Vector3 forward, float[] distances, float clear, List<Vector3> taken,
-        out Vector3 spot, Func<Vector3, bool> accept = null)
+        out Vector3 spot, Func<Vector3, bool> accept = null, float maxRise = 2.5f)
     {
         spot = Vector3.zero;
         forward.y = 0f;
@@ -182,7 +189,7 @@ internal static class SelfTests
                 var dir = Quaternion.Euler(0f, angle, 0f) * forward;
                 var p = center + dir * d;
                 p.y = zs.GetGroundHeight(p);
-                if (p.y < water + 0.5f || Mathf.Abs(p.y - center.y) > 2.5f)
+                if (p.y < water + 0.5f || Mathf.Abs(p.y - center.y) > maxRise)
                 {
                     continue;
                 }
@@ -254,6 +261,19 @@ internal static class SelfTests
 
     private static bool Alive(ZNetView nv) => nv != null && nv.IsValid();
 
+    // Vanilla pick roll a skill bonus (Pickable.Interact: chance = skill of the plant x m_maxLevelBonusChance, then
+    // m_bonusYieldAmount more and log line "Bonus food picked!"). Mod dig call that same Interact, so same roll. It is
+    // random: run of 2026-10-08 gave 2 yellow mushrooms for 1 in replant.bronze. Me switch the roll off on this one
+    // test plant (the prefab stay as it is): drop counts of the tests are then exact, by hand and by dig.
+    private static void NoSkillBonus(GameObject go)
+    {
+        var pick = go != null ? go.GetComponent<Pickable>() : null;
+        if (pick != null)
+        {
+            pick.m_maxLevelBonusChance = 0f;
+        }
+    }
+
     // Center of the object's colliders the interact ray can hit (no view-block layer).
     private static Vector3 AimPoint(GameObject go)
     {
@@ -308,6 +328,19 @@ internal static class SelfTests
         private bool _todOn;
         private float _tod;
         private string _knownRecipe;
+        // Extra things a test changed (player place, key state, stamina rate, real turn off...): Restore run them
+        // first, last added first.
+        private readonly List<Action> _undo = new List<Action>();
+        // Player moved away from Origin by a test (put back once, through the undo list).
+        internal bool Moved;
+
+        internal void Undo(Action undo)
+        {
+            if (undo != null)
+            {
+                _undo.Add(undo);
+            }
+        }
 
         internal Rig(Player player, string name)
         {
@@ -330,6 +363,9 @@ internal static class SelfTests
 
         internal Inventory Inv => Player.GetInventory();
 
+        // Test name (notes of the helpers).
+        internal string Name => _name;
+
         internal ItemDrop.ItemData Give(string prefab, int stack = 1, int quality = 1)
         {
             return Inv.AddItem(prefab, stack, quality, 0, 0L, "", false);
@@ -343,6 +379,7 @@ internal static class SelfTests
                 return null;
             }
             var go = Object.Instantiate(prefab, pos, rot);
+            NoSkillBonus(go);
             _spawned.Add(go);
             return go;
         }
@@ -352,6 +389,7 @@ internal static class SelfTests
         {
             if (go != null)
             {
+                NoSkillBonus(go);
                 _spawned.Add(go);
             }
         }
@@ -443,6 +481,11 @@ internal static class SelfTests
 
         internal void Restore()
         {
+            for (var i = _undo.Count - 1; i >= 0; i--)
+            {
+                Try("undo " + i, _undo[i]);
+            }
+            _undo.Clear();
             ClearOverrides();
             Try("content rebuild", TransplantContent.Rebuild);
             Try("gui", () =>
@@ -1433,6 +1476,8 @@ internal static class SelfTests
             rig.Noon();
             rig.NoAutoPickup();
             rig.TakeControls();
+            // PlantEasily (tester's PC) throw in its ghost grid when this test take the selected transplant away.
+            LiftPlantEasily(rig);
             var inv = rig.Inv;
             var tool1 = rig.Give(PlantCatalog.CultivatorPrefab, 1, 1);
             var tool3 = rig.Give(PlantCatalog.CultivatorPrefab, 1, 3);

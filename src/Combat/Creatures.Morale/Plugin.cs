@@ -191,6 +191,14 @@ internal sealed partial class Plugin : ModPlugin
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
     }
 
+#if DEBUG
+    // Self test: this game's copy blocked (real OnDeactivated / OnActivated through the framework, Enabled never
+    // written, server told "off" like a real turn-off). Me set it, then FeatureRegistry.RefreshAll().
+    internal static bool TestBlocked { get; set; }
+
+    protected override string LocalBlocker() => TestBlocked ? "Inactive: turned off by a self-test." : null;
+#endif
+
     // Mod on on this game (Attitudes.Decide step 1). Patches only run while Active anyway; this also cover the
     // OnDeactivated call (patches still on) and code reached outside patches (rpc handlers, rules change).
     internal static bool Live { get; private set; }

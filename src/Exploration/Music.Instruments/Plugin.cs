@@ -76,7 +76,65 @@ internal sealed partial class Plugin : ModPlugin
 #if DEBUG
     // Self test play "feature off" without the toggle. Never in release.
     internal static bool TestInactive { get; set; }
+
+    // Self test turn me off for real through the framework (patches removed, OnDeactivated run), without the Enabled
+    // setting: a reason here = framework say "cannot run" at its next refresh. Null = normal. Never in release.
+    internal static string TestBlocker { get; set; }
+
+    protected override string LocalBlocker() => TestBlocker;
+
+    // Self test force a personal setting in memory (never the config file). Null = the player's own.
+    internal static float? TestVolume { get; set; }
+    internal static float? TestGameMusicVolume { get; set; }
+    internal static float? TestNoteSpeed { get; set; }
+
+    // Self test: what the Volume setting's change event does.
+    internal static void TestVolumeChanged() => OnVolumeChanged();
 #endif
+
+    // Personal settings as the code reads them (entry not bound = default).
+    internal static float VolumeNow
+    {
+        get
+        {
+#if DEBUG
+            if (TestVolume.HasValue)
+            {
+                return TestVolume.Value;
+            }
+#endif
+            return Volume != null ? Volume.Value : 0.8f;
+        }
+    }
+
+    // Null = entry not bound (game music left alone).
+    internal static float? GameMusicVolumeNow
+    {
+        get
+        {
+#if DEBUG
+            if (TestGameMusicVolume.HasValue)
+            {
+                return TestGameMusicVolume.Value;
+            }
+#endif
+            return GameMusicVolume != null ? GameMusicVolume.Value : (float?)null;
+        }
+    }
+
+    internal static float NoteSpeedNow
+    {
+        get
+        {
+#if DEBUG
+            if (TestNoteSpeed.HasValue)
+            {
+                return Mathf.Clamp(TestNoteSpeed.Value, 0.5f, 2f);
+            }
+#endif
+            return NoteSpeed != null ? Mathf.Clamp(NoteSpeed.Value, 0.5f, 2f) : 1f;
+        }
+    }
 
     // Feature on (patches applied) and not faked off by a self test. Always-on code (registration) read this: its
     // patches stay while the feature is off.

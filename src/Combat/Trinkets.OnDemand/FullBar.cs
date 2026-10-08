@@ -47,11 +47,25 @@ internal static class FullBar
 #if DEBUG
     // Self test read what the last press did.
     internal static TriggerResult LastResult = TriggerResult.None;
+
+    // Self test count the AddAdrenaline calls of the local player that reach me (all, and the ones that ask for 0, as
+    // a melee miss does), and keep the last amount asked: a real swing or block is seen, not guessed.
+    internal static int Calls;
+    internal static int ZeroCalls;
+    internal static float LastAmount;
 #endif
 
     // Prefix of Player.AddAdrenaline, local player only. True = counted (finalizer must call Exit).
     internal static bool Enter(Player player, float v)
     {
+#if DEBUG
+        Calls++;
+        LastAmount = v;
+        if (v == 0f)
+        {
+            ZeroCalls++;
+        }
+#endif
         if (_triggering)
         {
             _triggering = false; // our own trigger call: vanilla pop

@@ -338,7 +338,7 @@ internal sealed class ImpostorAtlas
         float sunIntensity = sun != null ? sun.intensity : 0f;
         Color sunColor = Shader.GetGlobalColor("_SunColor");
         Color ambientColor = Shader.GetGlobalColor("_AmbientColor");
-        float brightness = Plugin.Cfg.ImpostorBakeBrightness.Value;
+        float brightness = Plugin.Cfg.V(Plugin.Cfg.ImpostorBakeBrightness);
         try
         {
             RenderSettings.ambientMode = AmbientMode.Flat;

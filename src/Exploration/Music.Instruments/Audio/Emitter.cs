@@ -154,7 +154,7 @@ internal sealed class Emitter : MonoBehaviour
     {
         if (_source != null)
         {
-            _source.volume = Plugin.Volume != null ? Plugin.Volume.Value : 0.8f;
+            _source.volume = Plugin.VolumeNow;
         }
     }
 
@@ -402,5 +402,8 @@ internal sealed class Emitter : MonoBehaviour
         PeakLeft = 0f;
         PeakRight = 0f;
     }
+
+    // Self test: the sound source (volume, mixer group, 2D / 3D).
+    internal AudioSource Source => _source;
 #endif
 }

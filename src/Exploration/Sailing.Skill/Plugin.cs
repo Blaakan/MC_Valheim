@@ -43,8 +43,21 @@ internal sealed partial class Plugin : ModPlugin
     private const string ServerWins = " In multiplayer the setting of the server (or host) is used for everyone.";
     private const string Linear = " Lower levels get a share in proportion (Sailing 50 = half).";
 
+#if DEBUG
+    // Self test turn the feature off and on like the MC Mods tick, in memory only: never write Enabled (config file).
+    // Framework ask LocalBlocker at every refresh: test set this, then call FeatureRegistry.RefreshAll().
+    internal const string TestBlockedText = "Inactive: turned off by a self test.";
+    internal static bool TestBlocked;
+
+    protected override string LocalBlocker() => TestBlocked ? TestBlockedText : null;
+#endif
+
     protected override void BindConfig()
     {
+        // Debug build only (call gone in Release): log watcher of the self tests, and the tests that must be there
+        // while the feature is off (server without me).
+        SelfTests.RegisterAlways();
+
         var d = SailingRules.Default;
 
         AllowPlayersWithoutMod = Config.Bind("General", "AllowPlayersWithoutMod", false, new ConfigDescription(

@@ -165,7 +165,7 @@ internal static class SongWindow
                                         + ", black keys on the row above; Space: octave up";
             var last = Find(Performance.LastSongId);
             var pick = last >= 0 ? last : NextSong(-1, 1);
-            if (ZInput.IsGamepadActive() && pick >= 0 && Items[pick].Entry.Source == SongSource.FreePlay)
+            if (PadInput.Active && pick >= 0 && Items[pick].Entry.Source == SongSource.FreePlay)
             {
                 pick = NextSong(pick, 1); // on a pad, A plays the first song, as before free play
             }
@@ -304,7 +304,7 @@ internal static class SongWindow
                     return; // the song came and started: window closed
                 }
             }
-            var pad = ZInput.IsGamepadActive();
+            var pad = PadInput.Active;
             if (!_padKnown || pad != _padShown)
             {
                 _padKnown = true;
@@ -1204,17 +1204,17 @@ internal static class SongWindow
     // True = a song started (window gone).
     private static bool HandleKeys()
     {
-        var pad = ZInput.IsGamepadActive();
+        var pad = PadInput.Active;
         var stickY = pad ? ZInput.GetJoyLeftStickY() : 0f; // > 0 = down
         var stickX = pad ? ZInput.GetJoyLeftStickX() : 0f;
 
         // Up / down: own edge + own repeat (D-pad and stick names repeat by themselves in ZInput).
         var dir = 0;
-        if ((_arrowsOk && ZInput.GetKey(KeyCode.UpArrow, false)) || (pad && (ZInput.GetButton("JoyDPadUp") || stickY < -0.5f)))
+        if ((_arrowsOk && KeyHeld(KeyCode.UpArrow)) || (pad && (ZInput.GetButton("JoyDPadUp") || stickY < -0.5f)))
         {
             dir = -1;
         }
-        else if ((_arrowsOk && ZInput.GetKey(KeyCode.DownArrow, false)) || (pad && (ZInput.GetButton("JoyDPadDown") || stickY > 0.5f)))
+        else if ((_arrowsOk && KeyHeld(KeyCode.DownArrow)) || (pad && (ZInput.GetButton("JoyDPadDown") || stickY > 0.5f)))
         {
             dir = 1;
         }
@@ -1245,11 +1245,11 @@ internal static class SongWindow
 
         // Left / right: part, one step per press.
         var side = 0;
-        if ((_arrowsOk && ZInput.GetKey(KeyCode.LeftArrow, false)) || (pad && (ZInput.GetButton("JoyDPadLeft") || stickX < -0.5f)))
+        if ((_arrowsOk && KeyHeld(KeyCode.LeftArrow)) || (pad && (ZInput.GetButton("JoyDPadLeft") || stickX < -0.5f)))
         {
             side = -1;
         }
-        else if ((_arrowsOk && ZInput.GetKey(KeyCode.RightArrow, false)) || (pad && (ZInput.GetButton("JoyDPadRight") || stickX > 0.5f)))
+        else if ((_arrowsOk && KeyHeld(KeyCode.RightArrow)) || (pad && (ZInput.GetButton("JoyDPadRight") || stickX > 0.5f)))
         {
             side = 1;
         }
@@ -1263,7 +1263,7 @@ internal static class SongWindow
             CyclePart(side);
         }
 
-        var enter = (_enterOk && ZInput.GetKeyDown(KeyCode.Return, false)) || (_padEnterOk && ZInput.GetKeyDown(KeyCode.KeypadEnter, false));
+        var enter = (_enterOk && KeyDown(KeyCode.Return)) || (_padEnterOk && KeyDown(KeyCode.KeypadEnter));
         if (enter)
         {
             // Same press no open chat. Chat.Update prefix (InputPatches) cover frames where chat read first; this one
@@ -1301,8 +1301,124 @@ internal static class SongWindow
         return false;
     }
 
+    // Raw key reads of the window (arrows, Enter): one place each.
+    private static bool KeyHeld(KeyCode key)
+    {
+#if DEBUG
+        if (TestHeldKey == key && key != KeyCode.None)
+        {
+            return true;
+        }
+#endif
+        return ZInput.GetKey(key, false);
+    }
+
+    private static bool KeyDown(KeyCode key)
+    {
+#if DEBUG
+        if (TestDownKey == key && key != KeyCode.None)
+        {
+            TestDownKey = KeyCode.None;
+            return true;
+        }
+#endif
+        return ZInput.GetKeyDown(key, false);
+    }
+
 #if DEBUG
     // ---------------------------------------------------------------- self-test helpers
+
+    // Self test: a window key held (arrows) / pressed once (Enter) without a keyboard. None = no key.
+    internal static KeyCode TestHeldKey;
+    internal static KeyCode TestDownKey;
+
+    internal static bool Built => _root != null;
+
+    internal static string HelpNavText => _helpNav != null ? _helpNav.text : null;
+
+    internal static string HelpPerformText => _helpPerform != null ? _helpPerform.text : null;
+
+    internal static string RepeatText => _repeatLabel != null ? _repeatLabel.text : null;
+
+    internal static string PartText => _partLabel != null && _partButton != null && _partButton.gameObject.activeSelf ? _partLabel.text : null;
+
+    internal static string TitleText => _title != null ? _title.text : null;
+
+    // The list as shown, top to bottom: "song|<id>|<title>", "header|<text>", "hint|<text>".
+    internal static List<string> TestItems()
+    {
+        var list = new List<string>(Items.Count);
+        foreach (var item in Items)
+        {
+            switch (item.Kind)
+            {
+                case ItemKind.Header:
+                    list.Add("header|" + item.Text);
+                    break;
+                case ItemKind.Hint:
+                    list.Add("hint|" + item.Text);
+                    break;
+                default:
+                    list.Add("song|" + item.Entry.Id + "|" + item.Entry.Title);
+                    break;
+            }
+        }
+        return list;
+    }
+
+    // Info line of a song as its row shows it (error, download state or info). Null = not in the list.
+    internal static string TestRowInfo(string songId)
+    {
+        var index = Find(songId);
+        if (index < 0)
+        {
+            return null;
+        }
+        var e = Items[index].Entry;
+        return e.Error ?? e.Pending ?? e.Info;
+    }
+
+    // The selected song has a row on screen (bound and inside the viewport).
+    internal static bool SelectedInView
+    {
+        get
+        {
+            if (_selected < 0 || _content == null || _viewport == null)
+            {
+                return false;
+            }
+            var view = _viewport.rect.height > 1f ? _viewport.rect.height : ListH - 2f * RowInset;
+            var top = _selected * RowH;
+            var y = _content.anchoredPosition.y;
+            return top >= y - 0.5f && top + RowH <= y + view + 0.5f;
+        }
+    }
+
+    // Click the row of a song through its button (what a mouse click on the row calls). False = that song has no
+    // row on screen (scrolled away) or the window is closed.
+    internal static bool TestClickRow(string songId)
+    {
+        if (!IsOpen)
+        {
+            return false;
+        }
+        var index = Find(songId);
+        if (index < 0)
+        {
+            return false;
+        }
+        ScrollTo(index, centre: false);
+        BindRows();
+        foreach (var row in Rows)
+        {
+            if (row.Bound == index && row.Go.activeSelf && row.Button.interactable)
+            {
+                row.Button.onClick.Invoke();
+                return true;
+            }
+        }
+        return false;
+    }
 
     internal static string SelectedId => SelectedEntry != null ? SelectedEntry.Id : null;
 

@@ -37,15 +37,44 @@ internal sealed partial class Plugin : ModPlugin
         RememberSort.SettingChanged += (_, _) => CraftSearch.OnRememberSortChanged();
     }
 
+    // Only door to RememberSort value. Debug build: self test may force it in memory (SelfTests override), never in
+    // config file.
+    internal static bool ReadRememberSort()
+    {
+#if DEBUG
+        if (SelfTests.RememberSortOverride.HasValue)
+        {
+            return SelfTests.RememberSortOverride.Value;
+        }
+#endif
+        return RememberSort.Value;
+    }
+
+    // Only door to KeepSearchText value. Same Debug override rule.
+    internal static bool ReadKeepSearchText()
+    {
+#if DEBUG
+        if (SelfTests.KeepSearchTextOverride.HasValue)
+        {
+            return SelfTests.KeepSearchTextOverride.Value;
+        }
+#endif
+        return KeepSearchText.Value;
+    }
+
     // Me just turned on (maybe with inventory open). Make row now, apply remembered sort.
+    // Debug build: in-world self tests join the list (call vanish in Release).
     protected override void OnActivated()
     {
         CraftSearch.Activate();
+        SelfTests.Register();
     }
 
     // Me going off (patches still on during this call). Kill row and menu, give layout back, vanilla list again.
+    // Debug build: self tests leave the list, forced settings forgotten (call vanish in Release).
     protected override void OnDeactivated()
     {
         CraftSearch.Deactivate();
+        SelfTests.Unregister();
     }
 }

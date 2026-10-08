@@ -41,15 +41,84 @@ internal sealed partial class Plugin : ModPlugin
         ShowHint.SettingChanged += (_, _) => HoverHint.Invalidate();
     }
 
+#if DEBUG
+    // Self test only (Debug build): settings and input forced in memory, never written to the cfg. Null = real value.
+    // Who set one must call HoverHint.Invalidate() (hint line is cached).
+    internal static int? TestAmount;
+    internal static KeyCode? TestModifierKey;
+    internal static bool? TestShowHint;
+    internal static bool? TestGamepad; // controller in use?
+    internal static bool? TestKeyHeld; // mod-only key down?
+#endif
+
+    // Me = single door to the settings and input the feature read. Release build: plain config and game value.
+    internal static int ReadAmount()
+    {
+#if DEBUG
+        if (TestAmount.HasValue)
+        {
+            return TestAmount.Value;
+        }
+#endif
+        return Amount.Value;
+    }
+
+    internal static KeyCode ReadModifierKey()
+    {
+#if DEBUG
+        if (TestModifierKey.HasValue)
+        {
+            return TestModifierKey.Value;
+        }
+#endif
+        return ModifierKey.Value;
+    }
+
+    internal static bool ReadShowHint()
+    {
+#if DEBUG
+        if (TestShowHint.HasValue)
+        {
+            return TestShowHint.Value;
+        }
+#endif
+        return ShowHint.Value;
+    }
+
+    internal static bool GamepadActive()
+    {
+#if DEBUG
+        if (TestGamepad.HasValue)
+        {
+            return TestGamepad.Value;
+        }
+#endif
+        return ZInput.IsGamepadActive();
+    }
+
+    // Mod-only key down now? ZInput throw ArgumentException on a key it no can map: caller catch.
+    internal static bool KeyHeld(KeyCode key)
+    {
+#if DEBUG
+        if (TestKeyHeld.HasValue)
+        {
+            return TestKeyHeld.Value;
+        }
+#endif
+        return ZInput.GetKey(key, logWarning: false);
+    }
+
     // Turned on mid-game: list covered pieces now (world already loaded, ZNetScene.Awake long gone).
     protected override void OnActivated()
     {
         CoverageDump.RunIfWorldLoaded();
+        SelfTests.Register();
     }
 
     // Turned off: forget everything me keep. Loop state and effect swap never live outside one press anyway.
     protected override void OnDeactivated()
     {
+        SelfTests.Unregister();
         BatchFeeder.Reset();
         PendingAdds.Clear();
         HoverHint.Clear();

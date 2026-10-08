@@ -44,7 +44,13 @@ namespace MC.Combat.WeaponsDualWieldMod;
 // Me force rules only through ServerRules.TestRules, keys only through Controls.TestMainHandHeld, trails through
 // LeftTrails.TestLeftHandTrails, crossed pair through BackCross.TestEnabled: never the config. Every test give its own items, spawn its own Troll, and take all
 // back in finally (drags leave clones: me remove every item that was not there before), skills and food put back.
-internal static class SelfTests
+// More tests live in the other parts of this class (same helpers):
+//   SelfTests.Hands.cs    dual.pair, dual.swap, dual.hammer, dual.toggle
+//   SelfTests.Combat.cs   dual.moves, dual.elements, dual.stamina, dual.trees, dual.parry, dual.wounded
+//   SelfTests.World.cs    dual.places, dual.sheath, dual.others, dual.log
+//   SelfTests.Mp.cs       dual.mp.* (client joined to a dedicated server, tools/Test-Multiplayer.ps1) and their
+//                         server halves
+internal static partial class SelfTests
 {
     private const string DataName = "dual.data";
     private const string EquipName = "dual.equip";
@@ -67,6 +73,7 @@ internal static class SelfTests
         SelfTest.Register(FieldsName, RunFields);
         SelfTest.Register(VisualsName, RunVisuals);
         SelfTest.Register(BlockName, RunBlock);
+        RegisterMore();
 #endif
     }
 
@@ -82,6 +89,7 @@ internal static class SelfTests
         SelfTest.Unregister(FieldsName);
         SelfTest.Unregister(VisualsName);
         SelfTest.Unregister(BlockName);
+        UnregisterMore();
 #endif
     }
 
@@ -366,6 +374,29 @@ internal static class SelfTests
         }
 
         internal int FreeSlots => Inventory.GetEmptySlots();
+
+        // Object a test made itself (piece, tree, dropped item): TakeBack destroy it like the spawned creatures.
+        internal void Track(GameObject go)
+        {
+            if (go != null)
+            {
+                _spawned.Add(go);
+            }
+        }
+
+        // Prefab instance at a spot (piece, tree...), tracked. Null = no such prefab.
+        internal GameObject SpawnAt(string prefab, Vector3 position, Quaternion rotation)
+        {
+            var scene = ZNetScene.instance;
+            var prefabGo = scene != null ? scene.GetPrefab(prefab) : null;
+            if (prefabGo == null)
+            {
+                return null;
+            }
+            var go = UnityEngine.Object.Instantiate(prefabGo, position, rotation);
+            _spawned.Add(go);
+            return go;
+        }
 
         internal ItemDrop.ItemData Give(string prefab) => Inventory.AddItem(prefab, 1, 1, 0, 0L, "", false);
 
@@ -664,6 +695,15 @@ internal static class SelfTests
         {
             ServerRules.TestRules = null;
             Controls.TestMainHandHeld = null;
+            Controls.TestKeyHeld = null;
+            Controls.TestKeyDown = null;
+            if (Controls.TestMainKey.HasValue || Controls.TestSwapKey.HasValue)
+            {
+                Controls.TestMainKey = null;
+                Controls.TestSwapKey = null;
+                Controls.TestForgetWarned();
+                Controls.CacheKeys();
+            }
             LeftTrails.TestLeftHandTrails = null;
             Hands.TestThrowInApply = false;
             if (BackCross.TestEnabled.HasValue)
@@ -686,6 +726,9 @@ internal static class SelfTests
         private readonly Vector3 _pos;
         private readonly Quaternion _rot;
         private readonly Rigidbody _body;
+
+        // False = Hold no longer top the health up (a test that let the creature die).
+        internal bool Refill = true;
 
         internal Dummy(GameObject go, Vector3 pos, Quaternion rot, float radius, float distance, float turn,
             string blocker)
@@ -726,7 +769,7 @@ internal static class SelfTests
                 _body.linearVelocity = Vector3.zero;
                 _body.angularVelocity = Vector3.zero;
             }
-            if (Character != null && Character.GetHealth() < 50000f)
+            if (Refill && Character != null && Character.GetHealth() < 50000f)
             {
                 Character.SetHealth(100000f);
             }
@@ -827,6 +870,125 @@ internal static class SelfTests
         }
     }
 
+    // Why the game refuse an attack right now: the gates of vanilla Humanoid.StartAttack in its own order (attack
+    // running, dodge, cannot move, pushed, staggered, minor action), then no weapon, then stamina of Attack.Start.
+    // Null = nothing stand in the way. Text also say what the body do (attached, emote, ground, clips), so a failed
+    // start name its cause in the test line instead of "started False".
+    private static string AttackGate(Player p)
+    {
+        var parts = new List<string>();
+        if (p.InAttack() && !p.HaveQueuedChain())
+        {
+            parts.Add("an attack is running");
+        }
+        if (p.InDodge())
+        {
+            parts.Add("in a dodge");
+        }
+        if (!p.CanMove())
+        {
+            // Player.CanMove: teleporting, cutscene (intro, sleeping), over the carry weight with no stamina; then
+            // Character.CanMove: staggering, or the animator state carry the tag freeze or sitting.
+            parts.Add($"cannot move (teleporting {p.IsTeleporting()}, cutscene {p.InCutscene()}, sleeping {p.IsSleeping()}, "
+                      + $"over the carry weight {p.IsEncumbered()}; else the animation state is tagged freeze or sitting)");
+        }
+        if (p.IsKnockedBack())
+        {
+            parts.Add("pushed back");
+        }
+        if (p.IsStaggering())
+        {
+            parts.Add("staggering");
+        }
+        if (p.InMinorAction())
+        {
+            parts.Add("in a minor action (equip, eat or reload animation)");
+        }
+        var weapon = p.GetCurrentWeapon();
+        if (weapon == null)
+        {
+            parts.Add("no weapon");
+        }
+        else if (weapon.m_shared.m_attack != null && weapon.m_shared.m_attack.m_attackStamina > 0f
+                 && !p.HaveStamina(weapon.m_shared.m_attack.m_attackStamina + 0.1f))
+        {
+            parts.Add($"stamina {F2(p.GetStamina())} of {F2(p.GetMaxStamina())}, the attack takes up to "
+                      + F2(weapon.m_shared.m_attack.m_attackStamina));
+        }
+        if (parts.Count == 0)
+        {
+            return null;
+        }
+        return string.Join(", ", parts.ToArray()) + $"; attached {p.IsAttached()}, emote {p.InEmote()}, on the ground "
+               + $"{p.IsOnGround()}, clips {ClipsNow(p)}";
+    }
+
+    // Clips the animator play now, per layer ("0:IdleTweaked | 1:-"), and the next one while in a transition.
+    private static string ClipsNow(Player p)
+    {
+        var animator = p.m_animator;
+        if (animator == null)
+        {
+            return "?";
+        }
+        var sb = new StringBuilder();
+        for (var layer = 0; layer < animator.layerCount; layer++)
+        {
+            if (layer > 0)
+            {
+                sb.Append(" | ");
+            }
+            sb.Append(layer).Append(':').Append(ClipNames(animator.GetCurrentAnimatorClipInfo(layer)));
+            if (animator.IsInTransition(layer))
+            {
+                sb.Append('>').Append(ClipNames(animator.GetNextAnimatorClipInfo(layer)));
+            }
+        }
+        return sb.ToString();
+    }
+
+    private static string ClipNames(AnimatorClipInfo[] infos)
+    {
+        if (infos == null || infos.Length == 0)
+        {
+            return "-";
+        }
+        return string.Join("+", infos.Select(i => i.clip != null ? i.clip.name : "?").ToArray());
+    }
+
+    // Me wait: the game would start an attack now (or 'seconds' gone). Player still attached or in an emote from a
+    // step before = me end that first, as a movement key does (Player.SetControls). Result in _attackGate: null =
+    // ready, else what still refuse (AttackGate).
+    private static string _attackGate;
+
+    private static IEnumerator WaitCanAttack(Player p, float seconds = 5f)
+    {
+        var until = Time.time + seconds;
+        if (p.IsAttached() || p.InEmote())
+        {
+            p.StopEmote();
+            p.AttachStop();
+            yield return null;
+        }
+        _attackGate = AttackGate(p);
+        while (_attackGate != null && Time.time < until)
+        {
+            yield return null;
+            _attackGate = AttackGate(p);
+        }
+    }
+
+    // End of a test that sat, lay down, ate or used another mod's item: NOTE when the player cannot attack after it
+    // (waited 'seconds' first), so the next test's failure point at the test that left it so.
+    private static IEnumerator NoteIfStuck(string test, Player p, string after, float seconds = 3f)
+    {
+        yield return WaitCanAttack(p, seconds);
+        if (_attackGate != null)
+        {
+            SelfTest.Note(test, $"left the player unable to attack after {after}: {_attackGate}");
+        }
+    }
+
     // Me wait: queued equip (hotbar path) done.
     private static IEnumerator WaitEquipped(Player p, ItemDrop.ItemData item)
     {
@@ -842,8 +1004,9 @@ internal static class SelfTests
     // Attack button the way vanilla read it: queued attack timer kept above 0 until 'count' converted swings started
     // (vanilla PlayerAttackInput start them and chain them through HaveQueuedChain), then the last one run to its end.
     // settle = false: return the moment the attack is done (next Swing can still continue the combo, 0.2 s).
+    // onFrame: called every frame while the swings run (a test sampling something the swing switches).
     private static IEnumerator Swing(Player p, Dummy dummy, int count, bool secondary, bool settle = true,
-        Action<DualSwing.HitRecord> onHit = null)
+        Action<DualSwing.HitRecord> onHit = null, Action onFrame = null)
     {
         yield return WaitIdle(p, dummy);
         var until = Time.time + 3f;
@@ -867,6 +1030,7 @@ internal static class SelfTests
             }
             Hold(dummy);
             seen = Watch(seen, onHit);
+            onFrame?.Invoke();
             yield return null;
         }
         p.m_queuedAttackTimer = 0f;
@@ -876,6 +1040,7 @@ internal static class SelfTests
         {
             Hold(dummy);
             seen = Watch(seen, onHit);
+            onFrame?.Invoke();
             yield return null;
         }
         if (!settle)
@@ -886,6 +1051,7 @@ internal static class SelfTests
         {
             Hold(dummy);
             seen = Watch(seen, onHit);
+            onFrame?.Invoke();
             yield return null;
         }
     }
@@ -1058,6 +1224,7 @@ internal static class SelfTests
         {
             ServerRules.TestRules = DualRules.Defaults;
             CheckRules(c);
+            CheckOwnRules(c);
             CheckJoin(c);
             CheckForeignMods(c);
             CheckHandTable(c);
@@ -1533,9 +1700,45 @@ internal static class SelfTests
         c.Check(ReferenceEquals(ServerRules.Pick(false, null, own), own), "single player: own rules");
     }
 
+    // Own settings -> rules, read only (a test never write the config): every setting land in its own field, and in
+    // single player the rules in force are the player's own.
+    private static void CheckOwnRules(Checks c)
+    {
+        var own = DualRules.Own();
+        c.Check(own.OffHandDamage == Plugin.OffHandDamage.Value && own.SwingStamina == Plugin.SwingStamina.Value
+                && own.SecondaryMoves == Plugin.SecondaryMoves.Value && own.HitPattern == Plugin.HitPattern.Value
+                && own.BothHandsDamage == Plugin.BothHandsDamage.Value && own.KnifePairBlock == Plugin.KnifePairBlock.Value
+                && own.PairMoves == (Plugin.PairMoves.Value ?? "").Trim()
+                && own.KnifePairMoves == (Plugin.KnifePairMoves.Value ?? "").Trim()
+                && own.ExcludedWeapons == (Plugin.ExcludedWeapons.Value ?? "").Trim(),
+            $"the player's own settings make the own rules, each setting in its own field ({own.Describe()})");
+        var net = ZNet.instance;
+        if (net != null && net.IsServer())
+        {
+            var forced = ServerRules.TestRules;
+            ServerRules.TestRules = null;
+            var current = ServerRules.Current;
+            var usingServer = ServerRules.UsingServer;
+            ServerRules.TestRules = forced;
+            c.Check(current.SameAs(own) && !usingServer,
+                $"single player (or host): the rules in force are the player's own settings ({current.Describe()})");
+        }
+    }
+
     // Join check verdicts (framework side PeerCompatible / HelloState: its own tests N07, N08).
     private static void CheckJoin(Checks c)
     {
+        // Wording of the two server log lines (TESTING.md M01, M02, M04), whoever the player and whatever the reason.
+        c.Check(PlayerCheck.RefusedText("Odin", "has the mod turned off")
+                == "Refused Odin: their game has the mod turned off. This server requires Dual Wielding on every player "
+                + "(everyone fights with the same rules). Their game shows \"Incompatible version\". To let such players in, "
+                + "set AllowPlayersWithoutMod = true.",
+            $"server log line of a refusal ('{PlayerCheck.RefusedText("Odin", "has the mod turned off")}')");
+        c.Check(PlayerCheck.AllowedText("Odin", "does not have the mod")
+                == "Odin plays without Dual Wielding: their game does not have the mod. AllowPlayersWithoutMod is on, so they "
+                + "may play, without this mod's rules (with another dual wield mod installed they may still dual wield, by "
+                + "that mod's rules).",
+            $"server log line for a player let in without the mod ('{PlayerCheck.AllowedText("Odin", "does not have the mod")}')");
         c.Check(PlayerCheck.Decide(true, true, true, false, true, false) == JoinVerdict.Compatible,
             "compatible player allowed");
         c.Check(PlayerCheck.Decide(true, true, true, false, false, false) == JoinVerdict.Refuse,
@@ -1715,6 +1918,13 @@ internal static class SelfTests
             yield return null;
             c.Check(Holds(player, butcher, null), $"KnifeButcher next to one knife: replaces it ({HandsText(player)})");
             Invariant(c, player, "butcher knife");
+            bench.Empty();
+            player.EquipItem(sword);
+            player.EquipItem(butcher);
+            yield return null;
+            c.Check(Holds(player, butcher, null) && !sword.m_equipped && !Hands.IsMarked(butcher),
+                $"KnifeButcher next to a lone sword: replaces it, never in the off hand ({HandsText(player)})");
+            Invariant(c, player, "butcher knife and sword");
 
             // T04: swap = vanilla equip of the off-hand weapon through vanilla's queue (design 2.3, D22).
             // Reference first: a vanilla hotbar equip of a weapon (the mace pairs into the off hand), sampled like the
@@ -2736,6 +2946,26 @@ internal static class SelfTests
                     + $"and the multi-object split (got {F2(ratio)})");
             }
 
+            // T11: off-hand hit of the second swing = half the main-hand hit of the first swing; both hits of the fourth
+            // swing doubled (vanilla double every hit of the last chain step).
+            var firstMain = DamageOf(SwingIndex(from, "dualaxes0"), 0, Hand.Main);
+            var secondOff = DamageOf(SwingIndex(from, "dualaxes1"), 0, Hand.Off);
+            var lastMain = DamageOf(SwingIndex(from, "dualaxes3"), 0, Hand.Main);
+            var lastOff = DamageOf(SwingIndex(from, "dualaxes3"), 1, Hand.Off);
+            var stepRatio = BaseRatio(secondOff, firstMain);
+            SelfTest.Note(DamageName, $"dualaxes0 main-hand hit {DamageText(firstMain)}, dualaxes1 off-hand hit "
+                                      + $"{DamageText(secondOff)}, ratio {F2(stepRatio)}; dualaxes3 main-hand hit "
+                                      + $"{DamageText(lastMain)}, off-hand hit {DamageText(lastOff)}");
+            c.Check(Rolled(firstMain) && Rolled(secondOff) && Mathf.Abs(stepRatio - 0.5f) <= RatioTolerance,
+                "the second swing's off-hand hit / the first swing's main-hand hit 0.50 with OffHandDamage 50, without "
+                + $"the random skill factor and the multi-object split (got {F2(stepRatio)})");
+            var lastMainRatio = BaseRatio(lastMain, firstMain);
+            var lastOffRatio = BaseRatio(lastOff, secondOff);
+            c.Check(Rolled(lastMain) && Rolled(lastOff) && Mathf.Abs(lastMainRatio - 2f) <= 2f * RatioTolerance
+                    && Mathf.Abs(lastOffRatio - 2f) <= 2f * RatioTolerance,
+                "both hits of the fourth swing are doubled: main-hand hit / the first swing's 2.00, off-hand hit / the "
+                + $"second swing's 2.00 (got {F2(lastMainRatio)} and {F2(lastOffRatio)})");
+
             // BothHandsDamage 100 against 50 on the special: each hand hit about half.
             ServerRules.TestRules = Rules(both: 100);
             yield return new WaitForSeconds(0.3f);
@@ -2793,6 +3023,34 @@ internal static class SelfTests
                 $"both-hands events: the off-hand half clears no snow, the main-hand half as the weapon ({shovel}), "
                 + "the clone has the weapon's value again after");
             c.Check(Approx(player.m_attackMissAdrenaline, missAdrenaline), "the player's miss adrenaline is back after the events");
+
+            // T27: BothHandsDamage 100 (OffHandDamage 100): each of the two numbers of a both-hands hit is as large as
+            // a normal hit of that weapon at the same combo step (default rules: Alternate, off hand 100).
+            ServerRules.TestRules = Rules();
+            yield return new WaitForSeconds(0.5f);
+            var plain = DualSwing.Swings.Count;
+            yield return Swing(player, dummy, 2, false);
+            ServerRules.TestRules = Rules(pattern: HitPatternMode.BothHands, both: 100);
+            yield return new WaitForSeconds(0.5f);
+            var strong = DualSwing.Swings.Count;
+            yield return Swing(player, dummy, 2, false);
+            CheckSwings(c, plain, "normal hits, then both-hands hits at 100%", "dualaxes0:0M", "dualaxes1:0O",
+                "dualaxes0:0M,0O", "dualaxes1:0M,0O");
+            var normalMain = DamageOf(plain, 0, Hand.Main);
+            var normalOff = DamageOf(plain + 1, 0, Hand.Off);
+            var strongMain = DamageOf(strong, 0, Hand.Main);
+            var strongOff = DamageOf(strong + 1, 0, Hand.Off);
+            var strongMainRatio = BaseRatio(strongMain, normalMain);
+            var strongOffRatio = BaseRatio(strongOff, normalOff);
+            SelfTest.Note(DamageName, $"BothHandsDamage 100: main-hand number {DamageText(strongMain)} against a normal "
+                                      + $"main-hand hit {DamageText(normalMain)}; off-hand number {DamageText(strongOff)} "
+                                      + $"against a normal off-hand hit {DamageText(normalOff)}");
+            c.Check(Rolled(normalMain) && Rolled(normalOff) && Rolled(strongMain) && Rolled(strongOff)
+                    && Mathf.Abs(strongMainRatio - 1f) <= RatioTolerance && Mathf.Abs(strongOffRatio - 1f) <= RatioTolerance,
+                "BothHandsDamage 100: each number of a both-hands hit is as large as a normal hit of that weapon at the "
+                + $"same combo step (main hand {F2(strongMainRatio)}, off hand {F2(strongOffRatio)}, 1.00 expected)");
+            ServerRules.TestRules = Rules(pattern: HitPatternMode.BothHands);
+            yield return new WaitForSeconds(0.3f);
             // A missed both-hands swing (facing away): NOTE the adrenaline.
             Face(player, -Forward(player));
             yield return new WaitForSeconds(0.6f);
@@ -3193,6 +3451,9 @@ internal static class SelfTests
         }
     }
 
+    // Test the sheath helpers below report under (NOTE lines, screenshots): dual.visuals, or dual.sheath while it runs.
+    private static string _visName = VisualsName;
+
     // Hide a back pair (R path), check the X a couple of frames later (vanilla rebuild the back items in its next
     // visual update), NOTE what BackCross did, screenshot from behind once the draw animation settled, then one from
     // the right side (an X standing off the back shows edge-on from behind).
@@ -3204,14 +3465,14 @@ internal static class SelfTests
         yield return null;
         yield return null;
         CheckCrossed(c, vis, joint, what, swordReference);
-        SelfTest.Note(VisualsName, $"{what} sheathed: {BackCross.LastRecord ?? "nothing crossed"}");
+        SelfTest.Note(_visName, $"{what} sheathed: {BackCross.LastRecord ?? "nothing crossed"}");
         yield return new WaitForSeconds(0.8f);
         // Stance change over (armed idle to unarmed idle: the joint leaned since the rebuild frame): still level.
         CheckSymmetric(c, vis, $"{what}, 0.8 s later");
-        SelfTest.Note(VisualsName, $"{what}: Level turned the X by {BackCross.LastLevelTotal.ToString("0.0", CultureInfo.InvariantCulture)} "
+        SelfTest.Note(_visName, $"{what}: Level turned the X by {BackCross.LastLevelTotal.ToString("0.0", CultureInfo.InvariantCulture)} "
                                    + $"degrees in all since it crossed (biggest single turn "
                                    + $"{BackCross.LastLevelMax.ToString("0.0", CultureInfo.InvariantCulture)} degrees)");
-        SelfTest.Screenshot(VisualsName, shot);
+        SelfTest.Screenshot(_visName, shot);
         yield return null;
         yield return null;
         yield return SideShot(p, shot + "-side");
@@ -3233,14 +3494,14 @@ internal static class SelfTests
         c.Check(BackCross.LastPlaneFromBind,
             $"{what}: mirror plane taken from the body's bind pose (not from this frame's pose)");
         CheckHips(c, vis, what, sameKnife);
-        SelfTest.Note(VisualsName, $"{what} sheathed: {BackCross.LastRecord ?? "nothing done"}");
+        SelfTest.Note(_visName, $"{what} sheathed: {BackCross.LastRecord ?? "nothing done"}");
         yield return new WaitForSeconds(0.8f);
         CheckHips(c, vis, $"{what}, 0.8 s later", sameKnife);
         if (shot == null)
         {
             yield break;
         }
-        SelfTest.Screenshot(VisualsName, shot);
+        SelfTest.Screenshot(_visName, shot);
         yield return null;
         yield return null;
         yield return SideShot(p, shot + "-side");
@@ -3300,7 +3561,7 @@ internal static class SelfTests
         }
         var pose = rig.Measure();
         CheckHipsPose(c, what, pose, rig);
-        SelfTest.Note(VisualsName, $"{what}: {PoseText(pose, rig)}");
+        SelfTest.Note(_visName, $"{what}: {PoseText(pose, rig)}");
         if (!sameKnife)
         {
             return;
@@ -3320,7 +3581,7 @@ internal static class SelfTests
         var rl = root.InverseTransformDirection(r.rotation * rs.Long);
         var ll = root.InverseTransformDirection(l.rotation * ls.Long);
         var bodyTurn = Vector3.Angle(ll, new Vector3(-rl.x, rl.y, rl.z));
-        SelfTest.Note(VisualsName, $"{what}: about the body's centre plane (no check: the pair rides the pelvis, "
+        SelfTest.Note(_visName, $"{what}: about the body's centre plane (no check: the pair rides the pelvis, "
                                    + $"{Deg(pose.TwistMax)} degrees from it here) the off-hand knife is {Cm(bodyGap)} cm "
                                    + $"and {Deg(bodyTurn)} degrees from the main knife's mirror image");
     }
@@ -3612,11 +3873,11 @@ internal static class SelfTests
                     if (!shotTaken && Time.time - start >= GaitWarmup + GaitSample * 0.5f)
                     {
                         shotTaken = true;
-                        SelfTest.Screenshot(VisualsName, $"{shot}-{GaitNames[g]}");
+                        SelfTest.Screenshot(_visName, $"{shot}-{GaitNames[g]}");
                     }
                 }
                 var gait = $"{what}, {GaitNames[g]}";
-                SelfTest.Note(VisualsName, $"{gait}: forward speed up to {F2(top)} m/s (the player's {GaitNames[g]} "
+                SelfTest.Note(_visName, $"{gait}: forward speed up to {F2(top)} m/s (the player's {GaitNames[g]} "
                                            + $"speed {F2(speeds[g])} m/s, sprinting seen {running}); {PoseText(least, rig)}");
                 c.Check(top >= GaitSpeedPart * speeds[g] && running == sprint,
                     $"{gait}: the gait played (forward speed up to {F2(top)} m/s, at least {F2(GaitSpeedPart * speeds[g])}; "
@@ -3676,7 +3937,7 @@ internal static class SelfTests
         yield return null;
         c.Check(BackCross.LastLayout == BackCross.Layout.Apart,
             $"{what}: seen by the SetBackEquipped patch and left apart (layout {BackCross.LastLayout})");
-        SelfTest.Note(VisualsName, $"{what} sheathed: {BackCross.LastRecord ?? "nothing done"}");
+        SelfTest.Note(_visName, $"{what} sheathed: {BackCross.LastRecord ?? "nothing done"}");
         CheckVanillaPose(c, vis, vis.m_rightBackItemInstance, vis.m_currentRightBackItemHash, mainJoint,
             $"{what}: main-hand weapon");
         CheckVanillaPose(c, vis, vis.m_leftBackItemInstance, vis.m_currentLeftBackItemHash, offJoint,
@@ -3690,7 +3951,7 @@ internal static class SelfTests
         {
             yield break;
         }
-        SelfTest.Screenshot(VisualsName, shot);
+        SelfTest.Screenshot(_visName, shot);
         yield return null;
         yield return null;
         yield return SideShot(p, shot + "-side");
@@ -3733,7 +3994,7 @@ internal static class SelfTests
         {
             p.m_eye.rotation = eye;
         }
-        SelfTest.Screenshot(VisualsName, shot);
+        SelfTest.Screenshot(_visName, shot);
         yield return null;
         p.transform.rotation = rotation;
         if (p.m_body != null)
@@ -3794,7 +4055,7 @@ internal static class SelfTests
                 $"{what}: the X lies along the body (plane normal {F2(Mathf.Abs(facing))} along the outward direction, "
                 + "at least 0.70 wanted)");
             var local = root.InverseTransformDirection(facing < 0f ? -normal : normal);
-            SelfTest.Note(VisualsName, $"{what}: X plane normal (outward) relative to the player: right {F2(local.x)}, "
+            SelfTest.Note(_visName, $"{what}: X plane normal (outward) relative to the player: right {F2(local.x)}, "
                                        + $"back {F2(-local.z)}, up {F2(local.y)}");
         }
         c.Check(BackCross.LastLayout == BackCross.Layout.Crossed,
@@ -3910,7 +4171,7 @@ internal static class SelfTests
             sb.Append(pair.Key).Append(" on ").Append(pair.Value.Count).Append(" (")
                 .Append(string.Join(", ", pair.Value.ToArray())).Append("); ");
         }
-        SelfTest.Note(VisualsName, sb.ToString());
+        SelfTest.Note(_visName, sb.ToString());
     }
 
     // ---------- dual.block ----------

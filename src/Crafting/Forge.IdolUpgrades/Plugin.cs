@@ -38,6 +38,8 @@ internal sealed partial class Plugin : ModPlugin
     protected override void BindConfig()
     {
         IconInlineGuard.Apply();
+        // Debug build only: log watch and the self tests that must run while me inactive (server without me).
+        SelfTests.RegisterAlways();
 
         AllowPlayersWithoutMod = Config.Bind("General", "AllowPlayersWithoutMod", false, new ConfigDescription(
             "Used only by the server (or the host). Off (default): a player whose game does not have this mod, has a "

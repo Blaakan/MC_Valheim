@@ -66,6 +66,18 @@ internal static class ServerSettings
 
     internal static bool PushPending => _pushPending;
 
+#if DEBUG
+    // Debug build only: self test put server numbers of an OLDER session in memory (what a game has after it left a
+    // server), to prove single player still use own config. Forget() clean it.
+    internal static void TestKeepOldServerNumbers(in RuleSettings rule, float farmerRange)
+    {
+        _haveServer = true;
+        _serverRule = rule;
+        _serverRange = farmerRange;
+        _serverSession = null;
+    }
+#endif
+
     // ---------- pure part (self test hammer it) ----------
 
     // "1|c0|c100|cw|range|maxStars". "R" = float come back bit-exact.

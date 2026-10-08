@@ -68,6 +68,46 @@ internal static class ServerRules
             }
         }
     }
+
+    private static bool _testHold;
+
+    // Multiplayer self test, server side: while set, server keep its rules to itself (no answer to a request, no
+    // push), so a client really wait for them. Cleared = rules pushed to every compatible player at once.
+    internal static bool TestHoldAnswers
+    {
+        get => _testHold;
+        set
+        {
+            if (_testHold == value)
+            {
+                return;
+            }
+            _testHold = value;
+            if (!value && _active)
+            {
+                _pushPending = true;
+                _changedAt = float.NegativeInfinity;
+            }
+        }
+    }
+
+    // Multiplayer self test, client side: like a fresh connection, forget the server's rules and ask for them again.
+    // False = not a client with a server connection.
+    internal static bool TestForgetAndAsk()
+    {
+        var net = ZNet.instance;
+        var server = net != null && !net.IsServer() ? net.GetServerPeer() : null;
+        if (!_active || server == null || server.m_rpc == null)
+        {
+            return false;
+        }
+        Forget();
+        Request(server.m_rpc);
+        return true;
+    }
+
+    // Multiplayer self test, server side: rules this server send (its own settings).
+    internal static string TestOwnDescription => OwnRules.Describe();
 #endif
 
     // Rules in force. Read per frame while the spyglass is up: cached objects, few compares.
@@ -200,6 +240,12 @@ internal static class ServerRules
             _pushPending = false;
             return;
         }
+#if DEBUG
+        if (_testHold)
+        {
+            return;
+        }
+#endif
         if (!Settled(Time.unscaledTime, _changedAt))
         {
             return;
@@ -260,6 +306,12 @@ internal static class ServerRules
             {
                 return;
             }
+#if DEBUG
+            if (_testHold)
+            {
+                return;
+            }
+#endif
             if (layout != SpyglassRules.Layout)
             {
                 // Other layout = other network version: join check handle that player, our package would not read.

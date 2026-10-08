@@ -48,6 +48,23 @@ internal static class Brace
     // Braced clone on the local player now (self tests), null = none.
     internal static SE_Stats Clone => _clone;
 
+#if DEBUG
+    // Self tests only: the last hit OnIncomingHit saw on the bearer (tower in hand) and what me decided, and how many
+    // hits so far. Never reset: test read the count before and after.
+    internal struct DebugHit
+    {
+        internal int Count;
+        internal Character Attacker;
+        internal HitData.HitType Type;
+        internal bool Braced;
+        internal bool Holds;
+        internal bool WasBlockable;
+        internal bool MadeBlockable;
+    }
+
+    internal static DebugHit DebugLast;
+#endif
+
     internal static HitScope SaveScope() => _scope;
 
     internal static void RestoreScope(HitScope scope) => _scope = scope;
@@ -112,6 +129,15 @@ internal static class Brace
         {
             clone.m_staggerModifier = holds ? StaggerModifier(player, clone, rules) : 0f;
         }
+#if DEBUG
+        DebugLast.Count++;
+        DebugLast.Attacker = hit.GetAttacker();
+        DebugLast.Type = hit.m_hitType;
+        DebugLast.Braced = braced;
+        DebugLast.Holds = holds;
+        DebugLast.WasBlockable = hit.m_blockable;
+        DebugLast.MadeBlockable = false;
+#endif
         // (a) Frontal attack hit the game mark unblockable, from a hostile attacker: blockable while braced. Cheapest
         // checks first; attacker lookup last.
         if (!rules.BlockUnblockableAttacks || hit.m_blockable
@@ -129,6 +155,9 @@ internal static class Brace
         if (IsHostile(hit.GetAttacker(), player, hit))
         {
             hit.m_blockable = true;
+#if DEBUG
+            DebugLast.MadeBlockable = true;
+#endif
         }
     }
 

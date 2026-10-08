@@ -101,7 +101,82 @@ internal sealed class DHConfig
     private readonly Dictionary<string, int> _nextOrder = new Dictionary<string, int>();
 
     // Quads per tile edge. Capped so tile stay under 65k vertex limit of 16-bit index mesh.
-    public int TileWidth => Mathf.Clamp(Mathf.RoundToInt(BaseTileSize.Value / BaseVertexSpacing.Value), 8, 250);
+    public int TileWidth => Mathf.Clamp(Mathf.RoundToInt(BaseTileSize.Value / V(BaseVertexSpacing)), 8, 250);
+
+    // One read point for settings a self test may force. Release: plain setting value. Debug: value a self test put
+    // in memory win (never saved: config file never touched).
+    internal T V<T>(ConfigEntry<T> entry)
+    {
+#if DEBUG
+        if (_testValues.Count > 0 && _testValues.TryGetValue(entry, out var forced))
+        {
+            return (T)forced;
+        }
+#endif
+        return entry.Value;
+    }
+
+#if DEBUG
+    private readonly Dictionary<ConfigEntryBase, object> _testValues = new Dictionary<ConfigEntryBase, object>();
+
+    // Self test: setting read as this value from now (through V), handlers told like after a real change. Nothing saved.
+    internal void SetForTest<T>(ConfigEntry<T> entry, T value)
+    {
+        _testValues[entry] = value;
+        OnSettingChanged(File, new SettingChangedEventArgs(entry));
+    }
+
+    // Self test: setting read from config again.
+    internal void ClearForTest(ConfigEntryBase entry)
+    {
+        if (_testValues.Remove(entry))
+        {
+            OnSettingChanged(File, new SettingChangedEventArgs(entry));
+        }
+    }
+
+    internal void ClearAllForTest()
+    {
+        if (_testValues.Count == 0)
+        {
+            return;
+        }
+        var entries = new List<ConfigEntryBase>(_testValues.Keys);
+        _testValues.Clear();
+        foreach (var entry in entries)
+        {
+            OnSettingChanged(File, new SettingChangedEventArgs(entry));
+        }
+    }
+
+    internal int TestForcedCount => _testValues.Count;
+
+    // How many listen to Changed now (managers hook on enable, unhook on disable).
+    internal int TestHandlerCount => Changed != null ? Changed.GetInvocationList().Length : 0;
+
+    // Config file really call OnSettingChanged on a real change? Null = BepInEx keep its event somewhere me cannot read.
+    internal bool? TestListensToFile()
+    {
+        var field = typeof(ConfigFile).GetField(nameof(ConfigFile.SettingChanged),
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        if (field == null)
+        {
+            return null;
+        }
+        if (!(field.GetValue(File) is Delegate handlers))
+        {
+            return false;
+        }
+        foreach (var d in handlers.GetInvocationList())
+        {
+            if (ReferenceEquals(d.Target, this) && d.Method.Name == nameof(OnSettingChanged))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+#endif
 
     // Vertex spacing really used on finest level (not same as BaseVertexSpacing when TileWidth get clamped).
     public float EffectiveVertexSpacing => BaseTileSize.Value / TileWidth;

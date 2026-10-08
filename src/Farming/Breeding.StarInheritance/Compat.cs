@@ -15,6 +15,12 @@ internal static class Compat
     private static bool _detected;
     private static bool _starLevelSystem;
 
+#if DEBUG
+    // Debug build only: self test say "Star Level System here" (or not) without the real mod. Null = look for real.
+    // Count at next Detect: caller call Reset after set and after clear.
+    internal static bool? TestStarLevelSystem;
+#endif
+
     internal static bool StarLevelSystemLoaded
     {
         get
@@ -38,6 +44,12 @@ internal static class Compat
     {
         _detected = true;
         _starLevelSystem = Chainloader.PluginInfos.ContainsKey(StarLevelSystemGuid);
+#if DEBUG
+        if (TestStarLevelSystem.HasValue)
+        {
+            _starLevelSystem = TestStarLevelSystem.Value;
+        }
+#endif
         if (_starLevelSystem)
         {
             Log.Info("Star Level System is installed: it decides breeding levels, so Breeding Star Inheritance leaves births to it.");

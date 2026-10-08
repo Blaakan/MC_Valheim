@@ -211,7 +211,7 @@ internal static class MiniGameHud
                 }
             }
             // Hint by device (pad: Start opens the menu, which stops) and instrument (tambourine: no octave).
-            var pad = ZInput.IsGamepadActive() ? 1 : 0;
+            var pad = PadInput.Active ? 1 : 0;
             if (pad != _freeHintPad)
             {
                 _freeHintPad = pad;
@@ -440,7 +440,7 @@ internal static class MiniGameHud
             }
         }
         // Way out named for the device in use (pad: Start opens the menu, which ends the run).
-        var pad = ZInput.IsGamepadActive() ? 1 : 0;
+        var pad = PadInput.Active ? 1 : 0;
         if (pad != _hintPadShown)
         {
             _hintPadShown = pad;
@@ -788,6 +788,109 @@ internal static class MiniGameHud
     internal static string AutoText => _autoLine != null ? _autoLine.text : null;
 
     internal static string JudgementText => _judgement != null ? _judgement.text : null;
+
+    internal static bool Built => _root != null;
+
+    // Our canvas draws (own canvas: the game's "hide HUD" must not switch it off).
+    internal static bool CanvasOn => _root != null && _root.activeInHierarchy && _canvas != null && _canvas.enabled;
+
+    // Judgement and Encore banner as seen now: text, or "" while faded out (or the rhythm game view is not up).
+    internal static string JudgementShown => MiniShown && _judgement != null && _judgementAlpha > 0.01f ? _judgement.text : "";
+
+    internal static string EncoreShown => MiniShown && _encore != null && _encoreAlpha > 0.01f ? _encore.text : "";
+
+    // Countdown number shown now ("" = none).
+    internal static string CountdownShown =>
+        MiniShown && _countdown != null && _countdown.gameObject.activeSelf ? _countdown.text : "";
+
+    internal static string TitleText => _title != null ? _title.text : null;
+
+    internal static string AccuracyText => _accuracy != null ? _accuracy.text : null;
+
+    internal static string MeterStateText => _meterState != null ? _meterState.text : null;
+
+    internal static Color MeterStateColor => _meterState != null ? _meterState.color : Color.clear;
+
+    internal static string HintText => _hint != null ? _hint.text : null;
+
+    internal static string AutoHintText => _autoHint != null ? _autoHint.text : null;
+
+    internal static string FreeHintText => _freeHint != null ? _freeHint.text : null;
+
+    internal static string LaneCaption(int lane) => lane >= 0 && lane < Chart.Lanes && Keys[lane] != null ? Keys[lane].text : null;
+
+    // Tambourine hit name over a lane ("" = not shown).
+    internal static string LaneHitName(int lane) =>
+        lane >= 0 && lane < Chart.Lanes && HitNames[lane] != null && HitNames[lane].gameObject.activeSelf ? HitNames[lane].text : "";
+
+    // Piano of the free play view: key boxes built (white, black), texts and state of one key.
+    internal static int FreeBoxCount(bool black)
+    {
+        var n = 0;
+        for (var key = 0; key < FreeKeys; key++)
+        {
+            if (FreeBoxes[key] != null && FreePlayMap.IsBlack(key) == black)
+            {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    internal static string FreeKeyLabel(int key) => key >= 0 && key < FreeKeys && FreeKeyText[key] != null ? FreeKeyText[key].text : null;
+
+    // Note name on a white key (null = black key: no note text).
+    internal static string FreeNoteLabel(int key) => key >= 0 && key < FreeKeys && FreeNoteText[key] != null ? FreeNoteText[key].text : null;
+
+    internal static bool FreeKeyLit(int key) => key >= 0 && key < FreeKeys && FreeLit[key];
+
+    // Key drawn greyed (plays nothing on this instrument).
+    internal static bool FreeKeyGreyed(int key)
+    {
+        if (key < 0 || key >= FreeKeys || FreeBoxes[key] == null)
+        {
+            return false;
+        }
+        var c = FreeBoxes[key].color;
+        return c == (FreePlayMap.IsBlack(key) ? BlackUnused : WhiteUnused);
+    }
+
+    // Left edge and centre (x, screen pixels) of a key box: black keys sit between the white ones.
+    internal static float FreeKeyCentreX(int key)
+    {
+        if (key < 0 || key >= FreeKeys || FreeBoxes[key] == null)
+        {
+            return float.NaN;
+        }
+        var corners = new Vector3[4];
+        FreeBoxes[key].rectTransform.GetWorldCorners(corners);
+        return (corners[0].x + corners[2].x) * 0.5f;
+    }
+
+    // Screen box (pixels, bottom-left origin) of a view: "mini" (lanes and meter), "free" (piano panel), "auto".
+    internal static Rect ScreenBox(string view)
+    {
+        RectTransform rt = null;
+        switch (view)
+        {
+            case "mini":
+                rt = _field != null ? _field.rectTransform : null;
+                break;
+            case "free":
+                rt = _free != null ? (RectTransform)_free.transform : null;
+                break;
+            case "auto":
+                rt = _auto != null ? (RectTransform)_auto.transform : null;
+                break;
+        }
+        if (rt == null)
+        {
+            return new Rect(0f, 0f, 0f, 0f);
+        }
+        var corners = new Vector3[4];
+        rt.GetWorldCorners(corners);
+        return Rect.MinMaxRect(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+    }
 
     // Short text dump: canvas, views, texts, note field size.
     internal static string DescribeLayout()

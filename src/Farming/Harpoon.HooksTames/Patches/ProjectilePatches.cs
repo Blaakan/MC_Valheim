@@ -33,6 +33,13 @@ internal static class ProjectilePatches
     {
         try
         {
+#if DEBUG
+            // Debug build only: self test play a thrower without me (vanilla answer stay).
+            if (TestSwitches.ThrowerSideOff)
+            {
+                return;
+            }
+#endif
             if (!HarpoonEffect.IsHarpoon(__instance.m_statusEffectHash))
             {
                 HarpoonEffect.ReportRemovedHookOnce(__instance, destr); // other mod eat hook? me say once

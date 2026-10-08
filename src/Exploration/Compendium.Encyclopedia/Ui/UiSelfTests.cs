@@ -17,7 +17,9 @@ namespace MC.Exploration.CompendiumEncyclopediaMod;
 
 // Debug build only (calls vanish in Release): in-world UI self tests run by the world probe (tools/Test-InWorld.ps1,
 // fresh character "MCProbe"), after the three data tests. Each ends with one PASS or FAIL line; NOTE lines give rects.
-// Settings forced in memory only (Plugin.TestDisplay, Plugin.TestSideButton), never a ConfigEntry write.
+// Settings forced in memory only (Plugin.TestDisplay, Plugin.TestSideButton), never a ConfigEntry write. "Enabled off / on"
+// below = the feature turned off and on live in memory (Plugin.SetOffForTest: same OnDeactivated / OnActivated path as
+// the Enabled setting, the .cfg never touched).
 //   compendium.ui     = opt-in side button off (default): no button, vanilla row. Raven button (onClick, as a click)
 //                       opens the Valheim Compendium with the two top tabs (Texts current), on the title line, inside
 //                       the frame, clear of title, close button, panes (screenshot). Its Encyclopedia tab opens our
@@ -44,7 +46,7 @@ namespace MC.Exploration.CompendiumEncyclopediaMod;
 //                       vanilla, ours Automatic; raven back: row and links again. "Another mod" moves a side control 3
 //                       times: twice adopted and laid out again, the third time we give up. Clean-up; opt-in off again:
 //                       vanilla row exactly.
-// Everything changed (known material, kill count, Enabled, forced settings, remembered tab) is put back in finally;
+// Everything changed (known material, kill count, the in-memory off switch, forced settings, remembered tab) is put back in finally;
 // window, vanilla dialog and inventory closed.
 internal static class UiSelfTests
 {
@@ -63,6 +65,9 @@ internal static class UiSelfTests
         SelfTest.Register(UiName, RunUi);
         SelfTest.Register(ToggleName, RunToggle);
         SelfTest.Register(SideRowName, RunSideRow);
+        // One small test per TESTING.md item (Ui/UiSelfTests.More.cs), other mods and multiplayer (Ui/UiSelfTests.Cross.cs).
+        UiMoreSelfTests.Register();
+        UiCrossSelfTests.Register();
 #endif
     }
 
@@ -73,6 +78,8 @@ internal static class UiSelfTests
         SelfTest.Unregister(UiName);
         SelfTest.Unregister(ToggleName);
         SelfTest.Unregister(SideRowName);
+        UiMoreSelfTests.Unregister();
+        UiCrossSelfTests.Unregister();
 #endif
     }
 
@@ -852,7 +859,7 @@ internal static class UiSelfTests
                 var before = Snapshot(dialog);
 
                 // b. Enabled off with it open: tabs gone at once, the dialog still open and exactly as before.
-                plugin.Enabled.Value = false;
+                Plugin.SetOffForTest(true);
                 yield return null;
                 yield return null; // Object.Destroy happen at the end of the frame
                 if (plugin.IsActive)
@@ -876,7 +883,7 @@ internal static class UiSelfTests
                 yield return null;
 
                 // c. Enabled on with it open: tabs back at once, the rest untouched.
-                plugin.Enabled.Value = true;
+                Plugin.SetOffForTest(false);
                 yield return null;
                 yield return null;
                 if (!plugin.IsActive)
@@ -920,7 +927,7 @@ internal static class UiSelfTests
                 {
                     oldWindowId = oldWindow.GetInstanceID();
                 }
-                plugin.Enabled.Value = false;
+                Plugin.SetOffForTest(true);
                 yield return null;
                 yield return null;
                 if (oldWindow != null)
@@ -939,7 +946,7 @@ internal static class UiSelfTests
 
                 // f. Enabled on: nothing shows by itself (no side button by default); the raven opens a NEW window at
                 // once (Encyclopedia still remembered: session memory survives a live toggle).
-                plugin.Enabled.Value = true;
+                Plugin.SetOffForTest(false);
                 yield return null;
                 yield return null;
                 if (SideButton.Exists)
@@ -964,9 +971,9 @@ internal static class UiSelfTests
         }
         finally
         {
-            if (!plugin.Enabled.Value)
+            if (Plugin.TestOff)
             {
-                plugin.Enabled.Value = true;
+                Plugin.SetOffForTest(false);
             }
             Plugin.TestSideButton = null;
             TopTabs.SetLastForTest(lastBefore);
@@ -1313,7 +1320,7 @@ internal static class UiSelfTests
         yield return null;
         CheckOptInButton(gui, problems, "opt-in on again");
 
-        plugin.Enabled.Value = false;
+        Plugin.SetOffForTest(true);
         yield return null;
         yield return null;
         if (SideButton.Exists || HasObject(gui, SideButton.ButtonName))
@@ -1321,7 +1328,7 @@ internal static class UiSelfTests
             problems.Add("button still there after Enabled = false (opt-in on)");
         }
         CheckRowExact(vanilla, problems, "Enabled = false with the opt-in on");
-        plugin.Enabled.Value = true;
+        Plugin.SetOffForTest(false);
         yield return null;
         CheckOptInButton(gui, problems, "Enabled = true with the opt-in on");
         SelfTest.Note(SideRowName, $"opt-in cycle done; row: {SideRow.State}");
@@ -1421,6 +1428,11 @@ internal static class UiSelfTests
         RectTransform moved = null;
         var vanillaPos = Vector2.zero;
         GameObject anchorOff = null;
+        // Third move below make the mod warn on purpose: the clean-log test must not count those lines. Two of them
+        // (design 3.15): the give-up line, and the placement check's "outside the side panel background" line when
+        // that check (a coroutine started at a Show, a few frames late) lands while our button sits after the last control.
+        IDisposable expectedWarning = null;
+        IDisposable expectedPlacement = null;
         try
         {
             var anchor = SideButton.AnchorButton;
@@ -1488,6 +1500,8 @@ internal static class UiSelfTests
             moved = pick.Rt;
             vanillaPos = pick.Pos;
             SelfTest.Note(SideRowName, $"'{moved.name}' plays the control another mod moves (vanilla position {vanillaPos:F1})");
+            expectedWarning = LogWatch.Expect(LogWatch.GaveUp);
+            expectedPlacement = LogWatch.Expect(LogWatch.OutsidePanel);
             for (var i = 1; i <= 3; i++)
             {
                 // "Another mod" moves it 3 units up, then the inventory shows again (our Show postfix).
@@ -1547,12 +1561,15 @@ internal static class UiSelfTests
             {
                 anchorOff.SetActive(true);
             }
-            plugin.Enabled.Value = false;
+            Plugin.SetOffForTest(true);
             if (moved != null)
             {
                 moved.anchoredPosition = vanillaPos;
             }
-            plugin.Enabled.Value = true;
+            // Feature off = our button gone, its late placement check end without a word: scopes close only now.
+            expectedWarning?.Dispose();
+            expectedPlacement?.Dispose();
+            Plugin.SetOffForTest(false);
         }
         yield return null;
         if (SideButton.CurrentPlacement != SideButton.Placement.Row || SideRow.GaveUp)

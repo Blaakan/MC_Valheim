@@ -77,6 +77,9 @@ internal static class Standing
         internal readonly int BossRank;
         internal readonly Dictionary<string, float> Kills = new Dictionary<string, float>();
 
+        // True = kills of the real profile (rank still forced): a real credited kill go through the whole path.
+        internal bool ProfileKills;
+
         internal Override(int bossRank)
         {
             BossRank = bossRank;
@@ -292,7 +295,10 @@ internal static class Standing
 #if DEBUG
         if (_testOverride != null)
         {
-            kills = _testOverride.Kills;
+            if (!_testOverride.ProfileKills)
+            {
+                kills = _testOverride.Kills;
+            }
             forced = _testOverride.BossRank;
         }
         else if (Plugin.ForceBossRank != null && Plugin.ForceBossRank.Value >= 0)

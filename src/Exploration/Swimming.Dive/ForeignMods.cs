@@ -48,6 +48,15 @@ internal static class ForeignMods
 
     private static readonly HashSet<string> Logged = new HashSet<string>();
 
+#if DEBUG
+    // Self test: made-up loaded plugins (guid, name) the scan see next to the real ones. Null = none. A blocking one
+    // turn me off like the real mod would (Status text, warning once), with no other dive mod installed.
+    internal static List<KeyValuePair<string, string>> TestPlugins;
+
+    // Self test: made-up plugin gone = its "logged once" mark gone too (next run of the test warn again).
+    internal static void ForgetTest(string guid) => Logged.Remove(guid);
+#endif
+
     // Pure (self test hammer it).
     internal static ForeignKind Classify(string guid, string name)
     {
@@ -86,27 +95,41 @@ internal static class ForeignMods
             {
                 continue;
             }
-            var guid = info.Metadata.GUID;
-            var name = string.IsNullOrEmpty(info.Metadata.Name) ? guid : info.Metadata.Name;
-            switch (Classify(guid, info.Metadata.Name))
+            Consider(info.Metadata.GUID, info.Metadata.Name, ref blocker);
+        }
+#if DEBUG
+        if (TestPlugins != null)
+        {
+            foreach (var fake in TestPlugins)
             {
-                case ForeignKind.Blocks:
-                    if (Logged.Add(guid))
-                    {
-                        Log.Warning($"{name} also handles diving, so {ModInfo.Name} stays off. Remove one of them. "
-                                    + $"A server that requires {ModInfo.Name} refuses this game while both are installed.");
-                    }
-                    blocker ??= name;
-                    break;
-                case ForeignKind.Composes:
-                    if (Logged.Add(guid))
-                    {
-                        Log.Info(ComposeText(guid, name));
-                    }
-                    break;
+                Consider(fake.Key, fake.Value, ref blocker);
             }
         }
+#endif
         return blocker == null ? null : $"Inactive: {blocker} also handles diving. Remove one of them.";
+    }
+
+    // One loaded plugin: first blocking one give the Status text, each known one logged once.
+    private static void Consider(string guid, string pluginName, ref string blocker)
+    {
+        var name = string.IsNullOrEmpty(pluginName) ? guid : pluginName;
+        switch (Classify(guid, pluginName))
+        {
+            case ForeignKind.Blocks:
+                if (Logged.Add(guid))
+                {
+                    Log.Warning($"{name} also handles diving, so {ModInfo.Name} stays off. Remove one of them. "
+                                + $"A server that requires {ModInfo.Name} refuses this game while both are installed.");
+                }
+                blocker ??= name;
+                break;
+            case ForeignKind.Composes:
+                if (Logged.Add(guid))
+                {
+                    Log.Info(ComposeText(guid, name));
+                }
+                break;
+        }
     }
 
     private static string ComposeText(string guid, string name)

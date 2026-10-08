@@ -47,14 +47,14 @@ internal static class BatchFeeder
     // Batch key down? Default (None) and controller = vanilla alt (Alternative placement / alt keys binding).
     internal static bool BatchKeyHeld(bool alt)
     {
-        var key = Plugin.ModifierKey.Value;
-        if (key == KeyCode.None || ZInput.IsGamepadActive() || !KeyUsable(key))
+        var key = Plugin.ReadModifierKey();
+        if (key == KeyCode.None || Plugin.GamepadActive() || !KeyUsable(key))
         {
             return alt;
         }
         try
         {
-            return ZInput.GetKey(key, logWarning: false);
+            return Plugin.KeyHeld(key);
         }
         catch (ArgumentException)
         {
@@ -70,6 +70,19 @@ internal static class BatchFeeder
     // keyboard key it no can map (F13, Hash, At...), Mouse5/6 never fire. Unusable = vanilla alt key work instead.
     private static KeyCode _checkedKey = KeyCode.None;
     private static bool _keyUsable = true;
+
+#if DEBUG
+    // Self test only: forget which key me checked last, so next check of a bad key warn again (exactly once).
+    internal static void ResetKeyCheck()
+    {
+        _checkedKey = KeyCode.None;
+        _keyUsable = true;
+    }
+
+    // Self test only: this owner uid count as another game still here. Single player has no other game, so test put a
+    // made-up owner on a station and name it here: the non-owner path then run like in multiplayer.
+    internal static long? TestConnectedOwner;
+#endif
 
     internal static bool KeyUsable(KeyCode key)
     {
@@ -161,7 +174,7 @@ internal static class BatchFeeder
             }
         }
 
-        var amount = Plugin.Amount.Value;
+        var amount = Plugin.ReadAmount();
         var room = target.Room(effective, amount);
         if (room == 0)
         {
@@ -382,6 +395,12 @@ internal static class BatchFeeder
         {
             return true;
         }
+#if DEBUG
+        if (TestConnectedOwner.HasValue && ownerId == TestConnectedOwner.Value)
+        {
+            return true;
+        }
+#endif
         if (net.IsServer())
         {
             var peer = net.GetPeer(ownerId);

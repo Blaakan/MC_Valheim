@@ -17,6 +17,11 @@ internal static class CoverageDump
 
     private static ZNetScene _doneFor;
 
+#if DEBUG
+    // Self test only: forget the world me already listed, so the next Run list it again (test read the lines).
+    internal static void ForgetScene() => _doneFor = null;
+#endif
+
     internal static void RunIfWorldLoaded()
     {
         var scene = ZNetScene.instance;

@@ -11,7 +11,7 @@ namespace MC.UX.ContainerSortMod;
 // hand-off (or open in same second other player changed it) old copy can stay. Saving old copy = dupe or lose items.
 // Me never use Inventory.AddItem/RemoveItem/MoveItemToThis: they save every call, move units one by one and can
 // refuse a slot. Me write m_gridPos / m_stack on the live items, then ONE Inventory.Changed() = one save for all.
-internal static class ContainerSorter
+internal static partial class ContainerSorter
 {
     private const CompareOptions NameOptions = CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace;
 
@@ -26,6 +26,19 @@ internal static class ContainerSorter
     internal const string StaleMessage = "This container changed elsewhere. Close it and open it again to sort.";
 
     private static bool _warnedTooMany;
+
+    // How one Sort click ended. Only the Debug build keep it (TestHooks.cs, read by self-tests).
+    internal enum SortOutcome
+    {
+        None,
+        NotReady,
+        SplitDialog,
+        NoContainer,
+        NotOwner,
+        Ineligible,
+        Stale,
+        Done,
+    }
 
     private struct SortKey
     {
@@ -51,6 +64,11 @@ internal static class ContainerSorter
     internal static bool IsEligible(Container container) =>
         container != null && container.GetInventory() != null && container.GetComponent<TombStone>() == null;
 
+    // Debug build: self-tests read how the click ended (TestHooks.cs). Release: no body, compiler drop the calls.
+    static partial void TestNote(SortOutcome outcome);
+
+    static partial void TestDone(SortCriterion criterion, Run run);
+
     // Sort button. Same guards as vanilla Take all / Place stacks, plus ownership, fresh local copy and split dialog.
     internal static void TrySortOpenContainer()
     {
@@ -58,25 +76,30 @@ internal static class ContainerSorter
         var player = Player.m_localPlayer;
         if (gui == null || player == null || player.IsTeleporting())
         {
+            TestNote(SortOutcome.NotReady);
             return;
         }
         if (gui.m_splitDialog != null && gui.m_splitDialog.IsActive)
         {
+            TestNote(SortOutcome.SplitDialog);
             return;
         }
         var container = gui.m_currentContainer;
         if (container == null)
         {
+            TestNote(SortOutcome.NoContainer);
             return;
         }
         if (!container.IsOwner())
         {
             // Panel shown but chest owned by other client (MultiUserChest-like mod, ship owner changed): hands off.
             Log.Debug("Sort skipped: this client does not own the open container.");
+            TestNote(SortOutcome.NotOwner);
             return;
         }
         if (!IsEligible(container))
         {
+            TestNote(SortOutcome.Ineligible);
             return;
         }
         if (!LocalCopyCurrent(container))
@@ -85,6 +108,7 @@ internal static class ContainerSorter
             // changed it). Me never save old copy over newer data: that dupe or lose items.
             Log.Debug("Sort skipped: local copy of the container is out of date.");
             player.Message(MessageHud.MessageType.Center, StaleMessage);
+            TestNote(SortOutcome.Stale);
             return;
         }
 
@@ -92,11 +116,11 @@ internal static class ContainerSorter
         gui.SetupDragItem(null, null, 1);
 
         var inventory = container.GetInventory();
-        var criterion = Plugin.SortBy.Value;
+        var criterion = Plugin.ReadSortBy();
         var run = new Run();
         try
         {
-            Sort(inventory, criterion, Plugin.MergeStacks.Value, run);
+            Sort(inventory, criterion, Plugin.ReadMergeStacks(), run);
         }
         finally
         {
@@ -109,6 +133,7 @@ internal static class ContainerSorter
         }
         Log.Debug($"Sorted {inventory.GetName()} by {criterion}: {inventory.NrOfItems()} items, {run.Moved} moved, "
                   + $"{run.Merged} stacks merged{(run.Written ? "" : " (already sorted, nothing saved)")}.");
+        TestDone(criterion, run);
     }
 
     // Local items = what ZDO hold? First exact bytes (true right after any own save). Else read ZDO bytes back through

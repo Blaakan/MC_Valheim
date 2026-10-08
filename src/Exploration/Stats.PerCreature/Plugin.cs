@@ -33,6 +33,32 @@ internal sealed partial class Plugin : ModPlugin
             null, new ConfigurationManagerAttributes { Order = 90 }));
     }
 
+#if DEBUG
+    // Self test only (Debug build): display settings forced in memory, config never written. Null = read config.
+    internal static (SortOrder SortBy, bool ShowWeaponTypes)? TestDisplay;
+
+    // Self test only (Debug build): true = me say "blocked", so framework run the real off path (patches removed,
+    // OnDeactivated) without anybody writing Enabled. Test put it back to false and refresh.
+    internal static bool TestForceOff;
+
+    protected override string LocalBlocker() => TestForceOff ? "Inactive: turned off by a self test." : null;
+#endif
+
+    // One door for the display settings. Page ask each time it is built.
+    internal static void ReadDisplaySettings(out SortOrder sortBy, out bool showWeaponTypes)
+    {
+#if DEBUG
+        if (TestDisplay.HasValue)
+        {
+            sortBy = TestDisplay.Value.SortBy;
+            showWeaponTypes = TestDisplay.Value.ShowWeaponTypes;
+            return;
+        }
+#endif
+        sortBy = SortBy != null ? SortBy.Value : SortOrder.MostKilled;
+        showWeaponTypes = ShowWeaponTypes == null || ShowWeaponTypes.Value;
+    }
+
     // Me turned on mid-game: start tame counting now for this character (spawn patch missed it).
     protected override void OnActivated()
     {
@@ -41,11 +67,14 @@ internal sealed partial class Plugin : ModPlugin
         {
             CounterStore.EnsureStarted(player);
         }
+        // Debug build only: call vanish in Release.
+        SelfTests.Register();
     }
 
     // Me turned off: drop parse cache. Stored data stay on character.
     protected override void OnDeactivated()
     {
         CounterStore.ClearCache();
+        SelfTests.Unregister();
     }
 }

@@ -108,8 +108,13 @@ internal static class Eligibility
             {
                 if (Warned.Add(name))
                 {
-                    Log.Warning($"ExcludedWeapons: no item named '{name}' in this game; it is ignored. Use prefab "
-                                + "names as the spawn command does (for example AxeBronze).");
+                    var text = $"ExcludedWeapons: no item named '{name}' in this game; it is ignored. Use prefab "
+                               + "names as the spawn command does (for example AxeBronze).";
+#if DEBUG
+                    LastWarning = text;
+                    WarningCount++;
+#endif
+                    Log.Warning(text);
                 }
                 continue;
             }
@@ -144,4 +149,13 @@ internal static class Eligibility
         _db = null;
         Excluded.Clear();
     }
+
+#if DEBUG
+    // Self test read me: last unknown-name warning, and how many were logged this session.
+    internal static string LastWarning;
+    internal static int WarningCount;
+
+    // Self test: this unknown name warn again (another test already used the name up this session).
+    internal static void TestForgetWarned(string name) => Warned.Remove(name);
+#endif
 }

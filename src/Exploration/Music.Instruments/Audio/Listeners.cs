@@ -85,6 +85,36 @@ internal static class Listeners
         : 0f;
 
     internal static void ForgetEncores() => LastEncore.Clear();
+
+    // Self test: sound source of that performer's performance not let go yet (null = none heard).
+    internal static Emitter EmitterOf(ZDOID performer)
+    {
+        foreach (var r in Remotes)
+        {
+            if (r.Performer == performer && !r.Released)
+            {
+                return r.Emitter;
+            }
+        }
+        return null;
+    }
+
+    // Self test: performances not let go yet.
+    internal static int LiveCount
+    {
+        get
+        {
+            var n = 0;
+            foreach (var r in Remotes)
+            {
+                if (!r.Released)
+                {
+                    n++;
+                }
+            }
+            return n;
+        }
+    }
 #endif
 
     // Game music multiplier (1 = untouched).
@@ -456,7 +486,7 @@ internal static class Listeners
     private static void UpdateDuck(float dt)
     {
         var heard = AnyHeard || Performance.Mode != PerformanceMode.None;
-        var target = heard && Plugin.GameMusicVolume != null ? Plugin.GameMusicVolume.Value : 1f;
+        var target = (heard ? Plugin.GameMusicVolumeNow : null) ?? 1f;
         _duck = Mathf.MoveTowards(_duck, target, dt * 0.8f);
     }
 

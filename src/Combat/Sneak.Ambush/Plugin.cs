@@ -69,6 +69,15 @@ internal sealed partial class Plugin : ModPlugin
 #if DEBUG
     // Self test (sneak.guard) play "feature off" without the toggle. Never in release.
     internal static bool TestInactive { get; set; }
+
+    // Self test (sneak.toggle) turn feature REALLY off (patches removed, OnDeactivated run) and on again, without the
+    // Enabled setting: framework ask LocalBlocker at every refresh (test call FeatureRegistry.RefreshAll after change).
+    // Memory only, never in release (release has no LocalBlocker override at all).
+    internal static bool TestBlocked { get; set; }
+
+    internal const string TestBlockedText = "Inactive: turned off by a self test.";
+
+    protected override string LocalBlocker() => TestBlocked ? TestBlockedText : null;
 #endif
 
     // Feature on (patches applied) and not faked off by a self test. Always-on code (registration, throw guard, XP

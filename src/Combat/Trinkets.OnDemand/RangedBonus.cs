@@ -48,6 +48,19 @@ internal static class RangedBonus
     }
 
     internal static Record Last;
+
+    // Self test read every new bow or crossbow shot, also the x1 ones (they scale nothing, so Last never tells).
+    internal struct Shot
+    {
+        internal int Serial;
+        internal Skills.SkillType Skill;
+        internal float DrawPercentage;
+        internal float Nominal;
+        internal float SinceLast;
+        internal float Factor;
+    }
+
+    internal static Shot LastShot;
     private static float _lastNominal;
     private static float _lastSince;
     private static float _lastDraw;
@@ -115,6 +128,15 @@ internal static class RangedBonus
 #if DEBUG
             _lastNominal = nominal;
             _lastSince = since;
+            LastShot = new Shot
+            {
+                Serial = LastShot.Serial + 1,
+                Skill = skill,
+                DrawPercentage = _lastDraw,
+                Nominal = nominal,
+                SinceLast = since,
+                Factor = _factor,
+            };
 #endif
         }
         if (_factor <= 1f)

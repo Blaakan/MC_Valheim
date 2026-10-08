@@ -59,6 +59,11 @@ internal static class StarIcons
     // Normal = false: Apply throw away CPU copy, texture live only on GPU like game icon.
     internal static bool KeepReadable { get; set; }
 
+#if DEBUG
+    // Self test play "GPU copy came back empty" (game window minimized) without minimizing. Never in release.
+    internal static bool TestForceEmpty { get; set; }
+#endif
+
     // Me give icon with N star (1..3). Bad input, 0 star or any trouble = give source back. Me never throw.
     // middle = star row lower, across the icon's middle: requirement slots print the item name over the icon top.
     internal static Sprite Get(Sprite source, int stars, bool middle = false)
@@ -181,6 +186,12 @@ internal static class StarIcons
 
     private static Texture2D Compose(Sprite source, int stars, bool middle)
     {
+#if DEBUG
+        if (TestForceEmpty)
+        {
+            throw new EmptyCopyException();
+        }
+#endif
         // Me no GPU = no Blit (headless run). Me give up, caller use plain icon.
         if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
         {

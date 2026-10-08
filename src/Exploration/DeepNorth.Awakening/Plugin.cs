@@ -50,6 +50,15 @@ internal sealed partial class Plugin : ModPlugin
     // Invasions (server only, never sent).
     internal static ConfigEntry<int> InvasionsAtThirdStone;
 
+#if DEBUG
+    // Self test turn me off and on like the tick in MC Mods, never through Enabled (that write the config file): text
+    // here = framework take my patches off and show it as Status. Null = normal. Set it, then FeatureRegistry.RefreshAll().
+    // Release build has no LocalBlocker at all (base one say nothing).
+    internal static string TestBlocked { get; set; }
+
+    protected override string LocalBlocker() => TestBlocked;
+#endif
+
     protected override void BindConfig()
     {
         var d = AwakeningRules.Default;

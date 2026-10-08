@@ -122,6 +122,11 @@ internal static class CounterStore
         _cachedWritable = true;
     }
 
+#if DEBUG
+    // Self test only (Debug build): "newer format" warning may come once more, so test can count it.
+    internal static void TestResetWarnings() => _newerFormatWarned = false;
+#endif
+
     // Read stored tames of this player. Same raw string object as last time = cached result.
     private static void Parse(Player player, out string raw, out Dictionary<string, int> tames, out bool writable)
     {

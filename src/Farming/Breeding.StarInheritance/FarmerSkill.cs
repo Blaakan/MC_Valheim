@@ -24,6 +24,15 @@ internal static class FarmerSkill
         _nextPublish = 0f;
     }
 
+#if DEBUG
+    // Debug build only: self test keep breeding ticks from publishing for a while, so it can tell the spawn publish
+    // (PlayerPatches) from a tick publish. Reset() put it back.
+    internal static void HoldThrottle(float seconds)
+    {
+        _nextPublish = Time.time + seconds;
+    }
+#endif
+
     // Called from Procreate prefix (every game, every loaded breeding animal): one float compare most calls.
     internal static void PublishThrottled()
     {

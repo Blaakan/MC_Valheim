@@ -54,6 +54,25 @@ internal static partial class CompendiumWindow
 
     internal static bool HeroShowsMark => _heroMark != null && _heroMark.gameObject.activeSelf;
 
+#if DEBUG
+    /// <summary>Detail row objects (self tests click them). Only the first <see cref="DetailRowsShown"/> are shown.</summary>
+    internal static IReadOnlyList<RowView> DetailRowViews => DetailRows;
+
+    internal static int DetailRowsShown => _detailRowsUsed;
+
+    /// <summary>Text size of the detail paragraphs (self tests compare the detail rows with it). 0 = no window.</summary>
+    internal static float ParagraphFontSize => _paraTemplate != null ? _paraTemplate.fontSize : 0f;
+
+    /// <summary>Paragraph text objects shown now (self tests read their wrap mode).</summary>
+    internal static IReadOnlyList<TMP_Text> ParagraphTexts => Paras;
+
+    internal static int ParagraphsShown => _parasUsed;
+
+    internal static ScrollRect DetailScroll => _detailScroll;
+
+    internal static RectTransform DetailContent => _detailContent;
+#endif
+
     private static void SetupDetails(Scrollbar rightSb, TMP_Text textArea)
     {
         _detailViewport = _detailScroll.viewport != null ? _detailScroll.viewport : (RectTransform)_detailScroll.transform;

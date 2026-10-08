@@ -44,6 +44,12 @@ internal static class Rout
 #if DEBUG
     // Self test: use the rpc even with no peer (ZRoutedRpc then handle it here at once), so register + handler run.
     internal static bool ForceBroadcast { get; set; }
+
+    // Self test: Rout messages this game handled while on (any sender), and the last one. Server half tell the client
+    // test that its message came through the server.
+    internal static int TestReceived { get; private set; }
+    internal static Vector3 TestLastPosition { get; private set; }
+    internal static int TestLastLeader { get; private set; }
 #endif
 
     // Creatures this game applied the last rout to (sender log, self tests).
@@ -185,6 +191,11 @@ internal static class Rout
             {
                 return;
             }
+#if DEBUG
+            TestReceived++;
+            TestLastPosition = position;
+            TestLastLeader = leaderHash;
+#endif
             var applied = Apply(position, leaderHash);
             var routed = ZRoutedRpc.instance;
             if (routed != null && sender == routed.m_id)

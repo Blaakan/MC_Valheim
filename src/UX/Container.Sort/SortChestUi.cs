@@ -15,7 +15,7 @@ namespace MC.UX.ContainerSortMod;
 // Both are clones of vanilla Place stacks (same look, sound, scaling), children of its parent, so they hide with the
 // panel. Controller: View/Select = Sort, left stick click = criterion, only while the chest grid is focused.
 // Everything me make die in Destroy (feature off) and come back in Create (feature on / new InventoryGui).
-internal static class SortChestUi
+internal static partial class SortChestUi
 {
     private const string SortName = "MC_ContainerSort_Sort";
     private const string CriterionName = "MC_ContainerSort_Criterion";
@@ -217,7 +217,7 @@ internal static class SortChestUi
         {
             return;
         }
-        var criterion = Plugin.SortBy.Value;
+        var criterion = Plugin.ReadSortBy();
         SetLabel(_sort, "Sort");
         SetLabel(_criterion, CriterionLabel(criterion));
         SetTip(_sort, SortTopic, "Rearrange this container from top left to bottom right, " + CriterionWords(criterion) + ".");
@@ -309,13 +309,13 @@ internal static class SortChestUi
             {
                 return;
             }
-            var next = Plugin.SortBy.Value switch
+            var next = Plugin.ReadSortBy() switch
             {
                 SortCriterion.Name => SortCriterion.Type,
                 SortCriterion.Type => SortCriterion.Biome,
                 _ => SortCriterion.Name,
             };
-            Plugin.SortBy.Value = next; // BepInEx save the file; SettingChanged refresh texts too
+            Plugin.WriteSortBy(next); // config: BepInEx save the file; SettingChanged refresh texts too
             RefreshTexts();
         }
         catch (Exception e)
@@ -708,6 +708,10 @@ internal static class SortChestUi
 
     // ---------------------------------------------------------------- self-check
 
+    // Debug build: self-tests see how far the check of one size combination got (TestHooks.cs: 1 = row picked,
+    // 2 = all done). Release: no body, compiler drop the calls.
+    static partial void TestMark(long combo, int stage);
+
     // Runs once per new size combination, a few frames after the panel opened (layout settled). Pick row A or B
     // (first that overlap nothing), warn when none fits or buttons leave the screen, dump layout at Debug level.
     private static IEnumerator SelfCheck(InventoryGui gui, Container container, long combo, int width, int height, int rows)
@@ -753,6 +757,7 @@ internal static class SortChestUi
             yield break;
         }
         Guarded(nameof(CheckLayout), () => CheckLayout(gui, combo, width, height, rows));
+        TestMark(combo, 1);
 
         // Screen check after show animation: wait until panel stop moving (or give up).
         var lastPos = panel.position;
@@ -784,6 +789,7 @@ internal static class SortChestUi
         }
         Guarded(nameof(CheckScreen), () => CheckScreen(width, height, rows));
         Guarded(nameof(DumpLayout), () => DumpLayout(gui, width, height, rows));
+        TestMark(combo, 2);
     }
 
     // 1e-3, not 0.5: overlap tests same at any scale; only a collapsed panel lie. Small GUI scale must still check.

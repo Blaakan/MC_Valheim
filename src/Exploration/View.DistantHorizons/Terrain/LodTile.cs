@@ -62,6 +62,11 @@ internal sealed class LodTile
     public Vector3[] BaseVertices;
     public Vector3[] WorkVertices;
 
+#if DEBUG
+    // Self test: heights of the mesh now shown came from an exact build (ExactBuildData).
+    public bool BuiltFromExact;
+#endif
+
     public int FailCount;
     // Unscaled time: before it, me no retry tile after failure.
     public float RetryAfter;

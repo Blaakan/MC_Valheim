@@ -16,6 +16,10 @@ internal static class GameCameraPatches
     private static void Prefix(GameCamera __instance, out float __state)
     {
         __state = __instance.m_distance;
+#if DEBUG
+        // Self test stand-in for vanilla wheel zoom (vanilla change the distance inside UpdateCamera).
+        ScopeCamera.TestNudge(__instance);
+#endif
     }
 
     [HarmonyPostfix]

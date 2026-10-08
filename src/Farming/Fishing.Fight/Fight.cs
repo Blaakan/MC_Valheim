@@ -55,15 +55,19 @@ internal sealed class Fight
 
 #if DEBUG
     // Self test: pin the fish marker (inside the zone / far from it), force a phase and side. Null = normal.
+    // TestSide 0 with a forced struggle = phase pinned, side free: the fish pick and switch sides itself (side switch
+    // and shallow-water turn run). TestSwitchRate = side switches per second in place of the fish's own rate.
     internal static FishPin? TestPin;
     internal static FightPhase? TestPhase;
     internal static int TestSide = FightLogic.Right;
+    internal static float? TestSwitchRate;
 
     internal static void ClearTest()
     {
         TestPin = null;
         TestPhase = null;
         TestSide = FightLogic.Right;
+        TestSwitchRate = null;
     }
 #endif
 
@@ -336,7 +340,14 @@ internal sealed class Fight
             }
             if (Phase == FightPhase.Struggle)
             {
-                Side = TestSide;
+                if (TestSide != 0)
+                {
+                    Side = TestSide;
+                }
+                else
+                {
+                    UpdateSide(dt);
+                }
             }
             PhaseLeft = 999f;
             return;
@@ -356,13 +367,30 @@ internal sealed class Fight
             EnterCalm(rules, first: false);
             return;
         }
+        UpdateSide(dt);
+    }
+
+    // Fighting fish: now and then it turn to the other side (never in its first second on a side).
+    private void UpdateSide(float dt)
+    {
         _sinceSwitch += dt;
         _flipCooldown -= dt;
-        if (_sinceSwitch >= FightLogic.MinSecondsPerSide && Chance(FightLogic.SwitchRate(Profile.D01), dt))
+        if (_sinceSwitch >= FightLogic.MinSecondsPerSide && Chance(SwitchRate(), dt))
         {
             Side = -Side;
             _sinceSwitch = 0f;
         }
+    }
+
+    private float SwitchRate()
+    {
+#if DEBUG
+        if (TestSwitchRate.HasValue)
+        {
+            return TestSwitchRate.Value;
+        }
+#endif
+        return FightLogic.SwitchRate(Profile.D01);
     }
 
     private void EnterCalm(FightRules rules, bool first)
@@ -398,7 +426,8 @@ internal sealed class Fight
             return;
         }
 #if DEBUG
-        if (TestPhase.HasValue)
+        // Self test pin the side: no turn. Side free (TestSide 0): turn like in a real fight.
+        if (TestPhase.HasValue && TestSide != 0)
         {
             return;
         }

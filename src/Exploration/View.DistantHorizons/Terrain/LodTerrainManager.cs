@@ -259,7 +259,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
         if (cam == null) return;
         Vector3 camPos = cam.transform.position;
 
-        _boost = ViewBoost.Read(cfg.SpyglassDetail.Value, cfg.SpyglassMaxBoost.Value);
+        _boost = ViewBoost.Read(cfg.V(cfg.SpyglassDetail), cfg.V(cfg.SpyglassMaxBoost));
         if (ViewBoost.Poll(ref _boostApplied, _boost, Time.unscaledTime)) _dirty = true;
 
         _updateTimer += Time.deltaTime;
@@ -310,8 +310,8 @@ internal sealed class LodTerrainManager : MonoBehaviour
     {
         _loggedLayoutKey = int.MinValue;
         DHConfig c = Cfg;
-        if (c != null && Mathf.Abs(c.EffectiveVertexSpacing - c.BaseVertexSpacing.Value) > 0.01f * c.BaseVertexSpacing.Value)
-            Log.Warning($"BaseVertexSpacing {c.BaseVertexSpacing.Value} m is not reachable with BaseTileSize {c.BaseTileSize.Value} m (tiles are limited to 8..250 quads per edge); using {c.EffectiveVertexSpacing:0.##} m.");
+        if (c != null && Mathf.Abs(c.EffectiveVertexSpacing - c.V(c.BaseVertexSpacing)) > 0.01f * c.V(c.BaseVertexSpacing))
+            Log.Warning($"BaseVertexSpacing {c.V(c.BaseVertexSpacing)} m is not reachable with BaseTileSize {c.BaseTileSize.Value} m (tiles are limited to 8..250 quads per edge); using {c.EffectiveVertexSpacing:0.##} m.");
     }
 
     private float TileSize(int level) => Cfg.BaseTileSize.Value * (1 << level);
@@ -321,7 +321,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
     // than 8x8 grid (that = thousands of tiles).
     private void RecomputeLayout()
     {
-        float r = Cfg.WorldRadius.Value;
+        float r = Cfg.V(Cfg.WorldRadius);
         float b = Cfg.BaseTileSize.Value;
         int configured = Cfg.LodLevels.Value - 1;
 
@@ -369,7 +369,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
     private bool InWorld(TileKey key)
     {
         GetBounds(key, out float minX, out float minZ, out float maxX, out float maxZ);
-        return AabbDist(0f, 0f, minX, minZ, maxX, maxZ) <= Cfg.WorldRadius.Value;
+        return AabbDist(0f, 0f, minX, minZ, maxX, maxZ) <= Cfg.V(Cfg.WorldRadius);
     }
 
     // ------------------------------------------------------------------ desired set
@@ -383,7 +383,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
         _desired.Clear();
 
         float rootSize = TileSize(_rootLevel);
-        float r = Cfg.WorldRadius.Value;
+        float r = Cfg.V(Cfg.WorldRadius);
         int min = Mathf.FloorToInt(-r / rootSize);
         int max = Mathf.CeilToInt(r / rootSize) - 1;
         for (int y = min; y <= max; y++)
@@ -410,7 +410,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
             // Spyglass up: node in the looked-at direction count as boost times nearer (split finer).
             float boost = _boost.Factor(camPos, minX, minZ, maxX, maxZ);
             // ViewDistance limit refinement only: far node stay one coarse tile, never hole.
-            split = cheb < Cfg.SplitFactor.Value * h * size * boost && dist <= Cfg.ViewDistance.Value * h;
+            split = cheb < Cfg.SplitFactor.Value * h * size * boost && dist <= Cfg.V(Cfg.ViewDistance) * h;
         }
 
         if (split)
@@ -479,6 +479,9 @@ internal sealed class LodTerrainManager : MonoBehaviour
         {
             LodTile t = _inFlight[i];
             if (t.State != TileState.Requested) continue;
+#if DEBUG
+            if (TestEvictExact && t.Exact && TestEvict(builder, t, wg)) TestEvictExact = false;
+#endif
             HeightmapBuilder.HMBuildData data = builder.RequestTerrain(t.Center, t.Width, t.Scale, true, wg);
             if (data != null)
             {
@@ -585,6 +588,10 @@ internal sealed class LodTerrainManager : MonoBehaviour
             return;
         }
 
+#if DEBUG
+        t.BuiltFromExact = t.BuildData is ExactBuildData;
+        if (t.Exact && !t.BuiltFromExact) TestExactFromPlain++;
+#endif
         t.BuildData = null;
         t.Go = go;
         t.Heightmap = hm;
@@ -1096,7 +1103,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
         }
 
         // Real zones beyond fade: me draw them, not their renderers.
-        if (Cfg.RealTerrainFadeFix.Value && !NoRealCopies) CollectRealZoneCopies(c);
+        if (Cfg.V(Cfg.RealTerrainFadeFix) && !NoRealCopies) CollectRealZoneCopies(c);
         else if (_realRenderersOff) RestoreRealRenderers();
 
         // Emit, grouped by shrink factor (largest first), so matrices change as rarely as possible.
@@ -1288,7 +1295,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
         return m;
     }
 
-    internal bool RealFadeFixActive => enabled && ShrinkMode && Cfg != null && Cfg.RealTerrainFadeFix.Value && !_vanillaCompare;
+    internal bool RealFadeFixActive => enabled && ShrinkMode && Cfg != null && Cfg.V(Cfg.RealTerrainFadeFix) && !_vanillaCompare;
 
     // Me give every real zone its renderer back.
     private void RestoreRealRenderers()
@@ -2270,6 +2277,258 @@ internal sealed class LodTerrainManager : MonoBehaviour
             if (c.magnitude >= minDistance && Vector2.Angle(forward, c) <= halfAngle) n++;
         }
         return n;
+    }
+
+    // ------------------------------------------------------------------ self test windows (Debug build only)
+
+    // What last camera render drew: far tiles, real-zone copies, far sea bands.
+    internal int TestTileDraws => _cmdDrawsLastFrame;
+    internal int TestRealDraws => _cmdRealDrawsLastFrame;
+    internal int TestSeaDraws => _waterDrawsLastFrame;
+    // Far plane the game had before me raised it (-1 = me not holding the camera).
+    internal float TestOriginalFarClip => _originalFarClip;
+    internal int TestTileCount => _tiles.Count;
+    internal int TestSurfaceCount => _surface.Count;
+    internal bool TestRebuildPending => _rebuildPending;
+    // Tiles flagged exact whose mesh came from plain (approximate) builder data.
+    internal int TestExactFromPlain { get; private set; }
+
+    // Tiles still to build (wanted, on builder thread, heights waiting for mesh).
+    internal int TestPendingBuilds
+    {
+        get
+        {
+            int n = 0;
+            foreach (LodTile t in _tiles.Values)
+                if (t.State == TileState.Wanted || t.State == TileState.Requested || t.State == TileState.Ready) n++;
+            return n;
+        }
+    }
+
+    internal bool TestTile(TileKey key, out LodTile tile) => _tiles.TryGetValue(key, out tile);
+    internal IEnumerable<LodTile> TestTiles => _tiles.Values;
+
+    // Built tiles with this many quads per edge.
+    internal int TestBuiltWithWidth(int width)
+    {
+        int n = 0;
+        foreach (LodTile t in _tiles.Values)
+            if (t.State == TileState.Built && t.Width == width) n++;
+        return n;
+    }
+
+    // Surface cut. overlaps = surface tile with another surface tile above it (ground drawn twice there);
+    // notShown = surface tile not built or not switched on (hole there).
+    internal void TestSurfaceCut(out int overlaps, out int notShown)
+    {
+        overlaps = 0;
+        notShown = 0;
+        foreach (TileKey k in _surface)
+        {
+            if (HasAncestorInSurface(k)) overlaps++;
+            if (!_tiles.TryGetValue(k, out LodTile t) || t.State != TileState.Built || t.Go == null || !t.Go.activeSelf
+                || t.Mode != DisplayMode.Surface) notShown++;
+        }
+    }
+
+    // Surface tiles below root level that have no built, lowered parent under them (crack filler missing).
+    internal int TestSurfaceWithoutFiller()
+    {
+        int n = 0;
+        foreach (TileKey k in _surface)
+        {
+            if (k.Level >= _rootLevel) continue;
+            if (!_tiles.TryGetValue(k.Parent, out LodTile p) || p.State != TileState.Built || p.Mode != DisplayMode.Lowered) n++;
+        }
+        return n;
+    }
+
+    // Wanted split nodes farther than distance from cam (XZ).
+    internal int TestInternalBeyond(Vector3 cam, float distance)
+    {
+        int n = 0;
+        foreach (KeyValuePair<TileKey, NodeRole> kv in _desired)
+        {
+            if (kv.Value != NodeRole.Internal) continue;
+            GetBounds(kv.Key, out float minX, out float minZ, out float maxX, out float maxZ);
+            if (AabbDist(cam.x, cam.z, minX, minZ, maxX, maxZ) > distance) n++;
+        }
+        return n;
+    }
+
+    // What a spyglass boost left (horizons.spyglass). pastReach = wanted split nodes the no-spyglass rule never split:
+    // camera of my last recompute at or past SplitFactor * (1 + SplitHysteresis) tile widths from them (same sum as
+    // Visit with boost 1 on a node already split; 0 whenever no boost in play). drawnFiner = surface tiles no longer
+    // wanted (finer ground still drawn until its wanted parent take over).
+    internal void TestBoostLeft(out int pastReach, out int drawnFiner, out string first)
+    {
+        pastReach = 0;
+        drawnFiner = 0;
+        first = "-";
+        float h = 1f + Cfg.SplitHysteresis.Value;
+        foreach (KeyValuePair<TileKey, NodeRole> kv in _desired)
+        {
+            if (kv.Value != NodeRole.Internal) continue;
+            GetBounds(kv.Key, out float minX, out float minZ, out float maxX, out float maxZ);
+            float size = maxX - minX;
+            float cheb = AabbCheb(_lastUpdatePos.x, _lastUpdatePos.z, minX, minZ, maxX, maxZ);
+            if (cheb < Cfg.SplitFactor.Value * h * size) continue;
+            if (pastReach++ == 0) first = $"{kv.Key} at {cheb / size:0.00} tile widths";
+        }
+        foreach (TileKey k in _surface)
+            if (!_desired.ContainsKey(k)) drawnFiner++;
+    }
+
+    // Shown tiles: how many, how many with renderer on (game switch them off in interiors), how many whose property
+    // block lost my hide distance or (shrink mode) my sunk water level.
+    internal void TestTileRenderers(out int shown, out int enabled, out int wrongHide, out int wrongWater)
+    {
+        shown = 0;
+        enabled = 0;
+        wrongHide = 0;
+        wrongWater = 0;
+        bool shrink = ShrinkMode;
+        var block = new MaterialPropertyBlock();
+        foreach (LodTile t in _tiles.Values)
+        {
+            if (t.Renderer == null || t.Go == null || t.Mode == DisplayMode.Hidden) continue;
+            shown++;
+            if (t.Renderer.enabled) enabled++;
+            t.Renderer.GetPropertyBlock(block);
+            float want = OnLodVariant(t) ? (_hideOverride >= 0f ? _hideOverride : HideDistance()) : NoHide;
+            if (Mathf.Abs(block.GetFloat(s_lodHideDistanceId) - want) > 0.5f) wrongHide++;
+            if (shrink && block.GetFloat(s_waterLevelId) < SunkWaterLevel) wrongWater++;
+        }
+    }
+
+    // Real zones as cam see them (renderer on). needCopy = reach past the game's fade (must be sunk and painted by me);
+    // missing = of those, not sunk; extra = near zone sunk though game should draw it; farthest = farthest needCopy
+    // zone centre from cam (XZ, m).
+    internal void TestRealZones(Vector3 cam, out int zones, out int needCopy, out int missing, out int extra, out float farthest)
+    {
+        zones = 0;
+        needCopy = 0;
+        missing = 0;
+        extra = 0;
+        farthest = 0f;
+        List<Heightmap> real = Heightmap.GetAllHeightmaps();
+        if (real == null) return;
+        var block = new MaterialPropertyBlock();
+        foreach (Heightmap hm in real)
+        {
+            if (hm == null || hm.IsDistantLod) continue;
+            MeshRenderer r = hm.GetComponent<MeshRenderer>();
+            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
+            zones++;
+            Bounds b = r.bounds;
+            bool need = NeedsCopy(cam, b);
+            r.GetPropertyBlock(block);
+            bool sunk = block.GetFloat(s_waterLevelId) >= SunkWaterLevel;
+            if (need)
+            {
+                needCopy++;
+                if (!sunk) missing++;
+                farthest = Mathf.Max(farthest, Utils.DistanceXZ(cam, b.center));
+            }
+            else if (sunk) extra++;
+        }
+    }
+
+    // Any time, also with me gone: real zones (renderer on or off) still carrying what me put on them. sunk = water
+    // level out of reach in block, forcedOff = rendering forced off, tessOff = block tessellation not the material's.
+    internal static void TestRealZoneLeftovers(out int zones, out int sunk, out int forcedOff, out int tessOff)
+    {
+        zones = 0;
+        sunk = 0;
+        forcedOff = 0;
+        tessOff = 0;
+        List<Heightmap> real = Heightmap.GetAllHeightmaps();
+        if (real == null) return;
+        var block = new MaterialPropertyBlock();
+        foreach (Heightmap hm in real)
+        {
+            if (hm == null || hm.IsDistantLod) continue;
+            MeshRenderer r = hm.GetComponent<MeshRenderer>();
+            if (r == null) continue;
+            zones++;
+            r.GetPropertyBlock(block);
+            if (block.GetFloat(s_waterLevelId) >= SunkWaterLevel) sunk++;
+            if (r.forceRenderingOff) forcedOff++;
+            Material m = r.sharedMaterial;
+            float tess = block.GetFloat(s_tessId); // 0 = not set in block
+            if (m != null && m.HasProperty(s_tessId) && tess > 0f && Mathf.Abs(tess - m.GetFloat(s_tessId)) > 0.001f) tessOff++;
+        }
+    }
+
+    // Coarse (not exact) surface tiles over loaded real zones: vertices inside a loaded zone that the skirt did not
+    // push down (far ground can draw over real ground there). tiles = such tiles, coarsest = their highest level.
+    internal void TestCoarseOverLoaded(out int tiles, out int vertices, out int coarsest)
+    {
+        tiles = 0;
+        vertices = 0;
+        coarsest = -1;
+        ZoneSystem zs = ZoneSystem.instance;
+        if (zs == null || ZNet.instance == null) return;
+        Vector3 pos = ZNet.instance.GetReferencePosition();
+        int r = NearSimulationDistance() + 1;
+        int pzx = Mathf.FloorToInt((pos.x + 32f) / 64f);
+        int pzy = Mathf.FloorToInt((pos.z + 32f) / 64f);
+        float minX = (pzx - r) * 64f - 32f, maxX = (pzx + r) * 64f + 32f;
+        float minZ = (pzy - r) * 64f - 32f, maxZ = (pzy + r) * 64f + 32f;
+        foreach (LodTile t in _tiles.Values)
+        {
+            if (t.Mode != DisplayMode.Surface || !t.Drawn || t.Exact || t.Mesh == null || t.Go == null) continue;
+            if (!(t.MaxX > minX && t.MinX < maxX && t.MaxZ > minZ && t.MinZ < maxZ)) continue;
+            int n = t.Width + 1;
+            bool skirted = t.CoverSignature != 0 && t.BaseVertices != null && t.WorkVertices != null
+                           && t.BaseVertices.Length == n * n && t.WorkVertices.Length == n * n;
+            bool any = false;
+            for (int i = 0; i < n; i++)
+            {
+                float z = t.MinZ + i * t.Scale;
+                if (z < minZ || z > maxZ) continue;
+                for (int j = 0; j < n; j++)
+                {
+                    float x = t.MinX + j * t.Scale;
+                    if (x < minX || x > maxX) continue;
+                    if (!ZoneExists(zs, Mathf.FloorToInt((x + 32f) / 64f), Mathf.FloorToInt((z + 32f) / 64f))) continue;
+                    int idx = i * n + j;
+                    if (skirted && t.BaseVertices[idx].y - t.WorkVertices[idx].y > SkirtDepth * 0.5f) continue;
+                    vertices++;
+                    any = true;
+                }
+            }
+            if (any)
+            {
+                tiles++;
+                if (t.Key.Level > coarsest) coarsest = t.Key.Level;
+            }
+        }
+    }
+
+    // Self test switch: next exact tile whose finished heights wait on builder's ready list lose them before my poll,
+    // like builder's own 16-entry trim do when many other builds finish in between. Then TestEvicted, TestEvictedKey.
+    internal bool TestEvictExact;
+    internal bool TestEvicted;
+    internal TileKey TestEvictedKey;
+
+    private bool TestEvict(HeightmapBuilder builder, LodTile t, WorldGenerator wg)
+    {
+        object gate = builder.m_lock;
+        List<HeightmapBuilder.HMBuildData> ready = builder.m_ready;
+        if (gate == null || ready == null) return false;
+        lock (gate)
+        {
+            for (int i = 0; i < ready.Count; i++)
+            {
+                if (!(ready[i] is ExactBuildData) || !ready[i].IsEqual(t.Center, t.Width, t.Scale, true, wg)) continue;
+                ready.RemoveAt(i);
+                TestEvicted = true;
+                TestEvictedKey = t.Key;
+                return true;
+            }
+        }
+        return false;
     }
 #endif
 

@@ -210,6 +210,10 @@ internal static class Stones
             RunVanilla(pes, ZNet.GetUID(), index);
         }
         var started = ActiveInvasions(pes, index) - before;
+#if DEBUG
+        TestLastRequested = count;
+        TestLastStarted = started;
+#endif
         if (started < count)
         {
             var max = pes.m_possibleEvents[index].maxConcurrent;
@@ -442,5 +446,14 @@ internal static class Stones
     internal static void TestResetDetection() => _detectDone = false;
 
     internal static int HeldCount => Held.Count;
+
+    // Self test: what the last StartInvasions was asked for and what really started (-1 = none since the reset).
+    internal static int TestLastRequested { get; set; } = -1;
+
+    internal static int TestLastStarted { get; set; } = -1;
+
+    // Self test: this stone's destroy is never counted (a stone that goes away like in a game without me: no count,
+    // no message, no invasion).
+    internal static void TestIgnoreBreak(ZDOID id) => Counted.Add(id);
 #endif
 }

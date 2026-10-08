@@ -15,13 +15,21 @@ internal sealed partial class Plugin : ModPlugin
         HarpoonEffect.Clear();
         HitScope.Close();
         Patches.ProjectilePatches.ClearSkipLog();
+        SelfTests.Register(); // Debug build only (call vanish in Release)
     }
 
     // Turned off: forget cache and scope. Hook already on a tame stay until vanilla end it (line break, block).
     protected override void OnDeactivated()
     {
+        SelfTests.Unregister(); // Debug build only
         HarpoonEffect.Clear();
         HitScope.Close();
         Patches.ProjectilePatches.ClearSkipLog();
     }
+
+#if DEBUG
+    // Debug build only: self test turn me off and on live through the framework (same refresh as the MC Mods tick),
+    // in memory, so test never write Enabled in player's config. Null = nothing block. Release build: no override.
+    protected override string LocalBlocker() => TestSwitches.Blocker;
+#endif
 }

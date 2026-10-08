@@ -20,6 +20,8 @@ namespace MC.Combat.SneakAmbushMod;
 //   sneak.content      Smoke Screen item, projectile, cloud, recipe registered once (still once after two more
 //                      registrations), vanilla Smoke Bomb untouched, clone values, every name me rely on exist
 //                      (prefabs, animator trigger, status effect, layer), NOTE dumps of unverified game values
+//   sneak.bug.missing-bomb-error  known bug, alone: error "BombSmoke is missing" logged at the main menu when another
+//                      mod (Jotunn) show a half-filled item database there; FAIL while it was logged since start
 //   sneak.curve        early-game curve: crouched target = vanilla formula x 0.85 at Sneak 0, x 1 at Sneak 100
 //   sneak.still        holding still -70% (icon, target), moving end it same frame (snap up), carried = no bonus,
 //                      rule change reach shown icon without re-add
@@ -41,7 +43,9 @@ namespace MC.Combat.SneakAmbushMod;
 // Me force rules only with ServerRules.TestRules / TestPending, feature off with Plugin.TestInactive, icons and
 // message with StealthCues.TestShowCues / SneakXp.TestShowMessage: never config. Rig put back player (crouch,
 // place, aim, skill, items, controls), time, weather, and destroy all me spawn.
-internal static class SelfTests
+// More tests for the in-game test list live in SelfTests.Coverage.cs (single player: real swings, arrows, ship,
+// recipe, default cloud, death, real off and on) and SelfTests.Multiplayer.cs (dedicated server runs).
+internal static partial class SelfTests
 {
     private const string ContentName = "sneak.content";
     private const string CurveName = "sneak.curve";
@@ -61,6 +65,7 @@ internal static class SelfTests
     {
 #if DEBUG
         SelfTest.Register(ContentName, RunContent);
+        SelfTest.Register(BugMissingBombName, RunBugMissingBomb);
         SelfTest.Register(CurveName, RunCurve);
         SelfTest.Register(StillName, RunStill);
         SelfTest.Register(CoverName, RunCover);
@@ -72,6 +77,8 @@ internal static class SelfTests
         SelfTest.Register(NetworkName, RunNetwork);
         SelfTest.Register(GuardName, RunGuard);
         SelfTest.Register(PendingName, RunPending);
+        RegisterCoverage();
+        RegisterMultiplayer();
 #endif
     }
 
@@ -80,6 +87,7 @@ internal static class SelfTests
     {
 #if DEBUG
         SelfTest.Unregister(ContentName);
+        SelfTest.Unregister(BugMissingBombName);
         SelfTest.Unregister(CurveName);
         SelfTest.Unregister(StillName);
         SelfTest.Unregister(CoverName);
@@ -91,11 +99,20 @@ internal static class SelfTests
         SelfTest.Unregister(NetworkName);
         SelfTest.Unregister(GuardName);
         SelfTest.Unregister(PendingName);
+        UnregisterCoverage();
+        UnregisterMultiplayer();
         ClearOverrides();
+        if (!Tap.Hold)
+        {
+            Tap.Remove();
+        }
 #endif
     }
 
 #if DEBUG
+    // Debug only (release keep its old constants, nothing new).
+    private const string BugMissingBombName = "sneak.bug.missing-bomb-error";
+
     // Names me (and TESTING.md) rely on: must be network prefabs in this game version.
     private static readonly string[] NeededPrefabs =
     {
@@ -118,6 +135,8 @@ internal static class SelfTests
         ServerRules.TestRules = null;
         StealthCues.TestShowCues = null;
         SneakXp.TestShowMessage = null;
+        Compat.TestOtherModPays = null;
+        Tap.ForceMist = false;
     }
 
     // ---------- helpers ----------
@@ -192,11 +211,18 @@ internal static class SelfTests
         private bool _controllerEnabled;
         private bool _moved;
         private bool _aimed;
+        // Items a test gave (shared name -> how many the player had before), every skill, god mode and health.
+        private readonly Dictionary<string, int> _givenBefore = new Dictionary<string, int>();
+        private Dictionary<Skills.SkillType, KeyValuePair<float, float>> _allSkills;
+        private bool _godOff;
+        private float _health;
+        private readonly float _startHealth;
 
         private Rig(string test, Player player)
         {
             Test = test;
             Player = player;
+            _startHealth = player.GetHealth();
             _cloudsBefore = new HashSet<SmokeCloud>(SmokeRegistry.All);
             _position = player.transform.position;
             _pitch = player.m_lookPitch;
@@ -219,6 +245,60 @@ internal static class SelfTests
         }
 
         internal int SmokeCount() => Player.GetInventory().CountItems(SmokeContent.DisplayName, -1, false);
+
+        // Where the player stood when the test began (Restore put him back there after a move).
+        internal Vector3 Home => _position;
+
+        // Any item into the bag (spawn name). Restore take away what the test added (also what a craft made of it).
+        internal ItemDrop.ItemData Give(string prefabName, int count = 1)
+        {
+            var prefab = ObjectDB.instance.GetItemPrefab(prefabName);
+            var drop = prefab != null ? prefab.GetComponent<ItemDrop>() : null;
+            if (drop == null)
+            {
+                return null;
+            }
+            Track(drop.m_itemData.m_shared.m_name);
+            return Player.GetInventory().AddItem(prefabName, count, 1, 0, 0L, "", false);
+        }
+
+        // Count of that item (shared name) now = what Restore put back.
+        internal void Track(string sharedName)
+        {
+            if (!_givenBefore.ContainsKey(sharedName))
+            {
+                _givenBefore[sharedName] = Player.GetInventory().CountItems(sharedName, -1, false);
+            }
+        }
+
+        // Item in hand (weapon, shield, bow). False when it could not be equipped.
+        internal bool Equip(ItemDrop.ItemData item) =>
+            item != null && (Player.IsItemEquiped(item) || Player.EquipItem(item, false));
+
+        // Every skill kept (real swings and shots raise weapon skills too).
+        internal void SaveAllSkills()
+        {
+            if (_allSkills != null)
+            {
+                return;
+            }
+            _allSkills = new Dictionary<Skills.SkillType, KeyValuePair<float, float>>();
+            foreach (var pair in Player.GetSkills().m_skillData)
+            {
+                _allSkills[pair.Key] = new KeyValuePair<float, float>(pair.Value.m_level, pair.Value.m_accumulator);
+            }
+        }
+
+        // Player can be hurt (a hit that must land). Restore give god mode and health back.
+        internal void GodOff()
+        {
+            if (!_godOff)
+            {
+                _godOff = true;
+                _health = Player.GetHealth();
+            }
+            Player.SetGodMode(false);
+        }
 
         // Sneak level for the test (progress 0); first call keep the real one.
         internal void SetSneak(float level)
@@ -408,7 +488,17 @@ internal static class SelfTests
 
         internal void Restore()
         {
+            // Feature really turned off by a test: on again first (activation rebuild recipe, register tests again).
+            Safe("feature", () =>
+            {
+                if (Plugin.TestBlocked)
+                {
+                    Plugin.TestBlocked = false;
+                    FeatureRegistry.RefreshAll();
+                }
+            });
             Safe("overrides", ClearOverrides);
+            Safe("test hooks", Tap.Release);
             Safe("clouds", DestroyNewClouds);
             Safe("spawned objects", () =>
             {
@@ -434,6 +524,40 @@ internal static class SelfTests
                     var skill = Player.GetSkills().GetSkill(Skills.SkillType.Sneak);
                     skill.m_level = _level;
                     skill.m_accumulator = _accumulator;
+                }
+                if (_allSkills != null)
+                {
+                    var data = Player.GetSkills().m_skillData;
+                    foreach (var type in data.Keys.ToList())
+                    {
+                        if (_allSkills.TryGetValue(type, out var saved))
+                        {
+                            data[type].m_level = saved.Key;
+                            data[type].m_accumulator = saved.Value;
+                        }
+                        else
+                        {
+                            // Skill first used in the test: gone again.
+                            data.Remove(type);
+                        }
+                    }
+                }
+            });
+            Safe("god mode and health", () =>
+            {
+                if (Player == null)
+                {
+                    return;
+                }
+                if (_godOff)
+                {
+                    Player.SetGodMode(true);
+                }
+                // Creature hits take health from a god-mode player too (down to 1): given back.
+                var wanted = _godOff ? Mathf.Max(_health, _startHealth) : _startHealth;
+                if (Player.GetHealth() < wanted)
+                {
+                    Player.SetHealth(Mathf.Min(wanted, Player.GetMaxHealth()));
                 }
             });
             Safe("time and weather", () =>
@@ -502,6 +626,23 @@ internal static class SelfTests
             if (extra > 0)
             {
                 inventory.RemoveItem(SmokeContent.DisplayName, extra, -1, false);
+            }
+            // Items a test gave: out of the hands first, then only the extra ones go.
+            foreach (var given in _givenBefore)
+            {
+                var more = inventory.CountItems(given.Key, -1, false) - given.Value;
+                if (more <= 0)
+                {
+                    continue;
+                }
+                foreach (var it in inventory.GetAllItems().ToList())
+                {
+                    if (it.m_shared.m_name == given.Key && Player.IsItemEquiped(it))
+                    {
+                        Player.UnequipItem(it, false);
+                    }
+                }
+                inventory.RemoveItem(given.Key, more, -1, false);
             }
             if (_right != null && inventory.ContainsItem(_right) && !Player.IsItemEquiped(_right))
             {
@@ -1036,6 +1177,22 @@ internal static class SelfTests
         }
     }
 
+    // ---------- sneak.bug.missing-bomb-error (L03) ----------
+
+    // Known bug of the mod, alone here so sneak.content judge the rest. With some other mods installed (Jotunn) the
+    // main menu show an item database that is not empty and hold no vanilla item yet: SmokeContent.RegisterInObjectDB
+    // then log the error "The vanilla Smoke Bomb (BombSmoke) is missing from the item database ..." although the
+    // Smoke Screen is made a moment later. FAIL while that error was logged since the game started.
+    private static IEnumerator RunBugMissingBomb()
+    {
+        var c = new Checks(BugMissingBombName);
+        c.Check(!SmokeContent.MissingReported,
+            "the error \"The vanilla Smoke Bomb (BombSmoke) is missing ...\" was logged since the game started "
+            + $"(the Smoke Screen was made all the same: {SmokeContent.Built})");
+        c.Report();
+        yield break;
+    }
+
     private static int OurRecipes(ObjectDB db) => db.m_recipes.Count(r => r != null && r.name == SmokeContent.RecipeName);
 
     private static string Counts(ObjectDB db, ZNetScene scene) =>
@@ -1045,7 +1202,6 @@ internal static class SelfTests
     private static void CheckRegistered(Checks c, ObjectDB db, ZNetScene scene)
     {
         c.Check(SmokeContent.Built, "the Smoke Screen was not made from BombSmoke");
-        c.Check(!SmokeContent.MissingReported, "the \"BombSmoke missing\" error was logged since start");
         var item = SmokeContent.ItemPrefab;
         var projectile = SmokeContent.ProjectilePrefab;
         var cloud = SmokeContent.CloudPrefab;
@@ -2405,6 +2561,8 @@ internal static class SelfTests
             yield return Stand(player);
             var dir = ClearDirection(player, 12f, out _);
             var origin = player.transform.position;
+            // Camera on the creature: the game switch plates outside the picture off.
+            rig.Aim(dir, 0f);
             var spot = Ground(origin + dir * 8f);
             var g = rig.Creature("Greydwarf", spot, -dir, false);
             if (!c.Check(g != null, "could not spawn a Greydwarf"))
@@ -2451,8 +2609,18 @@ internal static class SelfTests
             // Cloud on the player only.
             yield return rig.PutCloud(slot, origin);
             c.Check(hud.TestShow(g, true), "player inside, creature outside, OnlyInside: TestShow false");
+            // T22, the real plate. OnlyInside: the game make it again, it show once aimed at. ThroughSmoke: it go.
+            var plate = new Box();
+            yield return Plate(hud, g, plate, 60);
+            c.Check(plate.Ok && InSmoke(player, rules) && AimAt(hud, g),
+                $"player inside the cloud ({InSmoke(player, rules)}), creature outside, OnlyInside: the game made no plate for the creature");
+            yield return Frames(2);
+            c.Check(PlateShown(hud, g), "player inside, creature outside, OnlyInside: its bar does not show after aiming at it");
             ServerRules.TestRules = new AmbushRules { ActivationDelay = 0f, HealthBars = HealthBarMode.ThroughSmoke };
             c.Check(!hud.TestShow(g, true), "player inside, creature outside, ThroughSmoke: TestShow true");
+            var taken = new Box();
+            yield return WaitFor(() => !hud.m_huds.ContainsKey(g), 1f, taken);
+            c.Check(taken.Ok, "player inside, creature outside, ThroughSmoke: its bar did not go within 1 s");
             ServerRules.TestRules = new AmbushRules { ActivationDelay = 0f, HealthBars = HealthBarMode.Off };
             yield return rig.PutCloud(slot, g.transform.position);
             c.Check(hud.TestShow(g, true), "HealthBars Off: TestShow false");

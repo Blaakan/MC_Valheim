@@ -24,6 +24,13 @@ internal static class DayClock
 
     private static bool _warnedFallback;
 
+#if DEBUG
+    // Debug build only: self test read it, and put it back after it broke the day cycle on purpose.
+    internal static bool WarnedFallback => _warnedFallback;
+
+    internal static void ResetFallbackWarning() => _warnedFallback = false;
+#endif
+
     // Smoothed flags strictly between 06:00 and noon: exactly where vanilla time test (IsAfternoon || IsNight,
     // in CalculateCanSleep and UpdateSleeping) fail. Two static reads: ok every frame.
     internal static bool IsMorning() => !EnvMan.IsAfternoon() && !EnvMan.IsNight();

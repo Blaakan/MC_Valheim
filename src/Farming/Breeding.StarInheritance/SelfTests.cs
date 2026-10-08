@@ -23,7 +23,10 @@ namespace MC.Farming.BreedingStarInheritanceMod;
 //                   player (own config, network message ignored, override), join check verdicts, every species'
 //                   breeding tick longer than join check grace + disconnect delay (real prefab values, NOTE line)
 // Me force numbers with Override (no config file write). Me put back Override and destroy all me spawn at end.
-internal static class SelfTests
+// More tests live in the other parts of this class: SelfTests.World.cs (single player), SelfTests.Cross.cs (with other
+// MC mods), SelfTests.Mp.cs (client joined to a dedicated server + its server halves), SelfTests.Hooks.cs (switches,
+// notes from the patches, log of this mod's lines).
+internal static partial class SelfTests
 {
     private const string RuleName = "breeding.rule";
     private const string FarmerName = "breeding.farmer";
@@ -40,6 +43,11 @@ internal static class SelfTests
         SelfTest.Register(BirthName, RunBirth);
         SelfTest.Register(EggName, RunEgg);
         SelfTest.Register(NetworkName, RunNetwork);
+        StartSessionLog();
+        RegisterWorld();
+        RegisterCross();
+        RegisterWorldLast();
+        RegisterMultiplayer();
 #endif
     }
 
@@ -52,7 +60,11 @@ internal static class SelfTests
         SelfTest.Unregister(BirthName);
         SelfTest.Unregister(EggName);
         SelfTest.Unregister(NetworkName);
+        UnregisterWorld();
+        UnregisterCross();
+        UnregisterMultiplayer();
         Override = null;
+        RollOverride = null;
 #endif
     }
 
@@ -595,7 +607,46 @@ internal static class SelfTests
                 var until = Time.time + 1f;
                 while (Time.time < until)
                 {
+                    // Game show a creature's health bar and stars only after the player looked at it: me do the look.
+                    foreach (var baby in pen.Keep)
+                    {
+                        if (baby != null)
+                        {
+                            LookAtHud(baby.GetComponent<Character>());
+                        }
+                    }
                     yield return null;
+                }
+                // What the screenshot must show (TESTING.md T18): piglets with 1 star and one with 2 stars in their
+                // health bars. Me read the creature HUD in the frame of the shot: bar on screen, star marks by level.
+                var oneStar = 0;
+                var twoStars = 0;
+                foreach (var baby in pen.Keep)
+                {
+                    var kept = baby != null ? baby.GetComponent<Character>() : null;
+                    if (kept == null)
+                    {
+                        pen.Failures.Add("screenshot: a piglet kept for it vanished");
+                        continue;
+                    }
+                    var level = kept.GetLevel();
+                    if (!HudStars(kept, out var onScreen, out var star1, out var star2))
+                    {
+                        pen.Failures.Add($"screenshot: the creature HUD has no health bar with star marks for the level-{level} piglet");
+                        continue;
+                    }
+                    if (!onScreen || star1 != (level == 2) || star2 != (level == 3))
+                    {
+                        pen.Failures.Add($"screenshot: level-{level} piglet: health bar on screen {onScreen}, 1-star mark {star1}, "
+                                         + $"2-star mark {star2}; expected True / {level == 2} / {level == 3}");
+                    }
+                    oneStar += star1 ? 1 : 0;
+                    twoStars += star2 ? 1 : 0;
+                }
+                if (oneStar < 1 || twoStars < 1)
+                {
+                    pen.Failures.Add($"screenshot: the health bars show {oneStar} piglet(s) with 1 star and {twoStars} with 2 stars; "
+                                     + "expected at least one of each");
                 }
                 SelfTest.Screenshot(pen.Test, "piglets_with_stars");
                 yield return null;

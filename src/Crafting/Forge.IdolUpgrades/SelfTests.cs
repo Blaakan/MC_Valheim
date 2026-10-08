@@ -27,7 +27,15 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 //                  wooden-tier weapon asks for (and spends) a Bronze idol, recipe data never left swapped; notes list
 //                  which items the game puts on which idol tier
 // Me take back every item me give, forget recipes me teach, close the window, destroy the Forge, reset forced roll.
-internal static class SelfTests
+// More tests live in the other SelfTests.*.cs files (same class): Forge panel and rules (SelfTests.Forge.cs),
+// inventory and chest (SelfTests.Inventory.cs), mod turned off and on (SelfTests.Toggle.cs), other mods
+// (SelfTests.Compat.cs), dedicated server (SelfTests.Multiplayer.cs). Shared tools: SelfTests.Tools.cs. Me never
+// write config in a single-player test: rules through ServerRules.TestRules, roll through ForgeRefine.TestRoll,
+// IdolChoice through IdolChoice.TestPick, empty GPU copy through StarIcons.TestForceEmpty, mod off through
+// Plugin.TestSetOff.
+// Tests named forge.bug.* hold only the checks a real game run showed the mod fail (real bug, mod not fixed yet): kept
+// apart so the other checks of the same TESTING.md item still pass. Mod fixed = they pass, nothing to change here.
+internal static partial class SelfTests
 {
     private const string CatalogName = "forge.catalog";
     private const string IconsName = "forge.icons";
@@ -37,17 +45,39 @@ internal static class SelfTests
     private const string PopupName = "forge.popup";
     private const string TiersName = "forge.tiers";
 
+    // Plugin.BindConfig call me once, whatever the mod state: log watch, and tests that run while mod inactive.
+    [Conditional("DEBUG")]
+    internal static void RegisterAlways()
+    {
+#if DEBUG
+        LogWatch.Install();
+        foreach (var test in InactiveTests)
+        {
+            Add(test.Key, VanillaServerScenario, test.Value);
+        }
+#endif
+    }
+
     [Conditional("DEBUG")]
     internal static void Register()
     {
 #if DEBUG
-        SelfTest.Register(CatalogName, RunCatalog);
-        SelfTest.Register(IconsName, RunIcons);
-        SelfTest.Register(TooltipName, RunTooltip);
-        SelfTest.Register(IdolsName, RunIdols);
-        SelfTest.Register(RefineName, RunRefine);
-        SelfTest.Register(PopupName, RunPopup);
-        SelfTest.Register(TiersName, RunTiers);
+        if (_toggling)
+        {
+            return; // a test turned the mod off and on: its list stay as it is
+        }
+        foreach (var test in SingleTests)
+        {
+            Add(test.Key, null, test.Value);
+        }
+        foreach (var test in ModdedTests)
+        {
+            Add(test.Key, SelfTest.Modded, test.Value);
+        }
+        foreach (var step in ServerSteps)
+        {
+            SelfTest.RegisterServerStep(step.Key, step.Value);
+        }
 #endif
     }
 
@@ -55,18 +85,141 @@ internal static class SelfTests
     internal static void Unregister()
     {
 #if DEBUG
-        SelfTest.Unregister(CatalogName);
-        SelfTest.Unregister(IconsName);
-        SelfTest.Unregister(TooltipName);
-        SelfTest.Unregister(IdolsName);
-        SelfTest.Unregister(RefineName);
-        SelfTest.Unregister(PopupName);
-        SelfTest.Unregister(TiersName);
+        if (_toggling)
+        {
+            return;
+        }
+        foreach (var test in SingleTests)
+        {
+            SelfTest.Unregister(test.Key);
+        }
+        foreach (var test in ModdedTests)
+        {
+            SelfTest.UnregisterMultiplayer(test.Key);
+        }
+        foreach (var step in ServerSteps)
+        {
+            SelfTest.UnregisterServerStep(step.Key);
+        }
         ForgeRefine.TestRoll = null;
+        ServerRules.TestRules = null;
+        IdolChoice.TestPick = null;
+        StarIcons.TestForceEmpty = false;
 #endif
     }
 
 #if DEBUG
+    // True while a test turn the mod off and on through the framework: OnDeactivated / OnActivated must not touch the
+    // test list (running test stay, forced values stay).
+    private static bool _toggling;
+
+    // Tests that started in this game session (forge.cleanlog want the whole set to have run).
+    private static readonly HashSet<string> Ran = new HashSet<string>();
+
+    private const string VanillaServerScenario = "vanilla-server";
+
+    private static readonly KeyValuePair<string, Func<IEnumerator>>[] SingleTests =
+    {
+        Test(CatalogName, RunCatalog),
+        Test(IconsName, RunIcons),
+        Test(TooltipName, RunTooltip),
+        Test(IdolsName, RunIdols),
+        Test(RefineName, RunRefine),
+        Test(PopupName, RunPopup),
+        Test(TiersName, RunTiers),
+        // SelfTests.Forge.cs
+        Test(TabName, RunTab),
+        Test(CostName, RunCost),
+        Test(StepsName, RunSteps),
+        Test(MissingName, RunMissing),
+        Test(TooltipTextName, RunTooltipText),
+        Test(OddsName, RunOdds),
+        Test(FailureName, RunFailure),
+        Test(SuccessName, RunSuccess),
+        Test(StoneName, RunStone),
+        Test(TiersLiveName, RunTiersLive),
+        Test(FailureRulesName, RunFailureRules),
+        Test(ChoiceName, RunChoice),
+        Test(SpaceName, RunSpace),
+        Test(RulesLiveName, RunRulesLive),
+        Test(WiringName, RunWiring),
+        Test(TimerTabsName, RunTimerTabs),
+        Test(TimerLossName, RunTimerLoss),
+        Test(BadMaterialName, RunBadMaterial),
+        Test(BugBadMaterialName, RunBugBadMaterial),
+        Test(ZeroCostName, RunZeroCost),
+        Test(BugZeroCostName, RunBugZeroCost),
+        // SelfTests.Inventory.cs
+        Test(IconRowsName, RunIconRows),
+        Test(GridName, RunGrid),
+        Test(StacksName, RunStacks),
+        Test(EmptyCopyName, RunEmptyCopy),
+        Test(BugEmptyCopyName, RunBugEmptyCopy),
+        // SelfTests.Toggle.cs
+        Test(ToggleName, RunToggle),
+        Test(OffUpgradeName, RunOffUpgrade),
+        Test(OffRefineName, RunOffRefine),
+        Test(OnAtForgeName, RunOnAtForge),
+        Test(BugTabAfterOnName, RunBugTabAfterOn),
+        Test(PopupOffName, RunPopupOff),
+        // SelfTests.Compat.cs
+        Test(SearchName, RunSearch),
+        Test(SearchForgeName, RunSearchForge),
+        Test(CrossbowName, RunCrossbow),
+        Test(CrossbowDownName, RunCrossbowDown),
+        Test(RepairName, RunRepair),
+        Test(OtherForgeName, RunOtherForge),
+        Test(SortChestName, RunSortChest),
+        Test(LootFilterName, RunLootFilter),
+        // Last: what the mod say in log while all the others ran, and since the game started.
+        Test(CleanLogName, RunCleanLog),
+        Test(BugMenuWarningName, RunBugMenuWarning),
+    };
+
+    // Client joined to a dedicated server, both with every MC mod (tools/Test-Multiplayer.ps1, scenario modded).
+    private static readonly KeyValuePair<string, Func<IEnumerator>>[] ModdedTests =
+    {
+        Test(MpDedicatedName, RunMpDedicated),
+        Test(MpRulesName, RunMpRules),
+        Test(MpTiersName, RunMpTiers),
+        Test(MpItemsName, RunMpItems),
+    };
+
+    // Client joined to a dedicated server without any MC mod (scenario vanilla-server): this mod inactive there.
+    private static readonly KeyValuePair<string, Func<IEnumerator>>[] InactiveTests =
+    {
+        Test(MpVanillaServerName, RunMpVanillaServer),
+        Test(MpHandoffName, RunMpHandoff),
+    };
+
+    private static readonly KeyValuePair<string, Func<string, object[], IEnumerator>>[] ServerSteps =
+    {
+        new KeyValuePair<string, Func<string, object[], IEnumerator>>(StepSettings, ServerSettingsStep),
+        new KeyValuePair<string, Func<string, object[], IEnumerator>>(StepHealth, ServerHealthStep),
+        new KeyValuePair<string, Func<string, object[], IEnumerator>>(StepZdo, ServerZdoStep),
+    };
+
+    private static KeyValuePair<string, Func<IEnumerator>> Test(string name, Func<IEnumerator> run) =>
+        new KeyValuePair<string, Func<IEnumerator>>(name, run);
+
+    // scenario null = single-player test. Every test note that it started (forge.cleanlog).
+    private static void Add(string name, string scenario, Func<IEnumerator> run)
+    {
+        Func<IEnumerator> started = () =>
+        {
+            Ran.Add(name);
+            return run();
+        };
+        if (scenario == null)
+        {
+            SelfTest.Register(name, started);
+        }
+        else
+        {
+            SelfTest.RegisterMultiplayer(name, scenario, started);
+        }
+    }
+
     private sealed class Checks
     {
         private readonly string _name;

@@ -15,19 +15,65 @@ internal static class Visuals
 #if DEBUG
     // Self test: true = camera, fog and surface on with default look; null = config.
     internal static bool? TestAllOn;
+
+    // Self test: one setting alone (win over TestAllOn); null = TestAllOn, then config.
+    internal static bool? TestCamera;
+    internal static bool? TestFog;
+    internal static bool? TestSurface;
+    internal static float? TestVisibility;
 #endif
 
-    internal static bool Camera => Flag(Plugin.UnderwaterCamera);
+    internal static bool Camera
+    {
+        get
+        {
+#if DEBUG
+            if (TestCamera.HasValue)
+            {
+                return TestCamera.Value;
+            }
+#endif
+            return Flag(Plugin.UnderwaterCamera);
+        }
+    }
 
-    internal static bool Fog => Flag(Plugin.UnderwaterFog);
+    internal static bool Fog
+    {
+        get
+        {
+#if DEBUG
+            if (TestFog.HasValue)
+            {
+                return TestFog.Value;
+            }
+#endif
+            return Flag(Plugin.UnderwaterFog);
+        }
+    }
 
-    internal static bool Surface => Flag(Plugin.SurfaceFromBelow);
+    internal static bool Surface
+    {
+        get
+        {
+#if DEBUG
+            if (TestSurface.HasValue)
+            {
+                return TestSurface.Value;
+            }
+#endif
+            return Flag(Plugin.SurfaceFromBelow);
+        }
+    }
 
     internal static float Visibility
     {
         get
         {
 #if DEBUG
+            if (TestVisibility.HasValue)
+            {
+                return Mathf.Clamp(TestVisibility.Value, VisibilityMin, VisibilityMax);
+            }
             if (TestAllOn.HasValue)
             {
                 return DefaultVisibility;

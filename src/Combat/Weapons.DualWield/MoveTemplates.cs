@@ -104,6 +104,9 @@ internal static class MoveTemplates
         if (info != _lastInfo)
         {
             _lastInfo = info;
+#if DEBUG
+            InfoCount++;
+#endif
             Log.Info(info);
         }
     }
@@ -348,5 +351,10 @@ internal static class MoveTemplates
 #if DEBUG
     // Self test read me: last template warning (also when already logged once before).
     internal static string LastWarning;
+
+    // Self test read me: the "Pairs use the moves of ..." Info line last logged (null = none since Clear), and how
+    // many times one was logged this session.
+    internal static string LastInfo => _lastInfo;
+    internal static int InfoCount;
 #endif
 }

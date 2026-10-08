@@ -22,6 +22,142 @@ internal sealed partial class Plugin : ModPlugin
     internal static ConfigEntry<string> DefaultIgnored;
     internal static ConfigEntry<string> DefaultSelected;
 
+    // ---------------------------------------------------------------- settings as mod code read them
+    // One accessor per setting. Release build: plain config read. Debug build: self test may force a value in memory
+    // (TestHooks), so test never write the config file.
+
+    internal static bool ExemptHarvestOn
+    {
+        get
+        {
+#if DEBUG
+            if (TestHooks.ExemptHarvest.HasValue)
+            {
+                return TestHooks.ExemptHarvest.Value;
+            }
+#endif
+            return ExemptHarvest.Value;
+        }
+    }
+
+    internal static bool GamepadControlsOn
+    {
+        get
+        {
+#if DEBUG
+            if (TestHooks.GamepadControls.HasValue)
+            {
+                return TestHooks.GamepadControls.Value;
+            }
+#endif
+            return GamepadControls.Value;
+        }
+    }
+
+    internal static bool ShowMarkersOn
+    {
+        get
+        {
+#if DEBUG
+            if (TestHooks.ShowMarkers.HasValue)
+            {
+                return TestHooks.ShowMarkers.Value;
+            }
+#endif
+            return ShowMarkers.Value;
+        }
+    }
+
+    internal static bool ShowInHoverTextOn
+    {
+        get
+        {
+#if DEBUG
+            if (TestHooks.ShowInHoverText.HasValue)
+            {
+                return TestHooks.ShowInHoverText.Value;
+            }
+#endif
+            return ShowInHoverText.Value;
+        }
+    }
+
+    internal static float ButtonOffsetXNow
+    {
+        get
+        {
+#if DEBUG
+            if (TestHooks.ButtonOffsetX.HasValue)
+            {
+                return TestHooks.ButtonOffsetX.Value;
+            }
+#endif
+            return ButtonOffsetX.Value;
+        }
+    }
+
+    internal static float ButtonOffsetYNow
+    {
+        get
+        {
+#if DEBUG
+            if (TestHooks.ButtonOffsetY.HasValue)
+            {
+                return TestHooks.ButtonOffsetY.Value;
+            }
+#endif
+            return ButtonOffsetY.Value;
+        }
+    }
+
+    // Null = setting not bound yet (very early call).
+    internal static string DefaultIgnoredText
+    {
+        get
+        {
+#if DEBUG
+            if (TestHooks.DefaultIgnored != null)
+            {
+                return TestHooks.DefaultIgnored;
+            }
+#endif
+            return DefaultIgnored != null ? DefaultIgnored.Value : null;
+        }
+    }
+
+    internal static string DefaultSelectedText
+    {
+        get
+        {
+#if DEBUG
+            if (TestHooks.DefaultSelected != null)
+            {
+                return TestHooks.DefaultSelected;
+            }
+#endif
+            return DefaultSelected != null ? DefaultSelected.Value : null;
+        }
+    }
+
+    internal static KeyboardShortcut MarkKeyNow
+    {
+        get
+        {
+#if DEBUG
+            if (TestHooks.MarkKey.HasValue)
+            {
+                return TestHooks.MarkKey.Value;
+            }
+#endif
+            return MarkKey.Value;
+        }
+    }
+
+#if DEBUG
+    // Self test turn me off and on through the framework (patches really removed), without writing Enabled.
+    protected override string LocalBlocker() => TestHooks.ForceOff ? "Inactive: turned off by a self test." : null;
+#endif
+
     protected override void BindConfig()
     {
         ExemptHarvest = Config.Bind("Filter", "ExemptHarvest", true, new ConfigDescription(
@@ -70,8 +206,8 @@ internal sealed partial class Plugin : ModPlugin
             null, new ConfigurationManagerAttributes { Order = 90 }));
 
         // Me read key once per change (panel, ConfigurationManager, file edit), not every frame.
-        FilterUi.CacheMarkKey(MarkKey.Value);
-        MarkKey.SettingChanged += (_, _) => FilterUi.CacheMarkKey(MarkKey.Value);
+        FilterUi.CacheMarkKey(MarkKeyNow);
+        MarkKey.SettingChanged += (_, _) => FilterUi.CacheMarkKey(MarkKeyNow);
         ButtonOffsetX.SettingChanged += (_, _) => FilterUi.PlacementDirty = true;
         ButtonOffsetY.SettingChanged += (_, _) => FilterUi.PlacementDirty = true;
         // Verdict or shown text depend on these: caches out, label/tooltip redraw.
@@ -100,11 +236,14 @@ internal sealed partial class Plugin : ModPlugin
             FilterUi.EnsureButton(gui);
             FilterUi.PlacementDirty = true;
         }
+        // Debug build only (call vanish in Release): in-world self tests.
+        SelfTests.Register();
     }
 
     // Me going off (patches still on during this call). Every object me made go away; lists stay in character.
     protected override void OnDeactivated()
     {
+        SelfTests.Unregister();
         AutoPickupScope.Active = false;
         AutoPickupScope.LastEnabled = null;
         Safe(FilterUi.DestroyButton, "button");

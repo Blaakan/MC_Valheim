@@ -44,4 +44,9 @@ internal static class HitScope
     {
         s_target = null;
     }
+
+#if DEBUG
+    // Debug build only: self test look if scope is open (inside other mod's on-hit effect) or leaked after the hit.
+    internal static bool DebugIsOpen => (object)s_target != null;
+#endif
 }

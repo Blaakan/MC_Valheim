@@ -523,6 +523,9 @@ internal static class SongShare
                 return;
             }
             Transfers.Add(new Transfer { Peer = peer, Hash = hash, Request = request, Data = data });
+#if DEBUG
+            SendsStarted++;
+#endif
             Log.Debug($"Sending server song \"{song.Name}\" ({song.Size} bytes) to {PeerName(peer)}.");
         }
         catch (Exception e)
@@ -592,11 +595,19 @@ internal static class SongShare
                 Transfers.RemoveAt(_next);
                 continue;
             }
-            if (!CanSend(t.Peer.m_socket.GetSendQueueSize()))
+            var queue = t.Peer.m_socket.GetSendQueueSize();
+#if DEBUG
+            MaxQueueSeen = Math.Max(MaxQueueSeen, queue);
+#endif
+            if (!CanSend(queue))
             {
                 _next++;
                 continue;
             }
+#if DEBUG
+            MaxQueueAtSend = Math.Max(MaxQueueAtSend, queue);
+            PiecesSent++;
+#endif
             t.Peer.m_rpc.Invoke(ChunkRpc, ChunkPackage(t.Hash, t.Request, t.Data, t.Offset));
             t.Offset += Math.Min(ChunkBytes, t.Data.Length - t.Offset);
             sent++;
@@ -1025,6 +1036,32 @@ internal static class SongShare
     internal static int SharedCount => ServerSongs.Count;
     internal static int TransferCount => Transfers.Count;
     internal static int CachedCount => Cache.Count;
+
+    // Self test, client side: downloads asked for since the game started (each pick that needs the server: +1).
+    internal static int RequestsMade => _requestId;
+
+    // Self test, client side: the server's list is here, and it says it shares.
+    internal static bool ListKnown => _listKnown;
+    internal static bool ListShared => _listShared;
+
+    // Self test, server side: transfers started since the game started; hash and size of each shared song by name.
+    internal static int SendsStarted;
+
+    // Self test, server side: pieces sent, the longest send queue a piece was sent into (bytes waiting just before),
+    // and the longest queue seen while a transfer waited or ran.
+    internal static int PiecesSent;
+    internal static int MaxQueueAtSend;
+    internal static int MaxQueueSeen;
+
+    internal static string DescribeShared()
+    {
+        var sb = new StringBuilder();
+        foreach (var s in ServerSongs)
+        {
+            sb.Append(s.Name).Append('=').Append(s.Hash.ToString("x8", CultureInfo.InvariantCulture)).Append(':').Append(s.Size).Append(';');
+        }
+        return sb.ToString();
+    }
     internal static IReadOnlyList<SongEntry> ClientList => ClientSongs;
 
     // Self test: read the folder now.

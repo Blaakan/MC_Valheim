@@ -32,13 +32,22 @@ namespace MC.Exploration.SailingSkillMod;
 //                    no XP; rules back = all back
 //   sailing.ship     NOTE dump of every ship prefab and minimap values; then open sea found with WorldGenerator,
 //                    player teleported there, Karve spawned and steered: paddle acceleration and brake measured at
-//                    level 0 and 100 (paddle compare 0.5 s + 1 s speed, need 15% more; 0.25 s sample only in NOTE,
-//                    wave noise), sail speed checked when wind enough (else NOTE); player back at the spawn. No
-//                    sea in reach = NOTE, no measure.
+//                    level 0 and 100 (paddle compare mean speed from 0.5 to 1 s, need 15% more; speeds are the level
+//                    part along the bow: Ship.GetSpeed carries the bobbing on waves), sail speed checked when wind
+//                    enough (else NOTE); player back at the spawn. No sea in reach = NOTE, no measure.
+// More tests live in the other SelfTests.*.cs files (same class, Debug only):
+//   SelfTests.Tools.cs        log watcher, HUD message spy, Skills panel reader, console runner, wind setter
+//   SelfTests.Skill.cs        sailing.panel (console, Skills panel, save data, death penalty, language)
+//   SelfTests.Air.cs          sailing.xp, sailing.hud, sailing.sail, sailing.map, sailing.damage, sailing.ram, sailing.toggle,
+//                             sailing.bug.wind-icon-foreign, sailing.bug.sail-overshoot, sailing.cleanlog (ship in
+//                             the air above the spawn)
+//   SelfTests.Sea.cs          sailing.reach, sailing.upwind, sailing.paddle, sailing.heel, sailing.crew (real water,
+//                             fixed wind)
+//   SelfTests.Multiplayer.cs  sailing.mp.* client tests and their server half (tools/Test-Multiplayer.ps1)
 // Me force rules only with ServerRules.TestRules / TestPending and the level with HelmSkill.TestLocalLevel: never
 // config. Character skills changed in a test are put back from a saved copy (Skills.Save / Load). Every ship me spawn is
 // destroyed, the player put back where he was.
-internal static class SelfTests
+internal static partial class SelfTests
 {
     private const string NetworkName = "sailing.network";
     private const string MathName = "sailing.math";
@@ -57,6 +66,18 @@ internal static class SelfTests
         SelfTest.Register(HelmName, RunHelm);
         SelfTest.Register(PendingName, RunPending);
         SelfTest.Register(ShipName, RunShip);
+        RegisterMore();
+#endif
+    }
+
+    // Plugin BindConfig, once per process, feature on or off: log watcher (counts what this mod logs) and the tests
+    // that run while the feature is off (server without the mod).
+    [Conditional("DEBUG")]
+    internal static void RegisterAlways()
+    {
+#if DEBUG
+        StartWatch();
+        RegisterAlwaysMultiplayer();
 #endif
     }
 
@@ -70,16 +91,62 @@ internal static class SelfTests
         SelfTest.Unregister(HelmName);
         SelfTest.Unregister(PendingName);
         SelfTest.Unregister(ShipName);
+        UnregisterMore();
         ClearOverrides();
 #endif
     }
 
 #if DEBUG
+    // Tests of the other SelfTests.*.cs files, after the six above. sailing.cleanlog last: it looks back at everything
+    // the mod logged so far.
+    private static void RegisterMore()
+    {
+        SelfTest.Register(PanelName, RunPanel);
+        SelfTest.Register(XpName, RunXp);
+        SelfTest.Register(HudName, RunHud);
+        SelfTest.Register(SailName, RunSail);
+        SelfTest.Register(MapName, RunMap);
+        SelfTest.Register(DamageName, RunDamage);
+        SelfTest.Register(RamName, RunRam);
+        SelfTest.Register(ToggleName, RunToggle);
+        SelfTest.Register(ReachName, RunReach);
+        SelfTest.Register(UpwindName, RunUpwind);
+        SelfTest.Register(PaddleName, RunPaddle);
+        SelfTest.Register(HeelName, RunHeel);
+        SelfTest.Register(CrewName, RunCrew);
+        SelfTest.Register(HudForeignName, RunHudForeign);
+        SelfTest.Register(BugSailName, RunBugSailOvershoot);
+        SelfTest.Register(CleanLogName, RunCleanLog);
+        RegisterMultiplayer();
+    }
+
+    private static void UnregisterMore()
+    {
+        SelfTest.Unregister(PanelName);
+        SelfTest.Unregister(XpName);
+        SelfTest.Unregister(HudName);
+        SelfTest.Unregister(SailName);
+        SelfTest.Unregister(MapName);
+        SelfTest.Unregister(DamageName);
+        SelfTest.Unregister(RamName);
+        SelfTest.Unregister(ToggleName);
+        SelfTest.Unregister(ReachName);
+        SelfTest.Unregister(UpwindName);
+        SelfTest.Unregister(PaddleName);
+        SelfTest.Unregister(HeelName);
+        SelfTest.Unregister(CrewName);
+        SelfTest.Unregister(HudForeignName);
+        SelfTest.Unregister(BugSailName);
+        SelfTest.Unregister(CleanLogName);
+        UnregisterMultiplayer();
+    }
+
     private static void ClearOverrides()
     {
         ServerRules.TestPending = false;
         ServerRules.TestRules = null;
         HelmSkill.TestLocalLevel = null;
+        PlayerCheck.TestAllowWithoutMod = null;
     }
 
     // ---------- helpers ----------
@@ -770,8 +837,57 @@ internal static class SelfTests
         c.Check(Compat.Matches("GrindstoneSkills", new[] { "grindstoneskills" }) && !Compat.Matches("Swim Dive", new[] { "Sailing" })
                 && !Compat.Matches(null, new[] { "Sailing" }),
             "compat name markers");
+
+        // Sail response: my catch-up move the stored sail force after vanilla SmoothDamp and leave its velocity alone.
+        // Real engine SmoothDamp here: force never go past the target and never turn around when the sail empties,
+        // also when the target switch mid-way (15 steps); from a settled sail (100 steps) it only ever come closer.
+        foreach (var rate in new[] { 0.5f, r.SailResponseAtMax, SailingRules.SailResponseMax })
+        {
+            foreach (var segment in new[] { 100, 15 })
+            {
+                var closer = segment == 100 && rate >= r.SailResponseAtMax;
+                c.Check(CatchUpStaysBeforeTarget(rate, segment, closer, out var detail),
+                    $"sail catch-up at {F(rate)}/s, target switched every {segment} steps: {detail}");
+            }
+        }
         c.Report();
         yield break;
+    }
+
+    // Vanilla Ship.GetSailForce step (SmoothDamp, 1 s, max speed 99, velocity kept between steps) then my catch-up
+    // (Lerp toward the same target), with the target going full, empty, full the other way, full, empty.
+    private static bool CatchUpStaysBeforeTarget(float rate, int segment, bool onlyCloser, out string detail)
+    {
+        const float dt = 0.02f;
+        var full = new Vector3(0.02f, 0f, 0.03f);
+        var force = Vector3.zero;
+        var velocity = Vector3.zero;
+        var share = SailMath.CatchUp(rate, 1f, dt);
+        detail = "";
+        foreach (var target in new[] { full, Vector3.zero, -full, full, Vector3.zero })
+        {
+            var approach = target - force;
+            var last = approach.magnitude;
+            for (var i = 0; i < segment; i++)
+            {
+                force = Vector3.SmoothDamp(force, target, ref velocity, 1f, 99f, dt);
+                force = Vector3.Lerp(force, target, share);
+                var left = target - force;
+                if (Vector3.Dot(left, approach) < -1e-9f)
+                {
+                    detail = $"the force went past its target at step {i} ({left.magnitude.ToString("0.#######", CultureInfo.InvariantCulture)} beyond)";
+                    return false;
+                }
+                var distance = left.magnitude;
+                if (onlyCloser && distance > last + 1e-7f)
+                {
+                    detail = $"the force moved away from its target at step {i}";
+                    return false;
+                }
+                last = distance;
+            }
+        }
+        return true;
     }
 
     private static void Approach(float thrust, float drag, float submersion, out float top, out int stepsTo90)
@@ -1204,6 +1320,7 @@ internal static class SelfTests
     {
         internal float Level;
         internal readonly float[] Paddle = new float[4];   // speed after 0.25, 0.5, 1, 3 s at Slow
+        internal float PaddleEarly;                        // mean speed from 0.5 to 1 s at Slow, every physics step
         internal float StopFrom;
         internal float StopAfter;                          // 2 s after Stop
         internal float Sail2;                              // speed after 2 s at Full
@@ -1213,8 +1330,8 @@ internal static class SelfTests
 
         internal string Text() =>
             $"Sailing {F(Level)}: paddle {F(Paddle[0])}/{F(Paddle[1])}/{F(Paddle[2])}/{F(Paddle[3])} m/s after "
-            + $"0.25/0.5/1/3 s, stop {F(StopFrom)} -> {F(StopAfter)} m/s in 2 s, sail {F(Sail2)}/{F(Sail4)} m/s after "
-            + $"2/4 s (wind {F(Wind)}, d {F(WindD)})";
+            + $"0.25/0.5/1/3 s (mean {F(PaddleEarly)} from 0.5 to 1 s), stop {F(StopFrom)} -> {F(StopAfter)} m/s in 2 s, "
+            + $"sail {F(Sail2)}/{F(Sail4)} m/s after 2/4 s (wind {F(Wind)}, d {F(WindD)}); speeds level along the bow";
     }
 
     private static IEnumerator RunShip()
@@ -1362,6 +1479,22 @@ internal static class SelfTests
         ship.m_speed = Ship.Speed.Stop;
     }
 
+    // Speed along the bow, level part only (no up/down). Vanilla Ship.GetSpeed take the whole velocity along the pitched
+    // bow: on a rough sea the ship's bobbing (1 m/s and more, bow up or down 10 degrees) leak into it, +-0.1 m/s, as
+    // big as the paddle speed of the first second (run 2026-10-07, 2 m waves: 0.092 + 0.3 m/s at Sailing 0 against
+    // 0.05 + 0.202 at 100, while the 3 s speeds were 0.666 against 0.855). Waves only push the ship up and down
+    // (Ship.CustomFixedUpdate: every water force is Vector3.up), paddle and sail push along the bow: level speed
+    // along the level bow show them without the bobbing.
+    private static float BowSpeedFlat(Ship ship)
+    {
+        var bow = Flat(ship.transform.forward);
+        if (ship.m_body == null || bow.sqrMagnitude < 1e-6f)
+        {
+            return 0f;
+        }
+        return Vector3.Dot(Flat(ship.m_body.linearVelocity), bow.normalized);
+    }
+
     private static IEnumerator Measure(Ship ship, Vector3 start, Run run)
     {
         HelmSkill.TestLocalLevel = run.Level;
@@ -1370,18 +1503,27 @@ internal static class SelfTests
         ship.m_speed = Ship.Speed.Slow;
         var t0 = Time.time;
         var marks = new[] { 0.25f, 0.5f, 1f, 3f };
+        var earlySum = 0f;
+        var earlyCount = 0;
         for (var i = 0; i < marks.Length; i++)
         {
             while (Time.time - t0 < marks[i])
             {
                 yield return new WaitForFixedUpdate();
+                var t = Time.time - t0;
+                if (t >= 0.5f && t <= 1f)
+                {
+                    earlySum += BowSpeedFlat(ship);
+                    earlyCount++;
+                }
             }
-            run.Paddle[i] = ship.GetSpeed();
+            run.Paddle[i] = BowSpeedFlat(ship);
         }
+        run.PaddleEarly = earlyCount > 0 ? earlySum / earlyCount : 0f;
         ship.m_speed = Ship.Speed.Stop;
-        run.StopFrom = ship.GetSpeed();
+        run.StopFrom = BowSpeedFlat(ship);
         yield return new WaitForSeconds(2f);
-        run.StopAfter = ship.GetSpeed();
+        run.StopAfter = BowSpeedFlat(ship);
 
         ResetBoat(ship, start, BeamReach());
         yield return FixedSteps(2);
@@ -1390,31 +1532,33 @@ internal static class SelfTests
         run.WindD = env != null ? Vector3.Dot(env.GetWindDir(), -ship.transform.forward) : 0f;
         ship.m_speed = Ship.Speed.Full;
         yield return new WaitForSeconds(2f);
-        run.Sail2 = ship.GetSpeed();
+        run.Sail2 = BowSpeedFlat(ship);
         yield return new WaitForSeconds(2f);
-        run.Sail4 = ship.GetSpeed();
+        run.Sail4 = BowSpeedFlat(ship);
         ship.m_speed = Ship.Speed.Stop;
     }
 
     private static void Compare(Checks c, Run low, Run high)
     {
-        // Paddle: 0.5 s and 1 s speed added up, only while Sailing 0 still clearly speed up at 1 s (under 70% of its
-        // 3 s speed). 0.25 s sample too small: ship just settle on other wave, noise big as the bonus (one run 0.047
-        // against 0.051 m/s, then 0.121 against 0.094 at 0.5 s). Me not compare it.
-        var lowEarly = low.Paddle[1] + low.Paddle[2];
-        var highEarly = high.Paddle[1] + high.Paddle[2];
-        if (low.Paddle[2] > 0.05f && low.Paddle[2] < low.Paddle[3] * 0.7f)
+        // Paddle: mean level speed along the bow from 0.5 to 1 s (every physics step), only while Sailing 0 still
+        // clearly speed up then (under 70% of its 3 s speed). Vanilla paddle = 0.2 m/s per second on a Karve, x1.5 at
+        // Sailing 100: about 0.15 against 0.225 m/s. Single samples of Ship.GetSpeed were wave noise (see
+        // BowSpeedFlat); the 0.25 s sample is too small to compare at all.
+        var lowEarly = low.PaddleEarly;
+        var highEarly = high.PaddleEarly;
+        if (lowEarly > 0.05f && lowEarly < low.Paddle[3] * 0.7f)
         {
             c.Check(highEarly > lowEarly * 1.15f,
-                $"paddle: Sailing 100 not faster to pick up speed (0.5 s + 1 s: {F(high.Paddle[1])} + {F(high.Paddle[2])} "
-                + $"against {F(low.Paddle[1])} + {F(low.Paddle[2])} m/s)");
+                $"paddle: Sailing 100 not faster to pick up speed (mean from 0.5 to 1 s: {F(highEarly)} against "
+                + $"{F(lowEarly)} m/s, level speed along the bow)");
         }
         else
         {
             c.Note("paddle: Sailing 0 not clearly accelerating at 1 s (70% of its 3 s speed or more, or no speed): "
                    + "acceleration not compared");
         }
-        if (low.StopFrom > 0.5f && high.StopFrom > 0.5f)
+        // Level speed after 3 s of paddling is about 0.57 m/s at Sailing 0 (0.2 m/s per second, little drag yet).
+        if (low.StopFrom > 0.4f && high.StopFrom > 0.4f)
         {
             var lowKeep = low.StopAfter / low.StopFrom;
             var highKeep = high.StopAfter / high.StopFrom;
@@ -1476,7 +1620,8 @@ internal static class SelfTests
 
     // Vanilla distant teleport (loading screen, hold until the area is there). Vanilla refuse a new one within 2 s of
     // the last: retry.
-    private static IEnumerator TeleportAndWait(Player player, Vector3 target, float seconds, Box result)
+    // fast: skip vanilla's 8 s of teleport animation (timer put past it); the wait for the area stay.
+    private static IEnumerator TeleportAndWait(Player player, Vector3 target, float seconds, Box result, bool fast = false)
     {
         result.Ok = false;
         var until = Time.time + seconds;
@@ -1487,6 +1632,10 @@ internal static class SelfTests
                 yield break;
             }
             yield return new WaitForSeconds(0.25f);
+        }
+        if (fast)
+        {
+            player.m_teleportTimer = 8.1f;
         }
         while (player.IsTeleporting() && Time.time < until)
         {
