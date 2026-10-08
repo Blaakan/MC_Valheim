@@ -164,8 +164,31 @@ internal static class ProbeDriver
             yield break;
         }
         SelfTest.Note("probe", "quitting the game");
+        FlushLog();
         yield return new WaitForSecondsRealtime(1f);
+        FlushLog();
         Application.Quit();
+    }
+
+    // BepInEx write its log file every 2 s. Quit from main menu (refused player) is instant: last lines never
+    // reached the file and script said "client never logged DONE" (seen 2026-10-08, vanilla-client scenario, about
+    // one run in two). In a world the slow shutdown hid it. Me write them out before the quit.
+    private static void FlushLog()
+    {
+        try
+        {
+            foreach (var listener in BepInEx.Logging.Logger.Listeners)
+            {
+                if (listener is BepInEx.Logging.DiskLogListener disk && disk.LogWriter != null)
+                {
+                    disk.LogWriter.Flush();
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Warning($"log flush before quit failed: {e.Message}");
+        }
     }
 
     private static List<KeyValuePair<string, Func<IEnumerator>>> SinglePlayerTestList(List<string> skipped, out int registeredCount)

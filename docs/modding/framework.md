@@ -264,7 +264,10 @@ internal static class CrossbowSelfTests
 #endif
 ```
 
-- Name tests `<modshortname>.<what>`. A test must report at least one `SelfTest.Pass` or `SelfTest.Fail`, or it
+- Name tests `<modshortname>.<what>`. A check that fails because of a known bug of the mod goes alone in its own
+  small test `<modshortname>.bug.<what>`, so it only blocks the `TESTING.md` items it is about; a check that depends
+  on the player's other installed mods (for example "no error line since the game started") also gets its own test.
+  A test must report at least one `SelfTest.Pass` or `SelfTest.Fail`, or it
   fails. `SelfTest.Note` adds context. `SelfTest.Screenshot(name, label)` saves `<name>__<label>.png`; yield two
   frames before changing the screen, and take at most one screenshot per frame.
 - Yield `null`, a nested `IEnumerator`, `WaitForSeconds`, `WaitForSecondsRealtime`, `WaitUntil` / `WaitWhile`, an
@@ -335,7 +338,21 @@ private static IEnumerator ServerRules(string arg, object[] reply)
 
 - A client test runs only in the scenario it registered for, after `probe.mp.baseline`, with the same timeout, filter
   (`-Only`) and Pass / Fail / Note / Screenshot rules as an in-world test. `SelfTest.Scenario` tells the scenario
-  (`""` in a single-player run), `SelfTest.IsMultiplayerRun` whether this is one.
+  (`""` in a single-player run), `SelfTest.IsMultiplayerRun` whether this is one. `SelfTest.Modded` is the usual
+  scenario; a test can register for another one by its name (`"vanilla-server"`: what the mod does on a server
+  without it). Such a test must be registered while the mod is inactive, so register it outside `OnActivated`
+  (for example from `BindConfig`, through a `[Conditional("DEBUG")]` method).
+- A mod that runs on clients only (`ModSide=Client`) is not loaded by the dedicated server, so it has no server
+  steps: its multiplayer tests can only check the client side and what the client sent.
+- **A dedicated server holds no objects.** It runs its own `assembly_valheim.dll` (`valheim_server_Data\Managed`),
+  not the client's that `.ref` is decompiled from. Its `Game.FixedUpdate` puts the server's reference position at
+  (1000000, 0, 1000000), outside the world, on every physics step, so the server builds no zone and has no copy of
+  any player, creature or piece, wherever the players stand (`docs/game/core-engine.md`, section 15; seen again
+  2026-10-08 on 1.0.17: a position set once is gone one physics step later). A server step can therefore read ZDOs, rules and what it relays, but not game objects. A
+  step that needs the server to simulate something must put the reference position back on the player's place
+  after every physics step for as long as it watches (Weapon Moveset's `HoldRef` in `SelfTests.Mp.cs`), which makes
+  the server do more than a real one does. One client is not a second player: what another player's game sees,
+  owns or simulates stays a by-hand check.
 - A server step gets the argument string and must call `SelfTest.Answer(reply, ok, detail)`; it runs with a timeout
   (70 % of the test timeout) on the server. The client waits for the answer up to 75 % of the test timeout.
   Server-side `Note`/`Pass`/`Fail` lines go to the server's log; the script prints them with an `S` prefix and a

@@ -121,6 +121,13 @@ mods and multiplayer tests) + in-game tests.
   player without the mod) always get a test.
 - A mod's pending tests can also be mirrored in a GitHub issue (backlog mod workflow, step 8). `TESTING.md` stays
   the source of truth; when ticking it, tick the issue too.
+- A `TESTING.md` item can end with an automation note (last line of the item; the issue carries the same note):
+  `*Automated: `a`, `b`.*` = every expectation of the item is asserted by those self-tests, so a passing run ticks it
+  with nobody looking; `*Partly automated (`a`); by hand: <what is left>.*` = the box stays for a person, who only
+  checks the by-hand part; `**FAILED:** automated test: <what> (self-test `a`)` on a `[!]` item. Only write
+  "Automated" when the test really asserts the whole item (sounds as heard, looks, a real controller, a real second
+  player are by-hand parts). A self-test named `<prefix>.bug.<what>` holds one check that fails because of a known
+  bug of the mod: when the mod is fixed, fold the check back into its normal test and reset the item to `[ ]`.
 
 ## Backlog mod workflow (implement an idea end to end)
 
