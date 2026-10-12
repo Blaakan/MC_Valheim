@@ -24,8 +24,8 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 //   forge.compat.other-forge     stand-in for another Forge mod (foreign prefix that take DoCrafting over)
 //   forge.compat.sort-chest      Sort Chest: each idol level keep its own stack, stars stay
 //   forge.compat.loot-filter     Loot Pickup Filter: mark and stars on one slot, one entry for every level
-//   forge.cleanlog               what this mod say in log while every other forge test ran
-//   forge.bug.menu-warning       (real bug, fail until mod fixed) no warning that call existing items unknown
+//   forge.cleanlog               what this mod say in log since the game started, while every other forge test ran;
+//                                no warning that call existing items unknown (main menu too)
 internal static partial class SelfTests
 {
     private const string SearchName = "forge.compat.search";
@@ -37,7 +37,6 @@ internal static partial class SelfTests
     private const string SortChestName = "forge.compat.sort-chest";
     private const string LootFilterName = "forge.compat.loot-filter";
     private const string CleanLogName = "forge.cleanlog";
-    private const string BugMenuWarningName = "forge.bug.menu-warning";
 
     private const string SearchGuid = "MC.UX.Crafting.SearchSort";
     private const string SearchSpace = "MC.UX.CraftingSearchSortMod.";
@@ -714,7 +713,9 @@ internal static partial class SelfTests
     // with this mod's code in their stack). With settings in force (no test rules) there must be no error line and
     // no "Unknown item name(s)" warning about a name the game really does not have. Lines a test made on purpose
     // (typo rules, stand-in Forge mod) no count, a failed self test's own line neither. Warning that call items the
-    // game HAS unknown = the mod's own mistake: forge.bug.menu-warning count those.
+    // game HAS unknown = the mod's own mistake, counted too: until 0.1.1 the table got built on the main menu's item
+    // database while it held only other mods' items (at game start with Jotunn-based mods, at every return to the menu
+    // with MC item mods), and every default name looked unknown.
     private static IEnumerator RunCleanLog()
     {
         var c = new Checks(CleanLogName);
@@ -733,23 +734,6 @@ internal static partial class SelfTests
         var reallyUnknown = UnknownWarnings().SelectMany(l => UnknownNames(l.Text)).Where(n => Prefab(n) == null).Distinct().ToList();
         c.Check(reallyUnknown.Count == 0,
             $"no 'Unknown item name(s)' warning about a name this game does not have, with the settings in force ({reallyUnknown.Count} name(s): {string.Join(", ", reallyUnknown.Take(8).ToArray())})");
-        SelfTest.Note(CleanLogName, $"{lines.Count} lines heard from {ModInfo.Name}, {lines.Count(l => l.Level == LogLevel.Warning)} warnings "
-                                    + $"({lines.Count(l => l.Level == LogLevel.Warning && l.Provoked)} provoked by tests)");
-        c.Report();
-        yield break;
-    }
-
-    // ---------- forge.bug.menu-warning (T17, T29: real bug, fail until mod fixed) ----------
-
-    // Run 2026-10-07: at game start (and in multiplayer runs at every return to the main menu) the mod logged one
-    // "Unknown item name(s) in the idol settings, ignored: Upgrader0Weapon, Upgrader0Armor, Wood, TrophyDeer ..."
-    // naming every default item. All those items exist. IdolCatalog.Ensure only wait while the item database is
-    // empty; the main menu's database hold a few items of other mods and none of the game's, so the table get built
-    // against it and every name look unknown. Me fail when any warning since game start named an item the game has.
-    private static IEnumerator RunBugMenuWarning()
-    {
-        var c = new Checks(BugMenuWarningName);
-        c.Check(LogWatch.Installed, "the log watch was listening");
         var wrong = new List<string>();
         var names = new List<string>();
         foreach (var line in UnknownWarnings())
@@ -765,6 +749,8 @@ internal static partial class SelfTests
         c.Check(wrong.Count == 0,
             $"no 'Unknown item name(s)' warning names an item the game has ({wrong.Count} such warning(s) since the game started, {names.Count} existing item(s) called unknown: "
             + $"{string.Join(", ", names.Take(6).ToArray())}{(names.Count > 6 ? ", ..." : "")})");
+        SelfTest.Note(CleanLogName, $"{lines.Count} lines heard from {ModInfo.Name}, {lines.Count(l => l.Level == LogLevel.Warning)} warnings "
+                                    + $"({lines.Count(l => l.Level == LogLevel.Warning && l.Provoked)} provoked by tests)");
         c.Report();
         yield break;
     }

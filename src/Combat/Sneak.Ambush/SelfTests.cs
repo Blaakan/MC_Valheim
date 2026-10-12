@@ -19,10 +19,10 @@ namespace MC.Combat.SneakAmbushMod;
 // -Mod Sneak.Ambush). Design 7.5:
 //   sneak.content      Smoke Screen item, projectile, cloud, recipe registered once (still once after two more
 //                      registrations), vanilla Smoke Bomb untouched, clone values, every name me rely on exist
-//                      (prefabs, animator trigger, status effect, layer), NOTE dumps of unverified game values
-//   sneak.bug.missing-bomb-error  known bug, alone: error "BombSmoke is missing" logged at the main menu when another
-//                      mod (Jotunn) show a half-filled item database there; FAIL while it was logged since start
-//   sneak.curve        early-game curve: crouched target = vanilla formula x 0.85 at Sneak 0, x 1 at Sneak 100
+//                      (prefabs, animator trigger, status effect, layer), NOTE dumps of unverified game values; no
+//                      "BombSmoke is missing" error since game start (L03); item database that is not the game's
+//                      (another mod's copy, world closing): item kept out, recipe hidden, nothing said (M18)
+//   sneak.curve       early-game curve: crouched target = vanilla formula x 0.85 at Sneak 0, x 1 at Sneak 100
 //   sneak.still        holding still -70% (icon, target), moving end it same frame (snap up), carried = no bonus,
 //                      rule change reach shown icon without re-add
 //   sneak.cover        In foliage at Bush01 (sight ray blocked, FoliageBonus 30 = x 0.7), crown ray under Beech1, fog
@@ -65,7 +65,6 @@ internal static partial class SelfTests
     {
 #if DEBUG
         SelfTest.Register(ContentName, RunContent);
-        SelfTest.Register(BugMissingBombName, RunBugMissingBomb);
         SelfTest.Register(CurveName, RunCurve);
         SelfTest.Register(StillName, RunStill);
         SelfTest.Register(CoverName, RunCover);
@@ -87,7 +86,6 @@ internal static partial class SelfTests
     {
 #if DEBUG
         SelfTest.Unregister(ContentName);
-        SelfTest.Unregister(BugMissingBombName);
         SelfTest.Unregister(CurveName);
         SelfTest.Unregister(StillName);
         SelfTest.Unregister(CoverName);
@@ -110,9 +108,6 @@ internal static partial class SelfTests
     }
 
 #if DEBUG
-    // Debug only (release keep its old constants, nothing new).
-    private const string BugMissingBombName = "sneak.bug.missing-bomb-error";
-
     // Names me (and TESTING.md) rely on: must be network prefabs in this game version.
     private static readonly string[] NeededPrefabs =
     {
@@ -1169,6 +1164,7 @@ internal static partial class SelfTests
             CheckClones(c, db);
             CheckNames(c, db, scene, player);
             NoteGameValues(c, db, player);
+            CheckOtherDatabases(c, db);
             c.Report();
         }
         finally
@@ -1177,20 +1173,70 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------- sneak.bug.missing-bomb-error (L03) ----------
-
-    // Known bug of the mod, alone here so sneak.content judge the rest. With some other mods installed (Jotunn) the
-    // main menu show an item database that is not empty and hold no vanilla item yet: SmokeContent.RegisterInObjectDB
-    // then log the error "The vanilla Smoke Bomb (BombSmoke) is missing from the item database ..." although the
-    // Smoke Screen is made a moment later. FAIL while that error was logged since the game started.
-    private static IEnumerator RunBugMissingBomb()
+    // L03 and M18 (0.1.1). Item database that is not the game's: another mod's own copy (only its items, no Wood;
+    // Jotunn-based mods show one at the main menu), and the game's own while the world closes (item prefabs already
+    // destroyed, lookup give nothing: leaving a server that kept the mod off turn the mod on at that moment). Our item
+    // never go into the first; on the second the recipe hide without a word (was five false warnings). Stand-in
+    // databases sit on an inactive object: their Awake never run, so ObjectDB.instance stay the game's.
+    private static void CheckOtherDatabases(Checks c, ObjectDB db)
     {
-        var c = new Checks(BugMissingBombName);
-        c.Check(!SmokeContent.MissingReported,
-            "the error \"The vanilla Smoke Bomb (BombSmoke) is missing ...\" was logged since the game started "
-            + $"(the Smoke Screen was made all the same: {SmokeContent.Built})");
-        c.Report();
-        yield break;
+        const string defaultRecipe = "Resin:2,Coal:1,LeatherScraps:1 -> 2 at piece_workbench level 1";
+        var recipe = SmokeContent.CraftRecipe;
+        if (!c.Check(recipe != null && recipe.m_enabled && ZNetScene.instance != null && SmokeContent.HasVanillaItems(db),
+                "stand-in database checks need the recipe shown, a world and the game's item database"))
+        {
+            return;
+        }
+        GameObject holder = null;
+        try
+        {
+            Tap.Install(false);
+            holder = new GameObject("MC_SelfTest_OtherDatabases");
+            holder.SetActive(false);
+
+            var theirs = holder.AddComponent<ObjectDB>();
+            var foreign = new GameObject("MC_SelfTest_ForeignItem");
+            foreign.transform.SetParent(holder.transform, false);
+            theirs.m_items.Add(foreign);
+            theirs.m_itemByHash[foreign.name.GetStableHashCode()] = foreign;
+            c.Check(ReferenceEquals(ObjectDB.instance, db), "a stand-in database took the place of the game's (ObjectDB.instance changed)");
+            c.Check(!SmokeContent.HasVanillaItems(theirs), "a database holding one item of another mod and no Wood counts as the game's");
+            SmokeContent.RegisterInObjectDB(theirs);
+            c.Check(theirs.m_items.Count == 1 && !theirs.m_itemByHash.ContainsKey(SmokeContent.ItemName.GetStableHashCode())
+                    && theirs.m_recipes.Count == 0,
+                $"another mod's item database got our item or recipe (items {theirs.m_items.Count}, recipes {theirs.m_recipes.Count})");
+            c.Check(recipe.m_enabled, "registering in another mod's item database hid the recipe");
+
+            var closing = holder.AddComponent<ObjectDB>();
+            var wood = new GameObject(SmokeContent.VanillaWoodName);
+            wood.transform.SetParent(holder.transform, false);
+            closing.m_items.Add(wood);
+            closing.m_itemByHash[SmokeContent.VanillaWoodName.GetStableHashCode()] = wood;
+            c.Check(SmokeContent.HasVanillaItems(closing), "a database with a live Wood item does not count as the game's");
+            Object.DestroyImmediate(wood);
+            c.Check(!SmokeContent.HasVanillaItems(closing), "a database whose Wood item is destroyed (world closing) counts as the game's");
+            SmokeContent.Rebuild(closing);
+            c.Check(!recipe.m_enabled, "the recipe is still shown after a rebuild on a database whose items are gone");
+            var said = Tap.Problems();
+            c.Check(said.Length == 0, $"registering in another mod's database or rebuilding on a closing one logged: {said}");
+            c.Check(!SmokeContent.MissingReported, "the stand-in databases set off the \"Smoke Bomb is missing\" error");
+
+            SmokeContent.Rebuild();
+            var text = RecipeText(recipe);
+            c.Check(recipe.m_enabled && text == defaultRecipe,
+                $"back on the game's database: recipe shown {recipe.m_enabled}, \"{text}\" (expected \"{defaultRecipe}\")");
+            said = Tap.Problems();
+            c.Check(said.Length == 0, $"the rebuild on the game's database logged: {said}");
+        }
+        finally
+        {
+            SmokeContent.Rebuild();
+            if (holder != null)
+            {
+                Object.Destroy(holder);
+            }
+            Tap.Release();
+        }
     }
 
     private static int OurRecipes(ObjectDB db) => db.m_recipes.Count(r => r != null && r.name == SmokeContent.RecipeName);
@@ -1202,6 +1248,11 @@ internal static partial class SelfTests
     private static void CheckRegistered(Checks c, ObjectDB db, ZNetScene scene)
     {
         c.Check(SmokeContent.Built, "the Smoke Screen was not made from BombSmoke");
+        // L03: with some other mods (Jotunn-based) the main menu show an item database that hold their items and none
+        // of the game's. Until 0.1.1 that logged this error although the Smoke Screen was made a moment later.
+        c.Check(!SmokeContent.MissingReported,
+            "the error \"The vanilla Smoke Bomb (BombSmoke) is missing ...\" was logged since the game started "
+            + $"(the Smoke Screen was made all the same: {SmokeContent.Built})");
         var item = SmokeContent.ItemPrefab;
         var projectile = SmokeContent.ProjectilePrefab;
         var cloud = SmokeContent.CloudPrefab;

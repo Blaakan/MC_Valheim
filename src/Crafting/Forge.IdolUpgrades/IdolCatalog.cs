@@ -41,6 +41,7 @@ internal static class IdolCatalog
     private static readonly Dictionary<string, Idol> ByName = new Dictionary<string, Idol>();
     private static readonly Idol[,] ByTier = new Idol[IdolTierDefaults.Count, 2]; // [tier, 0 battle / 1 protection]
     private static readonly Tier[] Tiers = new Tier[IdolTierDefaults.Count];
+    private static readonly int VanillaWoodHash = "Wood".GetStableHashCode();
     private static ObjectDB _builtFor;
     private static bool _dirty = true;
     private static ForgeRules _rulesSeen;
@@ -140,6 +141,13 @@ internal static class IdolCatalog
         if (!_dirty && ReferenceEquals(db, _builtFor))
         {
             return true;
+        }
+        // Not the game's database yet: menu list holding only other mods' items (first Awake of a later menu load
+        // with item mods, Jotunn-based mods at start), no Wood. Table built on it called every name unknown. Not
+        // ready, stay dirty, say nothing.
+        if (db.GetItemPrefab(VanillaWoodHash) == null)
+        {
+            return false;
         }
         try
         {

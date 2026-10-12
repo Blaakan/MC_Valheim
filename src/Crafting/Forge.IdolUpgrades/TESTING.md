@@ -4,15 +4,23 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
 Mods panel). Smoke test (`./tools/Test-Smoke.ps1`) passed 2026-09-30: loads, patches cleanly, JitCheck clean (494
 methods, 0 failures). Automated in-world self-tests (`./tools/Test-InWorld.ps1 -Mod Forge.IdolUpgrades`) pass:
 `forge.catalog`, `forge.icons`, `forge.tooltip`, `forge.popup`, `forge.idols` (includes what turning the mod off does to a running
 idol upgrade), `forge.refine`, `forge.tiers` (the idol tier rule against the ForgeUpgradeChart of the idea sheet, and a
 level 6 Stone axe that asks for and spends a Bronze idol at the Forge). No hands-on in-game test yet.
 
-**Automated checks (2026-10-08):** 54 of 59 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**0.1.1 (2026-10-08):** fixes the false "Unknown item name(s)" warning that listed every default item at the main menu
+(T17 and T29, reset). The check of the removed self-test `forge.bug.menu-warning` is back in `forge.cleanlog`;
+`forge.catalog` also checks an item database that holds only another mod's item. Run on 0.1.1 (2026-10-08, game
+1.0.17, with the other installed mods, one of them Jotunn-based): in-world self-tests 44 of 48 (the four that fail are
+the open `forge.bug.*` tests), multiplayer scenarios all passed; no "Unknown item name(s)" warning at the main menu,
+and none in the client log of the each-off scenario, which goes back to the main menu 30 times (26 such warnings
+before).
+
+**Automated checks (2026-10-08):** 54 of 58 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -135,8 +143,7 @@ the idol and refinement tests: it makes everything free.
   Forge: vanilla text and odds, no IDOLS tab.*
 - [x] **T17 Clean log:** play through T01-T12 while `./tools/Watch-Log.ps1 -Mine` runs. Expected: no error from Forge
   Idol Upgrades, and no "Unknown item name(s)" warning with the default settings.
-  *Automated test failing: False 'Unknown item name(s)' warning listing every default item, at the main menu
-  (self-test `forge.bug.menu-warning`) (the box was ticked by hand).*
+  *Automated: `forge.cleanlog`.*
 - [!] **T22 Starred icon while the game window is minimized:** the first time a starred icon is needed while the game
   cannot copy the icon (window minimized), for example a never-seen 2-star idol taken by auto pickup. It cannot be
   forced by hand: the self-test `forge.icons.empty-copy` forces it. Expected: the plain icon shows until the starred
@@ -174,14 +181,14 @@ the idol and refinement tests: it makes everything free.
   so is the IDOLS tab (no need to close and reopen the Forge).
   **FAILED:** automated test: Turned on while the Forge window is open: the IDOLS tab does not come back until the
   panel is rebuilt (self-test `forge.bug.tab-after-on`)
-- [!] **T29 No false "Unknown item name(s)" warning:** with the default settings, start the game while
+- [ ] **T29 No false "Unknown item name(s)" warning:** with the default settings, start the game while
   `./tools/Watch-Log.ps1 -Mine` runs, load a world, then log out to the main menu. Expected: the log never shows an
   "Unknown item name(s) in the idol settings, ignored: ..." warning that lists items the game has (`Upgrader0Weapon`,
-  `Wood`, `TrophyDeer`, ...), neither at the start nor back at the main menu. The self-test `forge.bug.menu-warning`
-  checks the part from the start of the game to the end of the tests; the return to the main menu needs a look at the
-  log.
-  **FAILED:** automated test: False 'Unknown item name(s)' warning listing every default item, at the main menu
-  (self-test `forge.bug.menu-warning`)
+  `Wood`, `TrophyDeer`, ...), neither at the start nor back at the main menu. The self-test `forge.cleanlog` checks
+  the part from the start of the game to the end of the tests; the return to the main menu needs a look at the log.
+  *Partly automated (`forge.cleanlog`, `forge.catalog`); by hand: Load a world, log out to the main menu and read the
+  log: no 'Unknown item name(s)' warning listing the default items may appear there (the automated single-player run
+  never goes back to the menu).*
 
 ## 0.1.0 — multiplayer (needs a second player)
 

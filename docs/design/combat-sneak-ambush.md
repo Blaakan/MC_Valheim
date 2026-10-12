@@ -788,10 +788,14 @@ again (a new plate starts hidden, 1.5).
 - Idempotent: a prefab is added to `ObjectDB.m_items`, `m_itemByHash`, `m_itemByData` only when its name hash is not
   registered yet; to `ZNetScene.m_prefabs` and `m_namedPrefabs` only when `!HasPrefab(hash)`; the recipe only when no
   recipe of that name is in `m_recipes`.
-- **Missing `BombSmoke`:** an empty database is skipped silently (the main menu's first `ObjectDB.Awake` runs on
-  empty lists before `CopyOtherDB` fills them, 1.7); the `CopyOtherDB` postfix then does the work. Only a populated
-  database (`m_items.Count > 0`, or a `ZNetScene` with prefabs) without `BombSmoke` (a game update) logs one error: no
-  item, the feature's Status says so, everything else of the mod still works.
+- **Missing `BombSmoke`:** a database that is not the game's is skipped silently: an empty one (the main menu's first
+  `ObjectDB.Awake` runs on empty lists before `CopyOtherDB` fills them, 1.7; the `CopyOtherDB` postfix then does the
+  work) and one without the vanilla `Wood` item (`SmokeContent.HasVanillaItems`). The second case is another mod's
+  own list: with Jotunn-based mods the main menu showed one holding only their items, and until 0.1.1 that logged a
+  false "Smoke Bomb is missing" error. Our item is never added to such a list either (our item alone in the menu's
+  empty list made Forge Idol Upgrades take the list for the game's). Only the game's database (it has `Wood`), or a
+  `ZNetScene` with prefabs, without `BombSmoke` (a game update) logs one error: no item, the feature's Status says
+  so, everything else of the mod still works.
 - **Throw guard** (`[AlwaysOnPatch]` prefix on `Humanoid.StartAttack(Character, bool)`): for the local player, when
   the feature is not active and the current weapon is a Smoke Screen, refuse the attack and show (at most every 3 s)
   "Smoke Screen does nothing here: Sneak Ambush is turned off (or the server does not have it)." Without it, a
@@ -1149,7 +1153,7 @@ No `?.` / `??` on Unity objects.
 | `MonsterAI.UpdateTarget(Humanoid, float, out bool, out bool)` (private) | postfix | forget: `m_timeSinceSensedTargetCreature = 31` when due | per owned monster per AI tick (20 Hz): exit on registry empty |
 | `EnemyHud.TestShow(Character, bool)` (private) | postfix | health bars through smoke | per character per frame: exit on `!__result` or registry empty |
 | `ZNet.OnNewConnection`, `ZNet.RPC_PeerInfo`, `ZNet.Update` | postfix | rules and join check (Forge copy; the re-check comes from the `NetworkGate.PeerStateChanged` event, not a patch) | `Update`: two bool reads when idle |
-| `ObjectDB.Awake()`, `ObjectDB.CopyOtherDB(ObjectDB)` | postfix, **always on** | build clones if needed (skip an empty database), register item and recipe, set `m_enabled` | once per database |
+| `ObjectDB.Awake()`, `ObjectDB.CopyOtherDB(ObjectDB)` | postfix, **always on** | build clones if needed, register item and recipe (skip a database that is empty or has no vanilla `Wood`: not the game's), set `m_enabled` | once per database |
 | `ZNetScene.Awake()` | postfix, **always on** | register item, projectile, cloud | once per scene |
 | `Humanoid.StartAttack(Character, bool)` | prefix, **always on** | throw guard (E5; also while the rules are pending) | per attack start: two bool reads when active |
 
@@ -1307,6 +1311,10 @@ Recorded while building the mod; each differs from, or makes precise, a point ab
   while the feature is off only hides the recipe, reading and saying nothing: at game quit `ModPlugin.OnDestroy` runs
   `OnDeactivated` after Unity has destroyed the item prefabs, and a full rebuild there warned that `Resin`, `Coal`,
   `LeatherScraps` and `piece_workbench` did not exist (first in-world run). `OnActivated` rebuilds it in full.
+  The same happens with the feature on: when the player leaves a server that kept the mod inactive (no mod on the
+  server, or turned off there), the framework activates the mod again while the world closes, with `ZNetScene` still
+  alive and the item prefabs already destroyed. Since 0.1.1 a rebuild on a database without a live `Wood` item
+  (`HasVanillaItems`) only hides the recipe and says nothing; the next `ObjectDB` registration rebuilds it.
 - **`NpcTalk`** checks its sight through its creature's `MonsterAI.CanSeeTarget`, so an NPC with creature AI inside
   smoke does not greet a hidden player (turrets are unaffected, as designed). Harmless; noted for accuracy of D28.
 - **Foliage queries include trigger colliders** (`QueryTriggerInteraction.UseGlobal` instead of `Ignore`, 2.4): vanilla's

@@ -146,8 +146,12 @@ data in recipe panels).
 | 7 Bloodgold | `Upgrader7…` | `Gold` | `TrophyMoose, TrophyElaking, TrophyMole, TrophyJotunWarrior, TrophyBlob_Morkhalla, TrophySeal` | `TrophyBarka, TrophyJotunWitch` | `CrownJewel` |
 
 Pools are keyed by item name (the inventory counts and stacks by name), so both troll trophies count. Unknown names are
-logged once per rebuild; the table rebuilds lazily when the ObjectDB changes or a setting changes (skipped while the
-menu's ObjectDB is still empty).
+logged once per rebuild; the table rebuilds lazily when the ObjectDB changes or a setting changes. It is not built
+while the ObjectDB is not the game's: still empty (the main menu's first `ObjectDB.Awake`), or holding items but no
+vanilla `Wood` (0.1.1). The second case is a main-menu list with only other mods' items in it: Jotunn-based mods show
+one at game start, and until Sneak Ambush 0.1.1 and Spyglass 0.1.1 our own item mods put their items into the menu's
+empty list at every return to the menu. A table built on such a list called every default name unknown in one long
+false warning.
 
 ### 3.3 The Idols tab (`IdolsTab`)
 

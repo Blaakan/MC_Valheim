@@ -1024,6 +1024,7 @@ internal static partial class SelfTests
         var c = new Checks(WarnName);
         var rig = new Rig(WarnName);
         Harmony foreign = null;
+        GameObject dbHolder = null;
         try
         {
             var tap = Tap;
@@ -1086,6 +1087,47 @@ internal static partial class SelfTests
             c.Check(TowerSync.AppliedKey == defaults.Key && !cleanLines.Any(l => l.Contains("Towers")),
                 $"the default settings applied again: no Towers warning ({cleanLines.Count} warnings: {string.Join(" / ", cleanLines.ToArray())})");
 
+            // 0.1.1 (TESTING T41, M18). Item database without the game's items: another mod's own copy (main menu with
+            // Jotunn-based mods: only their items, no Wood) and the game's own while the world closes (item prefabs
+            // destroyed; leaving a server that kept the mod off turn the mod on at that moment). Every listed shield
+            // looked MISSING there. Now: empty tower table, nothing said. Stand-in databases sit on an inactive object
+            // (their Awake never run, ObjectDB.instance stay the game's). Rules with a key not warned about yet, else
+            // the once-per-rule-set guard hide the warning anyway.
+            var towersBefore = TowerCatalog.Count;
+            var real = ObjectDB.instance;
+            var otherRules = defaults.With(r => r.Towers = "ShieldIronTower:12, ShieldBanded:7");
+            var otherMark = tap.WarningMark();
+            dbHolder = new GameObject("MC_SelfTest_OtherDatabases");
+            dbHolder.SetActive(false);
+            var theirs = dbHolder.AddComponent<ObjectDB>();
+            var foreignItem = new GameObject("MC_SelfTest_ForeignItem");
+            foreignItem.transform.SetParent(dbHolder.transform, false);
+            theirs.m_items.Add(foreignItem);
+            theirs.m_itemByHash[foreignItem.name.GetStableHashCode()] = foreignItem;
+            var closing = dbHolder.AddComponent<ObjectDB>();
+            var wood = new GameObject("Wood");
+            wood.transform.SetParent(dbHolder.transform, false);
+            closing.m_items.Add(wood);
+            closing.m_itemByHash["Wood".GetStableHashCode()] = wood;
+            var withLiveWood = TowerCatalog.HasVanillaItems(closing);
+            Object.DestroyImmediate(wood);
+            c.Check(ReferenceEquals(ObjectDB.instance, real) && TowerCatalog.HasVanillaItems(real) && withLiveWood
+                    && !TowerCatalog.HasVanillaItems(theirs) && !TowerCatalog.HasVanillaItems(closing),
+                "the game's item database counts as the game's; one holding only another mod's item, or whose Wood item is destroyed (world closing), does not "
+                + $"(game's {TowerCatalog.HasVanillaItems(real)}, live Wood {withLiveWood}, other mod's {TowerCatalog.HasVanillaItems(theirs)}, closing {TowerCatalog.HasVanillaItems(closing)})");
+            TowerCatalog.Rebuild(theirs, otherRules);
+            var onTheirs = TowerCatalog.Count;
+            TowerCatalog.Rebuild(closing, otherRules);
+            var onClosing = TowerCatalog.Count;
+            var otherLines = tap.WarningsSince(otherMark);
+            c.Check(onTheirs == 0 && onClosing == 0 && otherLines.Count == 0,
+                $"a tower table built on such a database is empty ({onTheirs} and {onClosing} towers) and logs no Warning ({otherLines.Count}: {string.Join(" / ", otherLines.ToArray())})");
+            // What the ObjectDB postfix does when the game's database is here again.
+            TowerSync.OnObjectDB(real);
+            otherLines = tap.WarningsSince(otherMark);
+            c.Check(TowerCatalog.Count == towersBefore && towersBefore > 0 && TowerSync.AppliedKey == defaults.Key && otherLines.Count == 0,
+                $"back on the game's database: {TowerCatalog.Count} towers (before {towersBefore}), default rules applied, no Warning ({string.Join(" / ", otherLines.ToArray())})");
+
             // TESTING C07: another mod with a prefix on Humanoid.BlockAttack is named in one Warning.
             var block = AccessTools.DeclaredMethod(typeof(Humanoid), nameof(Humanoid.BlockAttack), new[] { typeof(HitData), typeof(Character) });
             const string id = "Test.ShieldBash.SelfTest";
@@ -1114,6 +1156,10 @@ internal static partial class SelfTests
             if (foreign != null)
             {
                 foreign.UnpatchSelf();
+            }
+            if (dbHolder != null)
+            {
+                Object.Destroy(dbHolder);
             }
             rig.Done();
         }

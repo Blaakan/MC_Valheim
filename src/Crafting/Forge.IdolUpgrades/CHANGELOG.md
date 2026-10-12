@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed a false warning, "Unknown item name(s) in the idol settings, ignored: ...", that listed every default item. It
+  was logged at game start with some other item mods installed (seen with Jotunn-based mods) and at every return to
+  the main menu. The idol settings were read correctly all along; a real typo is still reported once a world loads.
+
 ## 0.1.0
 
 - Initial version: Forge of Potential idols get 3 star levels. An **Idols** tab at the Forge upgrades an idol one star

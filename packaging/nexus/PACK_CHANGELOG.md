@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+Fixes for the problems the automated in-game tests found on 2026-10-08 (none of these versions is released).
+
+- Sneak Ambush 0.1.1, Spyglass 0.1.1, Forge Idol Upgrades 0.1.1, Tower Shield Wall 0.1.1, Music Instruments 0.4.1: no
+  more false errors and warnings in the log at the main menu (with other item mods installed) and when leaving a
+  server that does not have the mod.
+
 ## 0.4.0
 
 - Cheated Tag Remover 0.1.0 (new, not released): the console commands `cheated_clear` and `cheated_scan` remove (or

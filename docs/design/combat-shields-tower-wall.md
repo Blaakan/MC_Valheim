@@ -440,8 +440,12 @@ the skill-scaled value, block force, parry lines), knockback (`m_attackForce`), 
   copied `ServerRules` keeps a **generation** counter, raised when the rules in force change (server rules received and
   different, own config changed while not using the server's, session forgotten, `TestRules` set or cleared).
 - **Where it is written** (`TowerData.Apply`):
-  - the ObjectDB prefabs (`ObjectDB.Awake` / `CopyOtherDB` postfixes; the main-menu pass with an empty `m_items` is
-    skipped);
+  - the ObjectDB prefabs (`ObjectDB.Awake` / `CopyOtherDB` postfixes; a pass on a database that is not the game's is
+    skipped: the main-menu pass with an empty `m_items`, and, since 0.1.1, a list without the vanilla `Wood` item,
+    which is another mod's own list (Jotunn-based mods show one at the main menu). `TowerCatalog.Rebuild` has the same
+    test (`HasVanillaItems`, which also fails while the world closes and the item prefabs are already destroyed: the
+    framework activates the mod at that moment when the player leaves a server that kept it inactive). Until 0.1.1
+    both cases logged every default tower as MISSING);
   - every live copy on this game at activation and on every rules apply: the local player's inventory (equipped
     items included), all loaded `Container` inventories, `ItemDrop.s_instances`;
   - **heal on sight** for players (a copy created before activation, or before a rules change, is fixed before it
@@ -1390,7 +1394,7 @@ Every body catches its own exceptions and calls `PatchGuard.Report(site, e)`; no
 
 | Target | Kind | Priority | Purpose | Cost |
 |---|---|---|---|---|
-| `ObjectDB.Awake()` | postfix | Low | skip empty `m_items`; `TowerCatalog.Invalidate`; apply the rules in force (or vanilla while waiting) to prefabs; first pass: `TowerGuard` check | per scene load |
+| `ObjectDB.Awake()` | postfix | Low | skip a database that is empty or has no vanilla `Wood` (not the game's); `TowerCatalog.Invalidate`; apply the rules in force (or vanilla while waiting) to prefabs; first pass: `TowerGuard` check | per scene load |
 | `ObjectDB.CopyOtherDB(ObjectDB)` | postfix | Low | same | per scene load |
 | `ObjectDB.GetAllCraftableWeapons()` | postfix | normal | remove tower prefabs from the returned list | rare (cached list) |
 | `Humanoid.EquipItem(ItemDrop.ItemData, bool)` | prefix | High | player: heal a tower item before vanilla reads its type; non-player: revert a listed tower copy | per equip |

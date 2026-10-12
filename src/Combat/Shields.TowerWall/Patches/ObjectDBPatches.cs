@@ -60,7 +60,8 @@ internal static class ObjectDBPatches
     {
         try
         {
-            if (db == null || db.m_items == null || db.m_items.Count == 0)
+            // Empty, or another mod's own copy without the game's items: not the database me wait for.
+            if (!TowerCatalog.HasVanillaItems(db))
             {
                 return;
             }

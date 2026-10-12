@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+- Fixed eight false recipe warnings in the log ("... recipe material ... is not an item in this game", "... is not a
+  crafting station ...", "... has no valid material ...") when you left a server that does not have the mod or has it
+  turned off. The recipes were fine; only the messages were wrong.
+
 ## 0.4.0
 
 - Free play: the song window's first entry turns the keyboard into a piano, laid out like one (by place on the

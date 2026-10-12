@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed a false error at the main menu, "The vanilla Smoke Bomb (BombSmoke) is missing from the item database", shown
+  when another mod has its own item list there (seen with Jotunn-based mods). The Smoke Screen always worked; only the
+  message was wrong.
+- Fixed five false recipe warnings in the log ("... is not an item in this game", "... is not a crafting station ...",
+  "... has no valid material ...") when you left a server that does not have the mod or has it turned off.
+
 ## 0.1.0
 
 - Initial version. Sneak attacks (the normal game's backstab on an unaware creature) give Sneak XP: 3 plus 10 per 100

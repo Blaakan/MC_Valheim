@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
 test (`./tools/Test-Smoke.ps1 -Mod Spyglass`) passed 2026-10-02 (loads, patches cleanly, JitCheck clean). In-world
 self-tests (`./tools/Test-InWorld.ps1 -Mod View.Spyglass`) passed 2026-10-02, with Distant Horizons on:
 `spyglass.network`, `spyglass.item` (registration, recipe, tool taking both hands, no punch, dropped copy),
@@ -19,8 +19,18 @@ Horizons near-ground update: smoke test of all 25 MC mods passed, framework test
 both hands (like the hammer; no punch on click): smoke test of all 25 MC mods passed (Spyglass JitCheck 525 methods,
 0 failures), in-world run 12/12 (`spyglass.*` 6/6, `horizons.*` 6/6) on 2026-10-02. No hands-on in-game test yet.
 
-**Automated checks (2026-10-08):** 37 of 39 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**0.1.1 (2026-10-08):** fixes two false log messages: the "Flint Knife (KnifeFlint) is missing" error at the main menu
+when another mod shows its own item list there (T23, reset), and four recipe warnings when leaving a server that does
+not have the mod (new M08). The checks of the removed self-test `spyglass.bug.missing-knife-error` are back in
+`spyglass.item` and `spyglass.log`; `spyglass.item` also checks both cases on stand-in item databases. Run on 0.1.1
+(2026-10-08, game 1.0.17, with the other installed mods, one of them Jotunn-based): in-world self-tests 33 of 35 (the
+two that fail are the open `spyglass.bug.*` tests; `spyglass.view` and `spyglass.toggle` on a second run alone),
+multiplayer scenarios all passed (`spyglass.mp.rules` and `spyglass.mp.server` on a second run alone: right after the
+Music Instruments tests the Forge's craft list was empty); the log has no Spyglass line at the main menu, and none
+after "ZNet OnDestroy" in the client log of the server-without-mods scenario (four before).
+
+**Automated checks (2026-10-08):** 37 of 38 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -149,9 +159,9 @@ changed one back afterwards.
   *Partly automated (`spyglass.lowers`); by hand: Do the logout: the main menu and the character select must show no
   round view, blur or dark ring, and after loading the world again the view must be normal and the spyglass must
   raise.*
-- [!] **T23 Clean log:** after T01-T22, the log has no error or warning from Spyglass (`./tools/Watch-Log.ps1 -Mine`).
-  **FAILED:** automated test: False error at the main menu: 'The vanilla Flint Knife (KnifeFlint) is missing from the
-  item database' (self-test `spyglass.bug.missing-knife-error`)
+- [ ] **T23 Clean log:** after T01-T22, the log has no error or warning from Spyglass (`./tools/Watch-Log.ps1 -Mine`).
+  *Partly automated (`spyglass.log`, `spyglass.item`); by hand: After the parts only a person can do (T17 render
+  scale, T19 restart, T22 logout and reload, T26 real death), check the log for Spyglass warnings or errors.*
 - [x] **T24 Click at a ship's helm:** hold the spyglass, take the helm of a ship (`spawn Karve` on water) and left
   click. Expected: the click lets go of the helm, as in the normal game, and the spyglass does not go up (this is the
   right result for the helm, where T10 says "nothing happens").
@@ -232,3 +242,14 @@ changed one back afterwards.
   teleport starts (no round view, blur, dark ring, cleared fog or missing body during it), the spyglass is still down
   after they arrive, and they can raise it again.
   *Automated: `spyglass.mp.recall`, `spyglass.aborts`.*
+
+## 0.1.1 — false log messages
+
+- [ ] **M08 Leaving a server without the mod:** join a server that does not have Spyglass (the MC Mods panel shows
+  "Inactive: the server does not have this mod"), then log out to the main menu. Expected: no warning from Spyglass
+  while the world closes (no "The spyglass recipe material ... is not an item in this game", no "... is not a crafting
+  station in this game ..." and no "... has no valid material ..." line); back at the menu the MC Mods panel shows the
+  mod active again. The same after leaving a server that had the mod turned off.
+  *Partly automated (`spyglass.item`); by hand: The real thing: log out to the main menu from a server without the
+  mod, and from one that has it turned off, and read the log for Spyglass warnings; back at the menu the MC Mods panel
+  shows the mod active again.*

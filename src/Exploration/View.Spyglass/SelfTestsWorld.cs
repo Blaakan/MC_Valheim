@@ -28,9 +28,7 @@ namespace MC.Exploration.ViewSpyglassMod;
 //                            recipe hidden, inventory still loads it; on again: works [T15 T18 T19]
 //   spyglass.compat.swim     falling into deep water with the spyglass up: view back when swimming starts [X05 T10]
 //   spyglass.compat.dualwield, .towershield, .sort   other MC mods [X03 X04 X02]
-//   spyglass.bug.missing-knife-error   (fail with some other mods) no false "Flint Knife is missing" error at the
-//                            main menu [T23]
-//   spyglass.log             no other warning or error of this mod since it started [T23]
+//   spyglass.log             no warning or error of this mod since it started, the main menu's too [T23]
 internal static partial class SelfTests
 {
     private const string RecipeTest = "spyglass.recipe";
@@ -39,7 +37,6 @@ internal static partial class SelfTests
     private const string SettingsTest = "spyglass.settings";
     private const string BlurOffTest = "spyglass.blur-off";
     private const string BlurOffBugTest = "spyglass.bug.blur-off-capture";
-    private const string KnifeBugTest = "spyglass.bug.missing-knife-error";
     private const string CloseTest = "spyglass.close";
     private const string NoHorizonsTest = "spyglass.no-horizons";
     private const string HorizonsTest = "spyglass.horizons";
@@ -85,7 +82,6 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(DualTest, RunDualWield),
         new KeyValuePair<string, Func<IEnumerator>>(TowerTest, RunTowerShield),
         new KeyValuePair<string, Func<IEnumerator>>(SortTest, RunSort),
-        new KeyValuePair<string, Func<IEnumerator>>(KnifeBugTest, RunKnifeBug),
         new KeyValuePair<string, Func<IEnumerator>>(LogTest, RunLog),
     };
 
@@ -1785,36 +1781,11 @@ internal static partial class SelfTests
         c.Report();
     }
 
-    // ---------- spyglass.bug.missing-knife-error ----------
-
-    // The one error line with own test: "Flint Knife is missing from the item database". (The same error about the
-    // network prefab list is not this one: spyglass.log keep counting it.)
-    private static bool IsMenuKnifeError(string line) =>
-        line.Contains($"({SpyglassContent.VanillaKnifeName}) is missing from the item database");
-
-    // Alone here so spyglass.item and spyglass.log pass. Main menu with a mod that fill its own item database there
-    // (not empty, no vanilla items; Jotunn do): SpyglassContent.RegisterInObjectDB only skip an EMPTY database, so it
-    // look for the knife, find none and log the error, although the item is built fine once the real database is here.
-    private static IEnumerator RunKnifeBug()
-    {
-        var c = new Checks(KnifeBugTest);
-        if (_tap == null || ObjectDB.instance == null)
-        {
-            SelfTest.Fail(KnifeBugTest, "the log was not listened to, or no item database");
-            yield break;
-        }
-        var lines = _tap.Problems().FindAll(IsMenuKnifeError);
-        var knifeHere = ObjectDB.instance.GetItemPrefab(SpyglassContent.VanillaKnifeName) != null;
-        c.Check(!SpyglassContent.MissingReported && lines.Count == 0,
-            $"no \"Flint Knife is missing\" error (knife in the item database now {knifeHere}, spyglass built {SpyglassContent.Built}, "
-            + $"error reported {SpyglassContent.MissingReported}, {lines.Count} such line(s) logged{(lines.Count > 0 ? ": " + lines[0] : "")})");
-        c.Report();
-    }
-
     // ---------- spyglass.log ----------
 
-    // Own test, last of the spyglass ones: no warning or error from this mod since it start (the false missing-knife
-    // error of the main menu left out: spyglass.bug.missing-knife-error has it).
+    // Own test, last of the spyglass ones: no warning or error from this mod since it start. The main menu's false
+    // "Flint Knife is missing from the item database" error (other mods' item database there, fixed in 0.1.1) count
+    // like any other line.
     private static IEnumerator RunLog()
     {
         var c = new Checks(LogTest);
@@ -1824,11 +1795,6 @@ internal static partial class SelfTests
             yield break;
         }
         var problems = _tap.Problems();
-        var knife = problems.RemoveAll(IsMenuKnifeError);
-        if (knife > 0)
-        {
-            c.Note($"{knife} \"Flint Knife is missing from the item database\" error line(s) left out (own test: {KnifeBugTest})");
-        }
         c.Check(problems.Count == 0, problems.Count == 0
             ? "no warning or error from the spyglass since it started"
             : $"{problems.Count} warning or error line(s) from the spyglass, first: {First(problems)}");

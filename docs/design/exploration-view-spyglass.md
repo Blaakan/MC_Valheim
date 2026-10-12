@@ -283,6 +283,18 @@ The item is built from the network prefab list's `KnifeFlint` (no main-menu item
 icon, mesh, texture or material is made (the object, the eyepiece marker and the collider are). The rules and the join
 check run on the server.
 
+### 4.6 Item databases that are not the game's (0.1.1)
+
+`SpyglassContent.HasVanillaItems` tells the game's own item database from the others: it has items and a live vanilla
+`Wood` item. Two others exist. (1) Another mod's own list: with Jotunn-based mods the main menu shows an `ObjectDB`
+holding only their items; registering there logged a false "Flint Knife is missing" error, and adding our item to the
+menu's still empty list made Forge Idol Upgrades take that list for the game's. Registration now skips such a list
+silently and waits for the real one (`CopyOtherDB`). (2) The game's own database while the world closes: when the
+player leaves a server that kept the mod inactive, the framework activates the mod again with `ZNetScene` still alive
+and the item prefabs already destroyed, and the recipe rebuild warned that `Bronze`, `Crystal` and `forge` did not
+exist. A rebuild on a database without a live `Wood` item now only hides the recipe; the next registration rebuilds
+it. Sneak Ambush, Music Instruments, Tower Shield Wall and Forge Idol Upgrades use the same test.
+
 ## 5. Config
 
 | Section | Key | Default | Range | Scope |

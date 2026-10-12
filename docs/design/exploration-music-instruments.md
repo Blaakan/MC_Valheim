@@ -116,7 +116,11 @@ damage, no durability, no value (silver never turns into coins at a trader), wei
 teleportable. The tooltip subtitle shows `[Attack] Songs   [Block] Stop` with the player's own keys. An always-on
 `Player.PlayerAttackInput` prefix stops the fists from punching while an instrument is in hand (also with the feature
 off). Registration (`ObjectDB.Awake` / `CopyOtherDB`, `ZNetScene.Awake`) is always on, so instruments never vanish
-from inventories.
+from inventories. An item database without the vanilla `Wood` item is not the game's (empty at the main menu's first
+`Awake`, or another mod's own list): registration skips it. The recipe rebuild uses the same test since 0.4.1: when
+the player leaves a server that kept the mod inactive, the framework activates the mod again while the world closes
+(`ZNetScene` still alive, item prefabs already destroyed), and a rebuild there warned that every material and station
+did not exist; it now only hides the recipes, and the next registration rebuilds them.
 
 Recipes (server rules, all at the workbench; materials gate the tier as in vanilla):
 

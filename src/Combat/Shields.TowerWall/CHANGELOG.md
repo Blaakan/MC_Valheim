@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed a false warning, "The Towers setting names items this game does not have (MISSING), ignored: ...", that listed
+  every default tower shield. It was logged at the main menu with some other item mods installed (seen with
+  Jotunn-based mods) and when you left a server that does not have the mod or has it turned off. A real typo in the
+  Towers setting is still reported.
+
 ## 0.1.0
 
 - Initial version: tower shields (Wood, Bone, Iron, Serpent scale, Black metal, Flametal, Nord Greatshield) become

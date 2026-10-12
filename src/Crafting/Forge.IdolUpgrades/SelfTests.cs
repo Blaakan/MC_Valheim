@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using BepInEx.Logging;
 using MC.Shared;
 using TMPro;
 using UnityEngine;
@@ -173,7 +174,6 @@ internal static partial class SelfTests
         Test(LootFilterName, RunLootFilter),
         // Last: what the mod say in log while all the others ran, and since the game started.
         Test(CleanLogName, RunCleanLog),
-        Test(BugMenuWarningName, RunBugMenuWarning),
     };
 
     // Client joined to a dedicated server, both with every MC mod (tools/Test-Multiplayer.ps1, scenario modded).
@@ -286,6 +286,46 @@ internal static partial class SelfTests
 
     // ---------- forge.catalog ----------
 
+    // 0.1.1. Item database that hold items but none of the game's (main menu list with only other mods' items): the
+    // table wait and say nothing (was one warning calling every default item unknown). Stand-in database on an inactive
+    // object (its Awake never run) sit in ObjectDB's place for these lines only: no frame pass meanwhile.
+    private static void CheckOtherDatabase(Checks c)
+    {
+        var real = ObjectDB.instance;
+        var mark = LogWatch.Mark();
+        GameObject holder = null;
+        try
+        {
+            holder = new GameObject("MC_SelfTest_OtherDatabase");
+            holder.SetActive(false);
+            var theirs = holder.AddComponent<ObjectDB>();
+            var foreign = new GameObject("MC_SelfTest_ForeignItem");
+            foreign.transform.SetParent(holder.transform, false);
+            theirs.m_items.Add(foreign);
+            theirs.m_itemByHash[foreign.name.GetStableHashCode()] = foreign;
+            c.Check(ReferenceEquals(ObjectDB.instance, real), "a stand-in item database must not take the place of the game's by itself");
+            ObjectDB.m_instance = theirs;
+            // What the ObjectDB postfix does.
+            IdolCatalog.Invalidate();
+            IdolCatalog.RaiseIdolLevels();
+            var idols = IdolCatalog.AllIdols().Count();
+            c.Check(idols == 0 && IdolCatalog.IdolAt(0, true) == null,
+                $"no idol table on an item database that holds one item of another mod and none of the game's ({idols} idols)");
+            c.Check(Logged(mark, LogLevel.Warning, UnknownHead) == null, $"no 'Unknown item name(s)' warning on such a database: {Tail(mark)}");
+        }
+        finally
+        {
+            ObjectDB.m_instance = real;
+            IdolCatalog.Invalidate();
+            if (holder != null)
+            {
+                Object.Destroy(holder);
+            }
+        }
+        var back = IdolCatalog.AllIdols().Count();
+        c.Check(back == 16 && IdolCatalog.IdolAt(0, true) != null, $"the idol table is back on the game's item database ({back} idols)");
+    }
+
     private static IEnumerator RunCatalog()
     {
         var c = new Checks(CatalogName);
@@ -318,6 +358,7 @@ internal static partial class SelfTests
         c.Check(bronze != null && bronze.Pools[2].Names.Contains("$item_trophy_troll"), "bronze elite pool must hold the troll trophy");
         c.Check(IdolLevels.Of(new ItemDrop.ItemData { m_quality = 1 }) == 0 && IdolLevels.Of(new ItemDrop.ItemData { m_quality = 4 }) == 3
                 && IdolLevels.Of(new ItemDrop.ItemData { m_quality = 7 }) == 3, "quality 1 -> level 0, 4 -> 3, above clamped");
+        CheckOtherDatabase(c);
 
         // Server rules on the wire: round trip, clamping, unknown layout refused.
         var own = ForgeRules.Own();

@@ -4,15 +4,23 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
 test (`./tools/Test-Smoke.ps1`) passed 2026-09-30: loads, patches cleanly, JitCheck clean. In-world self-tests
 (`./tools/Test-InWorld.ps1 -Mod Sneak.Ambush`) passed 2026-09-30 in a full run with every MC mod (71 of 71 tests):
 `sneak.content`, `sneak.curve`, `sneak.still`, `sneak.cover`, `sneak.xp`, `sneak.smoke-throw`, `sneak.smoke-sight`,
 `sneak.smoke-blind`, `sneak.healthbars`, `sneak.network`, `sneak.guard`, `sneak.pending`. Their NOTE lines in the log
 record the values the design lists as unverified. No hands-on in-game test yet.
 
-**Automated checks (2026-10-08):** 48 of 49 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**0.1.1 (2026-10-08):** fixes two false log messages: the "Smoke Bomb (BombSmoke) is missing" error at the main menu
+when another mod shows its own item list there (L03, reset), and the five recipe warnings when leaving a server that
+does not have the mod (M18). The check of the removed self-test `sneak.bug.missing-bomb-error` is back in
+`sneak.content`, which also checks both cases on stand-in item databases. Run on 0.1.1 (2026-10-08, game 1.0.17, with
+the other installed mods, one of them Jotunn-based): in-world self-tests 33 of 33 (`sneak.smoke-bars` and
+`sneak.smoke-late` on a second run alone), multiplayer scenarios all passed; the log has no Sneak Ambush line at the
+main menu, and none after "ZNet OnDestroy" in the client log of the server-without-mods scenario (five before).
+
+**Automated checks (2026-10-08):** 48 of 48 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -216,11 +224,15 @@ skill-gain world modifier.
   *Partly automated (`sneak.toggle`); by hand: Starting the game with Enabled = false: the Status text "Off (disabled
   in settings).", Smoke Screens saved in the inventory and in a chest still there after loading, and no error at
   start-up.*
-- [!] **L03 Clean log:** play through T01-T26 while `./tools/Watch-Log.ps1 -Mine` runs, then quit the game from the
+- [ ] **L03 Clean log:** play through T01-T26 while `./tools/Watch-Log.ps1 -Mine` runs, then quit the game from the
   world (Esc, Logout, Exit). Expected: no error and no warning from Sneak Ambush (in particular no "Could not find the
-  smoke look" and no recipe warning, also not while the game quits).
-  **FAILED:** automated test: Error "The vanilla Smoke Bomb (BombSmoke) is missing from the item database" at the main
-  menu although the Smoke Screen is made later (self-test `sneak.bug.missing-bomb-error`)
+  smoke look", no "Smoke Bomb (BombSmoke) is missing" at the main menu and no recipe warning, also not while the game
+  quits).
+  *Partly automated (`sneak.content`, `sneak.attack`, `sneak.xp-sources`, `sneak.still-notice`, `sneak.still-ends`,
+  `sneak.foliage`, `sneak.fog`, `sneak.smoke-default`, `sneak.smoke-burst`, `sneak.smoke-reveal`, `sneak.smoke-boss`,
+  `sneak.smoke-hunt`, `sneak.smoke-late`, `sneak.toggle`, `sneak.death`); by hand: A play-through of T01-T26 and
+  quitting the game: the log outside the test runs (start-up, main menu, quit) is not judged, apart from the start-up
+  error above.*
 - [ ] **L04 Turned on mid-game:** start the game with `Enabled = false`, hit a few Greydwarfs (they fight you), then
   tick the mod on and do T20 with its setup (`resetskill Bows`, two-star Greydwarfs, so the shot does not kill).
   Expected: the Greydwarf you shoot from the smoke survives, sees you and fights you.
@@ -345,6 +357,9 @@ skill-gain world modifier.
   Expected: no warning from Sneak Ambush while the world closes (no "The Smoke Screen recipe material … is not an item
   in this game", no "… is not a crafting station in this game …" and no "… has no valid material …" line); back at the
   menu the MC Mods panel shows the mod active again. The same after leaving a server that had the mod turned off.
+  *Partly automated (`sneak.content`); by hand: The real thing: log out to the main menu from a server without the
+  mod, and from one that has it turned off, and read the log for Sneak Ambush warnings; back at the menu the MC Mods
+  panel shows the mod active again.*
 
 ## 0.1.0 — other mods
 

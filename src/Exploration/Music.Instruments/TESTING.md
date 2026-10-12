@@ -4,7 +4,11 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.4.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.4.0
+**Build under test:** 0.4.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.4.1
+fixes false recipe warnings when leaving a server without the mod (new M20; `music.badrecipe` checks it on a stand-in
+item database; run 2026-10-08 on game 1.0.17: in-world self-tests 52 of 52 with `music.play` and
+`music.freeplay.keys` on a second run alone, multiplayer scenarios all passed, and no Music Instruments line after
+"ZNet OnDestroy" in the client log of the server-without-mods scenario, eight before). 0.4.0
 adds free play (T30-T35, M18-M19); 0.3.0 made the Encore easier (T09, T23 reset, new T29); 0.2.0 added server songs
 (T26-T28, M12-M17). Runs are noted at the end of this paragraph. Earlier runs (0.1.0): smoke
 test (`./tools/Test-Smoke.ps1 -Mod Music.Instruments`) passed 2026-10-05 after both reviews (loads, patches cleanly,
@@ -35,7 +39,7 @@ freed after End); offline harness 5406 checks (piano map, note off in the synth)
 and Spyglass only.
 
 **Automated checks (2026-10-08):** 60 of 60 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -421,3 +425,15 @@ config folder). The friend's own songs folder should not have these files.
   A friend without the mod (AllowPlayersWithoutMod = true) hears nothing and nothing breaks for them.
   *Partly automated (`music.listen.more`, `scenario:open-server`); by hand: Two real friends free play at once without
   mix-ups; a friend without the mod (AllowPlayersWithoutMod = true) hears nothing and nothing breaks for them.*
+
+## 0.4.1 — false log messages
+
+- [ ] **M20 Leaving a server without the mod:** join a server that does not have Music Instruments (the MC Mods panel
+  shows "Inactive: the server does not have this mod"), then log out to the main menu. Expected: no warning from Music
+  Instruments while the world closes (no "The wooden flute recipe material ... is not an item in this game", no "...
+  is not a crafting station in this game ..." and no "... has no valid material ..." line for any of the three
+  instruments); back at the menu the MC Mods panel shows the mod active again. The same after leaving a server that had
+  the mod turned off.
+  *Partly automated (`music.badrecipe`); by hand: The real thing: log out to the main menu from a server without the
+  mod, and from one that has it turned off, and read the log for Music Instruments warnings; back at the menu the MC
+  Mods panel shows the mod active again.*

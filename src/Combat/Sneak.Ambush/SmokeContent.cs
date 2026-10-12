@@ -20,6 +20,7 @@ internal static class SmokeContent
     internal const string CloudName = "MC_SmokeScreen_cloud";
     internal const string RecipeName = "Recipe_MC_SmokeScreen";
     internal const string VanillaBombName = "BombSmoke";
+    internal const string VanillaWoodName = "Wood";
     internal const string DisplayName = "Smoke Screen";
 
     internal const string Description =
@@ -77,24 +78,25 @@ internal static class SmokeContent
         return prefab != null && prefab.name == ItemName;
     }
 
+    // The game's own item database? Not when empty (main menu first Awake), when another mod show its own copy with
+    // only its items (seen 2026-10-07 with Jotunn-based mods: no Wood, no Smoke Bomb), or when the world close (item
+    // prefabs already destroyed: lookup give nothing).
+    internal static bool HasVanillaItems(ObjectDB db) =>
+        db != null && db.m_items != null && db.m_items.Count > 0 && db.GetItemPrefab(VanillaWoodName) != null;
+
     // ObjectDB.Awake / CopyOtherDB postfix (always on). Main menu first Awake run on EMPTY lists: skip silently,
     // CopyOtherDB postfix do the job. Idempotent: add only what is missing.
     internal static void RegisterInObjectDB(ObjectDB db)
     {
-        if (db == null || db.m_items == null)
+        // Not the game's item database: me wait for the real one, say nothing, and never put our item into theirs
+        // (our item alone in the menu's empty list made other mods think the database was filled).
+        if (!HasVanillaItems(db))
         {
             return;
         }
-        if (!Built)
+        if (!Built && !EnsureBuilt(db.GetItemPrefab(VanillaBombName), "item database"))
         {
-            if (db.m_items.Count == 0)
-            {
-                return;
-            }
-            if (!EnsureBuilt(db.GetItemPrefab(VanillaBombName), "item database"))
-            {
-                return;
-            }
+            return;
         }
         var hash = ItemName.GetStableHashCode();
         if (!db.m_itemByHash.ContainsKey(hash))
@@ -169,7 +171,10 @@ internal static class SmokeContent
             db = ObjectDB.instance;
         }
         var rules = ServerRules.Current;
-        if (db == null || rules.IsPending)
+        // No game items in the database = not in game: world closing (leaving a server that kept the mod off turn it
+        // on again while item prefabs are already destroyed, ZNetScene still here) or not the game's database. Recipe
+        // hidden, nothing said; next registration rebuild.
+        if (!HasVanillaItems(db) || rules.IsPending)
         {
             recipe.m_enabled = false;
             return;

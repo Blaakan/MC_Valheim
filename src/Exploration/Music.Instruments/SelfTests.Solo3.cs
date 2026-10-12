@@ -156,6 +156,7 @@ internal static partial class SelfTests
         }
         var rig = new Rig(player);
         var x = new Extra(player);
+        GameObject dbHolder = null;
         try
         {
             rig.TakeControls();
@@ -213,10 +214,41 @@ internal static partial class SelfTests
             c.Check(flute.m_enabled && lyre.m_enabled && tambourine.m_enabled && flute.m_craftingStation != null && flute.m_craftingStation.name == MusicRules.Workbench
                     && Cost(InstrumentKind.Lyre) == "LinenThread:8,Silver:2" && Cost(InstrumentKind.Tambourine) == "FineWood:3,LeatherScraps:4",
                 "settings put right: the three recipes are back");
+
+            // 0.4.1 (TESTING M20). World closing: the item database is still there but its item prefabs are destroyed, so
+            // no material and no station can be found (leaving a server that kept the mod off turn the mod on at that
+            // moment: was eight false warnings). Recipes hidden, nothing said; back at the next rebuild on the game's
+            // items. Stand-in database on an inactive object: its Awake never run, ObjectDB.instance stay the game's.
+            var real = ObjectDB.instance;
+            var closingMark = LogTap.ProblemMark;
+            dbHolder = new GameObject("MC_SelfTest_ClosingDatabase");
+            dbHolder.SetActive(false);
+            var closing = dbHolder.AddComponent<ObjectDB>();
+            var wood = new GameObject(InstrumentContent.VanillaWoodName);
+            wood.transform.SetParent(dbHolder.transform, false);
+            closing.m_items.Add(wood);
+            closing.m_itemByHash[InstrumentContent.VanillaWoodName.GetStableHashCode()] = wood;
+            var withLiveWood = closing.GetItemPrefab(InstrumentContent.VanillaWoodName) != null;
+            UnityEngine.Object.DestroyImmediate(wood);
+            c.Check(ReferenceEquals(ObjectDB.instance, real) && withLiveWood && closing.GetItemPrefab(InstrumentContent.VanillaWoodName) == null,
+                "stand-in item database: the game's stays in place, its Wood item is found while alive and not once destroyed");
+            InstrumentContent.Rebuild(closing);
+            c.Check(!flute.m_enabled && !lyre.m_enabled && !tambourine.m_enabled, "a rebuild on an item database whose items are gone (world closing) hides the three recipes");
+            var closingLines = LogTap.ProblemsSince(closingMark);
+            c.Check(closingLines.Count == 0, "and says nothing in the log" + (closingLines.Count > 0 ? ": " + string.Join(" | ", closingLines.ToArray()) : ""));
+            InstrumentContent.Rebuild();
+            closingLines = LogTap.ProblemsSince(closingMark);
+            c.Check(flute.m_enabled && lyre.m_enabled && tambourine.m_enabled && Cost(InstrumentKind.Flute) == "FineWood:4"
+                    && Cost(InstrumentKind.Lyre) == "LinenThread:8,Silver:2" && Cost(InstrumentKind.Tambourine) == "FineWood:3,LeatherScraps:4" && closingLines.Count == 0,
+                "a rebuild on the game's item database brings the three recipes back, without a warning");
             c.Report();
         }
         finally
         {
+            if (dbHolder != null)
+            {
+                UnityEngine.Object.Destroy(dbHolder);
+            }
             x.Restore();
             rig.Restore();
         }

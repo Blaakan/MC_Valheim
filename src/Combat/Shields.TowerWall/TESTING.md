@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
 test (`./tools/Test-Smoke.ps1`) passed 2026-09-30: loads, patches cleanly, JitCheck clean. In-world self-tests
 (`./tools/Test-InWorld.ps1 -Mod Shields.TowerWall`) passed 2026-09-30 in a full run with every MC mod (71 of 71
 tests): `tower.data`, `tower.rules`, `tower.hands`, `tower.slow`, `tower.block`, `tower.bash`, `tower.lock`,
@@ -21,7 +21,7 @@ before each bash and put him back where he started after each test; rebuilt (Deb
 The smoke test has not been run on this build yet.
 
 **Automated checks (2026-10-08):** 40 of 41 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -398,3 +398,27 @@ to the hit, estimated from the clip data; T34).
   melee kill.
   *Partly automated (`tower.creature`); by hand: The line in Creature Kill and Tame Counts gaining one melee kill (the
   probe player is in god mode, which marks kills as cheated).*
+
+## 0.1.1 — false log messages
+
+0.1.1 (2026-10-08) fixes a false "The Towers setting names items this game does not have (MISSING)" warning that
+listed every default tower shield (seen in the logs of the automated runs of 2026-10-07 and 2026-10-08). Run on 0.1.1
+(2026-10-08, game 1.0.17, with the other installed mods, one of them Jotunn-based): in-world self-tests 29 of 30 (the
+one that fails is the open `tower.bug.keptpress`), multiplayer scenarios all passed; no Towers warning at the main
+menu, and none after "ZNet OnDestroy" in the client log of the server-without-mods scenario.
+
+- [ ] **T41 No false Towers warning at the main menu:** with the default settings and a Jotunn-based item mod
+  installed (any mod that adds items through Jotunn), start the game while `./tools/Watch-Log.ps1 -Mine` runs, wait
+  for the main menu, then load a world. Expected: the log never shows "The Towers setting names items this game does
+  not have (MISSING), ignored: ShieldWoodTower, ShieldBoneTower, ..."; in the world the tower shields work (two-handed,
+  bash). Then write `Towers = ShieldIronTower:12, MC_NoSuchShield` in the config file, in a world: the warning names
+  `MC_NoSuchShield` only.
+  *Partly automated (`tower.warn`); by hand: A real start with a Jotunn-based item mod installed, read by a person: no
+  MISSING warning at the main menu; then the typo case typed into the config file in a world.*
+- [ ] **M18 Leaving a server without the mod:** join a server that does not have Tower Shield Wall (the MC Mods panel
+  shows "Inactive: the server does not have this mod"), then log out to the main menu. Expected: no "The Towers
+  setting names items this game does not have (MISSING)" warning while the world closes; back at the menu the MC Mods
+  panel shows the mod active again. The same after leaving a server that had the mod turned off.
+  *Partly automated (`tower.warn`); by hand: The real thing: log out to the main menu from a server without the mod,
+  and from one that has it turned off, and read the log for the MISSING warning; back at the menu the MC Mods panel
+  shows the mod active again.*

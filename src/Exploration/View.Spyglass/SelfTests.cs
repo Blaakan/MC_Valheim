@@ -546,6 +546,77 @@ internal static partial class SelfTests
 
     // ---------- spyglass.item ----------
 
+    // 0.1.1. Item database that is not the game's: another mod's own copy (only its items, no Wood; Jotunn-based mods
+    // show one at the main menu), and the game's own while the world closes (item prefabs already destroyed, lookup
+    // give nothing: leaving a server that kept the mod off turn the mod on at that moment). Our item never go into the
+    // first; on the second the recipe hide without a word (was four false warnings). Stand-in databases sit on an
+    // inactive object: their Awake never run, so ObjectDB.instance stay the game's.
+    private static void CheckOtherDatabases(Checks c, ObjectDB db)
+    {
+        var recipe = SpyglassContent.CraftRecipe;
+        if (!c.Check(recipe != null && recipe.m_enabled && _tap != null && SpyglassContent.HasVanillaItems(db),
+                "recipe shown, log listened to and the game's item database here (the stand-in database checks need them)"))
+        {
+            return;
+        }
+        string Shown()
+        {
+            var names = new List<string>();
+            foreach (var r in recipe.m_resources)
+            {
+                names.Add(r.m_resItem.name + ":" + r.m_amount);
+            }
+            return string.Join(",", names.ToArray()) + " at " + (recipe.m_craftingStation != null ? recipe.m_craftingStation.name : "no station");
+        }
+        var before = Shown();
+        var said = _tap.Problems().Count;
+        GameObject holder = null;
+        try
+        {
+            holder = new GameObject("MC_SelfTest_OtherDatabases");
+            holder.SetActive(false);
+
+            var theirs = holder.AddComponent<ObjectDB>();
+            var foreign = new GameObject("MC_SelfTest_ForeignItem");
+            foreign.transform.SetParent(holder.transform, false);
+            theirs.m_items.Add(foreign);
+            theirs.m_itemByHash[foreign.name.GetStableHashCode()] = foreign;
+            c.Check(ReferenceEquals(ObjectDB.instance, db), "a stand-in database does not take the place of the game's");
+            c.Check(!SpyglassContent.HasVanillaItems(theirs), "a database with one item of another mod and no Wood is not the game's");
+            SpyglassContent.RegisterInObjectDB(theirs);
+            c.Check(theirs.m_items.Count == 1 && !theirs.m_itemByHash.ContainsKey(SpyglassContent.ItemHash) && theirs.m_recipes.Count == 0,
+                $"another mod's item database gets neither our item nor our recipe (items {theirs.m_items.Count}, recipes {theirs.m_recipes.Count})");
+            c.Check(recipe.m_enabled, "the recipe stays shown after that");
+
+            var closing = holder.AddComponent<ObjectDB>();
+            var wood = new GameObject(SpyglassContent.VanillaWoodName);
+            wood.transform.SetParent(holder.transform, false);
+            closing.m_items.Add(wood);
+            closing.m_itemByHash[SpyglassContent.VanillaWoodName.GetStableHashCode()] = wood;
+            c.Check(SpyglassContent.HasVanillaItems(closing), "a database with a live Wood item counts as the game's");
+            Object.DestroyImmediate(wood);
+            c.Check(!SpyglassContent.HasVanillaItems(closing), "a database whose Wood item is destroyed (world closing) does not");
+            SpyglassContent.Rebuild(closing);
+            c.Check(!recipe.m_enabled, "a rebuild on a database whose items are gone hides the recipe");
+            var lines = _tap.Problems();
+            c.Check(lines.Count == said && !SpyglassContent.MissingReported,
+                "neither says anything in the log" + (lines.Count > said ? ": " + lines[lines.Count - 1] : ""));
+
+            SpyglassContent.Rebuild();
+            c.Check(recipe.m_enabled && Shown() == before, $"back on the game's database the recipe is shown again ({Shown()})");
+            lines = _tap.Problems();
+            c.Check(lines.Count == said, "no warning from that rebuild" + (lines.Count > said ? ": " + lines[lines.Count - 1] : ""));
+        }
+        finally
+        {
+            SpyglassContent.Rebuild();
+            if (holder != null)
+            {
+                Object.Destroy(holder);
+            }
+        }
+    }
+
     private static IEnumerator RunItem()
     {
         var c = new Checks(ItemName);
@@ -558,8 +629,9 @@ internal static partial class SelfTests
         }
         c.Note("build: " + SpyglassContent.BuildReport);
         c.Check(SpyglassContent.Built, "item built");
-        // "No missing-knife error" has own test (spyglass.bug.missing-knife-error): with some other mods the main
-        // menu log it although the item is built fine afterwards.
+        // With some other mods (Jotunn-based) the main menu show an item database that hold their items and none of
+        // the game's. Until 0.1.1 that logged this error although the item was built fine afterwards.
+        c.Check(!SpyglassContent.MissingReported, "no \"Flint Knife is missing\" error since the game started");
         var prefab = db.GetItemPrefab(SpyglassContent.ItemName);
         c.Check(prefab != null && ReferenceEquals(prefab, SpyglassContent.ItemPrefab), "in the item database");
         c.Check(ZNetScene.instance.GetPrefab(SpyglassContent.ItemHash) != null, "in the network prefab list");
@@ -615,6 +687,7 @@ internal static partial class SelfTests
             var col = prefab.GetComponentInChildren<Collider>(true);
             c.Check(col != null && LayerMask.LayerToName(col.gameObject.layer) == "item", "dropped copy has a collider on the item layer");
         }
+        CheckOtherDatabases(c, db);
 
         var rig = new SpyRig(player, ItemName);
         GameObject dropped = null;

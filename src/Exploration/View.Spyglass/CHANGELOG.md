@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed a false error at the main menu, "The vanilla Flint Knife (KnifeFlint) is missing from the item database",
+  shown when another mod has its own item list there (seen with Jotunn-based mods). The spyglass always worked; only
+  the message was wrong.
+- Fixed four false recipe warnings in the log ("... is not an item in this game", "... is not a crafting station ...")
+  when you left a server that does not have the mod or has it turned off.
+
 ## 0.1.0
 
 - Initial version. A craftable spyglass (Forge, 2 Bronze and 2 Crystal by default), a tool like the hammer (held in

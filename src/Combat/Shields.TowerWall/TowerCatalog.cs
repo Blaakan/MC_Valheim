@@ -120,14 +120,22 @@ internal static class TowerCatalog
 
     internal static IEnumerable<TowerInfo> Towers => ByPrefab.Values;
 
-    // New tower table for these rules and this ObjectDB (TowerSync apply, ObjectDB postfix). Null rules or no items =
-    // empty table (vanilla).
+    // The game's own item database? Not when empty (main menu first Awake), when another mod show its own copy with
+    // only its items (seen 2026-10-07 with Jotunn-based mods: no Wood, no shield), or when the world close (item
+    // prefabs already destroyed: lookup give nothing).
+    internal static bool HasVanillaItems(ObjectDB db) =>
+        db != null && db.m_items != null && db.m_items.Count > 0 && db.GetItemPrefab(VanillaWoodName) != null;
+
+    private const string VanillaWoodName = "Wood";
+
+    // New tower table for these rules and this ObjectDB (TowerSync apply, ObjectDB postfix). Null rules or not the
+    // game's items = empty table (vanilla), nothing said: every listed shield would look MISSING there.
     internal static void Rebuild(ObjectDB db, TowerRules rules)
     {
         Bump();
         ByPrefab.Clear();
         ByShared.Clear();
-        if (rules == null || db == null || db.m_items == null || db.m_items.Count == 0)
+        if (rules == null || !HasVanillaItems(db))
         {
             return;
         }

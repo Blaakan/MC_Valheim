@@ -327,7 +327,10 @@ internal static class InstrumentContent
             db = ObjectDB.instance;
         }
         var rules = ServerRules.Current;
-        if (db == null || rules.IsPending)
+        // No Wood in the database = not in game: world closing (leaving a server that kept the mod off turn it on
+        // again while item prefabs are already destroyed, ZNetScene still here) or not the game's database. Recipes
+        // hidden, nothing said; next registration rebuild.
+        if (db == null || db.GetItemPrefab(VanillaWoodName) == null || rules.IsPending)
         {
             foreach (var def in Defs)
             {
