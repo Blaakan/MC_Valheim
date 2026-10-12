@@ -281,7 +281,7 @@ internal static class CrossbowSelfTests
   `Plugin.ReadDaySettings`; Encyclopedia: its display settings) and clear it in `finally`. Between tests the probe
   closes an inventory left open and turns god mode back on, and says so in a `NOTE`.
 - The player is in god mode: its health never drops below 1, and creatures it hurts are marked as cheated (vanilla
-  `Character.Damage`), which matters for kill statistics. A test that needs a normal player turns god mode off with
+  `Character.ApplyDamage`), which matters for kill statistics. A test that needs a normal player turns god mode off with
   `Player.SetGodMode(false)` and back on in its `finally`. Likewise a test that measures stamina use removes the
   modifier with `ZoneSystem.instance.RemoveGlobalKey(GlobalKeys.StaminaRate)` and sets it back with
   `ZoneSystem.instance.SetGlobalKey(GlobalKeys.StaminaRate, 0f)`.

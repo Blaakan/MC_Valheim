@@ -55,6 +55,7 @@ clearly who needs to install it and how it behaves in multiplayer. Details: [doc
 | [Crafting Search and Sort](src/UX/Crafting.SearchSort) | UX | QoL | only you (client-side) | works | in development |
 | [Loot Pickup Filter](src/UX/AutoPickup.Filter) | UX | QoL | only you (client-side) | works | in development |
 | [Sort Chest](src/UX/Container.Sort) | UX | QoL | only you (client-side) | works | in development |
+| [Cheated Tag Remover](src/UX/CheatedTag.Remover) | UX | QoL | server (or host) and the admin who types the command | works | in development |
 
 The full list of planned ideas, with feasibility and existing mods, is in [docs/backlog.md](docs/backlog.md).
 

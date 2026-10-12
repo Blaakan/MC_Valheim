@@ -315,7 +315,7 @@ Covered in §8. It is the standard per-item persistent store.
 - **`ItemData.Clone()`** is `MemberwiseClone` plus a **new dictionary copy of `m_customData`**. The clone shares `m_shared` with its source.
 - Prefab lookup from an item: `item.m_dropPrefab` (fast), `ObjectDB.GetItemPrefab(item.m_shared)`, or by name hash.
 - Identity for stacking: `ItemData.IsSameType` compares `m_shared.m_name` + `m_worldLevel` (+ `m_quality` if `m_maxQuality > 1`). `Inventory.FindFreeStackItem` matches name/quality/worldLevel. **Neither compares `m_customData`.** When a stackable item merges into an existing stack, the incoming item's custom data is lost. Use `m_customData` only on non-stackable items (`m_maxStackSize == 1`), or handle merging explicitly.
-- Cheated flag (1.0): `Inventory.AddItem(int prefabHash, …)` marks items cheated if total damage > 10 000. The flag propagates into stacks unless `PlayerProfile.s_bypassCheatChecks`. It affects achievements only.
+- Cheated flag (1.0): `Inventory.AddItem(int prefabHash, …)` marks items cheated if total damage > 10 000. The flag propagates into stacks unless `PlayerProfile.s_bypassCheatChecks`. It does more than block achievements: it spreads through crafting, building, kills and stations (section 20).
 
 ### Data & persistence (`ItemData.Save/Load`, version `Item.ChunksNCheats = 109`)
 Durability (int ×100), grid pos, world level, a flags byte, then optional quality, stack, variant, crafter id/name, drop-prefab hash, **custom data (count + key/value strings)**, and the cheated byte. This one format is used by:
@@ -615,6 +615,76 @@ Harmony notes: prefer postfixes. Use transpilers only when a const or inlined va
 Vanilla keeps the loaded state **on the player, not the item**. `Player.m_weaponLoaded` (an `ItemData` reference) is set by `Player.SetWeaponLoaded` when the queued `MinorActionData.ActionType.Reload` completes (in `Player.UpdateActionQueue`), and mirrored to `ZDOVars.s_weaponLoaded` for remote peers. `Humanoid.UnequipItem` calls `ResetLoadedWeapon`, which clears it and cancels queued reloads. `Player.UpdateWeaponLoading` queues a reload whenever `m_weaponLoaded != weapon`. `Attack.Start` requires `IsWeaponLoaded()` for `m_requiresReload` attacks, and `Attack.OnAttackTrigger` calls `ResetLoadedWeapon` when the shot fires. The QoL mod should persist a per-item flag in `ItemData.m_customData` (crossbows are non-stackable), set it when the reload completes and clear it on fire, and on equip restore `m_weaponLoaded` from the flag. That makes it a **client-only** mod: all of this runs on the owning client, and the ZDO bool keeps remote visuals right.
 
 ---
+
+## 20. The cheated tag (1.0)
+
+Checked on 1.0.17 (client and dedicated-server assemblies) for [Cheated Tag Remover](../../src/UX/CheatedTag.Remover);
+the full trace is in [docs/design/ux-cheatedtag-remover.md](../design/ux-cheatedtag-remover.md), section 1.
+
+### Where it is stored
+- **Per item:** `ItemDrop.ItemData.m_cheated`, bit 0 of the last byte of the item record (`ItemData.Save`, layout
+  `Version.Item.ChunksNCheats` = 109). Layout 108 has no such byte; 107 has a tag in another shape for containers
+  (`Inventory.LoadOld`). Records are saved in: `Container` (ZDO byte array `ZDOVars.s_items`: int32 layout, uint16
+  count, records; a byte array in 1.0, no longer a base64 string), ground items, fish and `ItemStand` (ZDO byte array
+  `ZDOVars.s_itemData`: one byte layout, one record), `ArmorStand` (`"<slot>_itemData"`), and the player's inventory
+  (character file, only on that player's PC).
+- **Per object:** ZDO int `ZDOVars.s_cheated` (pieces, creatures, stations, destructibles, ragdolls, anything spawned
+  by the console), and `ZDOVars.s_cheatedQueued` for the queue of a `Smelter` or `Fermenter`. A `CookingStation`
+  keeps one per slot at the key `s_cheatedQueued + slot` (a number added to the hash; `SetSlot` writes
+  `"slotstatus<slot>"` next to it).
+- **Per character:** `PlayerProfile.m_usedCheats` (set by `ConsoleCommand.RunAction` after any cheat command, never
+  cleared), and the player key `bypasscheatchecks` (`PlayerProfile.s_bypassCheatChecks`, set by
+  `yesiuseddevcommandsbutiwantmyachievementsanyway`: that character's game ignores tags, nothing is removed).
+- **Per world:** `Achievements.IsWorldCheated` (a world-modifier key the World Modifiers GUI cannot produce).
+
+### How it spreads
+Object to items: `Piece.DropResources`, `DropOnDestroyed`, `Character.OnDeath` (drops, ragdoll),
+`InventoryGui.DoCrafting` (the **crafting station's** tag marks every item crafted at it), `Smelter.Spawn`,
+`Fermenter.DelayedTap`, `CookingStation`. Items to objects: `Player.PlacePiece` (a tagged stack of a required resource
+in the inventory), a tagged weapon equipped (`Character.ApplyDamage`, `Destructible.Destroy`), tagged items fed to a
+station. Items to items: `Inventory.AddItem(ItemData)` marks the stack a tagged item merges into, crafting, the trader.
+God mode, ghost mode and debug fly tag every creature the player damages. Only items show the tag (one grey tooltip
+line, `ItemData.GetTooltip`); nothing shows it on objects.
+
+### Rules for code that changes saved object data in bulk
+- `ZDO.Set` has no owner check, raises the data revision only when the value really changes, queues the object for
+  sending on a client and marks its save chunk dirty. **`ZDO.Remove*` does none of that**, and a receiver only adds or
+  overwrites the keys in a packet (`ZDODataHelper.ReadData`): a removed key is not saved, not sent, and comes back.
+- `Set` on an object without the key adds the key (and dirties its chunk, and resends it): write only where needed.
+- `ZDO.GetByteArray` returns the stored array itself; `Set` with the same array is a no-op
+  (`BinarySearchDictionary.SetValue` compares with `Equals`). Always set a new array.
+- World saves rewrite only dirty chunks (`ZDOMan.AddObjectsPerChunk`). Portals are saved in their own chunk, which
+  `ZDO.Set` does not mark: call `ZDOMan.SetDirtyPortals()`.
+- **Data that comes in from another game marks nothing for saving**: `ZDOMan.RPC_ZDOData` + `ZDO.Deserialize` fill the
+  tables without `SetDirtySector` or the portal flag (the only callers of the marks are local revision bumps, sector
+  moves and new or destroyed portals). What a player's game changes on a server is written to disk only when
+  something else marks that chunk before the next save. Server code that relies on a client's write being saved calls
+  `ZDOMan.SetDirtySector(zdo)` (and `SetDirtyPortals()` for a portal) itself.
+- All of an object's keys of one type sit sorted in a `BinarySearchDictionary` inside the static tables of
+  `ZDOExtraData` (`s_ints`, `s_byteArrays`...). There is no `GetInts` / `GetByteArrays`; `GetAllZDOIDsWithHash` covers
+  four types and allocates per object. With the publicized assemblies a mod can walk the tables directly.
+- A loaded `Container` keeps its items in memory, reloads them when the data revision moved and the chest is not open
+  on that game, and its owner writes them back on every item move. `Container.SetInUse` only works on the owner:
+  **never take ownership of a container another player may have open** (it stays stuck "in use" there, and that game
+  later writes its old items over everything). The ZDO int `InUse` is not taken back when its owner leaves.
+- A `Container` reloads with new `ItemData` objects: never keep an item reference of a chest over frames.
+- `Inventory.Load` + `Inventory.Save` is not a neutral round trip: items with an unknown prefab are dropped, stacks
+  clamped, variants reset, and the 10 000 damage rule applied.
+- **`ZNet.SaveWorldAndPlayerProfiles()` (the `save` command) throws on a dedicated server when a save ran in the last
+  minute** (`ZNet.HardSaveBlock` reads `PlatformManager.DistributionPlatform`, which is null there; seen in a
+  multiplayer self-test on 1.0.17). The autosave calls (`Game.SavePlayerProfile`, then
+  `ZNet.Save(sync: false, saveOtherPlayerProfiles: true, waitForNextFrame: true)`, as in `Game.UpdateSaving`) are safe.
+- `Achievements.IsCheatedAtAll` reads `ServerOptionsGUI.m_instance` without a null check: do not call it on a
+  dedicated server.
+
+### Console details learned here
+- A typed command is sent to the server only when the client knows it, it has `remoteCommand`, **and it is not valid
+  locally** (`Terminal.TryRunCommand`); an unknown command is never forwarded. The vanilla remote command cannot answer
+  the caller (`ZNet.InternalCommand` drops the connection object). A dedicated server has no console input.
+- `ZNet.RemoteCommand` must not be called where `IsServer()` (it dereferences a null connection).
+- A command that must stay available while its mod is "inactive" for the framework (a Both mod on a server without
+  it) is created in `BindConfig` and follows `Enabled` instead of `OnActivated` / `OnDeactivated`
+  (`ClearCommand` of Cheated Tag Remover).
 
 ## Appendix A: key constants
 

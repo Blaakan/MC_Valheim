@@ -29,6 +29,7 @@
     "MC.Farming.Cultivator.Replant": "",
     "MC.UX.Crafting.SearchSort": "",
     "MC.UX.AutoPickup.Filter": "",
-    "MC.UX.Container.Sort": ""
+    "MC.UX.Container.Sort": "",
+    "MC.UX.CheatedTag.Remover": ""
   }
 }

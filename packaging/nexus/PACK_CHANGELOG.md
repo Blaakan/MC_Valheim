@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Cheated Tag Remover 0.1.0 (new, not released): the console commands `cheated_clear` and `cheated_scan` remove (or
+  count) the vanilla cheated tag in a whole world: building pieces, creatures, stations, items in chests, on the
+  ground and on stands, and the items you carry.
+
 ## 0.3.0
 
 - Music Instruments 0.4.0 (not released): free play, play your own tune with the keyboard.
