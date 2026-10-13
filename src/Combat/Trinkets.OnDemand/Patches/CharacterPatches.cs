@@ -8,6 +8,7 @@ namespace MC.Combat.TrinketsOnDemandMod.Patches;
 //   Character.Damage:     runs on the attacker's game for every melee, area, projectile and AOE hit, before the hit
 //                         goes to the victim's owner. Local player hit a real foe = exchange.
 //   Character.RPC_Damage: runs on the victim's owner. Local player hit by a real foe (blocked or not) = exchange.
+//   Real foe = creature, or other player while PvP is on for both (CombatState.IsRealFoe).
 //                         Prefix = before vanilla's early exits (debug fly, not owner).
 [HarmonyPatch(typeof(Character))]
 internal static class CharacterPatches

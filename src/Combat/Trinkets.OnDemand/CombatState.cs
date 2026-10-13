@@ -10,9 +10,10 @@ namespace MC.Combat.TrinketsOnDemandMod;
 // In a fight = last exchange within CombatLingerSeconds, or (still targeted by an alerted monster and last exchange
 // within EngagedWindowSeconds): kiting and ranged approach keep the income while the fight goes on, a caged or stuck
 // mob alone pays at most EngagedWindowSeconds after the last real hit.
-// Real foe = enemy of the player (BaseAI.IsEnemy), not a player (PvP out), not tamed, not dead, and not an AI skip
-// target (m_aiSkipTarget: training dummy, ShadowPerson, root tentacle). Not Faction.TrainingDummy: FrostWisp and
-// Frysling have that faction too (docs/game/combat.md).
+// Real foe = enemy of the player (BaseAI.IsEnemy), or another player while PvP is on for both (user decision
+// 2026-10-13: players count like creatures; 0.1.0 kept them out but still counted their dodged attacks); not tamed,
+// not dead, and not an AI skip target (m_aiSkipTarget: training dummy, ShadowPerson, root tentacle). Not
+// Faction.TrainingDummy: FrostWisp and Frysling have that faction too (docs/game/combat.md).
 internal static class CombatState
 {
     // Alerted targeting counts this long (Player.IsTargeted uses 1 s; the RPC comes every 0.5 s).
@@ -66,9 +67,16 @@ internal static class CombatState
         {
             return false;
         }
-        if (c.m_aiSkipTarget || c.IsPlayer() || c.IsDead() || c.IsTamed())
+        if (c.m_aiSkipTarget || c.IsDead() || c.IsTamed())
         {
             return false;
+        }
+        // Other player = foe only while a hit between us can do damage: PvP on for both. Game ask attacker's own
+        // flag before the swing land (Attack.DoMeleeAttack, Projectile.IsValidTarget) and victim's own flag before
+        // damage (Character.RPC_Damage). BaseAI.IsEnemy say no for two players (same faction).
+        if (c.IsPlayer())
+        {
+            return local.IsPVPEnabled() && c.IsPVPEnabled();
         }
         return BaseAI.IsEnemy(local, c);
     }

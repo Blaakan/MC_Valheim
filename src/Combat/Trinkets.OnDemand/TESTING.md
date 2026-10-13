@@ -4,15 +4,17 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
-test (`./tools/Test-Smoke.ps1`) passed 2026-10-01 (loads, patches cleanly, JitCheck clean). In-world self-tests
-(`./tools/Test-InWorld.ps1`) passed 2026-10-01 on the final code: all 8 of this mod's tests (`trinkets.network`,
-`trinkets.controls`, `trinkets.pending`, `trinkets.hold-and-fire`, `trinkets.income`, `trinkets.combat-state`,
-`trinkets.ranged-factor`, `trinkets.ranged-shot`); their NOTE lines gave the measured values below. No hands-on
-in-game test yet.
+**Build under test:** 0.2.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
+changed one rule: another player counts like a creature while PvP is on for both players (0.1.0 said other players
+never count, yet counted a perfect dodge of their attack). M10 is reworded and open again, M11 and M12 are new; no
+other item changed. On 0.2.0 (2026-10-13, game 1.0.17, every MC mod loaded): smoke test (`./tools/Test-Smoke.ps1 -Mod Trinkets`) passed; in-world
+self-tests (`./tools/Test-InWorld.ps1 -Only trinkets.`) all 27 passed, with the new `trinkets.pvp`; with a dedicated
+server (`./tools/Test-Multiplayer.ps1 -Scenario modded,vanilla-server -Only trinkets.`) all 8 `trinkets.mp.*` tests
+passed. History, on 0.1.0: smoke test passed 2026-10-01; the in-world self-tests of that day gave the measured values
+below (their NOTE lines). No hands-on in-game test yet.
 
-**Automated checks (2026-10-08):** 37 of 38 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 38 of 38 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `d144018`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -245,14 +247,27 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
 - [x] **M09 Dedicated server:** a dedicated server with the mod and one player. Do T02, T08 and T17 there. Expected:
   the same results as in single player (everything runs on the player's game); no error in the server's log.
   *Automated: `trinkets.mp.fight`, `trinkets.mp.full-bar`, `trinkets.mp.server-log`.*
-- [!] **M10 Perfect dodge of another player's attack (PvP):** two players with the mod, both with PvP on, no creature
+- [ ] **M10 Perfect dodge of another player's attack (PvP):** two players with the mod, both with PvP on, no creature
   nearby. A wears a trinket, `adrenaline 0`; B swings at A (or shoots an arrow at A) while A rolls through it (a perfect
-  dodge: A gets the normal game's 5 adrenaline). Expected: no fight starts for A: no Debug "In a fight: adrenaline
-  income on." line and no income after those 5 (other players do not count as a fight). The self-test
-  `trinkets.bug.pvp-dodge` checks the same rule on one game (a perfect dodge counts only while an alerted creature hunts
-  you) and fails in 0.1.0, where every perfect dodge starts a fight.
-  **FAILED:** automated test: A perfectly dodged attack of another player (PvP) starts a fight (found in round 1,
-  confirmed by the re-run) (self-test `trinkets.bug.pvp-dodge`)
+  dodge: A gets the normal game's 5 adrenaline). Expected (changed in 0.2.0: other players count like creatures): a
+  fight starts for A, as after dodging a creature: the Debug line "In a fight: adrenaline income on." and 1 adrenaline
+  per second for 6 seconds after the dodge.
+  *Partly automated (`trinkets.dodge-fight`); by hand: Two real players with PvP on: A rolls through B's swing or
+  arrow and gets the income for 6 seconds. The self-test sends the perfect-dodge message itself, with nothing hunting
+  the player.*
+- [ ] **M11 Fighting another player (PvP on for both):** two players with the mod, both with PvP on, no creature nearby,
+  both wear a trinket, `adrenaline 0`, `god` off. (a) A hits B once. Expected: a fight starts for A (the attacker) and
+  for B (the victim): each gets 1 adrenaline per second for 6 seconds after the hit (besides whatever
+  the normal game gives for the hit itself). (b) B blocks A's next hit. Expected: the same for both. (c) Both stop.
+  Expected: 6 seconds after the last hit the income stops and the bar stays where it is.
+  *Partly automated (`trinkets.pvp`); by hand: Two real players: the hit, the block and the income on both games. The
+  self-test uses a stand-in for the other player's character on one game and checks that a hit given and a hit taken
+  each start a fight.*
+- [ ] **M12 PvP off for one of them:** as M11, but only A has PvP on (then the other way round: only B). A swings at B
+  and B swings at A. Expected: no hit does damage (normal game) and no fight starts for either: no income, no Debug "In
+  a fight" line. With PvP off for both: the same.
+  *Partly automated (`trinkets.pvp`); by hand: Two real players swinging at each other with PvP off on one side, then
+  on the other: no income on either game.*
 
 ## 0.1.0 — other mods
 

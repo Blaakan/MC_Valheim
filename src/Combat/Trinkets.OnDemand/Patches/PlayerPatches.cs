@@ -135,7 +135,8 @@ internal static class PlayerPatches
         }
     }
 
-    // Perfect dodge: someone swung or shot at the local player (the RPC carries no attacker).
+    // Perfect dodge: someone swung or shot at the local player (the RPC carries no attacker). Creature or other
+    // player, both count: players count like creatures (0.2.0), and a player only swing at players with own PvP on.
     [HarmonyPrefix]
     [HarmonyPatch(nameof(Player.RPC_HitWhileDodging))]
     private static void RPC_HitWhileDodging_Prefix(Player __instance)

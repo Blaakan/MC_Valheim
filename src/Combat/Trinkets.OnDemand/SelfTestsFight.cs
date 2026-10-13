@@ -16,17 +16,17 @@ namespace MC.Combat.TrinketsOnDemandMod;
 //                         creature; real fall
 //   trinkets.targeting    T04: one hit, then hunted (call hunting creature's AI makes): income goes on past
 //                         linger, stops about 20 s after hit; stops soon after hunt ends
-//   trinkets.dodge-fight  perfect dodge of hunting creature's attack: game's dodge amount in one call, fight starts
-//   trinkets.bug.pvp-dodge  one check alone (real bug, TESTING.md M10): perfect dodge with no creature hunting
-//                         (dodged attack of another player) must start no fight. Fails until mod or its README
-//                         is changed
+//   trinkets.dodge-fight  perfect dodge of hunting creature's attack: game's dodge amount in one call, fight starts;
+//                         M10: perfect dodge with nothing hunting (dodged attack of another player) start fight too
+//   trinkets.pvp          M11 M12: other player is real foe while PvP is on for both: hit given, hit taken; PvP off
+//                         on either side = no fight (stand-in for the other player's character)
 internal static partial class SelfTests
 {
     private const string BlockFightName = "trinkets.block-fight";
     private const string NoFightName = "trinkets.no-fight";
     private const string TargetingName = "trinkets.targeting";
     private const string DodgeFightName = "trinkets.dodge-fight";
-    private const string PvpDodgeBugName = "trinkets.bug.pvp-dodge";
+    private const string PvpName = "trinkets.pvp";
 
     // ---------- trinkets.block-fight ----------
 
@@ -575,33 +575,12 @@ internal static partial class SelfTests
             c.Check(FullBar.Calls == calls + 1 && Near(FullBar.LastAmount, pay) && Near(p.m_adrenaline, want, 0.001f),
                 $"perfect dodge: {FullBar.Calls - calls} adrenaline call(s) of {F(FullBar.LastAmount)}, bar 0 -> {F(p.m_adrenaline)} "
                 + $"(the game's amount is {F(pay)}, adding {F(want)})");
-            CheckCleanLog(c, mark);
-        }
-        finally
-        {
-            rig.Restore();
-        }
-        c.Report();
-    }
 
-    // ---------- trinkets.bug.pvp-dodge (real bug, M10) ----------
-
-    // One check, alone. Another player's attack dodged (PvP): same perfect-dodge message arrives, and no creature
-    // hunts player. Message carries no attacker, so this is all difference player's game can see. README and
-    // design doc say other players do not count; mod 0.1.0 counts every perfect dodge: this fails until fixed.
-    private static IEnumerator RunPvpDodgeBug()
-    {
-        var rig = Rig.Create(PvpDodgeBugName);
-        if (rig == null)
-        {
-            yield break;
-        }
-        try
-        {
-            var p = rig.P;
-            ServerRules.TestRules = new TrinketRules();
-
-            // Quiet moment: no real creature of world may hunt or fight player right now (else not PvP case).
+            // M10. Another player's attack dodged (PvP): same perfect-dodge message, and no creature hunts player.
+            // Message carries no attacker, so this is all the player's game can see. 0.2.0 (user decision): players
+            // count like creatures, so this dodge start a fight like any other (0.1.0 README said it must not, the
+            // code counted it: that was the old trinkets.bug.pvp-dodge).
+            // Quiet moment first: no real creature of the world may hunt or fight player right now.
             var quiet = false;
             for (var attempt = 0; attempt < 10 && !quiet; attempt++)
             {
@@ -613,28 +592,154 @@ internal static partial class SelfTests
                     yield return new WaitForSeconds(1f);
                 }
             }
-            if (!quiet)
+            if (c.Check(quiet, "a real creature hunts or fights the player: the PvP case (no creature hunting) could not be set up"))
             {
-                SelfTest.Fail(PvpDodgeBugName,
-                    "a real creature hunts or fights the player: the PvP case (no creature hunting) could not be set up");
-                yield break;
-            }
-            p.RPC_HitWhileDodging(0L);
-            if (float.IsNegativeInfinity(CombatState.LastExchange))
-            {
-                SelfTest.Pass(PvpDodgeBugName, "1 checks OK");
-            }
-            else
-            {
-                SelfTest.Fail(PvpDodgeBugName,
+                var t1 = Time.time;
+                p.RPC_HitWhileDodging(0L);
+                c.Check(CombatState.LastExchange >= t1 && CombatState.InCombat(rules.CombatLingerSeconds),
                     "a perfect dodge with no creature hunting the player (what a dodged attack of another player looks like) "
-                    + "started a fight: the README says other players (PvP) do not count");
+                    + "did not start a fight: other players count like creatures");
             }
+            CheckCleanLog(c, mark);
         }
         finally
         {
             rig.Restore();
         }
+        c.Report();
+    }
+
+    // ---------- trinkets.pvp (M11, M12) ----------
+
+    // Other player = real foe while PvP is on for both (0.2.0). Stand-in for the other player's character: player
+    // prefab made without network start (like Breeding's farmer stand-in), own ZDO far outside the loaded area given
+    // to a game that is not there, known to the scene so a hit can name it as attacker. Its PvP flag is read from
+    // the ZDO, like for a real other player. All in one frame (no physics tick sees the stand-in), then gone.
+    private static IEnumerator RunPvp()
+    {
+        var rig = Rig.Create(PvpName);
+        if (rig == null)
+        {
+            yield break;
+        }
+        var c = new Checks(PvpName);
+        var mark = LogMark();
+        GameObject ghost = null;
+        ZNetView ghostView = null;
+        ZDO ghostZdo = null;
+        var p = rig.P;
+        var pvpBefore = p.m_pvp;
+        try
+        {
+            var rules = new TrinketRules();
+            ServerRules.TestRules = rules;
+            // Quiet moment: no real creature of the world may hunt or fight player during the checks.
+            var quiet = false;
+            for (var attempt = 0; attempt < 10 && !quiet; attempt++)
+            {
+                CombatState.Reset();
+                yield return FixedTicks(2);
+                quiet = float.IsNegativeInfinity(CombatState.LastTargeted) && float.IsNegativeInfinity(CombatState.LastExchange);
+                if (!quiet)
+                {
+                    yield return new WaitForSeconds(1f);
+                }
+            }
+            if (!c.Check(quiet && Game.instance != null && Game.instance.m_playerPrefab != null && ZDOMan.instance != null && ZNetScene.instance != null,
+                    "a real creature hunts or fights the player, or there is no player prefab: the PvP case could not be set up"))
+            {
+                c.Report();
+                yield break;
+            }
+
+            var players = Player.GetAllPlayers().Count;
+            ZNetView.m_forceDisableInit = true;
+            try
+            {
+                ghost = Object.Instantiate(Game.instance.m_playerPrefab, p.transform.position + Flat(p.transform.forward) * 2f, Quaternion.identity);
+            }
+            finally
+            {
+                ZNetView.m_forceDisableInit = false;
+            }
+            var other = ghost.GetComponent<Player>();
+            ghostView = other != null ? other.m_nview : null;
+            if (!c.Check(other != null && ghostView != null, "could not make the stand-in for another player"))
+            {
+                c.Report();
+                yield break;
+            }
+            ghostZdo = ZDOMan.instance.CreateNewZDO(p.transform.position + new Vector3(3000f, 0f, 3000f), 0);
+            ghostZdo.SetOwner(ZDOMan.GetSessionID() + 1L);
+            ghostView.m_zdo = ghostZdo;
+            ZNetScene.instance.m_instances[ghostZdo] = ghostView;
+            c.Check(Player.GetAllPlayers().Count == players + 1 && !ReferenceEquals(other, Player.m_localPlayer) && other.IsPlayer()
+                    && !ghostView.IsOwner() && !other.GetZDOID().IsNone(),
+                "the stand-in must be a second loaded player that another game owns, not the local one");
+
+            void Flags(bool mine, bool theirs)
+            {
+                p.m_pvp = mine;
+                ghostZdo.Set(ZDOVars.s_pvp, theirs);
+            }
+
+            // (label, my PvP, their PvP) -> real foe, and a hit either way starts a fight, or none of it.
+            void Expect(string label, bool mine, bool theirs, bool counts)
+            {
+                Flags(mine, theirs);
+                c.Check(p.IsPVPEnabled() == mine && other.IsPVPEnabled() == theirs,
+                    $"{label}: PvP flags as set (mine {p.IsPVPEnabled()}, the other player's {other.IsPVPEnabled()})");
+                c.Check(CombatState.IsRealFoe(p, other) == counts, $"{label}: the other player {(counts ? "is" : "is not")} a real foe");
+
+                CombatState.Reset();
+                var t0 = Time.time;
+                HitFromPlayer(p, other);
+                var given = CombatState.LastExchange >= t0;
+                c.Check(given == counts && given == CombatState.InCombat(rules.CombatLingerSeconds),
+                    $"{label}: my hit on the other player {(counts ? "starts a fight" : "starts no fight")} (exchange {given})");
+
+                CombatState.Reset();
+                t0 = Time.time;
+                HitPlayer(p, other);
+                var taken = CombatState.LastExchange >= t0;
+                c.Check(taken == counts && taken == CombatState.InCombat(rules.CombatLingerSeconds),
+                    $"{label}: the other player's hit on me {(counts ? "starts a fight" : "starts no fight")} (exchange {taken})");
+            }
+
+            Expect("PvP on for both", true, true, true);
+            Expect("my PvP off", false, true, false);
+            Expect("the other player's PvP off", true, false, false);
+            Expect("PvP off for both", false, false, false);
+            Expect("PvP on for both again", true, true, true);
+
+            // Not a player thing: own character is never its own foe, also with PvP on.
+            c.Check(!CombatState.IsRealFoe(p, p), "the own character is not a real foe");
+            CombatState.Reset();
+            CheckCleanLog(c, mark);
+        }
+        finally
+        {
+            p.m_pvp = pvpBefore;
+            if (ghostZdo != null && ZNetScene.instance != null)
+            {
+                ZNetScene.instance.m_instances.Remove(ghostZdo);
+            }
+            if (ghostView != null)
+            {
+                ghostView.m_zdo = null;
+            }
+            if (ghost != null)
+            {
+                Object.DestroyImmediate(ghost);
+            }
+            if (ghostZdo != null && ZDOMan.instance != null)
+            {
+                ghostZdo.SetOwner(ZDOMan.GetSessionID());
+                ZDOMan.instance.DestroyZDO(ghostZdo);
+            }
+            rig.Restore();
+        }
+        c.Report();
     }
 }
 #endif

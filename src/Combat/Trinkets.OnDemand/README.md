@@ -16,8 +16,10 @@ mods included.
 - **What counts as a fight:** you hit a creature, or a creature hits you (blocked or not), or you make a perfect dodge.
   The fight lasts 6 seconds after the last such hit. While an alerted creature keeps hunting you (kiting, closing in
   with a bow), it lasts longer, up to 20 seconds after the last hit.
-- **What does not count:** training dummies, tamed creatures, the Dvergr (unless you angered them), other players
-  (PvP), and falling or drowning. A creature hunting you without anyone landing a hit is not a fight either.
+- **Other players count like creatures** while PvP is on for both of you: hitting them, being hit by them or perfectly
+  dodging their attack starts a fight. With PvP off for either of you, hits between you do nothing and start no fight.
+- **What does not count:** training dummies, tamed creatures, the Dvergr (unless you angered them), and falling or
+  drowning. A creature hunting you without anyone landing a hit is not a fight either.
 
 ### The bar never drains
 
@@ -94,7 +96,7 @@ player's own choice); AllowPlayersWithoutMod is read only by the server.
 | Feedback | ShowFullMessage | `true` | Show the "Adrenaline full" message when the bar becomes full (at most every 20 seconds). The bar flashes either way. Each player's own choice. |
 | Feedback | FullFlashInterval | `4` | While the bar stays full, flash it again every this many seconds (0-60). 0 = flash once. Each player's own choice. |
 | Adrenaline | IncomePerSecond | `1` | Adrenaline gained every second in a fight while you wear a trinket (0-10). 0 = no income. |
-| Adrenaline | CombatLingerSeconds | `6` | A fight lasts this many seconds after the last hit you gave to or took from a hostile creature (1-30). |
+| Adrenaline | CombatLingerSeconds | `6` | A fight lasts this many seconds after the last hit you gave to or took from a hostile creature, or another player while PvP is on for both of you (1-30). |
 | Trigger | RefuseWhileActive | `false` | On: the trigger is refused while the effect of a trinket you wear still runs (the bar is kept). Off: triggering again restarts the effect and spends the bar, as in the normal game. |
 | Ranged | RangedReferenceSeconds | `1.5` | Bow and crossbow hits pay more when a shot takes longer than this many seconds (0.2-5). The default makes shooting earn about as much adrenaline per second as melee. |
 | Ranged | RangedMaxMultiplier | `4` | Most a bow or crossbow hit can pay, as a multiple of the normal amount (1-10). 1 = no ranged bonus. |

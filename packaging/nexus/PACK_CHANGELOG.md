@@ -40,6 +40,9 @@ Fixes for the problems the automated in-game tests found on 2026-10-08 (none of 
 - Distant Horizons 0.1.1: far trees, rocks and buildings follow the far ground when the mod is turned on while paused
   and after a simulation-distance change; far trees at tile edges stand on the ground again; near far-terrain tiles
   always use exact heights.
+- Trinkets on Demand 0.2.0: other players count like creatures. While PvP is on for you and for the other player, a
+  hit given or taken or a perfect dodge of their attack starts a fight and gives the income; with PvP off for either
+  of you, nothing between you starts one.
 
 ## 0.4.0
 

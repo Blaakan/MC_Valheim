@@ -44,7 +44,8 @@ The user's expected behaviours (idea sheet rows "Trinket revamp" and "Adrenaline
   turned off), learned per-weapon attack times, kill bonus, per-enemy income scaling, a debug readout on the HUD, and a
   per-move bonus for Weapon Moveset moves. The `Adrenaline revamp` sheet row is linked to this mod but only partly
   covered: passive income while fighting, no decay, ranged catch-up.
-- PvP combat state (players are never "real foes").
+- A separate PvP rule set: since 0.2.0 another player counts like a creature while PvP is on for both (D24); there is
+  no PvP-only income, fight length or setting.
 - Carrying the bar over death or logout (vanilla does not save it).
 
 ### Later (cut from v1, one-line sketches)
@@ -231,7 +232,8 @@ write, no call, so the HUD number is honest.
   victim is a real foe), `Character.RPC_Damage` prefix (victim = local player and `hit.GetAttacker()` is a real foe;
   before vanilla's early exits), `Player.RPC_HitWhileDodging` prefix (local player).
 - Targeted timestamp: `Player.RPC_OnTargeted` postfix (local player, `alerted`).
-- Real foe = `!m_aiSkipTarget && !IsPlayer() && !IsDead() && !IsTamed() && BaseAI.IsEnemy(local, c)`.
+- Real foe = `!m_aiSkipTarget && !IsDead() && !IsTamed()` and then: for another player, `IsPVPEnabled()` on the local
+  player and on that player (D24); for anything else, `BaseAI.IsEnemy(local, c)`.
 - In a fight = last exchange within `CombatLingerSeconds` (6), or (targeted within 1.5 s and last exchange within 20 s,
   `EngagedWindowSeconds`).
 - Income: the `UpdateStats(float)` postfix adds `dt`; every 1 s, in a fight, max > 0 and bar below the max:
@@ -296,7 +298,7 @@ Flagged items are repeated at the pause.
 | D3 | Telling the trigger apart | `v == 0` / scope flag | **Scope flag, consumed by the first call** (vanilla misses send 0). Nested calls inside the pop hide as usual: a modded trinket with an up-front gain cannot pop in a loop (vanilla would recurse). |
 | D4 | No drain | Timer floor 1 s / huge timer / skip the drain call | **Floor 1 s** in an `UpdateStats(float)` prefix while max > 0: after a live toggle-off the vanilla drain is back within 1 s (or when the vanilla delay after a recent gain ends, 6-10 s). |
 | D5 | Bar above the max after a swap | Leave it (vanilla sets it at the next call) / clamp | **Clamp in the `UpdateStats(float)` postfix** by field write (no call, no pop): the number is honest at once. |
-| D6 | "In combat" | `IsTargeted` / music timer / hits | **Hits given or taken with a real foe + perfect dodges; alerted targeting extends it up to 20 s after the last hit.** Targeting alone is farmable on the training dummy (a `MonsterAI`). Real foe excludes `m_aiSkipTarget` (dummy), tames, players, the dead, and the Dvergr unless angered (`BaseAI.IsEnemy`); not by `Faction.TrainingDummy` (it covers FrostWisp and Frysling). **Flag:** animals (deer, boars) count, as `BaseAI.IsEnemy` says; PvP does not. |
+| D6 | "In combat" | `IsTargeted` / music timer / hits | **Hits given or taken with a real foe + perfect dodges; alerted targeting extends it up to 20 s after the last hit.** Targeting alone is farmable on the training dummy (a `MonsterAI`). Real foe excludes `m_aiSkipTarget` (dummy), tames, the dead, and the Dvergr unless angered (`BaseAI.IsEnemy`); not by `Faction.TrainingDummy` (it covers FrostWisp and Frysling). Animals (deer, boars) count, as `BaseAI.IsEnemy` says. Other players: D24 (0.1.0 kept them out). |
 | D7 | Income numbers | | **1 per second, fight lasts 6 s after the last hit.** Server settings. **Flag:** tune with play (the Adrenaline revamp's target was "one enemy fills about half of a 60-cost trinket"). |
 | D8 | How the income is paid | Field write / `AddAdrenaline` | **`AddAdrenaline` once per second:** world rate, gain curve, effects and the hold all apply like any vanilla source. |
 | D9 | Keyboard default | H (backlog) / Y / U / O | **Y**: H is Weapons.DualWield's `SwapHandsKey`, read every frame while dual wielding. **Flag.** |
@@ -314,6 +316,7 @@ Flagged items are repeated at the pause.
 | D21 | Mods that change when trinkets fire | Compose / stand aside | **Stand aside** (`LocalBlocker`, "Inactive: … also changes when trinkets fire") for BetterTrinkets, Passive_Trinket_Modifiers, Balrond Battle Flow, matched by name or GUID markers (GUIDs unverified). **Flag:** such a game is "not ready", so a server requiring the mod refuses it. |
 | D22 | Other adrenaline mods | | **Compose, Info log only:** AdrenalineModifier, KeepAdrenalineLonger, RageNAdrenaline, MultiTrinket (name or GUID markers, substring), Surge (short marker: only the whole name "Surge" or its exact GUID `ezomic.valheim.surge`, read in its source, so "Resurgence" and such do not match). |
 | D23 | Two sheet ideas in one mod | Two mods / one | **One mod** (the backlog's point 1: the hold only makes sense with the build-up). `<ModIdea>Trinket revamp;Adrenaline revamp</ModIdea>`. **Flag:** the Adrenaline revamp row is only partly covered (Non-goals). |
+| D24 | Other players (PvP) | Never real foes (0.1.0) / count only when identified / count like creatures | **Count like creatures while PvP is on for both** (user decision, 2026-10-13, 0.2.0): the mod works the same way everywhere. A hit given or taken counts when `Player.IsPVPEnabled()` is true for the local player and for the other one, which is when vanilla lets that hit do damage (the attacker's game skips player targets while its own PvP is off: `Attack.DoMeleeAttack`, `Projectile.IsValidTarget`; the victim's game drops the hit while its own PvP is off: `Character.RPC_Damage`). The other player's flag is read from their ZDO, as vanilla does. Every perfect dodge counts, whoever attacked: `RPC_HitWhileDodging` carries no attacker, and a player only swings at players with their own PvP on. 0.1.0 said players never count but counted their dodged attacks (test item M10); a fix that told creature dodges from player dodges by "an alerted creature hunts you" was written and dropped (it also dropped dodges of creatures another game controls before their targeting message arrived, `trinkets.mp.fight`). |
 
 ## 4. Multiplayer
 
@@ -323,7 +326,7 @@ Flagged items are repeated at the pause.
 |---|---|
 | Hold, trigger, feedback, tooltip | the wearer's game (local player only) |
 | No drain, income | the wearer's game (`UpdateStats(float)` runs only for the owner, not dead) |
-| Combat state | the local game: hits it deals (`Character.Damage`, attacker side), hits it takes (`RPC_Damage`, victim owner = itself), targeting RPCs addressed to its player |
+| Combat state | the local game: hits it deals (`Character.Damage`, attacker side), hits it takes (`RPC_Damage`, victim owner = itself), targeting RPCs addressed to its player. In a PvP hit each player's own game stamps its own fight (D24): nothing is sent |
 | Ranged factor | the shooter's game (projectile `Setup` with `m_owner` there; other copies have no owner and never pay) |
 | Join check, rules push | the server (dedicated or host) |
 
@@ -486,6 +489,8 @@ next frame applies the rules; a full bar gets the rising-edge feedback.
 | `trinkets.combat-state` | `InCombat` timing (pure); live: hitting a Greydwarf and being hit by one stamp, a tame, the training dummy and no attacker do not; alerted targeting stamps but alone is no fight |
 | `trinkets.ranged-factor` | formula cases (cap, floor, swap burst, sharing, off, bad numbers), bow and crossbow cycles, the default numbers the docs give (1.5 s reference: bow x2 / x1.33 / x1 at Bows 0 / 50 / 75+, crossbow x2.67 / x1.5); NOTE of every bow's D, crossbow's R, ammo's pay and the resulting factors; NOTE of the melee pay of player weapons (items with a recipe, plus bare hands) by skill (Swords, Axes, Clubs, Knives, Spears, Polearms, Unarmed, Pickaxes, ElementalMagic, BloodMagic): primary and secondary `m_attackAdrenaline`, `m_attackUseAdrenaline` when above 0 and the projectile's pay, as "value: count (examples)" (for the reference, D14) |
 | `trinkets.ranged-shot` | a real full-draw `Bow` shot: the arrow's `m_adrenaline` = the prefab value × the formula's factor at the default rules' reference and cap (first shot) |
+| `trinkets.dodge-fight` | a perfect dodge pays the game's amount in one call and starts a fight, also with nothing hunting the player (what a dodged attack of another player looks like, M10) |
+| `trinkets.pvp` | a stand-in for another player's character (their PvP flag read from its ZDO): a real foe only while PvP is on for both; a hit given and a hit taken each start a fight then, and none with PvP off on either side (M11, M12) |
 
 Overrides only in memory (`ServerRules.TestRules` / `TestPending`, `Controls.TestPress`), never a config value; the
 rig restores equipment, ammo, bar, drain timer, effects (trinket and tier), controls and destroys what it spawns.
@@ -523,7 +528,8 @@ rig restores equipment, ammo, bar, drain timer, effects (trinket and tier), cont
 ### Open questions for the user
 
 1. Default key Y (H is Dual Wielding's); gamepad LT + RS; no default for the alternative gamepad layouts.
-2. Income 1 per second, fight lasting 6 s (20 s while hunted); animals count, PvP does not.
+2. Income 1 per second, fight lasting 6 s (20 s while hunted); animals count. PvP: answered on 2026-10-13, other
+   players count like creatures while PvP is on for both (D24).
 3. Ranged reference: settled at 1.5 s on 2026-10-01 from the measured melee pay (D14): shooting earns about 1.33
    adrenaline per second, between one-handed (about 1.1) and two-handed (about 1.4) melee. Tune with
    `RangedReferenceSeconds` after hands-on play (T17, T18).

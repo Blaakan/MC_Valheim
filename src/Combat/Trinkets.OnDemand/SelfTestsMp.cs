@@ -72,7 +72,7 @@ internal static partial class SelfTests
         SelfTest.Register(ToggleName, RunToggle);
         SelfTest.Register(DualWieldName, RunDualWield);
         SelfTest.Register(DodgeFightName, RunDodgeFight);
-        SelfTest.Register(PvpDodgeBugName, RunPvpDodgeBug);
+        SelfTest.Register(PvpName, RunPvp);
         SelfTest.Register(CleanLogName, RunCleanLog);
 
         SelfTest.RegisterMultiplayer(MpRulesName, SelfTest.Modded, RunMpRules);
@@ -95,7 +95,7 @@ internal static partial class SelfTests
                  {
                      ParityName, BlockFightName, NoFightName, TargetingName, DrainName, FullBarName, AnswersName, GatesName,
                      KeysName, FeedbackName, SwapName, BowHitsName, CrossbowShotName, OtherRangedName, ToggleName,
-                     DualWieldName, DodgeFightName, PvpDodgeBugName, CleanLogName,
+                     DualWieldName, DodgeFightName, PvpName, CleanLogName,
                  })
         {
             SelfTest.Unregister(name);

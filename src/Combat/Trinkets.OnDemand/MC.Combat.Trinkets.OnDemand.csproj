@@ -2,7 +2,7 @@
   <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
   <PropertyGroup>
     <ModName>Trinkets on Demand</ModName>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <ModScope>Revamp</ModScope>
     <!-- Ideas from the sheet this mod implement (tools/Update-Backlog.ps1 link them). Two ideas, split by ";": me do
          all of Trinket revamp, and part of Adrenaline revamp (income in fight, no drain, ranged catch-up). -->

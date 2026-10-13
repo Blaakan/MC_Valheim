@@ -95,7 +95,8 @@ internal sealed partial class Plugin : ModPlugin
             new ConfigDescription(
                 "A fight lasts this many seconds after the last hit you gave to or took from a hostile creature (or a "
                 + "perfect dodge). While an alerted creature keeps hunting you it lasts longer, up to 20 seconds after "
-                + "the last hit. Training dummies, tamed creatures and other players do not count." + ServerWins,
+                + "the last hit. Training dummies and tamed creatures do not count; another player counts like a "
+                + "creature while PvP is on for both of you." + ServerWins,
                 new AcceptableValueRange<float>(TrinketRules.LingerMin, TrinketRules.LingerMax),
                 new ConfigurationManagerAttributes { Order = 95 }));
         RefuseWhileActive = Config.Bind(TriggerSection, "RefuseWhileActive", d.RefuseWhileActive,

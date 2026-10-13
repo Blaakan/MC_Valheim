@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- Other players count like creatures: while PvP is on for you and for the other player, hitting them, being hit by
+  them (blocked or not) or perfectly dodging their attack starts a fight and gives the income while fighting. With PvP
+  off for either of you, their hits do nothing and start no fight. In 0.1.0 other players were meant not to count,
+  yet a perfect dodge of a player's attack did start a fight; now every case follows one rule.
+
 ## 0.1.0
 
 - Initial version.

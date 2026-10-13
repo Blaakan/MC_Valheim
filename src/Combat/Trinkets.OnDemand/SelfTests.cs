@@ -33,7 +33,7 @@ namespace MC.Combat.TrinketsOnDemandMod;
 //   trinkets.ranged-shot    real full-draw Bow shot: arrow's m_adrenaline = base x factor from the formula
 // More tests live in the other SelfTests*.cs files (same class, Debug only), one block per TESTING.md item:
 //   SelfTestsBar.cs       vanilla-parity, drain, full-bar, answers, swap, feedback, keys, gates, toggle, clean-log
-//   SelfTestsFight.cs     block-fight, no-fight, targeting, dodge-fight, bug.pvp-dodge
+//   SelfTestsFight.cs     block-fight, no-fight, targeting, dodge-fight, pvp
 //   SelfTestsRanged.cs    bow-hits, crossbow-shot, other-ranged
 //   SelfTestsOtherMods.cs dual-wield (and the other-mod parts the tests above call)
 //   SelfTestsMp.cs        multiplayer: client tests and their server halves (tools/Test-Multiplayer.ps1)
