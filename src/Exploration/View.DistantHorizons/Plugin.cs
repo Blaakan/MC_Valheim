@@ -34,6 +34,8 @@ internal sealed partial class Plugin : ModPlugin
                         + $"{Cfg.BaseTileSize.Value} m (tiles are limited to 8..250 quads per edge); using "
                         + $"{Cfg.EffectiveVertexSpacing:0.##} m.");
         }
+        // Debug build only (call vanish in Release): self tests that run while me never get active.
+        SelfTests.RegisterAtStart();
     }
 
     // No graphics device (batch mode, server start through valheim.exe): nothing to draw. Other far-terrain mod

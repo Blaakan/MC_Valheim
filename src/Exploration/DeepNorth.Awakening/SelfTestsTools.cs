@@ -89,6 +89,8 @@ internal static partial class SelfTests
         SelfTest.Register(KallRestartName, RunKallRestart);
         SelfTest.Register(OldWorldName, RunOldWorld);
         SelfTest.Register(ToggleName, RunToggle);
+        // Newer tests (SelfTestsReal.cs, SelfTestsMap.cs, SelfTestsOtherMods.cs, SelfTestsStaged.cs, SelfTestsMpMore.cs).
+        RegisterReal();
         SelfTest.Register(CleanLogName, RunCleanLog);
 
         SelfTest.RegisterMultiplayer(MpRulesName, SelfTest.Modded, RunMpRules);
@@ -100,6 +102,7 @@ internal static partial class SelfTests
         SelfTest.RegisterServerStep(StepState, ServerState);
         SelfTest.RegisterServerStep(StepSet, ServerSet);
         SelfTest.RegisterServerStep(StepKill, ServerKill);
+        RegisterMpMore();
     }
 
     private static void UnregisterMore()
@@ -120,6 +123,7 @@ internal static partial class SelfTests
         SelfTest.UnregisterServerStep(StepState);
         SelfTest.UnregisterServerStep(StepSet);
         SelfTest.UnregisterServerStep(StepKill);
+        UnregisterReal();
     }
 
     // ---------- log tap ----------

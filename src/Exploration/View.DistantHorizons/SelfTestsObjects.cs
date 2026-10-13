@@ -697,7 +697,7 @@ internal static class ObjectTests
     // atLeast: never done before this many seconds. Zone the game no longer want only leave after
     // ZoneSystem.m_zoneTTL (4 s), then one zone per zone-system tick: 2.5 s of same count right after lowering the
     // distance say nothing (run of 2026-10-07: "unloaded" was said with all 137 zones still there).
-    private static IEnumerator ZonesSettle(float timeout, Kit.Box result, float atLeast = 0f)
+    internal static IEnumerator ZonesSettle(float timeout, Kit.Box result, float atLeast = 0f)
     {
         var start = Kit.Now;
         var last = -1;
@@ -1021,7 +1021,7 @@ internal static class ObjectTests
 
     // Finest far tile drawn under points along the view (every 250 m between the two distances, on the view line and
     // 4 degrees to each side). 99 = no far ground there.
-    private static int FinestInCone(LodTerrainManager mgr, Vector3 cam, Vector2 forward, float halfAngle, float min, float max)
+    internal static int FinestInCone(LodTerrainManager mgr, Vector3 cam, Vector2 forward, float halfAngle, float min, float max)
     {
         var finest = 99;
         LodTile hint = null;
@@ -1043,7 +1043,7 @@ internal static class ObjectTests
     // Finest far tile the no-spyglass rule can want at distance or farther from the camera: its parent (p wide) is
     // split only while the camera is within SplitFactor * (1 + SplitHysteresis) * p of it (Chebyshev), and the parent
     // reach at most p nearer than a point in it (point at distance d = at least d / sqrt 2 away, Chebyshev).
-    private static int FinestNormal(DHConfig cfg, float distance)
+    internal static int FinestNormal(DHConfig cfg, float distance)
     {
         var reach = cfg.SplitFactor.Value * (1f + cfg.SplitHysteresis.Value);
         var level = 0;

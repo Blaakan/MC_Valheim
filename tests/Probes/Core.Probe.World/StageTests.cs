@@ -292,6 +292,13 @@ internal static class StageTests
             throw new InvalidOperationException("not in a world: cannot log out");
         }
         SelfTest.Note("probe", "relog: logging out to the main menu");
+        // Pause flag is static and only Menu.Update clear it: a test that left the pause menu open would bring a
+        // frozen world back after the load. Me log out unpaused, like a player whose menu closes with the scene.
+        if (Game.IsPaused())
+        {
+            SelfTest.Note("probe", "relog: the game was paused (pause menu left open?): unpaused before the log out");
+            Game.Unpause();
+        }
         game.Logout(save: true);
         var end = Time.realtimeSinceStartup + LogoutTimeout - 10f;
         var seenAt = -1f;
@@ -317,6 +324,10 @@ internal static class StageTests
     {
         yield return MenuDriver.StartWorld(timings, again: true);
         yield return ProbeDriver.WaitSpawnAndSettle(timings);
+        if (Game.IsPaused())
+        {
+            Game.Unpause();
+        }
         SelfTest.Note("probe", "relog: back in the world");
     }
 

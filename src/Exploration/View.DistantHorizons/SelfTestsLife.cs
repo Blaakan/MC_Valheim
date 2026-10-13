@@ -105,7 +105,7 @@ internal static class LifeTests
     // ---------- horizons.settings
 
     // README configuration table, top to bottom.
-    private static readonly string[][] ReadmeOrder =
+    internal static readonly string[][] ReadmeOrder =
     {
         new[] { "General", "Enabled", "Status" },
         new[]

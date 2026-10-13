@@ -24,8 +24,11 @@ namespace MC.Exploration.ViewDistantHorizonsMod;
 // More tests in own files, registered here: WorldTests (SelfTestsWorld.cs: what get drawn), LifeTests
 // (SelfTestsLife.cs: off-on, settings, console), ObjectTests (SelfTestsObjects.cs: far objects, simulation distance,
 // spyglass), EdgeTests (SelfTestsEdge.cs: one small test per edge case), MpTests (SelfTestsMp.cs:
-// client on a dedicated server), NearGroundTests (horizons.near). Shared tools: SelfTestKit.cs. horizons.cleanlog go
-// last: it look back at the whole session.
+// client on a dedicated server), NearGroundTests (horizons.near), RealTests (SelfTestsReal.cs: the real thing where
+// an older test took a shortcut), ModsTests (SelfTestsMods.cs: one other mod loaded too), InputTests
+// (SelfTestsInput.cs: real key, mouse and wheel input), StagedTests (SelfTestsStaged.cs: real log out, real restart
+// with the mod off). Shared tools: SelfTestKit.cs. horizons.cleanlog go last of the normal tests: it look back at the
+// whole session (staged tests run after it: horizons.disabled.session-log look back once more at the very end).
 // Me never write config (framework rule): detach test call same code the toggle call, without the toggle; tests that
 // need the framework's own off-on use Plugin.TestBlocker, settings are forced in memory (DHConfig.SetForTest).
 internal static class SelfTests
@@ -52,7 +55,21 @@ internal static class SelfTests
         ObjectTests.Register();
         EdgeTests.Register();
         MpTests.Register();
+        RealTests.Register();
+        ModsTests.Register();
+        InputTests.Register();
+        StagedTests.Register();
         SelfTest.Register(LifeTests.CleanLogName, LifeTests.RunCleanLog);
+#endif
+    }
+
+    // BindConfig: tests that must exist while me never get active (second game of a run start with Enabled = false,
+    // OnActivated never run there). Never unregistered.
+    [Conditional("DEBUG")]
+    internal static void RegisterAtStart()
+    {
+#if DEBUG
+        StagedTests.RegisterAtStart();
 #endif
     }
 
@@ -74,6 +91,10 @@ internal static class SelfTests
         ObjectTests.Unregister();
         EdgeTests.Unregister();
         MpTests.Unregister();
+        RealTests.Unregister();
+        ModsTests.Unregister();
+        InputTests.Unregister();
+        StagedTests.Unregister();
         SelfTest.Unregister(LifeTests.CleanLogName);
 #endif
     }

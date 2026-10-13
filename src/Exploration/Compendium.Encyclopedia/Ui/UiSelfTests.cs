@@ -65,9 +65,12 @@ internal static class UiSelfTests
         SelfTest.Register(UiName, RunUi);
         SelfTest.Register(ToggleName, RunToggle);
         SelfTest.Register(SideRowName, RunSideRow);
-        // One small test per TESTING.md item (Ui/UiSelfTests.More.cs), other mods and multiplayer (Ui/UiSelfTests.Cross.cs).
+        // One small test per TESTING.md item (Ui/UiSelfTests.More.cs), other mods and multiplayer (Ui/UiSelfTests.Cross.cs),
+        // real controller input (Ui/UiSelfTests.Input.cs), what mods that are not installed do (Ui/UiSelfTests.Mods.cs).
         UiMoreSelfTests.Register();
         UiCrossSelfTests.Register();
+        UiInputSelfTests.Register();
+        UiModsSelfTests.Register();
 #endif
     }
 
@@ -80,6 +83,8 @@ internal static class UiSelfTests
         SelfTest.Unregister(SideRowName);
         UiMoreSelfTests.Unregister();
         UiCrossSelfTests.Unregister();
+        UiInputSelfTests.Unregister();
+        UiModsSelfTests.Unregister();
 #endif
     }
 

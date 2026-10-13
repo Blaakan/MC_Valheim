@@ -132,6 +132,10 @@ internal sealed partial class Plugin : ModPlugin
         // Every rule setting (section Fight): new own snapshot, server send it again. General and Display: not rules.
         Config.SettingChanged += OnSettingChanged;
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
+
+        // Self tests that need me before OnActivated (game started with me off; log heard from the start).
+        // Conditional method: call gone in Release.
+        SelfTests.RegisterAlways();
     }
 
 #if DEBUG

@@ -32,7 +32,10 @@ namespace MC.Farming.FishingFightMod;
 // gone, hooked fish picked up), fishing.swim (full bag, deep water), fishing.toggle (feature off and on mid-fight),
 // fishing.input (bar settings, Toggle block, inventory, pause, hidden HUD, fish out of the water), fishing.dual (rod
 // from a weapon pair, dodge), fishing.harpoon (harpoon line let go by a cast).
-// Multiplayer tests in SelfTests.Mp.cs (real dedicated server).
+// Multiplayer tests in SelfTests.Mp.cs (real dedicated server), one more in SelfTests.MpMore.cs.
+// The real thing in place of a shortcut (natural nibble, shallows, fish lifted out of the water, the normal game's
+// fight after a turn-off) and the log check in SelfTests.Real.cs; real gamepad input in SelfTests.Input.cs; two MC
+// mods together in SelfTests.Mods.cs; real log out and a game started with the mod off in SelfTests.Staged.cs.
 // Me force rules only with ServerRules.TestRules / TestPending, phase and marker with Fight.TestPhase / TestPin /
 // TestSide / TestSwitchRate, water under the fish with Fight.TestOutOfWater, the arrow and the bar place with
 // FightHud.TestArrow / TestDisplay, feature off with Plugin.TestBlocked: never config. Rig put back controls, look,
@@ -54,6 +57,30 @@ internal static partial class SelfTests
         SelfTest.Register(FightName, RunFight);
         RegisterLive();
         RegisterMultiplayer();
+        RegisterReal();
+        RegisterInput();
+        RegisterMods();
+        RegisterStaged();
+        RegisterMultiplayerMore();
+        // Last: it reads what every test before it left in the log.
+        RegisterLast();
+#endif
+    }
+
+    // Plugin.BindConfig call me (Debug build): the test of a game started with the mod off (OnActivated never run
+    // there) and the log listener of fishing.log-clean (it must hear the whole game). Never taken back.
+    [Conditional("DEBUG")]
+    internal static void RegisterAlways()
+    {
+#if DEBUG
+        try
+        {
+            RegisterAlwaysBody();
+        }
+        catch (Exception e)
+        {
+            Log.Warning($"Self tests of a start with the mod off were not registered: {e.Message}");
+        }
 #endif
     }
 
@@ -67,6 +94,12 @@ internal static partial class SelfTests
         SelfTest.Unregister(FightName);
         UnregisterLive();
         UnregisterMultiplayer();
+        UnregisterReal();
+        UnregisterInput();
+        UnregisterMods();
+        UnregisterStaged();
+        UnregisterMultiplayerMore();
+        UnregisterLast();
         ClearOverrides();
 #endif
     }

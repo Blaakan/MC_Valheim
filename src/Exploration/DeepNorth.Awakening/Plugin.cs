@@ -168,6 +168,9 @@ internal sealed partial class Plugin : ModPlugin
         // Every rule setting (sections Awakening, Storms, Map): new own snapshot, server send it again.
         Config.SettingChanged += OnSettingChanged;
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
+
+        // Debug build only (call vanish in Release): self tests that run in a game started with me turned off.
+        SelfTests.RegisterEarly();
     }
 
     protected override void OnActivated()

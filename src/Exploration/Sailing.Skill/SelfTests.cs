@@ -45,6 +45,11 @@ namespace MC.Exploration.SailingSkillMod;
 //   SelfTests.Sea.cs          sailing.reach, sailing.upwind, sailing.paddle, sailing.heel, sailing.crew (real water,
 //                             fixed wind)
 //   SelfTests.Multiplayer.cs  sailing.mp.* client tests and their server half (tools/Test-Multiplayer.ps1)
+//   SelfTests.Mods.cs         sailing.encyclopedia, sailing.sneak (another MC mod in the same game)
+//   SelfTests.Input.cs        sailing.input.tab, sailing.input.dive (real key presses)
+//   SelfTests.Real.cs         sailing.real.serpent (a real Serpent with its AI on bites the ship)
+//   SelfTests.Staged.cs       sailing.relog.level (real log out), sailing.disabled.* (real restart with the mod off)
+//   SelfTests.MpMore.cs       sailing.mp.other-version, sailing.mp.vanilla-server.saved
 // Me force rules only with ServerRules.TestRules / TestPending and the level with HelmSkill.TestLocalLevel: never
 // config. Character skills changed in a test are put back from a saved copy (Skills.Save / Load). Every ship me spawn is
 // destroyed, the player put back where he was.
@@ -79,6 +84,8 @@ internal static partial class SelfTests
 #if DEBUG
         StartWatch();
         RegisterAlwaysMultiplayer();
+        RegisterAlwaysMultiplayerMore();
+        RegisterStaged();
 #endif
     }
 
@@ -115,8 +122,16 @@ internal static partial class SelfTests
         SelfTest.Register(PaddleName, RunPaddle);
         SelfTest.Register(HeelName, RunHeel);
         SelfTest.Register(CrewName, RunCrew);
+        // Other MC mods and real keys (SelfTests.Mods.cs, SelfTests.Input.cs), still before sailing.cleanlog.
+        SelfTest.Register(EncyclopediaName, RunEncyclopedia);
+        SelfTest.Register(InputTabName, RunInputTab);
+        SelfTest.Register(SneakName, RunSneak);
+        SelfTest.Register(InputDiveName, RunInputDive);
+        SelfTest.Register(RealSerpentName, RunRealSerpent);
         SelfTest.Register(CleanLogName, RunCleanLog);
+        RegisterRelogTests();
         RegisterMultiplayer();
+        RegisterMultiplayerMore();   // after sailing.mp.join: its test ends refused
     }
 
     private static void UnregisterMore()
@@ -134,8 +149,15 @@ internal static partial class SelfTests
         SelfTest.Unregister(PaddleName);
         SelfTest.Unregister(HeelName);
         SelfTest.Unregister(CrewName);
+        SelfTest.Unregister(EncyclopediaName);
+        SelfTest.Unregister(InputTabName);
+        SelfTest.Unregister(SneakName);
+        SelfTest.Unregister(InputDiveName);
+        SelfTest.Unregister(RealSerpentName);
         SelfTest.Unregister(CleanLogName);
+        UnregisterRelogTests();
         UnregisterMultiplayer();
+        UnregisterMultiplayerMore();
     }
 
     private static void ClearOverrides()

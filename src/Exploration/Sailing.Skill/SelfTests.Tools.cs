@@ -39,8 +39,19 @@ internal static partial class SelfTests
         private readonly object _gate = new object();
         private readonly List<LogLine> _lines = new List<LogLine>();
         private readonly List<string> _mine = new List<string>();
+        private readonly Dictionary<string, int> _heard = new Dictionary<string, int>();
         private int _dropped;
         private int _mineCount;
+
+        // Lines heard from one log source since game start, any level, test result lines too. A check "no warning or
+        // error from X" prove something only when me heard X at all (wrong source name, deaf listener = 0).
+        internal int Heard(string source)
+        {
+            lock (_gate)
+            {
+                return source != null && _heard.TryGetValue(source, out var count) ? count : 0;
+            }
+        }
 
         // Warnings and errors of this mod since game start (me keep first 50 as text), never cut.
         internal int MyProblemCount
@@ -90,6 +101,11 @@ internal static partial class SelfTests
                     return;
                 }
                 var source = e.Source != null ? e.Source.SourceName : "";
+                lock (_gate)
+                {
+                    _heard.TryGetValue(source, out var heard);
+                    _heard[source] = heard + 1;
+                }
                 var mine = source == ModInfo.Name;
                 var bad = (e.Level & (LogLevel.Warning | LogLevel.Error | LogLevel.Fatal)) != 0;
                 if (!mine && !bad)
@@ -703,6 +719,9 @@ internal static partial class SelfTests
     // Every test end with this: mod itself stay quiet (no warning, no error) while test run.
     private static void CheckQuiet(Checks c, int mark)
     {
+        // Watcher that never heard the mod (not running, deaf) would call every test quiet.
+        c.Check(_watch != null && _watch.Heard(ModInfo.Name) > 0,
+            $"the log watcher is not running or never heard a line of {ModInfo.Name}: 'no warning or error' cannot be checked");
         var problems = Problems(mark, ModInfo.Name);
         c.Check(problems.Count == 0, $"{ModInfo.Name} logged warnings or errors during the test: {Join(problems)}");
     }

@@ -37,7 +37,10 @@ namespace MC.Exploration.DeepNorthAwakeningMod;
 // More tests live beside me (same class, registered from here): SelfTestsMore.cs (at the spawn: real stone breaks, star
 // rolls, console command, map paint...), SelfTestsNorth.cs (travel to the Deep North: dormant, stage 1, storms, bands,
 // after Kall, old world, live toggle), SelfTestsMp.cs (multiplayer client tests and their server halves); their tools
-// in SelfTestsTools.cs.
+// in SelfTestsTools.cs. Newer ones: SelfTestsReal.cs (the real thing in place of a shortcut: real Kall key, trips, a
+// real death, a meteor on the player), SelfTestsMap.cs (fog of war, real map key, screen pixels), SelfTestsOtherMods.cs
+// (with Creature Morale and Sneak Ambush), SelfTestsStaged.cs (real log out and load, game started with the mod off),
+// SelfTestsMpMore.cs (kill target lowered while the player stands in the area).
 internal static partial class SelfTests
 {
     private const string LogicName = "dn.logic";
@@ -66,6 +69,23 @@ internal static partial class SelfTests
         SelfTest.Register(AreaName, RunArea);
         SelfTest.Register(MorkhallaName, RunMorkhalla);
         RegisterMore();
+#endif
+    }
+
+    // Disabled-start tests (SelfTestsStaged.cs): registered from BindConfig, because in the second game of such a test
+    // the mod is off and OnActivated never run. Never throw into BindConfig.
+    [Conditional("DEBUG")]
+    internal static void RegisterEarly()
+    {
+#if DEBUG
+        try
+        {
+            RegisterDisabledStart();
+        }
+        catch (Exception e)
+        {
+            Log.Warning($"Could not register the disabled-start self tests: {e.Message}");
+        }
 #endif
     }
 
