@@ -58,7 +58,13 @@ internal static partial class SelfTests
         SelfTest.Register(BushSightName, RunBushSight);
         SelfTest.Register(FogName, RunFog);
         SelfTest.Register(RecipeName, RunRecipe);
+        // Real-thing tests and tests with other MC mods (SelfTests.Real.cs, SelfTests.OtherMods.cs): before the smoke
+        // group, whose last test kills the player.
+        RegisterReal();
+        RegisterOtherMods();
         RegisterSmoke();
+        // After everything else of this mod: it reads what the tests before it left in the log file.
+        RegisterLast();
     }
 
     private static void UnregisterCoverage()
@@ -72,7 +78,10 @@ internal static partial class SelfTests
         SelfTest.Unregister(BushSightName);
         SelfTest.Unregister(FogName);
         SelfTest.Unregister(RecipeName);
+        UnregisterReal();
+        UnregisterOtherMods();
         UnregisterSmoke();
+        UnregisterLast();
     }
 
     // ---------- ears: log lines and HUD messages ----------

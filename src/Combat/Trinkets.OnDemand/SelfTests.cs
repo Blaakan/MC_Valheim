@@ -37,6 +37,12 @@ namespace MC.Combat.TrinketsOnDemandMod;
 //   SelfTestsRanged.cs    bow-hits, crossbow-shot, other-ranged
 //   SelfTestsOtherMods.cs dual-wield (and the other-mod parts the tests above call)
 //   SelfTestsMp.cs        multiplayer: client tests and their server halves (tools/Test-Multiplayer.ps1)
+//   SelfTestsMpVersion.cs mp.other-version (copy of the mod with another network version)
+//   SelfTestsInput.cs     real keys and test gamepad: input.keys, input.pad-default, input.pad-layouts,
+//                         input.dual-wield, input.music
+//   SelfTestsStages.cs    respawn, relog.bar (real log out), disabled.* (real restart with the mod off), and the
+//                         registration of all tests of these four files
+//   SelfTestsMods.cs      dual-wield-creature, moveset, smoke-screen, morale-flee, morale-afraid, pvp-dodge-arrow
 //   SelfTestsTools.cs     log listener, swing / face / message helpers
 // Me force rules only with ServerRules.TestRules / TestPending, the key with Controls.TestPress, personal settings with
 // Controls.TestKey... / Feedback.Test...: never config in a single-player test. Rig put back player (equipment, ammo,
@@ -95,6 +101,7 @@ internal static partial class SelfTests
         {
             EnsureLog();
             SelfTest.RegisterMultiplayer(MpNoServerName, VanillaServerScenario, RunMpNoServerMod);
+            RegisterStaged(); // disabled-start tests: second game never activates me
         }
         catch (Exception e)
         {

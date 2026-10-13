@@ -288,6 +288,11 @@ internal sealed partial class Plugin : ModPlugin
         // read feature state itself (off = recipe hidden).
         ServerRules.Changed -= OnRulesChanged;
         ServerRules.Changed += OnRulesChanged;
+#if DEBUG
+        // Self test of a game started with me off (second game of a test run): OnActivated never run there, so me
+        // register it here. Never in release.
+        SelfTests.RegisterDisabledStart();
+#endif
     }
 
     protected override void OnActivated()

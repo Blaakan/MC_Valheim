@@ -32,13 +32,56 @@ internal sealed partial class Plugin : ModPlugin
         RebuildWeaponFilter();
         ExtraItems.SettingChanged += (_, _) => RebuildWeaponFilter();
         ExcludedItems.SettingChanged += (_, _) => RebuildWeaponFilter();
+
+        // Debug build only (call vanish in Release): log watch, and self tests that must exist while me is off.
+        SelfTests.RegisterAlways();
     }
 
     private static void RebuildWeaponFilter() => WeaponFilter.Rebuild(ExtraItems.Value, ExcludedItems.Value);
 
+#if DEBUG
+    // Self test only (SelfTests.cs, crossbow.vanilla-shot): feature off and on again the way ModPlugin.Refresh do it
+    // (OnDeactivated, then patches gone; patches back, then OnActivated), with no setting written. Framework state stay
+    // Active meanwhile: only for a few seconds inside one test, put back in its finally.
+    internal bool TestOff { get; private set; }
+
+    internal void TestTurnOff()
+    {
+        if (TestOff || !IsActive)
+        {
+            return;
+        }
+        TestOff = true;
+        try
+        {
+            OnDeactivated();
+        }
+        finally
+        {
+            Harmony.UnpatchSelf();
+        }
+    }
+
+    internal void TestTurnOn()
+    {
+        if (!TestOff)
+        {
+            return;
+        }
+        TestOff = false;
+        ApplyPatches(Harmony);
+        OnActivated();
+    }
+
+    // Me going off: self tests leave the list (Release build has no such override: nothing to undo there).
+    protected override void OnDeactivated() => SelfTests.Unregister();
+#endif
+
     // Me just turned on (maybe mid-game). Catch up on what happened while me was off.
     protected override void OnActivated()
     {
+        SelfTests.Register(); // Debug build only (call vanish in Release)
+
         var player = Player.m_localPlayer;
         if (player == null)
         {

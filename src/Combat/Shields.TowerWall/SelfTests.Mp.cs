@@ -71,6 +71,7 @@ internal static partial class SelfTests
     private static void RegisterInactive()
     {
         SelfTest.RegisterMultiplayer(MpNoServerName, VanillaServerScenario, RunMpNoServer);
+        RegisterAutoAlways(); // SelfTests.Staged.cs: relog, disabled-start and leave tests, log tap from the start
     }
 
     // ---------- words between the two halves ----------

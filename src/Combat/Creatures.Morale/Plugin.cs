@@ -189,6 +189,10 @@ internal sealed partial class Plugin : ModPlugin
         // standing published again. Safe while off (guards inside).
         Config.SettingChanged += OnSettingChanged;
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
+
+        // Debug build only (call vanish in Release): self tests that must exist before the mod turn on, or while it
+        // is off (start with Enabled = false, session log, tests of other multiplayer scenarios).
+        SelfTests.RegisterAtStart();
     }
 
 #if DEBUG

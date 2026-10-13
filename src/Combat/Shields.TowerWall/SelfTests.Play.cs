@@ -71,6 +71,7 @@ internal static partial class SelfTests
             SelfTest.Register(test.Key, test.Value);
         }
         RegisterMultiplayer();
+        RegisterAuto(); // SelfTests.Real.cs: newer tests, tower.log moved behind them
     }
 
     private static void UnregisterMore()
@@ -80,6 +81,7 @@ internal static partial class SelfTests
             SelfTest.Unregister(test.Key);
         }
         UnregisterMultiplayer();
+        UnregisterAuto();
     }
 
     // ---------- log tap ----------

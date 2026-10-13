@@ -13,6 +13,16 @@ internal static class WeaponFilter
     private static HashSet<string> _extra = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private static HashSet<string> _excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+#if DEBUG
+    // Self test only (SelfTests.cs): Crossbows setting forced in memory, null = player's own setting. Single-player
+    // test never write player's cfg. Name lists: test call Rebuild with own text, then again with the settings.
+    internal static bool? TestCrossbows;
+
+    private static bool CrossbowsSetting => TestCrossbows ?? Plugin.KeepCrossbows?.Value ?? true;
+#else
+    private static bool CrossbowsSetting => Plugin.KeepCrossbows?.Value ?? true;
+#endif
+
     public static void Rebuild(string extra, string excluded)
     {
         _extra = Parse(extra);
@@ -29,7 +39,7 @@ internal static class WeaponFilter
         {
             return false;
         }
-        var crossbows = Plugin.KeepCrossbows?.Value ?? true;
+        var crossbows = CrossbowsSetting;
         if (crossbows && shared.m_skillType == Skills.SkillType.Crossbows)
         {
             return true;

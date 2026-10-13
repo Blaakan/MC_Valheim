@@ -48,6 +48,9 @@ internal static partial class SelfTests
             }
         }
 
+        // A test record now (session log ask: line logged inside a test is judged by that test's Checks).
+        internal static bool Recording => _instance != null && _instance._recording;
+
         internal void Begin()
         {
             lock (_gate)

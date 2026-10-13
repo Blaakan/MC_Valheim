@@ -73,6 +73,7 @@ internal static partial class SelfTests
         SelfTest.Register(DualWieldName, RunDualWield);
         SelfTest.Register(DodgeFightName, RunDodgeFight);
         SelfTest.Register(PvpName, RunPvp);
+        RegisterAuto(); // real input, other mods, respawn, relog (SelfTestsStages.cs): before clean-log, it reads their log
         SelfTest.Register(CleanLogName, RunCleanLog);
 
         SelfTest.RegisterMultiplayer(MpRulesName, SelfTest.Modded, RunMpRules);
@@ -87,10 +88,12 @@ internal static partial class SelfTests
         SelfTest.RegisterServerStep(SrvLogStep, ServerLogStep);
         SelfTest.RegisterServerStep(SrvSendStep, ServerSendStep);
         SelfTest.RegisterServerStep(SrvItemStep, ServerItemStep);
+        RegisterAutoMp(); // last: trinkets.mp.other-version ends refused and leaves a 'Refused' line on the server
     }
 
     private static void UnregisterMore()
     {
+        UnregisterAuto();
         foreach (var name in new[]
                  {
                      ParityName, BlockFightName, NoFightName, TargetingName, DrainName, FullBarName, AnswersName, GatesName,

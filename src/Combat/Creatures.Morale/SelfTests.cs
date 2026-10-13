@@ -68,6 +68,7 @@ internal static partial class SelfTests
         SelfTest.Register(RoutName, RunRout);
         RegisterMore();
         RegisterMultiplayer();
+        RegisterAuto();
 #endif
     }
 
@@ -83,6 +84,7 @@ internal static partial class SelfTests
         SelfTest.Unregister(RoutName);
         UnregisterMore();
         UnregisterMultiplayer();
+        UnregisterAuto();
         ResetHooks();
 #endif
     }
