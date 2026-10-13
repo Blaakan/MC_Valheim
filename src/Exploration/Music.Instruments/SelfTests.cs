@@ -76,6 +76,17 @@ internal static partial class SelfTests
         LogTap.Install();
         RegisterSolo();
         RegisterMulti();
+        RegisterAuto();
+#endif
+    }
+
+    // BindConfig (every start, also with the mod off or on a server without it): tests that must be there while
+    // the mod is inactive (SelfTests.Staged.cs). Never unregistered.
+    [Conditional("DEBUG")]
+    internal static void RegisterEarly()
+    {
+#if DEBUG
+        RegisterStaged();
 #endif
     }
 
@@ -89,6 +100,7 @@ internal static partial class SelfTests
         }
         UnregisterSolo();
         UnregisterMulti();
+        UnregisterAuto();
         ClearOverrides();
 #endif
     }

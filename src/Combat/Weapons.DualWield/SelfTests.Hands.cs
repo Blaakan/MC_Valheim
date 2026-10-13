@@ -55,11 +55,18 @@ internal static partial class SelfTests
         SelfTest.Register(WoundedName, RunWounded);
         SelfTest.Register(KillsName, RunKills);
         SelfTest.Register(ToggleName, RunToggle);
+        // Real input and other-mod tests that swing (SelfTests.Input.cs, SelfTests.Mods.cs).
+        RegisterAutoFights();
         SelfTest.Register(OthersName, RunOthers);
         SelfTest.Register(PlacesName, RunPlaces);
         SelfTest.Register(SheathName, RunSheath);
+        // Forge, barber, bed, water, the two real deaths, and the relog tests (SelfTests.Mods.cs, SelfTests.Real.cs,
+        // SelfTests.Staged.cs).
+        RegisterAutoPlaces();
         SelfTest.Register(LogName, RunLog);
         RegisterMultiplayerTests();
+        // After the tests that turn the mod off; the last one of these gets the player refused (SelfTests.MpMore.cs).
+        RegisterMoreMultiplayerTests();
         LogWatch.Install();
     }
 
@@ -81,6 +88,7 @@ internal static partial class SelfTests
         SelfTest.Unregister(ToggleName);
         SelfTest.Unregister(LogName);
         UnregisterMultiplayerTests();
+        UnregisterAuto();
     }
 
     // ---------- helpers ----------

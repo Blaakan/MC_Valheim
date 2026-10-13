@@ -267,6 +267,8 @@ internal sealed partial class Plugin : ModPlugin
         ServerRules.Changed -= OnRulesChanged;
         ServerRules.Changed += OnRulesChanged;
         LaneKeys.Cache();
+        // Debug build only (call vanish in Release): self tests that must be there while me inactive.
+        SelfTests.RegisterEarly();
     }
 
     private ConfigEntry<string> BindResources(InstrumentKind kind, string name, string value, int order)

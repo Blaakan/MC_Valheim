@@ -74,6 +74,7 @@ internal static partial class SelfTests
         SelfTest.Register(RootName, RunRoot);
         SelfTest.Register(IconsName, RunIcons);
         RegisterMore();
+        RegisterNew();
 #endif
     }
 
@@ -89,6 +90,7 @@ internal static partial class SelfTests
         SelfTest.Unregister(RootName);
         SelfTest.Unregister(IconsName);
         UnregisterMore();
+        UnregisterNew();
         ClearOverrides();
 #endif
     }

@@ -84,6 +84,8 @@ internal static partial class SelfTests
     internal static void RegisterAlways()
     {
         SelfTest.RegisterMultiplayer(MpNoServerName, VanillaServerScenario, RunMpNoServer);
+        // The disabled-start test (SelfTests.Staged.cs): in the second game the feature never turns on.
+        RegisterStaged();
     }
 
     // ---------- server halves ----------

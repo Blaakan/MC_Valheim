@@ -171,6 +171,8 @@ internal sealed partial class Plugin : ModPlugin
         // read feature state itself (off = recipe hidden).
         ServerRules.Changed -= OnRulesChanged;
         ServerRules.Changed += OnRulesChanged;
+        // Debug build only (call vanish in Release): self tests that run while me never get active.
+        SelfTests.RegisterAtStart();
     }
 
     protected override void OnActivated()

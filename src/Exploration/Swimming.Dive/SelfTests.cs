@@ -41,6 +41,12 @@ namespace MC.Exploration.SwimmingDiveMod;
 //                       dive.serpent
 //   SelfTests.Mp.cs     multiplayer (tools/Test-Multiplayer.ps1): dive.mp.rules, dive.mp.diver, dive.mp.server-off and
 //                       their server steps; dive.mp.server-missing (scenario vanilla-server)
+//   SelfTests.Input.cs  real keyboard and gamepad presses (probe's input driver): dive.input.pad, dive.input.pad-alt,
+//                       dive.input.rebind, dive.input.rebind-settings, dive.input.storm
+//   SelfTests.Mods.cs   other MC mods in the same game: dive.dualwield, dive.sneak-icons, dive.moveset-attack
+//   SelfTests.Real.cs   the real thing: dive.tarpit, dive.serpent-hunt, dive.death
+//   SelfTests.Staged.cs registration of those, and the staged tests: dive.relog.underwater (real log out),
+//                       dive.disabled.vanilla and dive.disabled.log (game started with me off)
 internal static partial class SelfTests
 {
     private const string NetworkName = "dive.network";
@@ -56,6 +62,8 @@ internal static partial class SelfTests
         {
             SelfTest.Register(test.Key, test.Value);
         }
+        // Tests added later (real input, real tar pit, real death, other MC mods) and the relog test: SelfTests.Staged.cs.
+        RegisterMore();
         RegisterMultiplayer();
 #endif
     }
@@ -68,6 +76,7 @@ internal static partial class SelfTests
         {
             SelfTest.Unregister(test.Key);
         }
+        UnregisterMore();
         UnregisterMultiplayer();
         // A test that turn me off and on itself keep its overrides (it clear them at its end).
         if (!KeepOverrides)

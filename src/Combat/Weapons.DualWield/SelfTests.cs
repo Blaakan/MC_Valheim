@@ -50,6 +50,11 @@ namespace MC.Combat.WeaponsDualWieldMod;
 //   SelfTests.World.cs    dual.places, dual.sheath, dual.others, dual.log
 //   SelfTests.Mp.cs       dual.mp.* (client joined to a dedicated server, tools/Test-Multiplayer.ps1) and their
 //                         server halves
+//   SelfTests.Input.cs    dual.input.* (real key, mouse button and test gamepad presses)
+//   SelfTests.Mods.cs     dual.x.* (other MC mods in the same game: Moveset, Sneak Ambush, Morale, Forge, kill counts)
+//   SelfTests.Real.cs     dual.real.* (real death and respawn, real night in a bed, barber, real water)
+//   SelfTests.Staged.cs   dual.relog.* (real log out and back in), dual.disabled.pair (restart with the mod off)
+//   SelfTests.MpMore.cs   dual.mp.keys, dual.mp.version-panel, dual.mp.allow-back
 internal static partial class SelfTests
 {
     private const string DataName = "dual.data";

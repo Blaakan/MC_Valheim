@@ -123,6 +123,9 @@ internal sealed partial class Plugin : ModPlugin
 #if DEBUG
         // Self test log watch (replant.log): keep my own log lines from the start.
         SelfTestLog.Install(Logger);
+        // Self tests that must be known while me off: second game of a run (every MC mod Enabled = false), server
+        // without me. OnActivated never run there.
+        SelfTests.RegisterAtLoad();
 #endif
         // Me pin ItemData.GetIcon as not inlined first (tier gem postfix must always run).
         IconInlineGuard.Apply();

@@ -54,6 +54,17 @@ internal static partial class SelfTests
         SelfTest.Register(FarName, RunFar);
         SelfTest.Register(ExportName, RunExport);
         RegisterMore();
+        RegisterAuto();
+#endif
+    }
+
+    // BindConfig: tests that must be there while the feature never gets active (second game of a run with every MC
+    // mod off, server without the mod), and the log listener from the first line on. See SelfTestsStaged.cs.
+    [Conditional("DEBUG")]
+    internal static void RegisterAtStart()
+    {
+#if DEBUG
+        RegisterStaged();
 #endif
     }
 
@@ -68,6 +79,7 @@ internal static partial class SelfTests
         SelfTest.Unregister(FarName);
         SelfTest.Unregister(ExportName);
         UnregisterMore();
+        UnregisterAuto();
         ClearOverrides();
 #endif
     }

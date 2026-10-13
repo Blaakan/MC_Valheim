@@ -91,6 +91,10 @@ internal sealed partial class Plugin : ModPlugin
         // Every rule setting (section Diving): new own snapshot, server send it again. General and Visuals: not rules.
         Config.SettingChanged += OnSettingChanged;
         AllowPlayersWithoutMod.SettingChanged += OnAllowChanged;
+#if DEBUG
+        // Self test of a game started with me off (OnActivated never run there): registered here. Debug build only.
+        SelfTests.RegisterAtBind();
+#endif
     }
 
     protected override string LocalBlocker() => ForeignMods.BlockerText();
