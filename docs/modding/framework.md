@@ -385,6 +385,9 @@ finally
   gamepad makes the game switch to gamepad input (`ZInput.IsGamepadActive()`), which changes hints and some
   behaviour; `ReleaseInput` removes the gamepad and the game goes back to keyboard and mouse within a few frames.
   Always call it in `finally`; the probe also calls it after every staged test.
+- The game clears some named buttons itself the moment it uses them: `InventoryGui` resets `JoyButtonY` when the
+  inventory opens on it, so `ZInput.GetButton("JoyButtonY")` is already false when a test looks after the game's
+  own `Update`. Check such a press by what it did (the inventory is open), not by reading the button back.
 - Every call returns `false` when no probe drives the game. Mouse position and clicks on UI elements are not
   driven: call the handler of the button, as before.
 - Still by hand: how a real controller feels, its rumble, and layouts other than the one the test read.

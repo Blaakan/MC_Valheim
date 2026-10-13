@@ -571,7 +571,10 @@ function Test-Coverage {
         elseif ($Mod -or $why.Bad) { Write-Warn2 "$($p.BaseName) ran no test: $($why.Text)" }
     }
     $guids = @($selected | ForEach-Object { $_.BaseName })
-    if (-not $modRan.Count) {
+    # -Only with probe names only (-Only probe., -Only probe.input) = a check of the harness itself: no mod test wanted.
+    $probeOnly = $filters.Count -gt 0 -and -not @($filters | Where-Object { $_ -notlike 'probe*' }).Count
+    if ($probeOnly -and -not $modRan.Count) { Write-Ok 'harness check (-Only names probe tests only): no mod test wanted' }
+    elseif (-not $modRan.Count) {
         Write-Fail ("no mod test ran, only the probe's own: a run that tests no mod does not pass" + $(if ($listed) { '' } else { " ($knownText)" }))
         $ok = $false
     }

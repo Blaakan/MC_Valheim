@@ -533,12 +533,22 @@ internal static class StageTests
             }
             yield return PressCheck(T, mouseKey, "mouse button");
 
-            // KeyTap: one press, one release.
+            // KeyTap: one press, one release. Looked at every frame of the tap (press show for one frame only).
             var downs = 0;
             var ups = 0;
             var tap = SelfTest.KeyTap(key, 0.2f);
             while (tap.MoveNext())
             {
+                if (tap.Current is CustomYieldInstruction wait)
+                {
+                    while (wait.keepWaiting)
+                    {
+                        yield return null;
+                        downs += ZInput.GetKeyDown(key) ? 1 : 0;
+                        ups += ZInput.GetKeyUp(key) ? 1 : 0;
+                    }
+                    continue;
+                }
                 yield return tap.Current;
                 downs += ZInput.GetKeyDown(key) ? 1 : 0;
                 ups += ZInput.GetKeyUp(key) ? 1 : 0;
@@ -581,42 +591,41 @@ internal static class StageTests
                 padActive |= ZInput.IsGamepadActive();
             }
             SelfTest.PadStick(false, Vector2.zero);
+            // Named buttons are what the game and the mods read. Left trigger: game never reset "JoyLTrigger" by
+            // itself. (It does reset some: "JoyButtonY" is cleared by InventoryGui the moment the inventory opens on
+            // it, so a test can never read that one after the game's own Update.)
             SelfTest.Pad("LeftTrigger", 1f);
             var trigger = 0f;
-            var triggerButton = false;
+            var namedDown = false;
+            var namedHeld = false;
             for (var i = 0; i < 10; i++)
             {
                 yield return null;
                 trigger = Mathf.Max(trigger, ZInput.GetJoyLTrigger());
-                triggerButton |= ZInput.GetButton("JoyLTrigger");
+                namedDown |= ZInput.GetButtonDown("JoyLTrigger");
+                namedHeld |= ZInput.GetButton("JoyLTrigger");
                 padActive |= ZInput.IsGamepadActive();
             }
             SelfTest.Pad("LeftTrigger", 0f);
-            var pressed = false;
-            var namedDown = false;
-            var namedHeld = false;
-            SelfTest.Pad("North", 1f);
-            for (var i = 0; i < 10; i++)
-            {
-                yield return null;
-                pressed |= Gamepad.current != null && Gamepad.current.buttonNorth.isPressed;
-                namedDown |= ZInput.GetButtonDown("JoyButtonY");
-                namedHeld |= ZInput.GetButton("JoyButtonY");
-                padActive |= ZInput.IsGamepadActive();
-            }
-            SelfTest.Pad("North", 0f);
             var namedUp = false;
             for (var i = 0; i < 5; i++)
             {
                 yield return null;
-                namedUp |= ZInput.GetButtonUp("JoyButtonY");
+                namedUp |= ZInput.GetButtonUp("JoyLTrigger");
             }
-            // Named buttons are what the game and the mods read ("JoyButtonY" = the physical top face button).
-            Check(T, namedDown && namedHeld && namedUp && !ZInput.GetButton("JoyButtonY"),
-                "test gamepad top face button: press, hold and release seen through ZInput.GetButton(\"JoyButtonY\")",
-                $"test gamepad top face button through ZInput \"JoyButtonY\": press {namedDown}, held {namedHeld}, release {namedUp}, down after {ZInput.GetButton("JoyButtonY")}");
-            Check(T, triggerButton, "test gamepad left trigger seen through ZInput.GetButton(\"JoyLTrigger\")",
-                "test gamepad left trigger never seen through ZInput.GetButton(\"JoyLTrigger\")");
+            Check(T, namedDown && namedHeld && namedUp && !ZInput.GetButton("JoyLTrigger"),
+                "test gamepad left trigger: press, hold and release seen through ZInput.GetButton(\"JoyLTrigger\")",
+                $"test gamepad left trigger through ZInput \"JoyLTrigger\": press {namedDown}, held {namedHeld}, release {namedUp}, down after {ZInput.GetButton("JoyLTrigger")}");
+            var pressed = false;
+            SelfTest.Pad("LeftShoulder", 1f);
+            for (var i = 0; i < 10; i++)
+            {
+                yield return null;
+                pressed |= Gamepad.current != null && Gamepad.current.leftShoulder.isPressed;
+                padActive |= ZInput.IsGamepadActive();
+            }
+            SelfTest.Pad("LeftShoulder", 0f);
+            yield return null;
             Check(T, InputDriver.PadExists && stick > 0.5f, $"test gamepad left stick seen by ZInput ({stick:F2})",
                 $"test gamepad left stick not seen by ZInput ({stick:F2}, pad exists {InputDriver.PadExists})");
             Check(T, trigger > 0.5f, $"test gamepad left trigger seen by ZInput ({trigger:F2})", $"test gamepad left trigger not seen by ZInput ({trigger:F2})");
