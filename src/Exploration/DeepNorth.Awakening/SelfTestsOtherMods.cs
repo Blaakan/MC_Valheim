@@ -284,6 +284,10 @@ internal static partial class SelfTests
 
             // Control, where the test starts: a weak creature never targets this player (in the normal game it would at
             // once: 9 m away, face to face).
+            // Creature Morale read a player's standing at most once a second (its StandingCache): the old one may still
+            // be in its memory. Me wait that out, else the Greydwarf can pick the player on its very first look and the
+            // control fail for nothing.
+            yield return new WaitForSeconds(1.2f);
             var fwd = Forward(player);
             var weak = Spawn("Greydwarf", player.transform.position + fwd * 9f, -fwd);
             spawned.Add(weak);
@@ -313,6 +317,7 @@ internal static partial class SelfTests
             if (c.Check(box.Ok, $"travelled to the invaded area {cell} at {F(point)}"))
             {
                 var pos = player.transform.position;
+                yield return FreshTimers(pos);
                 yield return WaitTagged(pos, 250f, 4, clock.Cap(18f));
                 var fighters = AreaFighters(pos, 250f, false);
                 Character jotun = null;
@@ -482,6 +487,9 @@ internal static partial class SelfTests
             if (c.Check(box.Ok, $"travelled to the invaded area {cell} at {F(point)}"))
             {
                 var pos = player.transform.position;
+                // Same area as dn.x.morale, which ran a minute ago and took its Jotun away: without this, timers of the
+                // place are not due and no Jotun come.
+                yield return FreshTimers(pos);
                 yield return WaitTagged(pos, 250f, 4, clock.Cap(18f));
                 var fighters = AreaFighters(pos, 250f, false);
                 if (c.Check(fighters.Count > 0 && WorldState.HostilityOn, $"area Jotun stand near the player ({Kinds(TaggedNear(pos, 250f))}), nature fights back"))
@@ -518,6 +526,8 @@ internal static partial class SelfTests
                             var duel = new Duel();
                             yield return WatchDuel(barka, second, clock.Cap(12f, 1), duel);
                             c.Check(duel.Fought, $"the Barka and the area Jotun fight too: one targets the other after {F(duel.Seconds)} s");
+                            var barkaZdo = ZdoOf(barka);
+                            c.Check(barkaZdo != null && barkaZdo.GetLong(MoraleRoutKey, 0L) == 0L, "Creature Morale did not make the Barka run (no rout on it)");
                         }
                     }
 
@@ -605,6 +615,7 @@ internal static partial class SelfTests
                 yield return SelfTest.KeyTap(key);
                 yield return Until(() => player.IsCrouching(), 3f);
                 c.Check(player.IsCrouching(), $"the {key} key (the Crouch button) makes the player sneak");
+                yield return FreshTimers(pos);
                 yield return WaitTagged(pos, 250f, 4, clock.Cap(18f));
                 var around = TaggedNear(pos, 250f);
                 var hunters = 0;

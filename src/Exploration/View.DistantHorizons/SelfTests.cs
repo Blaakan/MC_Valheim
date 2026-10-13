@@ -64,11 +64,13 @@ internal static class SelfTests
     }
 
     // BindConfig: tests that must exist while me never get active (second game of a run start with Enabled = false,
-    // OnActivated never run there). Never unregistered.
+    // OnActivated never run there). Never unregistered. Log watch go on here too, before my patches are applied and
+    // also in a game where me stay off: "no error line of the mod" then cover the start and the game with the mod off.
     [Conditional("DEBUG")]
     internal static void RegisterAtStart()
     {
 #if DEBUG
+        ErrorWatch.Install();
         StagedTests.RegisterAtStart();
 #endif
     }

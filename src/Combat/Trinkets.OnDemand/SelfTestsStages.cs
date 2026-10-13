@@ -342,6 +342,14 @@ internal static partial class SelfTests
                 ConsoleAdrenaline(now, 999f);
                 c.Check(Near(now.m_adrenaline, newMax) && !now.GetSEMan().HaveStatusEffect(hash),
                     $"new player: a full bar does not wait (bar {F(now.m_adrenaline)} of {F(newMax)})");
+                // Fresh respawn: game take no input for a moment (first run: trigger said Blocked). Player cannot press
+                // then either, so me wait like a player has to. Still closed after 20 s = fail that say which gate.
+                yield return Until(() => now.TakeInput() && !Hud.InRadial() && !now.InPlaceMode(), 20f);
+                c.Check(now.TakeInput() && !Hud.InRadial() && !now.InPlaceMode(),
+                    $"new player: the game takes no input 20 s after the respawn (TakeInput {now.TakeInput()}, dead {now.IsDead()}, "
+                    + $"teleporting {now.IsTeleporting()}, cutscene {now.InCutscene()}, inventory {InventoryGui.IsVisible()}, menu {Menu.IsVisible()}, "
+                    + $"text viewer {TextViewer.instance != null && TextViewer.instance.IsVisible()}, map {Minimap.IsOpen()}, radial {Hud.InRadial()}, "
+                    + $"build mode {now.InPlaceMode()}, console {Console.IsVisible()})");
                 yield return Press();
                 c.Check(FullBar.LastResult == TriggerResult.Fired && now.GetSEMan().HaveStatusEffect(hash) && Near(now.m_adrenaline, 0f),
                     $"new player: the trigger answered {FullBar.LastResult} (expected Fired)");

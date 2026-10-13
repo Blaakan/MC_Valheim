@@ -25,8 +25,12 @@ namespace MC.Exploration.ViewDistantHorizonsMod;
 //                                 print), vanilla 3x3 with meshes that end about 1.2 km from the camera, no manager, no
 //                                 root, no buffer, no live patch, no "dh" command, real zones plain, game's distant
 //                                 water plane, game's far plane, clear weather fog not thinned
-//   horizons.disabled.session-log T19: end of first game (after every test and every real relog): no error line from
-//                                 or about me since game start, no guarded failure; second game: no guarded failure
+//   horizons.disabled.session-log T19: end of first game (after every test and every real relog): log watch proven
+//                                 to hear, no error line from or about me since the plugin loaded, no guarded
+//                                 failure; second game: the same with the mod off from the start
+//   horizons.disabled.checked     T13, T19: second game only (no first-game part): the second-game parts of the two
+//                                 tests above ran to their last check. Their first parts must pass alone in the first
+//                                 game, so their name can read "passed" when the second game never judged them
 // Relog tests register in OnActivated (SelfTests.Register), disabled-start tests from BindConfig
 // (SelfTests.RegisterAtStart): in second game OnActivated never run.
 internal static class StagedTests
@@ -35,6 +39,11 @@ internal static class StagedTests
     private const string LoadCoverName = "horizons.relog.load-cover";
     private const string DisabledName = "horizons.disabled.vanilla";
     private const string SessionLogName = "horizons.disabled.session-log";
+    private const string CheckedName = "horizons.disabled.checked";
+
+    // Second game only: the second-game part of the two tests above ran to its last check in this game process.
+    private static bool _vanillaChecked;
+    private static bool _sessionChecked;
 
     private const string FarClipKey = DisabledName + ".farclip";
     private const string OffStatus = "Off (disabled in settings).";
@@ -59,6 +68,22 @@ internal static class StagedTests
     {
         SelfTest.RegisterDisabledStart(DisabledName, DisabledLeave, DisabledCheck);
         SelfTest.RegisterDisabledStart(SessionLogName, SessionLeave, SessionCheck);
+        // No first-game part: this one only ever ends in the second game. The two above end in both games under one
+        // name, and their first part must report a pass: when the second game stops before their second part (crash,
+        // script timeout), the first part's pass is all a result reader sees. A tick that needs the second game must
+        // list this test too.
+        SelfTest.RegisterDisabledStart(CheckedName, null, DisabledChecked);
+    }
+
+    private static IEnumerator DisabledChecked()
+    {
+        const string N = CheckedName;
+        var c = new Kit.Checks(N);
+        c.Check(SelfTest.Stage == SelfTest.DisabledStage, $"this is the game started with every MC mod turned off (stage '{SelfTest.Stage}')");
+        c.Check(_vanillaChecked, $"the second-game part of {DisabledName} ran to its last check in this game");
+        c.Check(_sessionChecked, $"the second-game part of {SessionLogName} ran to its last check in this game");
+        c.Report("both disabled-start tests of the mod were really judged in the game started with the mod off");
+        yield break;
     }
 
     // Player, camera, mod active, far terrain up? Else one failed check.
@@ -240,6 +265,8 @@ internal static class StagedTests
         internal int WorstVertices;
         internal int WorstLevel = -1;
         internal int Looks;
+        internal int Compared;      // most far-tile vertices held against real ground at one look
+        internal int ComparedLooks; // looks that had some to compare
         internal int CoverLooks;
         internal int CoverPoking;
         internal int WorstPoking;
@@ -336,8 +363,12 @@ internal static class StagedTests
                         if (Kit.Now >= nextProbe || (vertices > 0 && w.CoverLooks == 0))
                         {
                             nextProbe = Kit.Now + 0.5f;
-                            mgr.ProbeNearGround(cam.transform.position, player.transform.position, 200f, out var poking, out _);
+                            var probe = mgr.ProbeNearGround(cam.transform.position, player.transform.position, 200f, out var poking, out _);
                             w.Looks++;
+                            // Look that found no far vertex over loaded real ground compared nothing.
+                            var compared = Kit.ProbeCompared(probe);
+                            w.Compared = Mathf.Max(w.Compared, compared);
+                            w.ComparedLooks += compared > 0 ? 1 : 0;
                             w.WorstPoking = Mathf.Max(w.WorstPoking, poking);
                             if (vertices > 0)
                             {
@@ -385,6 +416,8 @@ internal static class StagedTests
             }
             c.Check(w.Problem.Length == 0, "the watcher ran without an exception: " + (w.Problem.Length == 0 ? "ok" : w.Problem));
             c.Check(w.Spawned >= 0f && w.Looks > 0, $"the watcher saw the player stand in the loaded world and looked at the near ground ({w.Looks} looks, one every 0.5 s)");
+            c.Check(w.ComparedLooks > 0,
+                $"far-tile vertices over loaded real ground were there to compare within 200 m (at {w.ComparedLooks} of {w.Looks} looks, up to {w.Compared} vertices): without any, 'none above the real ground' would say nothing");
             var open = w.LastOpen < 0f || w.Spawned < 0f ? 0f : Mathf.Max(0f, w.LastOpen - w.Spawned);
             c.Note($"world load: {w.SurfaceAtSpawn} far surface tiles were drawn in the first frame with the player in the world, far ground first seen "
                    + $"{(w.FirstSurface < 0f ? -1f : w.FirstSurface - w.Spawned):0.0} s after that frame; coarse tiles kept ground-level vertices inside loaded zones for {open:0.0} s "
@@ -516,6 +549,8 @@ internal static class StagedTests
                 c.Check(Kit.Near(RenderSettings.fogDensity, raw), $"normal fog: clear-weather fog is the weather's own ({Kit.F(RenderSettings.fogDensity)}, weather {Kit.F(raw)})");
                 c.Check(Patches.EnvManPatches.TestAfter < 0f, "the mod wrote no fog value in this game");
             }
+            // Every check above was made (early ends report a failure and never come here).
+            _vanillaChecked = true;
             c.Report("started with Enabled = false: vanilla distant terrain, sky distance, water and fog; the mod is listed as off");
         }
         finally
@@ -530,39 +565,47 @@ internal static class StagedTests
     // ---------- horizons.disabled.session-log (T19)
 
     // End of the first game: every normal test and every real relog are behind us. Log listener (ErrorWatch) is on
-    // since the mod first got active in this game.
+    // since BindConfig of this game (before my patches went on).
     private static IEnumerator SessionLeave()
     {
         const string N = SessionLogName;
         var c = new Kit.Checks(N);
         if (!c.Check(Plugin.Instance != null && Plugin.Instance.IsActive,
-                "Distant Horizons is active at the end of the first game (its log watch runs since it was first active): "
+                "Distant Horizons is active at the end of the first game (its log watch runs since the plugin loaded): "
                 + (Plugin.Instance != null ? Plugin.Instance.StatusText : "no plugin")))
         {
             c.Report("");
             yield break;
         }
+        // Deaf listener would say "no error" too: prove it hears first.
+        ErrorWatch.Proof(c, N);
         c.Check(ErrorWatch.Errors == 0,
-            $"no error line from or about Distant Horizons from the start of the game to the end of its tests, real log outs included ({ErrorWatch.Errors}, first: {ErrorWatch.FirstError})");
+            $"no error line from or about Distant Horizons from the loading of the plugin to the end of its tests, real log outs included ({ErrorWatch.Errors}, first: {ErrorWatch.FirstError})");
         var guarded = Guarded();
         c.Check(guarded != null && guarded.Count == 0,
             guarded == null ? "cannot read the list of guarded failures" : $"no patch or update of the mod failed ({string.Join(", ", guarded.ToArray())})");
         c.Note($"warning lines of the mod this game: {ErrorWatch.Warnings("")}; error lines of others: {ErrorWatch.OtherErrors} "
-               + $"(last: {ErrorWatch.LastOtherError}), of them through Valheim Community Patch: {ErrorWatch.KnownForeignErrors}");
+               + $"(last: {ErrorWatch.LastOtherError}), of them through Valheim Community Patch: {ErrorWatch.KnownForeignErrors}; {ErrorWatch.Heard} log lines heard");
         c.Report("whole first game (tests, real log outs): log clean of Distant Horizons errors");
     }
 
     // Second game, mod off: its code still load (settings, registry). Log lines of that game are judged by the probe
-    // (probe.disabled.<GUID>); here what the log cannot show: failures the mod's guards caught.
+    // from the log file (probe.disabled.<GUID>) and here by the log watch (on since BindConfig, also with the mod
+    // off: it hears what a log file without the game's own lines would not show); and what no log shows: failures
+    // the mod's guards caught.
     private static IEnumerator SessionCheck()
     {
         const string N = SessionLogName;
         var c = new Kit.Checks(N);
+        ErrorWatch.Proof(c, N);
+        c.Check(ErrorWatch.Errors == 0,
+            $"no error line from or about Distant Horizons in the game started with the mod off ({ErrorWatch.Errors}, first: {ErrorWatch.FirstError})");
         var guarded = Guarded();
         c.Check(guarded != null && guarded.Count == 0,
             guarded == null ? "cannot read the list of guarded failures" : $"no guarded failure of the mod's code in the game started with the mod off ({string.Join(", ", guarded.ToArray())})");
         c.Check(Plugin.Instance != null && !Plugin.Instance.IsActive, "the mod stayed off in this game");
-        c.Report("game started with the mod off: no failure caught by the mod's guards");
+        _sessionChecked = true;
+        c.Report("game started with the mod off: log watch hears, no error line of the mod, no failure caught by its guards");
         yield break;
     }
 }

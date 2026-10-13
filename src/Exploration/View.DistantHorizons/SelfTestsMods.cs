@@ -22,7 +22,10 @@ namespace MC.Exploration.ViewDistantHorizonsMod;
 //   horizons.mods.sneak-fog        C02, Sneak Ambush: player crouched. Clear weather: Fog stealth icon the same with
 //                                  the mod on (fog on screen thinned) and off. Then a foggy weather that my rule is
 //                                  made to thin on screen too (FogStormDensity forced high, in memory): icon shown with
-//                                  the same percent on and off, though the fog on screen differ by more than a third
+//                                  the same percent on and off, though the fog on screen differ by more than a third.
+//                                  Weather is picked so that the two fogs are worth 3 % or more apart under Sneak
+//                                  Ambush's own fog settings (else same icon prove nothing), and with my mod off the
+//                                  icon must show what those settings give (so the test know its rule)
 //   horizons.mods.community-patch  C05, Valheim Community Patch: its "Verify Heightmap Registry" pass on (its own
 //                                  switch object swapped for a stand-in that says on; the player's config never
 //                                  touched). Control: one far tile put in the game's ground list for one lookup = it
@@ -112,23 +115,64 @@ internal static class ModsTests
         return cue;
     }
 
-    // Weather my fog rule leaves alone by default but Sneak Ambush gives a clear fog bonus for: day fog 0.03 to 0.3.
-    // Mild ones first (not wet, not freezing, not always dark), then any not wet, then any.
-    private static EnvSetup FoggyWeather()
+    // Sneak Ambush's fog rule as its settings describe it (section Stealth, read through BepInEx config, no type of
+    // theirs): nothing at or under FogDensityNoBonus, all of FogBonus at or over FogDensityFullBonus, straight line
+    // between; any fog over NoBonus = all of it when FullBonus is not above NoBonus.
+    private struct FogRule
+    {
+        internal int Bonus;
+        internal float None;
+        internal float Full;
+
+        // Whole percent the icon shows for a fog density.
+        internal int For(float density)
+        {
+            var share = density <= None ? 0f : Full <= None ? 1f : Mathf.Clamp01((density - None) / (Full - None));
+            return Mathf.RoundToInt(Bonus * share);
+        }
+    }
+
+    // Percent the two fogs must be apart under that rule: the icon then cannot be the same for both.
+    private const int MinGap = 3;
+
+    // What my fog rule leaves on screen of a weather's own density while the test forces it to thin fog too
+    // (FogStormDensity 1, wet weather not kept): same line as EnvManPatches.
+    private static float ForcedThin(float raw)
+    {
+        var cfg = Plugin.Cfg;
+        var mult = cfg.V(cfg.FogDensityMultiplier);
+        var clear = cfg.V(cfg.FogClearDensity);
+        return raw * Mathf.Lerp(mult, 1f, Mathf.Clamp01((raw - clear) / (1f - clear)));
+    }
+
+    // Weather whose own day fog and what my forced rule leaves of it on screen are worth clearly different bonuses
+    // under Sneak Ambush's rule (MinGap percent or more): only there an equal icon says which fog it reads. A thick
+    // weather is no use (its thinned fog still gives the full bonus), a thin one neither (no bonus either way).
+    // Mild ones first (not wet, not freezing, not always dark), then any not wet, then any; widest gap wins.
+    private static EnvSetup FoggyWeather(FogRule rule)
     {
         EnvSetup best = null;
         var bestRank = int.MaxValue;
+        var bestGap = 0;
         foreach (var env in EnvMan.instance.m_environments)
         {
-            if (env == null || string.IsNullOrEmpty(env.m_name) || env.m_fogDensityDay < 0.03f || env.m_fogDensityDay > 0.3f)
+            if (env == null || string.IsNullOrEmpty(env.m_name) || env.m_fogDensityDay <= 0f)
+            {
+                continue;
+            }
+            var raw = env.m_fogDensityDay;
+            var thin = ForcedThin(raw);
+            var gap = rule.For(raw) - rule.For(thin);
+            if (gap < MinGap || thin > raw * 0.55f)
             {
                 continue;
             }
             var rank = env.m_isWet ? 2 : env.m_isFreezing || env.m_isCold || env.m_alwaysDark ? 1 : 0;
-            if (rank < bestRank)
+            if (rank < bestRank || (rank == bestRank && gap > bestGap))
             {
                 best = env;
                 bestRank = rank;
+                bestGap = gap;
             }
         }
         return best;
@@ -171,8 +215,26 @@ internal static class ModsTests
                 c.Report("");
                 yield break;
             }
-            var foggy = FoggyWeather();
-            if (!c.Check(foggy != null, "the game has a weather with a day fog density between 0.03 and 0.3"))
+            // Its fog rule, as set now (single-player run: its own settings are the rule). Needed to know that the two
+            // fogs compared below would give different icons: else "same icon" would prove nothing.
+            var rule = new FogRule();
+            var haveRule = InputTests.OtherSetting(SneakGuid, "Stealth", "FogBonus", out rule.Bonus);
+            haveRule &= InputTests.OtherSetting(SneakGuid, "Stealth", "FogDensityNoBonus", out rule.None);
+            haveRule &= InputTests.OtherSetting(SneakGuid, "Stealth", "FogDensityFullBonus", out rule.Full);
+            if (!c.Check(haveRule && rule.Bonus >= MinGap,
+                    haveRule
+                        ? $"Sneak Ambush's FogBonus is {rule.Bonus} % (density {Kit.F(rule.None)} to {Kit.F(rule.Full)}): at least {MinGap} % is needed for its Fog icon to tell two fogs apart"
+                        : "Sneak Ambush's fog settings (Stealth: FogBonus, FogDensityNoBonus, FogDensityFullBonus) were not found: nothing was checked"))
+            {
+                c.Report("");
+                yield break;
+            }
+            var cfg = Plugin.Cfg;
+            var errors = ErrorWatch.Errors;
+            Kit.ForceFogDefaults();
+            var foggy = FoggyWeather(rule);
+            if (!c.Check(foggy != null,
+                    $"the game has a weather whose own day fog and what is left of it on screen (thinned) are worth at least {MinGap} % apart under Sneak Ambush's fog settings: without one an equal icon would not say which fog it reads"))
             {
                 c.Report("");
                 yield break;
@@ -182,9 +244,6 @@ internal static class ModsTests
                 c.Report("");
                 yield break;
             }
-            var cfg = Plugin.Cfg;
-            var errors = ErrorWatch.Errors;
-            Kit.ForceFogDefaults();
             var clearEnv = EnvMan.instance.GetEnv("Clear");
             var rawClear = clearEnv.m_fogDensityDay;
             var thinClear = Kit.ExpectedFog(clearEnv, rawClear);
@@ -218,6 +277,11 @@ internal static class ModsTests
             c.Check(foggyOnFog <= rawFoggy * 0.6f,
                 $"mod on, '{foggy.m_name}' with FogStormDensity forced to 1: its fog on screen is thinned too ({Kit.F(foggyOnFog)}, weather {Kit.F(rawFoggy)})");
             c.Check(foggyOn.Shown && foggyOn.Percent >= 2, $"mod on, '{foggy.m_name}': Sneak Ambush shows its Fog icon with a bonus ({foggyOn}; none when its FogBonus setting is 0)");
+            // The fog on screen as measured, not as foreseen: an icon that read it would show byScreen.
+            var byWeather = rule.For(rawFoggy);
+            var byScreen = rule.For(foggyOnFog);
+            c.Check(byWeather - byScreen >= MinGap,
+                $"'{foggy.m_name}': under Sneak Ambush's settings the weather's own fog ({Kit.F(rawFoggy)}) is worth {byWeather} % and the thinned fog on screen ({Kit.F(foggyOnFog)}) only {byScreen} %: an icon that read the fog on screen would change");
 
             // Mod off (framework path), same two weathers.
             Kit.SwitchOff();
@@ -227,6 +291,10 @@ internal static class ModsTests
             var foggyOffFog = RenderSettings.fogDensity;
             crouched &= player.IsCrouching();
             c.Check(Kit.Near(foggyOffFog, rawFoggy), $"mod off, '{foggy.m_name}': the fog on screen is the weather's own ({Kit.F(foggyOffFog)}, weather {Kit.F(rawFoggy)})");
+            // Mod off = one fog only (screen and weather agree): whatever Sneak Ambush reads, its icon must show what
+            // the rule read from its settings gives. If not, the rule above is not its rule and the gap says nothing.
+            c.Check(foggyOff.Shown && Mathf.Abs(foggyOff.Percent - byWeather) <= 1,
+                $"mod off, '{foggy.m_name}': the Fog icon shows the bonus Sneak Ambush's settings give for that fog ({foggyOff}, expected -{byWeather}%): the test reads its fog rule right");
             yield return ShowWeather(weather, "Clear", box);
             var clearOff = ReadCue(player);
             var clearOffFog = RenderSettings.fogDensity;

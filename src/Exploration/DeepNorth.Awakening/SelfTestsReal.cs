@@ -239,6 +239,17 @@ internal static partial class SelfTests
         Physics.SyncTransforms();
     }
 
+    // Right after arrival, before Kall: place's own Jotun and meteor timers back to "never ran", so place fill like one
+    // nobody visited. Other test may have stood in this very place less than the 500 s the timers take (two tests on
+    // one area, area that is also the stage 1 one, slots wrapped in a small world): then no Jotun come and the test
+    // fail for nothing. Fresh place: timers are 0 already, nothing change. Filled place: game only top up to its caps.
+    private static IEnumerator FreshTimers(Vector3 pos)
+    {
+        var spawner = new Found<SpawnSystem>();
+        yield return WaitSpawner(pos, 6f, spawner);
+        AreaSpawns.TestResetTimers(spawner.Value, true, false);
+    }
+
     private static bool DryAt(WorldGenerator wg, Vector3 p) => wg.GetHeight(p.x, p.z) >= 36f;
 
     private struct Edge
@@ -810,6 +821,7 @@ internal static partial class SelfTests
             if (c.Check(box.Ok, $"travelled to the invaded area {cell} at {F(point)}"))
             {
                 var pos = player.transform.position;
+                yield return FreshTimers(pos);
                 yield return WaitTagged(pos, 250f, 4, clock.Cap(18f));
                 c.Check(TaggedOf(cell).Count > 0, $"before Kall: area Jotun around the player ({Kinds(TaggedOf(cell))})");
 
@@ -894,6 +906,7 @@ internal static partial class SelfTests
             {
                 var pos = player.transform.position;
                 var blizzard = Storms.Env();
+                yield return FreshTimers(pos);
                 yield return WaitTagged(pos, 250f, 4, clock.Cap(18f, 1));
                 SetRealKall(true);
                 yield return Until(() => HeldCells.Scanned && HeldCells.TestServerEngaged(cell), 5f);
@@ -1160,6 +1173,7 @@ internal static partial class SelfTests
             if (c.Check(box.Ok, $"travelled to the invaded area {a.Cell} at {F(a.Point)}; the area {b.Cell} lies next to it, {F(Flat(b.Point - a.Point).magnitude)} m away"))
             {
                 var pos = player.transform.position;
+                yield return FreshTimers(pos);
                 yield return WaitTagged(pos, 250f, 4, clock.Cap(18f, 2));
                 var nextDoor = TaggedOf(b.Cell).Count;
                 c.Check(TaggedOf(a.Cell).Count > 0 && nextDoor == 0,
@@ -1311,6 +1325,16 @@ internal static partial class SelfTests
                 var bed = bedObject != null ? bedObject.GetComponent<Bed>() : null;
                 if (c.Check(bed != null, $"a bed ({bedPrefab.name}) stands in the area"))
                 {
+                    // Monster with no creature to fight break pieces within 10 m (MonsterAI with attackPlayerObjects,
+                    // BaseAI.FindRandomStaticTarget; a piece is a target even when no player built it). Player is dead
+                    // for 10 s with Jotun at the bed: this one bed is no target for them, else it is gone at the respawn
+                    // and the game put the player at the world start.
+                    var bedPiece = bedObject.GetComponent<Piece>();
+                    if (bedPiece != null)
+                    {
+                        bedPiece.m_randomTarget = false;
+                        bedPiece.m_primaryTarget = false;
+                    }
                     bed.SetOwner(profile.GetPlayerID(), profile.GetName());
                     profile.SetCustomSpawnPoint(bed.GetSpawnPoint());
                     yield return Frames(3);
@@ -1355,6 +1379,9 @@ internal static partial class SelfTests
                     if (c.Check(dead && back != null, $"the player died and respawned {F(took)} s later"))
                     {
                         player = back;
+                        // New player object has no god mode and little health, Jotun stand at the bed: god mode on now,
+                        // else they kill it again inside the watch below and next test start with no player.
+                        player.SetGodMode(true);
                         c.Check(Flat(player.transform.position - spawnAt).magnitude < 10f && WorldState.CellAt(player.transform.position) == cell,
                             $"respawned at the bed inside the area ({F(Flat(player.transform.position - spawnAt).magnitude)} m from it)");
                         c.Check(waiting && newJotun == 0,

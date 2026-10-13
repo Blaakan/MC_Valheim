@@ -949,7 +949,9 @@ internal static class LifeTests
     {
         const string N = CleanLogName;
         var c = new Kit.Checks(N);
-        c.Check(ErrorWatch.Errors == 0, $"no error line from or about Distant Horizons since the game started ({ErrorWatch.Errors}, first: {ErrorWatch.FirstError})");
+        // Deaf listener would say "no error" too: prove it hears first.
+        ErrorWatch.Proof(c, N);
+        c.Check(ErrorWatch.Errors == 0, $"no error line from or about Distant Horizons since the plugin loaded ({ErrorWatch.Errors}, first: {ErrorWatch.FirstError})");
         var field = typeof(PatchGuard).GetField("Reported", BindingFlags.Static | BindingFlags.NonPublic);
         var reported = field != null ? field.GetValue(null) as HashSet<string> : null;
         c.Check(reported != null && reported.Count == 0,

@@ -924,13 +924,19 @@ internal static partial class SelfTests
         }
         c.Note($"after the turn-off the fish (running at {F(running)} m/s) slows like this: {speeds}slowest {F(slowest)} m/s, {F(path)} m moved before its own fight began");
         c.Check(escapeAt > 0.8f, $"about a second later the normal game's own fight starts ({(escapeAt < 0f ? "not within 2.5 s" : F(escapeAt) + " s after the turn-off")})");
-        c.Check(slowest < running, $"meanwhile the fish is not driven any more: it slows down ({F(running)} -> {F(slowest)} m/s at its slowest)");
+        // Fish still driven keep its run speed: a drop of a hair prove nothing, a fifth do (two game runs of
+        // fishing.toggle saw 0.61 and 0.10 of the run speed half a second after the turn-off).
+        c.Check(slowest < running * 0.8f,
+            $"meanwhile the fish is not driven any more: it loses a fifth of its speed or more ({F(running)} -> {F(slowest)} m/s at its slowest)");
 
         // The normal game's fight that follows: splashes at the fish, a normal short length. Watched until 6 s after
-        // the turn-off (the game makes a splash on about one tick in forty).
+        // the turn-off (the game makes a splash on about one tick in forty, and goes on after its fight ended: it
+        // writes the end of the fight as a whole number, the splash reads the other number).
         var vanillaMax = fish.m_escapeMax + fish.m_escapeMaxPerLevel;
         var escapeLength = escapeAt > 0f ? fish.m_escapeTime : -1f;
         var escapeEnd = -1f;
+        // Splash object made in the quiet second (before the normal game's fight) not count below: said only.
+        var quietSplashes = NewSplashes(fish, names, seen);
         var splashes = 0;
         var ticks = 0;
         var hookedAll = true;
@@ -963,7 +969,7 @@ internal static partial class SelfTests
                 && escapeEnd - escapeAt <= vanillaMax + 0.3f,
             $"the normal game's fight has a normal short length: {F(escapeLength)} s (at most {F(vanillaMax)} s for a plain Perch), over {(escapeEnd < 0f ? "not within the watch" : F(escapeEnd - escapeAt) + " s after it began")}");
         c.Check(names.Count > 0 && splashes > 0,
-            $"splashes appear at the fish in the normal game's fight ({splashes} splash objects in {F(Time.time - offAt - Mathf.Max(0f, escapeAt))} s; the game's splash effects: {string.Join(", ", names.ToArray())})");
+            $"splashes appear at the fish once the normal game's fight has begun ({splashes} new splash objects in the {F(Time.time - offAt - Mathf.Max(0f, escapeAt))} s from its start, {quietSplashes} in the quiet second before it; the game's splash effects: {string.Join(", ", names.ToArray())})");
         c.Check(!OwnPatchOn(typeof(Fish), nameof(Fish.CustomFixedUpdate)) && !OwnPatchOn(typeof(Fish), nameof(Fish.SwimDirection))
                 && Fight.Current == null && !FightHud.Shown,
             "all that time the mod stays out: no patch on the fish, no fight, nothing on screen");

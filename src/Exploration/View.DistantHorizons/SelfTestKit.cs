@@ -12,18 +12,25 @@ using UnityEngine.SceneManagement;
 
 namespace MC.Exploration.ViewDistantHorizonsMod;
 
-// Debug build only. Me = error and warning lines of this mod since game start (BepInEx log listener, put on once and
-// kept: mod off-on in a test must not lose the count). Self test lines ("[selftest] FAIL ...") never count.
+// Debug build only. Me = error and warning lines of this mod since the plugin loaded (BepInEx log listener, put on
+// once from BindConfig and kept: mod off-on in a test must not lose the count, and a game started with the mod off
+// is watched too). Self test lines ("[selftest] FAIL ...") never count.
 // Every error line of the log go in one of three counts: mine (Errors), not mine but stack run through Valheim
 // Community Patch (KnownForeignErrors: the known incompatibility of the README, tests NOTE it, never fail on it),
 // anybody else's (OtherErrors).
+// "No error line" from a listener that hear nothing prove nothing: Heard / HeardUnity count every line that arrive,
+// Proof() make a test fail when the listener is deaf.
 internal sealed class ErrorWatch : ILogListener
 {
     // Namespace of Valheim Community Patch, as its frames show in a stack trace.
     internal const string KnownForeign = "ValheimCommunityPatch";
+    // Log source BepInEx give the game's own (Unity) lines: exceptions thrown under Unity come through it.
+    private const string UnitySource = "Unity Log";
 
     private static ErrorWatch _instance;
     private static readonly object Gate = new object();
+    private static int _heard;
+    private static int _heardUnity;
     private static int _errors;
     private static string _firstError = "";
     private static int _knownForeign;
@@ -110,6 +117,41 @@ internal sealed class ErrorWatch : ILogListener
         BepInEx.Logging.Logger.Listeners.Add(_instance);
     }
 
+    // Log lines of any level and any source that reached me, and those of the game itself (Unity).
+    internal static int Heard => System.Threading.Volatile.Read(ref _heard);
+
+    internal static int HeardUnity => System.Threading.Volatile.Read(ref _heardUnity);
+
+    // Still in BepInEx's list of listeners?
+    internal static bool Installed => _instance != null && BepInEx.Logging.Logger.Listeners.Contains(_instance);
+
+    // Pure: error line of mine? My log source wrote it, or its text name my GUID, my code (namespace, as in a stack
+    // trace) or the mod by its name.
+    internal static bool Mine(string source, string text)
+    {
+        text = text ?? "";
+        return source == ModInfo.Name || text.IndexOf(ModInfo.Guid, StringComparison.Ordinal) >= 0
+                                      || text.IndexOf("ViewDistantHorizonsMod", StringComparison.Ordinal) >= 0
+                                      || text.IndexOf(ModInfo.Name, StringComparison.Ordinal) >= 0;
+    }
+
+    // Checks that make "no error line" mean something: me still listen, a line logged right now arrive (same road
+    // an error of the mod take), lines of the game itself arrived in this game, and the rule know a line of mine.
+    internal static void Proof(Kit.Checks c, string test)
+    {
+        var before = Heard;
+        SelfTest.Note(test, "control line for the log watch (it must hear this one)");
+        c.Check(Installed && Heard > before,
+            $"the log watch listens: a line logged just now reached it ({Heard - before} new, {Heard} lines heard since the plugin loaded, still installed: {Installed})");
+        c.Check(HeardUnity > 0, $"the game's own log lines (source '{UnitySource}', where exceptions arrive) reach the log watch too ({HeardUnity} heard)");
+        c.Check(Mine(ModInfo.Name, "anything")
+                && Mine(UnitySource, "NullReferenceException: x\nStack trace:\nMC.Exploration.ViewDistantHorizonsMod.LodTerrainManager.Update ()")
+                && Mine("BepInEx", "Error in plugin " + ModInfo.Guid)
+                && Mine("Some Other Mod", "could not draw " + ModInfo.Name + " settings")
+                && !Mine(UnitySource, "NullReferenceException: x\nStack trace:\nPlayer.Update ()"),
+            "the log watch takes a line for the mod's by its log source, its GUID, its code in a stack trace or its name, and no other");
+    }
+
     // Warning lines of this mod that contain text.
     internal static int Warnings(string text)
     {
@@ -130,7 +172,18 @@ internal sealed class ErrorWatch : ILogListener
     // Any thread (terrain builder thread log too).
     public void LogEvent(object sender, LogEventArgs e)
     {
-        if (e == null || (e.Level & (LogLevel.Error | LogLevel.Fatal | LogLevel.Warning)) == 0)
+        if (e == null)
+        {
+            return;
+        }
+        // Every line count as heard (two adds, no lock, no text made): Proof() need it.
+        var source = e.Source != null ? e.Source.SourceName : null;
+        System.Threading.Interlocked.Increment(ref _heard);
+        if (source == UnitySource)
+        {
+            System.Threading.Interlocked.Increment(ref _heardUnity);
+        }
+        if ((e.Level & (LogLevel.Error | LogLevel.Fatal | LogLevel.Warning)) == 0)
         {
             return;
         }
@@ -139,7 +192,7 @@ internal sealed class ErrorWatch : ILogListener
         {
             return;
         }
-        var mine = e.Source != null && e.Source.SourceName == ModInfo.Name;
+        var mine = source == ModInfo.Name;
         lock (Gate)
         {
             if ((e.Level & LogLevel.Warning) != 0)
@@ -150,9 +203,9 @@ internal sealed class ErrorWatch : ILogListener
                 }
                 return;
             }
-            // Error of mine, or error of the game or Unity that name my code. Mine win over the two other counts.
-            if (mine || text.IndexOf(ModInfo.Guid, StringComparison.Ordinal) >= 0
-                     || text.IndexOf("ViewDistantHorizonsMod", StringComparison.Ordinal) >= 0)
+            // Error of mine, or error of the game, Unity or another plugin that name my code or the mod. Mine win
+            // over the two other counts.
+            if (Mine(source, text))
             {
                 _errors++;
                 if (_firstError.Length == 0)
@@ -920,6 +973,24 @@ internal static class Kit
                 }
             }
         }
+    }
+
+    // Far-tile vertices LodTerrainManager.ProbeNearGround really held against real ground ("checked=N" in its text).
+    // 0 = it found none to compare: "none above the real ground" then say nothing, test must not take it for a pass.
+    internal static int ProbeCompared(string probe)
+    {
+        const string Tag = "checked=";
+        var at = probe != null ? probe.IndexOf(Tag, StringComparison.Ordinal) : -1;
+        if (at < 0)
+        {
+            return 0;
+        }
+        var n = 0;
+        for (var i = at + Tag.Length; i < probe.Length && probe[i] >= '0' && probe[i] <= '9'; i++)
+        {
+            n = n * 10 + (probe[i] - '0');
+        }
+        return n;
     }
 
     internal static IEnumerator Shot(string test, string label)

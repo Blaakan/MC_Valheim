@@ -217,6 +217,9 @@ internal static class RealTests
             yield return Kit.Frames(3);
             var probe = mgr.ProbeNearGround(cam.transform.position, ground, 200f, out var poking, out var mismatched);
             c.Note($"hills, camera flying 12 m up: {(probe.Length > 400 ? probe.Substring(0, 400) + "..." : probe)}");
+            // Nothing compared = "none above" would say nothing.
+            var compared = Kit.ProbeCompared(probe);
+            c.Check(compared > 0, $"hills: far-tile vertices over loaded real ground were there to compare within 200 m ({compared})");
             c.Check(poking == 0, $"hills: {poking} far-tile vertices above the real ground within 200 m");
             c.Check(mismatched == 0, $"hills: {mismatched} painted real zones whose depth renderer still tessellates");
             yield return Kit.Shot(N, "hills-12m-up");

@@ -806,6 +806,12 @@ internal static partial class SelfTests
                 }
                 else
                 {
+                    // First run said it took a target: me note which one and when, so the fail tell what happened.
+                    if (fled && greyling != null && ai.m_targetCreature != null)
+                    {
+                        c.Note($"the {GreylingName} took the target {ai.m_targetCreature.name} (the player: {ReferenceEquals(ai.m_targetCreature, p)}) "
+                               + $"{F(Time.time - hitAt)} s after the hit, alerted {ai.IsAlerted()}, {F(Utils.DistanceXZ(greyling.transform.position, p.transform.position))} m from the player");
+                    }
                     fled &= greyling != null && ai.m_targetCreature == null;
                 }
                 yield return null;

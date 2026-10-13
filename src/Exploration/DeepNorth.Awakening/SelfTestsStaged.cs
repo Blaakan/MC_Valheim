@@ -473,8 +473,9 @@ internal static partial class SelfTests
             var pos = s.LogoutAt;
             RelogLoaded(c, player, s, 3, true);
             yield return Until(() => HeldCells.Scanned && HeldCells.TestKills(cell) == 2 && HeldCells.KillsIn(cell) == 2, 10f);
-            c.Check(HeldCells.TestKills(cell) == 2 && HeldCells.KillsIn(cell) == 2 && !HeldCells.IsCleared(cell),
-                $"the kills made before are read back from the saved world ({HeldCells.TestKills(cell)} of 6)");
+            // Kill slot counted on the zone controls of the world loaded now (from the save), not only in mod memory.
+            c.Check(HeldCells.TestKills(cell) == 2 && HeldCells.KillsIn(cell) == 2 && !HeldCells.IsCleared(cell) && HeldCells.TestKillSlots(cell) == 1,
+                $"the kills made before are read back from the saved world ({HeldCells.TestKills(cell)} of 6, kept on {HeldCells.TestKillSlots(cell)} zone control of the loaded world)");
             // Topped up on arrival: Jotun that were not there before the log out.
             yield return Until(() => HeldCells.TestServerEngaged(cell) && CountMarked(TaggedOf(cell), s.MarkValue, false) > 0, 15f);
             yield return WaitTagged(pos, 400f, 1, 4f);
@@ -526,15 +527,23 @@ internal static partial class SelfTests
                     SpawnRing(Hostility.Krigen, pos, extra, 14f, spawned);
                     yield return Frames(3);
                 }
-                var slain = 0;
+                var slainFirst = new List<Character>();
                 foreach (var go in spawned)
                 {
                     var ch = go != null ? go.GetComponent<Character>() : null;
                     if (ch != null && WorldState.CellAt(ch.transform.position) == cell)
                     {
                         Slay(ch);
-                        slain++;
+                        slainFirst.Add(ch);
                     }
+                }
+                var slain = slainFirst.Count;
+                if (slain > 0)
+                {
+                    // Slain creature count as dead only from game's next physics step (Character.CheckDeath). Me wait
+                    // for that: else SlayArmy below take the same ones again and count each twice (9 "slain", fewer
+                    // real deaths, test fail for nothing).
+                    yield return Until(() => slainFirst.TrueForAll(x => x == null || x.IsDead()), 3f);
                 }
                 slain += SlayArmy(pos, cell, 9 - slain, null);
                 yield return WaitServerKills(cell, 9, 12f);

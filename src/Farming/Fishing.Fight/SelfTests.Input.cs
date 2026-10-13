@@ -772,8 +772,11 @@ internal static partial class SelfTests
                 $"the trigger keeps reeling: Block held on every frame through the stick press and for a second after, same fight (fight on {stillOn}, Block all along {blockAll}, reeling all along {reelAll})");
             c.Check(stillOn && (used > 2f || readOver),
                 $"the reel goes on after the press: it still costs stamina ({F(used)} in {F(Time.time - tA)} s{(overRate > 0f ? ", while the trinket gives " + F(overRate) + " a second back" : "")})");
+            // Guard only, no proof that the trinket used the press up: with the block trigger held (the game's
+            // "alt keys" button of the Default layout) the normal game put no weapon away on a stick tap either
+            // (Player.Update), and its radial menu want a hold of 0.33 s.
             c.Check(ReferenceEquals(p.GetCurrentWeapon(), st.Rod) && Utils.FindChild(p.transform, "_RodTop") != null && !Hud.InRadial(),
-                "the stick press is used up by the trinket: the rod stays in the hands and no radial menu opens");
+                "after the stick press the rod is still in the hands and no radial menu is open");
             SelfTest.Pad(trigger, 0f);
             yield return WaitBlock(rig, false);
         }
