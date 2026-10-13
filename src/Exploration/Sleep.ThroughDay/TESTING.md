@@ -4,14 +4,18 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
-Mods panel). Committed build `1254c75` (2026-09-29): Debug and Release build without warnings; smoke test
-(`./tools/Test-Smoke.ps1`, all MC mods) passed (loads, patches apply, JIT check clean); automated in-world self-tests
-(T17, `./tools/Test-InWorld.ps1`) passed on the same code: `sleep.morning`, `sleep.night`, `sleep.afternoon.default`
-and `sleep.afternoon.included` (17/17 tests of the run). No hands-on in-game test yet.
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+Mods panel). 0.1.1 fixed the wake-up message of T21 (a sleep that started after nightfall and ended on the same day
+without a time skip was taken for a daytime sleep and showed "Good evening"): T21 is reset to `[ ]` and T23 is new;
+the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded):
+all of this mod's tests passed. History, on 0.1.0: committed build `1254c75` (2026-09-29): Debug and Release build
+without warnings; smoke test (`./tools/Test-Smoke.ps1`, all MC mods) passed (loads, patches apply, JIT check clean);
+automated in-world self-tests (T17, `./tools/Test-InWorld.ps1`) passed on the same code: `sleep.morning`,
+`sleep.night`, `sleep.afternoon.default` and `sleep.afternoon.included` (17/17 tests of the run). No hands-on in-game
+test yet.
 
-**Automated checks (2026-10-08):** 39 of 40 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 40 of 40 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -46,11 +50,12 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. Info lines from the server side (the ho
   time in 12 s (day length 1800 s).`
 - an afternoon sleep with IncludeAfternoon on (or a sleep started by another mod in the day window): `Day sleep: a
   sleep started at 14:10 by the game or another mod now ends at 18:00 instead of the next morning.`
-With Debug logging (`./tools/Setup.ps1 -DevBepInExConfig`) each game also logs `Sleep started at ..., day ... (after
-dawn|before dawn).` and `Woke up at ..., day ...: daytime sleep, message "Good evening" instead of "Good morning".` or
-`...: night sleep, vanilla message.` (`...: daytime sleep, WakeUpMessage empty, vanilla message kept.` when the setting
-is empty). The vanilla line `Time ..., day: ...    nextm: ...` still appears before the mod's lines: its `nextm` is the
-target the mod then replaces.
+With Debug logging (`./tools/Setup.ps1 -DevBepInExConfig`) each game also logs `Sleep started at ..., day ... (before
+dawn|after dawn|after nightfall).` (before 06:00, from 06:00 to 18:00, after 18:00 of that day; only a sleep that
+starts "after dawn" can be a daytime sleep) and `Woke up at ..., day ...: daytime sleep, message "Good evening"
+instead of "Good morning".` or `...: night sleep, vanilla message.` (`...: daytime sleep, WakeUpMessage empty, vanilla
+message kept.` when the setting is empty). The vanilla line `Time ..., day: ...    nextm: ...` still appears before
+the mod's lines: its `nextm` is the target the mod then replaces.
 
 ## 0.1.0 — single player
 
@@ -164,16 +169,28 @@ target the mod then replaces.
   within a few seconds a normal night sleep starts and you wake at 06:00 of the next day with "Good morning"; no
   `Day sleep:` Info line.
   *Automated: `sleep.tod`.*
-- [!] **T21 Sleep without a time skip:** (automated by the self-test `sleep.noskip`, which stands in for another mod
+- [x] **T21 Sleep without a time skip:** (automated by the self-test `sleep.noskip`, which stands in for another mod
   that makes the game's skip to the morning do nothing; no such mod is known, so it cannot be done by hand) a sleep
   that starts at about 20:00 and ends 2 s later on the same day, without any time skip. Expected: it stays a night
   sleep: "Good morning" (not "Good evening"), Debug line `night sleep, vanilla message`.
-  **FAILED:** automated test: A sleep that starts after 06:00 and ends on the same date without a time skip is treated
-  as a daytime sleep ("Good evening") (self-test `sleep.bug.noskip-evening`)
+  *Automated: `sleep.noskip`.*
 - [x] **T22 WakeUpMessage made of spaces only:** as T12, with `WakeUpMessage` set to a few spaces. Expected: it
   counts as empty: "Good morning" after a daytime sleep, Debug line `daytime sleep, WakeUpMessage empty, vanilla
   message kept`.
   *Automated: `sleep.wakemessage`.*
+
+## 0.1.1 — sleeps that start around nightfall
+
+- [x] **T23 Late-afternoon daytime sleep, then a sleep just after nightfall:** (also run by the self-test
+  `sleep.nightfall`, at 17:45 and 18:05) set `IncludeAfternoon` on and `WakeUpHour` 23, so that sleeps count as
+  daytime sleeps until 18:00. Lie down when `time` shows 0.73-0.74 (about 17:30-17:45). Expected: you wake at 23:00
+  of the same day (`time` about 0.96) with "Good evening" (or the Rested message over it); Info line `Day sleep: a
+  sleep started at 17:.. by the game or another mod now ends at 23:00`; Debug lines `Sleep started at 17:.., day n
+  (after dawn).` and `daytime sleep`. Then, on another day, lie down when `time` shows 0.76-0.78 (shortly after
+  18:00). Expected: a night sleep: you wake at 06:00 of the next day with "Good morning"; no `Day sleep:` Info line;
+  Debug lines `Sleep started at 18:.., day n (after nightfall).` and `night sleep, vanilla message`. Restore
+  `WakeUpHour` 18 and `IncludeAfternoon` off.
+  *Automated: `sleep.nightfall`.*
 
 ## 0.1.0 — multiplayer (needs a second player)
 

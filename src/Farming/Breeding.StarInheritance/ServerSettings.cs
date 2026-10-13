@@ -37,8 +37,9 @@ internal readonly struct BreedingSettings
 //                                                                                 turn on
 // Vanilla peer ignore unknown rpc. Numbers in invariant culture. Client never trust wire: check and clamp (same ranges
 // as config). Values belong to ZNet instance they came on: new session = stale, own config again.
-// Handlers stay on rpc after feature off (ZRpc no unregister): server answer only while Active; client store always
-// (used only while Active, and client ask again when it turn on).
+// Handlers stay on rpc after feature off (me never unregister them): server answer only while Active; client store
+// always (used only while Active) but say nothing in log while off, and client ask again when it turn on: that
+// answer is the one that say the "Using the server's breeding settings" line.
 internal static class ServerSettings
 {
     internal const string SettingsRpc = ModInfo.Guid + ".Settings";
@@ -242,7 +243,9 @@ internal static class ServerSettings
         }
     }
 
-    // ZNet.Update postfix, only when PushPending.
+    // ZNet.Update postfix, only when PushPending. Me send to every ready player with mod installed (PeerHasMod), on or
+    // off: who may stay is PlayerCheck's job, and a copy that is off but allowed to stay keep the numbers for when it
+    // turn on (it say nothing in log meanwhile, see Receive).
     internal static void Update()
     {
         _pushPending = false;
@@ -337,6 +340,10 @@ internal static class ServerSettings
     }
 
     // Client: numbers from server. Server / single player / host never take numbers from a peer.
+    // Me off but still connected (server let me stay: AllowPlayersWithoutMod, or it has not cut me yet; it push to
+    // every player with mod installed, handler still on rpc): keep numbers, write no log line and remember none as
+    // written. Births here are vanilla then, line would lie; and line remembered as written would be left out when me
+    // turn on (Start ask, answer has same numbers).
     internal static ReceiveResult Receive(string payload)
     {
         var net = ZNet.instance;
@@ -346,7 +353,7 @@ internal static class ServerSettings
         }
         if (!TryDecode(payload, out var rule, out var range, out var clamped))
         {
-            if (!_badLogged)
+            if (_active && !_badLogged)
             {
                 _badLogged = true;
                 Log.Warning($"The server sent breeding settings this version cannot read ({Shorten(payload)}); "
@@ -359,7 +366,7 @@ internal static class ServerSettings
         _serverRange = range;
         _serverSession = net;
         var text = Describe(rule, range);
-        if (text != _lastLogged)
+        if (_active && text != _lastLogged)
         {
             _lastLogged = text;
             if (clamped)

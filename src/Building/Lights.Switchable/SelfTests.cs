@@ -14,7 +14,8 @@ namespace MC.Building.LightsSwitchableMod;
 //   lights.torch    standing wood torch in front of player: flag, top-up, E off, E on, hold E, no resin used, no burn
 //   lights.candle   resin candle: E off = vanilla state 2, E on = state 1, burnt-out candle light again
 //   lights.campfire fire pit stay vanilla: E add wood, fuel burn, hover show fuel; cooking fires never lights (even
-//                   listed); server rules on the wire; join check verdicts; foreign flag kept
+//                   listed); server rules on the wire; player check verdicts (no mod, mod off, other network
+//                   version = refused); foreign flag kept
 // Me destroy all me spawn and take back items me give, also when test fail.
 internal static class SelfTests
 {
@@ -359,9 +360,18 @@ internal static class SelfTests
             Check(!ServerRules.Receive(new ZPackage()), "single player never takes rules from a peer");
             Check(PlayerCheck.Decide(true, true, true, false, false, false) == JoinVerdict.Refuse
                   && PlayerCheck.Decide(true, true, true, false, false, true) == JoinVerdict.Allowed
-                  && PlayerCheck.Decide(true, true, true, false, true, false) == JoinVerdict.HasMod
+                  && PlayerCheck.Decide(true, true, true, false, true, false) == JoinVerdict.Compatible
                   && PlayerCheck.Decide(false, true, true, false, false, false) == JoinVerdict.Skip,
-                "join check: no mod refused (or allowed by setting), mod fine, only the server acts");
+                "player check: not compatible (no mod, turned off, other network version) refused (or allowed by "
+                + "setting), compatible fine, only the server acts");
+            // Live re-check can come many times for one player: gone, not in yet or already being refused = nothing.
+            Check(PlayerCheck.Decide(true, false, true, false, false, false) == JoinVerdict.Skip
+                  && PlayerCheck.Decide(true, true, false, false, false, false) == JoinVerdict.Skip
+                  && PlayerCheck.Decide(true, true, true, true, false, false) == JoinVerdict.Skip,
+                "player check: a player who left, is not in yet or is already being refused is skipped");
+            // Nobody else here (single player world): no peer, no hello = not compatible, and framework give a reason.
+            Check(!NetworkGate.PeerCompatible(null) && !string.IsNullOrEmpty(NetworkGate.PeerProblem(null)),
+                "player check: a peer that never answered the handshake is not compatible, and the log gets a reason");
 
             // Flag of a fire me never changed stays as another mod set it, through apply and restore.
             fire.m_canRefill = false;

@@ -4,11 +4,21 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
-Mods panel). Smoke test (`./tools/Test-Smoke.ps1`) passed 2026-09-29: loads, patches cleanly, JitCheck clean (268
-methods, 0 failures). Automated in-world self-tests (`./tools/Test-InWorld.ps1 -Mod Lights.Switchable`) pass:
-`lights.torch`, `lights.candle`, `lights.campfire` (includes the cooking-fire rule: campfires and braziers stay
-normal fires even when listed; rules wire round trip; player check verdicts). No hands-on in-game test yet.
+**Build under test:** 0.2.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+Mods panel). 0.2.0 changed the server's player check: it now also refuses a player who has the mod turned off or has
+another version of it, when they join and about a second after they turn it off while connected (0.1.0 only refused a
+player without the mod). M05 and M06 are reworded and stay `[ ]`, M08 to M11 are new; the self-tests ran on 0.2.0 on
+2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): its three in-world tests passed,
+and in the each-off scenario the server refuses the player who turns the mod off, while connected and when joining
+with it off. History, on 0.1.0: smoke test (`./tools/Test-Smoke.ps1`) passed 2026-09-29: loads, patches cleanly,
+JitCheck clean (268 methods, 0 failures). Automated in-world self-tests (`./tools/Test-InWorld.ps1 -Mod
+Lights.Switchable`) passed: `lights.torch`, `lights.candle`, `lights.campfire` (includes the cooking-fire rule:
+campfires and braziers stay normal fires even when listed; rules wire round trip; player check verdicts). No hands-on
+in-game test yet.
+
+**Automated checks (2026-10-13):** the three in-world self-tests and the multiplayer scenarios
+(`./tools/Test-Multiplayer.ps1`, dedicated server) passed on 0.2.0. An item ending in "Automated: ..." is checked in
+full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`), then
 `nocost` to build without materials (it does not affect fire fuel: refuelling always takes the item).
@@ -65,7 +75,7 @@ dedicated server of 1.0.16, like 1.0.15, never runs lights itself (only the play
 
 ## 0.1.0 — multiplayer (needs a second player)
 
-Unless a test says otherwise, both players have the mod and `AllowPlayersWithoutMod` is `false` (default).
+Unless a test says otherwise, both players have the mod turned on and `AllowPlayersWithoutMod` is `false` (default).
 
 - [ ] **M01 Both with the mod:** host and friend have the mod. One switches a torch off, the other sees it go dark
   within a second or two, and can switch it on again. Nobody's torches burn fuel (T02 with both players near).
@@ -79,19 +89,57 @@ Unless a test says otherwise, both players have the mod and `AllowPlayersWithout
 - [ ] **M04 Host turns it off live:** the host unticks the mod while you play. Expected: your status changes to
   "Inactive: the server has this mod turned off" and lights go back to vanilla for you too; ticking it on again brings
   switching back.
-- [ ] **M05 Dedicated server:** install on a dedicated server and on both players. Expected: M01, M06 and M07
-  behaviour; the server log shows the mod loaded, no error.
+- [ ] **M05 Dedicated server:** install on a dedicated server and on both players. Expected: the behaviour of M01 and
+  of M06 to M09; the server log shows the mod loaded, no error.
+  *Partly automated (`probe.mp.refused`, `probe.mp.off.MC.Building.Lights.Switchable`); by hand: With two real
+  players on a dedicated server: M01 (one switches a torch, the other sees it) and M07 (the server's list reaches the
+  player); the server log shows the mod loaded.*
 - [ ] **M06 Player without the mod refused:** default settings. A friend without the mod joins. Expected: about a
   second after joining (usually still in the loading screen) their game goes back to the main menu with "Incompatible
-  version"; the host's log: `Refused <name> (<id>): their game does not run Switchable Lights, ...`. The host sets
-  `AllowPlayersWithoutMod = true`: the friend can join and play (host log: the "AllowPlayersWithoutMod is on"
-  warning). Setting it back to `false` while they are online refuses them about a second later; a player with the mod
-  stays. (unverified: the menu message is read from the game code, not seen in game yet)
+  version"; the host's log: `Refused <name> (<id>): does not have the mod. This server requires Switchable Lights on
+  every player ...`. The host sets `AllowPlayersWithoutMod = true`: the friend can join and play (host log:
+  `<name> (<id>) does not have the mod; AllowPlayersWithoutMod is on, so they may play, ...`). Setting it back to
+  `false` while they are online refuses them about a second later; a player with the mod turned on stays.
+  (unverified: the menu message is read from the game code, not seen in game yet)
+  *Partly automated (`probe.mp.refused`, `scenario:open-server`); by hand: Read the host's log for this mod's own
+  line "Refused <name>: does not have the mod ..." (several mods refuse the same player and only the first one writes
+  it); set AllowPlayersWithoutMod back to false while the player without the mod is online: refused about a second
+  later, a player with the mod stays.*
 - [ ] **M07 Server list for everyone:** the host removes `piece_walltorch` from its `Lights`; the friend keeps the
   default list. Expected: the friend's log shows `Using the server's light list: ...` once; for both players a sconce
   shows the vanilla hover and burns resin, torches still switch. The host puts the default list back: the friend's log
   shows `Using the server's default light list.` and sconces switch again, no rejoin needed. The friend's own
   config file is unchanged; in a single-player world the friend's own list applies.
+
+## 0.2.0 — multiplayer: players with the mod turned off (needs a second player)
+
+Both players have the mod. Unless a test says otherwise, `AllowPlayersWithoutMod` is `false` (default) on the host.
+
+- [x] **M08 Joins with the mod turned off:** the friend sets `Enabled = false` for Switchable Lights (in
+  `BepInEx/config/MC.Building.Lights.Switchable.cfg`, or unticked in the MC Mods panel from the main menu), then joins.
+  Expected: about a second after joining (usually still in the loading screen) their game goes back to the main menu
+  with "Incompatible version".
+  *Automated: `probe.mp.off.MC.Building.Lights.Switchable`.*
+- [ ] **M09 Turned off while connected:** the friend joins with the mod on and plays, then unticks Switchable Lights in
+  the MC Mods panel (Esc). Expected: about a second later their game goes back to the main menu with "Incompatible
+  version"; the host keeps playing. The host's log shows `<name> turned Switchable Lights off on their game.`, then
+  `Refused <name> (<id>): has the mod turned off. This server requires Switchable Lights on every player ...`. The
+  friend joins again with the mod on, then unticks and ticks it again within a second. Expected: they stay.
+  *Partly automated (`probe.mp.off.MC.Building.Lights.Switchable`); by hand: Read the host's log for the two lines
+  ("<name> turned Switchable Lights off on their game." and "Refused <name>: has the mod turned off ..."), and untick
+  and tick the mod again within a second: the player stays.*
+- [ ] **M10 AllowPlayersWithoutMod and a player with the mod turned off:** the host sets `AllowPlayersWithoutMod =
+  true`. (a) The friend joins with the mod turned off. Expected: they can play; the host's log shows
+  `<name> (<id>) has the mod turned off; AllowPlayersWithoutMod is on, so they may play, ...`. (b) The friend ticks the
+  mod on, then unticks it again while connected. Expected: they stay both times (the same host log line about a second
+  after the untick); with it off, lights show them the vanilla hover (Fuel n/max) and the lights their game runs burn
+  fuel; with it on, E switches lights again. (c) While the friend's mod is off, the host sets `AllowPlayersWithoutMod`
+  back to `false`. Expected: the friend is refused about a second later ("Incompatible version").
+- [ ] **M11 Another version of the mod (needs a test build):** the friend uses a build of the mod with another
+  `ModNetworkVersion` than the host's. Expected: refused about a second after joining ("Incompatible version"); the
+  host's log: `Refused <name> (<id>): has another version of the mod (network version <n>, the server has <m>). ...`.
+  Every build so far has network version 1, so this can only be tried with a build made for the test; skip it
+  (`[-]`) until a second network version exists.
 
 ## 0.1.0 — compatibility (optional, needs another mod)
 

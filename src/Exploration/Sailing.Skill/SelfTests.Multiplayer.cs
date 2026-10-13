@@ -22,9 +22,9 @@ namespace MC.Exploration.SailingSkillMod;
 //   sailing.mp.helm    ship the SERVER simulates (a dedicated server keeps no object by itself: the server step holds
 //                      the server's reference place on its ship, Debug only, so it stands in for a passenger's game),
 //                      client boards and takes the helm the vanilla way: server reads the helmsman's published level
-//                      (0 = no bonus, 100 = bonuses, Debug line), client's rudder swings faster and reaches the
-//                      server, helmsman earns XP on a ship the server moves, passenger does not, simulation handed to
-//                      the client = bonuses on its game
+//                      (0 = no bonus, 100 = bonuses, Debug line), helmsman's wind factor (HUD wind icon) keeps the
+//                      bonus there, client's rudder swings faster and reaches the server, helmsman earns XP on a ship
+//                      the server moves, passenger does not, simulation handed to the client = bonuses on its game
 //   sailing.mp.crew    same ship, client on deck (nobody at the helm): best sailor aboard halves a hit on the server,
 //                      full again once the client left; own map reveal on a ship another game simulates
 //   sailing.mp.join    server join check on the live player: allowed with the mod; with AllowPlayersWithoutMod forced
@@ -1100,6 +1100,10 @@ internal static partial class SelfTests
             yield return FixedSteps(4);
             c.Check(!ReferenceEquals(ShipFixedUpdatePatches.LastShip, ship) && !ship.IsOwner(),
                 "the helmsman's game applied the handling bonuses to a ship it does not simulate");
+            // Helmsman's HUD wind icon (its number: the wind factor asked outside a physics step) on a ship the server
+            // simulates: the server runs the mod, so the icon shows the pull with the bonus (test list M14). A ship
+            // of a game without the mod shows the normal game's: sailing.hud.
+            CheckWind(c, ship, rules, 1f, "Sailing 100 at the helm of a ship the server simulates");
 
             // ----- rudder: turned on the helmsman's own game, faster at 100, and it reaches the server -----
             var steps = new int[2];

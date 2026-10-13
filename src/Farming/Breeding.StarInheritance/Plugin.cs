@@ -9,7 +9,8 @@ namespace MC.Farming.BreedingStarInheritanceMod;
 // Enabled toggle, dependencies, server check, status, live on/off. Patches in Patches/ apply only while Active.
 // No Awake/Start/Update/OnDestroy here (they hide ModPlugin ones). Use BindConfig / OnActivated / OnDeactivated.
 // Baby start from weaker parent level, chance of one more level (up to MaxStars) grow with best farmer's Farming.
-// Both side: server refuse players without me (PlayerCheck) and send its birth numbers to everyone (ServerSettings).
+// Both side: server refuse players whose game not run me (no mod, turned off, other network version: PlayerCheck) and
+// send its birth numbers to everyone (ServerSettings).
 // Numbers read at every birth (CurrentSettings, nothing cached). SettingChanged only tell server to send them again.
 // Off = patches gone = vanilla births.
 internal sealed partial class Plugin : ModPlugin
@@ -55,12 +56,11 @@ internal sealed partial class Plugin : ModPlugin
             new AcceptableValueRange<int>(ServerSettings.MinMaxStars, ServerSettings.MaxMaxStars),
             new ConfigurationManagerAttributes { Order = 50 }));
         AllowPlayersWithoutMod = Config.Bind("General", "AllowPlayersWithoutMod", false, new ConfigDescription(
-            "Used only by the server (or the host). Off (default): a player whose game does not have this mod "
-            + "installed is refused about a second after joining, and their game shows \"Incompatible version\", "
-            + "because the animals their game simulates would breed the normal game way. The check only looks at "
-            + "whether the mod is installed: a player who turned it off on their own game is not refused. On: players "
-            + "without the mod may play, and the animals their game simulates breed the normal game way (the baby "
-            + "takes the level of the parent that gives birth).",
+            "Used only by the server (or the host). Off (default): a player whose game does not have this mod, has it "
+            + "turned off or has another version of it is refused about a second after joining, or about a second "
+            + "after turning it off, and their game shows \"Incompatible version\", because the animals their game "
+            + "simulates would breed the normal game way. On: such players may play, and the animals their game "
+            + "simulates breed the normal game way (the baby takes the level of the parent that gives birth).",
             null, new ConfigurationManagerAttributes { Order = 40 }));
     }
 
@@ -96,7 +96,8 @@ internal sealed partial class Plugin : ModPlugin
 #endif
 
     // Turned on (game start, or live): look for Star Level System again at next use, publish Farming now if in world,
-    // start network part (server: check players already in, send numbers; client: ask numbers).
+    // start network part (server: check players already in, listen for players who turn me on/off, send numbers;
+    // client: ask numbers).
     protected override void OnActivated()
     {
         Compat.Reset();
@@ -156,7 +157,7 @@ internal sealed partial class Plugin : ModPlugin
         }
     }
 
-    // Switched back to refuse: players without me already in get checked (after the grace) too.
+    // Switched back to refuse: players already in whose game not run me get checked (after the grace) too.
     private static void OnAllowChanged(object sender, EventArgs e)
     {
         try

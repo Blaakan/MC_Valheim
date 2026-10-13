@@ -35,8 +35,7 @@ namespace MC.Exploration.CompendiumEncyclopediaMod;
 //   compendium.buildclose     = T25: window closed during the catalog build (Tab path, Esc path), one build line each.
 //   compendium.cleanlog       = T24: no warning or error line of the mod since it started.
 //   compendium.texts          = T35: a text learned while the Encyclopedia is open is in the Texts list after.
-//   compendium.bug.refused-toggle = T39: a refused window stays refused after the feature goes off and on. Real bug
-//                               of the mod (CompendiumWindow.Destroy forget the refusal): fail until the mod is fixed.
+//   compendium.refused-toggle = T39: a refused window stays refused after the feature goes off and on.
 internal static class UiMoreSelfTests
 {
 #if DEBUG
@@ -56,8 +55,7 @@ internal static class UiMoreSelfTests
     private const string BuildCloseName = "compendium.buildclose";
     private const string CleanLogName = "compendium.cleanlog";
     private const string TextsName = "compendium.texts";
-    // Real bug of the mod (T39), alone in its test: it fails until the mod is fixed.
-    private const string RefusedToggleName = "compendium.bug.refused-toggle";
+    private const string RefusedToggleName = "compendium.refused-toggle";
 
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -2558,14 +2556,13 @@ internal static class UiMoreSelfTests
         run.Report();
     }
 
-    // ---------------------------------------------------------------- compendium.bug.refused-toggle (T39)
+    // ---------------------------------------------------------------- compendium.refused-toggle (T39)
 
     // A window that could not be built on this inventory (played in memory, as a UI mod would cause), SideButton on,
     // then the feature off and on: the refusal must last until the next inventory screen. No button, no tabs, no new
-    // warning. (Design: "side button stay away until the next one"; X07: at most one warning.)
-    // REAL BUG, seen in the run: CompendiumWindow.Destroy -> ForgetObjects set _refused false while _sessionGui stay,
-    // SideButton.Forget clear _hidden, so OnActivated -> SideButton.Sync build the button again and lay the row out
-    // (TopTabs keep its own flag: tabs stay away). Test fail until the mod is fixed; nothing else is checked here.
+    // warning, and Open (what a button click run) build nothing. (Design: "side button stay away until the next one";
+    // X07: at most one warning.) The refusal live with the window's session, not its objects: CompendiumWindow.Destroy
+    // keep it, so OnActivated -> SideButton.Sync ask RefusedFor and make no button (0.1.0 forgot it there).
     private static IEnumerator RunRefusedToggle()
     {
         var run = new UiRun();
@@ -2637,11 +2634,18 @@ internal static class UiMoreSelfTests
             {
                 p.Add($"Valheim Compendium after the toggle: shown {TopTabs.VanillaShown(gui)}, tabs on it {TopTabs.VanillaStrip != null}, Encyclopedia open {CompendiumWindow.IsOpen}");
             }
+            // What a click on the side button (or any late caller) run: still refused, no second build try.
+            var opened = CompendiumWindow.Open();
+            if (opened || CompendiumWindow.IsOpen || CompendiumWindow.Root != null)
+            {
+                p.Add($"CompendiumWindow.Open after the toggle: returned {opened}, window open {CompendiumWindow.IsOpen}, window built {CompendiumWindow.Root != null}");
+            }
             if (LogWatch.Bad != bad || !LogWatch.Installed)
             {
                 p.Add($"{LogWatch.Bad - bad} new warning or error line(s) after the toggle (log watch installed {LogWatch.Installed})");
             }
-            run.Detail = "a refused window stays refused after the feature goes off and on: no side button, the game's side row, no tabs, no new warning";
+            run.Detail = "a refused window stays refused after the feature goes off and on: no side button, the game's side row, no tabs, "
+                         + "nothing built by what a button click runs, no new warning";
         }
         finally
         {

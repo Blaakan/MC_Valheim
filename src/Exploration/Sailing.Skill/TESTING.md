@@ -4,15 +4,22 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+fixed the wind icon of M13 (at the helm of a ship simulated by a game without the mod, the HUD wind icon showed the
+Sailing bonus although the ship did not get it): M13 is reset to `[ ]` and M14 is new. 0.1.1 also changed the sail
+response (T19: when the wind shifted while the sail was still filling, the sail's pull went about 0.5% past its normal
+strength for a moment; the faster sail now follows the normal game's own curve, only sooner, and its last part is a
+little gentler than in 0.1.0): T07, T18 and T19 are reset to `[ ]`, and T19's check is part of the self-test
+`sailing.sail` now (its own failing self-test is gone). The self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17,
+in-world and with a dedicated server, every MC mod loaded): all of this mod's tests passed. History, on 0.1.0: smoke
 test (`./tools/Test-Smoke.ps1`) passed 2026-10-01: loads, patches cleanly, JitCheck clean. In-world self-tests
-(`./tools/Test-InWorld.ps1`) passed 2026-10-01 on the final code: all six `sailing.*` tests (`sailing.network`,
-`sailing.math`, `sailing.skill`, `sailing.helm`, `sailing.pending`, `sailing.ship`). An earlier run with the same
-ship code failed `sailing.ship`'s paddle comparison at 0.25 s (wave noise); the check now compares the 0.5 s and 1 s
-speeds. No hands-on in-game test yet.
+(`./tools/Test-InWorld.ps1`) passed 2026-10-01 on the final 0.1.0 code: all six `sailing.*` tests of that day
+(`sailing.network`, `sailing.math`, `sailing.skill`, `sailing.helm`, `sailing.pending`, `sailing.ship`). An earlier
+run with the same ship code failed `sailing.ship`'s paddle comparison at 0.25 s (wave noise); the check now compares
+the 0.5 s and 1 s speeds. No hands-on in-game test yet.
 
-**Automated checks (2026-10-08):** 27 of 29 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 27 of 27 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -126,15 +133,14 @@ main character for the death and reset items.
   beyond its normal strength for that heading and never the other way when the sail comes down (no lurch forward or
   backward).
   *Automated: `sailing.sail`, `sailing.math`.*
-- [!] **T19 Wind shift while the sail is still filling (G5):** at Sailing 100 with the wind from the side (`wind 0 1`,
-  beam reach), go from Stop to Full sail and flip the wind (`wind 180 1`) about a second later. Expected: the sail's
-  pull never goes beyond its normal strength for the new wind (the design says the sail response is bounded by the
-  game's own target). Far too small to judge by feel: the in-world self-test `sailing.bug.sail-overshoot` measures it.
-  (Known problem in 0.1.0, computed from the engine's smoothing code and not yet measured in the game: about 0.5% over
-  the full pull for a moment, about 2 s after the flip, with the default `SailResponseAtMax`; none when the sail had
-  about 1.5 s or more to fill before the flip, as in T18.)
-  **FAILED:** automated test: Carried over from earlier rounds, NOT re-checked in this pass: the sail force goes about
-  0.5% past its target when the wind flips while the sail is still filling (self-test `sailing.bug.sail-overshoot`)
+- [x] **T19 Wind shift while the sail is still filling (G5):** at Sailing 100 with the wind from the side (`wind 0 1`,
+  beam reach), go from Stop to Full sail and flip the wind (`wind 180 1`) about a second later; also flip it sooner
+  (under half a second after Full), and repeat both with `SailResponseAtMax = 5` (the largest value). Expected: the
+  sail's pull never goes beyond its normal strength for the new wind, and three seconds after the flip it sits on
+  that strength. Far too small to judge by feel: the in-world self-tests `sailing.sail` and `sailing.math` measure
+  it. (Fixed in 0.1.1; in 0.1.0 the pull went about 0.5% over its normal strength for a moment, about 2 s after the
+  flip, with the default `SailResponseAtMax`, when the sail had less than about 1.5 s to fill before the flip.)
+  *Automated: `sailing.sail`, `sailing.math`.*
 - [x] **L01 Live toggle:** at Sailing 100 at the helm under sail, untick Sailing Skill in the MC Mods panel. Expected:
   the handling is the normal game's at once (slower turns, no brake at Stop), the map reveal is normal, no Sailing XP;
   the Skills panel still shows Sailing 100; Debug "Withdrew the published Sailing level (mod turned off).". Tick it
@@ -247,14 +253,24 @@ lines.
   *Partly automated (`sailing.mp.helm`); by hand: How the steering feels with a real second player's game simulating
   the ship (same as single player at 100, no jerks beyond the normal game's), under way on water. As long as
   sailing.mp.helm has not passed: also everything listed under 'asserts'.*
-- [!] **M13 Wind icon on a ship a player without the mod simulates:** M07 setup (`AllowPlayersWithoutMod = true`, C
+- [ ] **M13 Wind icon on a ship a player without the mod simulates:** M07 setup (`AllowPlayersWithoutMod = true`, C
   without the mod boards first, A at Sailing 100 takes the helm), `wind 0 1` on the host; A turns the bow toward the
   wind. Expected: A's HUD wind icon greys out at the normal game's angle (about 37 degrees off the wind), like the
-  ship's real pull: C's game sails the ship as the normal game does. (Known problem in 0.1.0: the icon stays white
+  ship's real pull: C's game sails the ship as the normal game does. (Fixed in 0.1.1; in 0.1.0 the icon stayed white
   down to about 26 degrees.)
-  **FAILED:** automated test: Carried over from earlier rounds, NOT re-checked in this pass: the helmsman's HUD wind
-  icon shows the Sailing bonus on a ship whose simulating game does not apply it (self-test
-  `sailing.bug.wind-icon-foreign`)
+  *Partly automated (`sailing.hud`); by hand: A real player C without the mod (AllowPlayersWithoutMod = true) whose
+  game simulates the ship while A (Sailing 100) steers: A's wind icon greys out at about 37 degrees off the wind, like
+  the ship's real pull. The test stands in for C's game by handing the ship to a session that is not there.*
+- [ ] **M14 Wind icon on a ship another player with the mod simulates (new in 0.1.1):** M03 setup (A, with the mod,
+  boards first and stays as a passenger, so A's game simulates the ship; B at Sailing 100 takes the helm), `wind 0 1`
+  on the host; B turns the bow toward the wind. Expected: B's HUD wind icon stays white down to about 26 degrees off
+  the wind, as in single player at Sailing 100, and the ship keeps pulling there (A's game gives the ship B's bonus).
+  Then A dies aboard and respawns while B keeps steering (a creature, or `die` with `god` off when A is the host).
+  Expected: B's icon does not change, neither while A is dead nor when A respawns.
+  *Partly automated (`sailing.hud`, `sailing.mp.helm`); by hand: Two real players: a passenger's game with the mod
+  simulating the ship while the other steers at Sailing 100 (the icon stays white down to about 26 degrees), and the
+  passenger dying aboard and respawning. sailing.hud stands in for the passenger's game and its player;
+  sailing.mp.helm uses a ship the dedicated server simulates.*
 
 ## 0.1.0 — other mods
 

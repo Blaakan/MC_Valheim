@@ -714,7 +714,7 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------- batchfeed.hint-follows, batchfeed.bug.hint-stale (C05) ----------
+    // ---------- batchfeed.hint-follows (C05) ----------
 
     // What Switchable Lights (MC) does to a light when it is turned on: the instance stops taking fuel
     // (m_canRefill = false) and its hover keeps a Use line. Turned off: the flag goes back.
@@ -724,22 +724,26 @@ internal static partial class SelfTests
         fire.m_canTurnOff = on;
     }
 
-    // The crosshair stays on this spot: the game asks its hover text every frame.
-    private static IEnumerator KeepLooking(Fireplace fire, float seconds)
+    // The crosshair stays on this spot (a fire, a cooking station): the game asks its hover text every frame.
+    // seen = what each of those frames showed.
+    private static IEnumerator KeepLooking(MonoBehaviour spot, float seconds, Action<string> seen = null)
     {
+        var hoverable = (Hoverable)spot;
         var end = Time.time + seconds;
         while (Time.time < end)
         {
             yield return null;
-            if (fire == null)
+            if (spot == null)
             {
                 yield break;
             }
-            fire.GetHoverText();
+            var hover = hoverable.GetHoverText();
+            seen?.Invoke(hover);
         }
     }
 
-    // What already works: the press follows the flag at once, and the hint is right after a look at another covered spot.
+    // The press follows the flag at once. The hint is right after a look at another covered spot, and within about half
+    // a second while the crosshair stays on the spot (the mod asks the spot again every half second).
     private static IEnumerator RunHintFollows()
     {
         var c = new Checks(HintFollowsName);
@@ -780,33 +784,8 @@ internal static partial class SelfTests
             c.Check(p.Removed == 5 && Near(Fuel(a), 8f), $"C05 Shift+E on a fire that takes fuel again adds 5 at once (removed {p.Removed}, fuel {Fuel(a)})");
             b.GetHoverText();
             ExpectHint(c, "C05 a fire that takes fuel again, after a look at another fire", a.GetHoverText());
-            c.Report();
-        }
-        finally
-        {
-            rig?.End();
-        }
-    }
 
-    // REAL BUG, expected to fail until the mod is fixed: the hint keeps the covered / not covered answer of the
-    // spot while the crosshair stays on it (HoverHint.Append resolves the spot only when the hovered component
-    // changes). Only these two checks, so nothing else is blocked by it.
-    private static IEnumerator RunHintStale()
-    {
-        var c = new Checks(HintStaleName);
-        Rig rig = null;
-        try
-        {
-            rig = new Rig();
-            var goA = rig.Spawn("fire_pit", -3f, 7f);
-            var goB = rig.Spawn("fire_pit", 3f, 7f);
-            var a = goA != null ? goA.GetComponent<Fireplace>() : null;
-            var b = goB != null ? goB.GetComponent<Fireplace>() : null;
-            if (!c.Check(a != null && b != null && FeedTarget.FireSkip(a) == null && FeedTarget.FireSkip(b) == null, "spawn two campfires"))
-            {
-                c.Report();
-                yield break;
-            }
+            // From here the crosshair stays on the spot while its flag flips: no look at another spot in between.
             // Fuel in both: a fire that can be turned off keeps its Use line only while it has fuel.
             SetFuel(a, 5f);
             SetFuel(b, 5f);
@@ -819,7 +798,7 @@ internal static partial class SelfTests
             // Covered fire becomes a switch while the crosshair stays on it.
             MakeSwitch(a, true);
             yield return KeepLooking(a, 0.7f);
-            var hover = a.GetHoverText();
+            hover = a.GetHoverText();
             c.Check(hover.IndexOf(Anchor, StringComparison.Ordinal) >= 0 && HintLine(hover) == null,
                 $"C05 the hint goes away within about half a second when the fire you look at stops taking fuel, still shows '{HintLine(hover)}'");
 
@@ -831,6 +810,50 @@ internal static partial class SelfTests
             var back = HintOk(b.GetHoverText(), AltLabel(), 5, out var detail);
             c.Check(none && back,
                 $"C05 the hint comes back within about half a second when the fire you look at takes fuel again (no hint while it took none: {none}; {detail})");
+
+            // Asking the spot again every half second must never make the line blink. Nothing changes on this fire: the
+            // hint is there on every frame of a long look.
+            var alt = AltLabel();
+            var frames = 0;
+            var wrong = 0;
+            yield return KeepLooking(b, 0.7f, text =>
+            {
+                frames++;
+                if (!HintOk(text, alt, 5, out _))
+                {
+                    wrong++;
+                }
+            });
+            c.Check(frames > 0 && wrong == 0,
+                $"the hint stays on every frame while you keep looking at a fire that takes fuel (missing or wrong on {wrong} of {frames} frames)");
+
+            // Same for the hidden hint: a cooking station holding a cooked piece (E takes the piece first) shows none on
+            // any frame of a long look.
+            var cookGo = rig.Spawn("piece_cookingstation", 0f, 11f);
+            var cook = cookGo != null ? cookGo.GetComponent<CookingStation>() : null;
+            if (c.Check(cook != null && cook.m_addFoodSwitch == null && cook.m_conversion.Count > 0 && cook.m_conversion[0].m_to != null,
+                    "spawn 'piece_cookingstation'"))
+            {
+                SetSlot(cook, 0, cook.m_conversion[0].m_to.name, cook.m_conversion[0].m_cookTime + 1f, 1);
+                hover = cook.GetHoverText();
+                var first = hover.IndexOf(Anchor, StringComparison.Ordinal) >= 0 && HintLine(hover) == null;
+                frames = 0;
+                var shown = 0;
+                yield return KeepLooking(cook, 0.7f, text =>
+                {
+                    frames++;
+                    if (HintLine(text) != null)
+                    {
+                        shown++;
+                    }
+                });
+                c.Check(first && frames > 0 && shown == 0,
+                    $"a cooking station holding a cooked piece shows no hint on any frame while you keep looking at it (first look without one: {first}; hint on {shown} of {frames} frames)");
+                if (cook != null)
+                {
+                    SetSlot(cook, 0, "", 0f, 0);
+                }
+            }
             c.Report();
         }
         finally

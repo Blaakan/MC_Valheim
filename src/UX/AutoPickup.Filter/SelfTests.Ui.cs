@@ -25,8 +25,6 @@ internal static partial class SelfTests
     private const string LayoutName = "lootfilter.layout";
     private const string MarksName = "lootfilter.marks";
     private const string MarkColoursName = "lootfilter.mark-colours";
-    private const string BugBadgeHotbarName = "lootfilter.bug.badge-hotbar-number";
-    private const string BugListsPanelName = "lootfilter.bug.lists-panel-over-grid";
     private const string ChestName = "lootfilter.chest";
     private const string BadgesName = "lootfilter.badges";
     private const string OutsideGridName = "lootfilter.outside-grid";
@@ -570,23 +568,16 @@ internal static partial class SelfTests
 
     // ---------------------------------------------------------------- lootfilter.badges (T13)
 
-    private static IEnumerator RunBadges() => BadgesCore(BadgesName, hotbarNumberOnly: false);
-
-    // REAL BUG of 0.1.0, alone here so the other placement checks stay green. Round 1 (2560x1440): the mark sits in
-    // the top-left corner of the slot, right on the hotbar number of the first row (screenshot
-    // lootfilter.badges__marks: numbers 2, 3, 4 hidden under the marks). MarkerOverlay.TryPickCorner finds something in
-    // every corner and takes the "least covered" one. FAIL until the mod keeps the hotbar number readable.
-    private static IEnumerator RunBugBadgeHotbar() => BadgesCore(BugBadgeHotbarName, hotbarNumberOnly: true);
-
-    // hotbarNumberOnly false: every slot part but the hotbar number. True: the hotbar number alone.
-    private static IEnumerator BadgesCore(string name, bool hotbarNumberOnly)
+    // Mark sit on the left edge of the slot, half-way up (0.1.1; 0.1.0 put it in the top-left corner, on the hotbar
+    // number of first-row slots). Every game part a slot can show is checked against it, the hotbar number too.
+    private static IEnumerator RunBadges()
     {
-        if (!Ready(name, out var player, out var gui))
+        if (!Ready(BadgesName, out var player, out var gui))
         {
             yield break;
         }
-        var c = new Checks(name);
-        var rig = new Rig(player, name);
+        var c = new Checks(BadgesName);
+        var rig = new Rig(player, BadgesName);
         try
         {
             var inv = rig.Inv;
@@ -612,19 +603,27 @@ internal static partial class SelfTests
                 c.Report();
                 yield break;
             }
+            // Food show the game's fork icon in its slot (any free slot will do).
+            var food = rig.Give("Raspberry", 3);
+            if (!c.Check(food != null && inv.ContainsItem(food), "Raspberry given, in a slot of its own"))
+            {
+                c.Report();
+                yield break;
+            }
             player.EquipItem(spear, false);
             spear.m_durability = spear.GetMaxDurability() * 0.5f;
             FilterState.SetMode(FilterMode.SkipIgnored);
             FilterState.Toggle(FilterState.Ignored, "SpearFlint");
             FilterState.Toggle(FilterState.Ignored, "CopperOre");
             FilterState.Toggle(FilterState.Ignored, "ArrowWood");
+            FilterState.Toggle(FilterState.Ignored, "Raspberry");
             yield return Open();
             yield return Frames(4);
             var grid = gui.m_playerGrid;
             c.Note($"SpearFlint max quality {spear.m_shared.m_maxQuality}, teleportable CopperOre {ore.m_shared.m_teleportable}, "
                    + $"spear equipped {spear.m_equipped}, durability {F(spear.m_durability)}/{F(spear.GetMaxDurability())}");
             var seen = new HashSet<string>();
-            foreach (var item in new[] { spear, ore, arrows })
+            foreach (var item in new[] { spear, ore, arrows, food })
             {
                 var who = item.m_dropPrefab != null ? item.m_dropPrefab.name : "?";
                 var element = ElementOf(grid, item);
@@ -635,16 +634,20 @@ internal static partial class SelfTests
                 }
                 var box = WorldRect(badge.rectTransform);
                 var slot = WorldRect((RectTransform)element.transform);
-                if (!hotbarNumberOnly)
-                {
-                    c.Check(box.xMin >= slot.xMin - 0.5f && box.xMax <= slot.xMax + 0.5f && box.yMin >= slot.yMin - 0.5f && box.yMax <= slot.yMax + 0.5f,
-                        $"{who}: mark inside its slot");
-                    c.Check(!badge.raycastTarget, $"{who}: mark never takes clicks");
-                }
+                c.Check(box.xMin >= slot.xMin - 0.5f && box.xMax <= slot.xMax + 0.5f && box.yMin >= slot.yMin - 0.5f && box.yMax <= slot.yMax + 0.5f,
+                    $"{who}: mark inside its slot");
+                c.Check(!badge.raycastTarget, $"{who}: mark never takes clicks");
+                // Same place on every slot: left edge (in the first tenth of the slot), half-way up.
+                c.Check(box.xMin - slot.xMin <= slot.width * 0.1f && Mathf.Abs(box.center.y - slot.center.y) <= 1f,
+                    $"{who}: mark {F(box)} on the left edge of its slot {F(slot)}, half-way up");
                 var parts = new List<KeyValuePair<string, Rect>>();
                 if (element.m_noteleport != null && element.m_noteleport.enabled)
                 {
                     parts.Add(new KeyValuePair<string, Rect>("no-portal icon", WorldRect(element.m_noteleport.rectTransform)));
+                }
+                if (element.m_food != null && element.m_food.enabled)
+                {
+                    parts.Add(new KeyValuePair<string, Rect>("food icon", WorldRect(element.m_food.rectTransform)));
                 }
                 if (element.m_equiped != null && element.m_equiped.enabled)
                 {
@@ -679,32 +682,19 @@ internal static partial class SelfTests
                 foreach (var part in parts)
                 {
                     seen.Add(part.Key);
-                    // The hotbar number has its own test (lootfilter.bug.badge-hotbar-number): not met in 0.1.0.
-                    if (hotbarNumberOnly != (part.Key == "hotbar number"))
-                    {
-                        continue;
-                    }
                     c.Check(!box.Overlaps(part.Value), $"{who}: mark {F(box)} does not cover the {part.Key} {F(part.Value)}");
                 }
-                var anchor = badge.rectTransform.anchorMin;
-                c.Note($"{who}: mark corner {(anchor.y > 0.5f ? "top" : "bottom")}-{(anchor.x > 0.5f ? "right" : "left")}, slot parts shown: "
-                       + string.Join(", ", parts.Select(p => p.Key).ToArray()));
+                c.Note($"{who}: mark {F(box)} in slot {F(slot)}, slot parts shown: "
+                       + (parts.Count == 0 ? "none" : string.Join(", ", parts.Select(p => p.Key + " " + F(p.Value)).ToArray())));
             }
-            if (hotbarNumberOnly)
+            foreach (var need in new[] { "no-portal icon", "durability bar", "stack amount", "hotbar number", "quality number", "food icon" })
             {
-                c.Check(seen.Contains("hotbar number"), "the hotbar number was on screen for the check");
+                c.Check(seen.Contains(need), $"the {need} was on screen for the check");
             }
-            else
-            {
-                foreach (var need in new[] { "no-portal icon", "durability bar", "stack amount" })
-                {
-                    c.Check(seen.Contains(need), $"the {need} was on screen for the check");
-                }
-                c.Check(seen.Any(s => s.StartsWith("equipped marker", StringComparison.Ordinal)), "the equipped marker was on screen for the check");
-                SelfTest.Screenshot(name, "marks");
-                yield return null;
-                yield return null;
-            }
+            c.Check(seen.Any(s => s.StartsWith("equipped marker", StringComparison.Ordinal)), "the equipped marker was on screen for the check");
+            SelfTest.Screenshot(BadgesName, "marks");
+            yield return null;
+            yield return null;
             c.Report();
         }
         finally
@@ -1213,10 +1203,26 @@ internal static partial class SelfTests
             {
                 yield return null;
                 var box = WorldRect((RectTransform)panel.transform.GetChild(0));
-                c.Note($"lists panel {F(box)}, slots {F(SlotArea(grid))}, screen {Screen.width}x{Screen.height}");
+                var slots = SlotArea(grid);
+                var modeButton = FindButton();
+                var b = modeButton != null ? WorldRect((RectTransform)modeButton.transform) : default;
+                var inventory = WorldRect(gui.m_player);
+                c.Note($"lists panel {F(box)}, slots {F(slots)}, button {F(b)}, inventory panel {F(inventory)}, screen {Screen.width}x{Screen.height}");
                 c.Check(box.xMin >= -0.5f && box.yMin >= -0.5f && box.xMax <= Screen.width + 0.5f && box.yMax <= Screen.height + 0.5f, "lists panel fully on screen");
-                // "Next to the button, not over the grid" has its own test (lootfilter.bug.lists-panel-over-grid):
-                // not met in 0.1.0.
+                // Where it opens (0.1.1): right of your inventory panel, level with its top. 0.1.0 opened it over the
+                // Auto pickup button and the left half of the grid.
+                c.Check(!box.Overlaps(slots), $"lists panel {F(box)} is not over the grid {F(slots)} (screen {Screen.width}x{Screen.height})");
+                c.Check(modeButton != null && !box.Overlaps(b), $"lists panel is not over the Auto pickup button {F(b)}");
+                c.Check(box.xMin >= inventory.xMax - 0.5f && Mathf.Abs(box.yMax - inventory.yMax) <= 1f,
+                    $"lists panel {F(box)} is right of your inventory panel {F(inventory)}, level with its top");
+                if (GlyphRect(gui.m_armor, out var armorRect))
+                {
+                    c.Check(!box.Overlaps(armorRect), $"lists panel is not over the armor number {F(armorRect)}");
+                }
+                if (GlyphRect(gui.m_weight, out var weightRect))
+                {
+                    c.Check(!box.Overlaps(weightRect), $"lists panel is not over the weight number {F(weightRect)}");
+                }
                 var text = ListsText(panel);
                 c.Check(text.Contains("Hold LT and click the right stick to change the mode.") && text.Contains("Right stick click on an item in your inventory")
                         && text.Contains("RT + right stick click closes this list."), "controller only: panel explains LT + stick, stick, RT + stick");
@@ -1300,60 +1306,6 @@ internal static partial class SelfTests
                     $"chest grid focused: right stick clicks do nothing of ours (got: {AllMessages()})");
             }
             c.Check(rig.NewGuardReports == 0, "no error inside the mod");
-            c.Report();
-        }
-        finally
-        {
-            rig.Restore();
-        }
-    }
-
-    // ---------------------------------------------------------------- lootfilter.bug.lists-panel-over-grid (T18)
-
-    // REAL BUG of 0.1.0, alone here so the other controller checks stay green. Round 1 (2560x1440): the lists panel
-    // (62.67,702.41)-(476,1440) lies over the Auto pickup button and over the left half of the slots
-    // (62.67,1016)-(801.33,1381.33), screenshot lootfilter.gamepad__lists-panel. FilterUi.PositionListsPanel puts the
-    // panel's bottom-left on the button's top-left, where there are 3 px of screen left, then Utils.ClampUIToScreen
-    // pushes it down. FAIL until the panel opens next to the button and off the grid (TESTING.md T18).
-    private static IEnumerator RunBugListsPanel()
-    {
-        if (!Ready(BugListsPanelName, out var player, out var gui))
-        {
-            yield break;
-        }
-        var c = new Checks(BugListsPanelName);
-        var rig = new Rig(player, BugListsPanelName);
-        try
-        {
-            var stone = rig.Give("Stone", 3);
-            if (!c.Check(stone != null, "Stone given"))
-            {
-                c.Report();
-                yield break;
-            }
-            TestHooks.PadActive = true;
-            TestHooks.PadOnly = true;
-            FilterState.SetMode(FilterMode.SkipIgnored);
-            yield return Open();
-            yield return Frames(3);
-            var grid = gui.m_playerGrid;
-            var button = FindButton();
-            TestHooks.RightTrigger = true;
-            yield return StickGesture(grid, stone);
-            TestHooks.RightTrigger = false;
-            var panel = ListsPanel();
-            if (!c.Check(button != null && panel != null && panel.activeInHierarchy && panel.transform.childCount > 0 && grid.m_elements.Count > 0,
-                    "RT + right stick click opens the lists panel"))
-            {
-                c.Report();
-                yield break;
-            }
-            yield return null;
-            var box = WorldRect((RectTransform)panel.transform.GetChild(0));
-            var slots = SlotArea(grid);
-            var b = WorldRect((RectTransform)button.transform);
-            c.Check(!box.Overlaps(slots), $"lists panel {F(box)} is not over the grid {F(slots)} (screen {Screen.width}x{Screen.height})");
-            c.Check(!box.Overlaps(b), $"lists panel is next to the Auto pickup button {F(b)}, not over it");
             c.Report();
         }
         finally

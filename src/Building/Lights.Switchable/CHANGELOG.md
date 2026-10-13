@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- The server (or the host) now also refuses a player who has the mod turned off, or who has a version of it that
+  cannot talk to the server's, and not only a player without the mod: the lights their game runs would burn fuel and
+  go out. A player who turns the mod off while connected is refused about a second later (their game shows
+  "Incompatible version"). `AllowPlayersWithoutMod` lets all of them play, as before.
+
 ## 0.1.0
 
 - Initial version: torches, sconces, the Jack-o-turnip, the snow lantern, the resin candle and the unlit castle

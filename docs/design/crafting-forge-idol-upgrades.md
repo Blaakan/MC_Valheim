@@ -257,7 +257,10 @@ name.
   `HideAndDontSave`, **kept for the whole game session**, also after a toggle off: messages waiting in MessageHud's
   queues (pickup "Added", "New material" unlock) hold the sprite, and a destroyed sprite shows as a white square there
   (reported by the user in game, 2026-09-29). A copy that comes back empty (all transparent, e.g. game window
-  minimized) is never cached: plain icon, retried 1 s later. Any other failure: plain icon, logged once.
+  minimized) is never cached: plain icon, retried 1 s later. Any other failure: plain icon, logged once. Since 0.1.1
+  the request that finds the copy empty gets the plain icon too (`StarIcons.Make` gives the game's sprite back
+  whenever it made none); before, that one request got no sprite, and a caller that keeps what it gets (the "New
+  material" popup of an idol picked up at that moment) showed a white square.
 - `ItemData.GetIcon` postfix (quality ≥ 2 idols only: cheap fast path). `IconInlineGuard` patches and unpatches
   GetIcon at plugin load, so it stays non-inlinable even when the mod starts disabled and is turned on later.
 - `InventoryGrid.UpdateGui` postfix: hides the quality number of idols and sets the starred sprite (also covers any
@@ -268,7 +271,10 @@ name.
 - `ItemDrop.GetHoverText` postfix: a starred idol on the ground reads "(2 stars)" instead of vanilla's raw "[3]".
 - `ItemData.GetTooltip` (static overload) postfix: replaces the vanilla "Quality: q" line with "Level: … (n of 3)",
   "Refinement chance: N%", and the next upgrade's cost or "Maximum level". A tier metal the settings cannot name is
-  still counted in that cost, as "N metal of its biome" (0.1.1; the reason is given in the Idols tab, 3.3).
+  still counted in that cost, as "N metal of its biome" (0.1.1; the reason is given in the Idols tab, 3.3). A cost
+  set to 0 is left out of the line (0.1.1: the separator is written only between two parts; before, a trophy cost of
+  0 left "5 Silver, "). With both costs at 0 the line keeps only where to upgrade, "Upgrade at a Forge of Potential,
+  Idols tab." (decision 16).
 
 ### 3.7 Configuration
 
@@ -430,6 +436,11 @@ restores the vanilla tab look, so the next station does not show both vanilla ta
     like the existing one for a step without trophies, and the cost keeps counting the metal without a name (panel
     and idol tooltip). No requirement slot with a flashing amount, the game's sign for a missing resource: there is
     no item to show in it.
+16. **Idol tooltip with both costs of the next star set to 0** (0.1.1): the line stays and only says where to upgrade
+    ("Upgrade at a Forge of Potential, Idols tab."), instead of being dropped. The upgrade still exists and still
+    happens in the Idols tab, every other idol tooltip ends with that line or with "Maximum level.", and the Idols tab
+    keeps its own sentence in that case ("Cost: this idol."). The alternative, no line at all, would hide the Idols
+    tab from the tooltip exactly when the upgrade is free.
 
 ### Added beyond the request
 

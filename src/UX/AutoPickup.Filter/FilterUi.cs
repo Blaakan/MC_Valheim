@@ -17,7 +17,7 @@ namespace MC.UX.AutoPickupFilterMod;
 //   tooltip explain modes and show both lists;
 // - mark gesture (MarkKey, default middle click) on a slot of your inventory or an open chest;
 // - controller gestures while your inventory grid is focused (R3 mark, LT+R3 mode, RT+R3 lists panel);
-// - lists panel for controller (our own copy of the tooltip look, pinned next to the button);
+// - lists panel for controller (our own copy of the tooltip look, pinned right of your inventory panel);
 // - top-left messages.
 // All objects me make are destroyed on deactivate and made again when needed (live toggle).
 internal static class FilterUi
@@ -379,8 +379,10 @@ internal static class FilterUi
         var size = player.rect.size;
         var pos = player.position;
         var screenHeight = Screen.height;
-        if (!_worldPlaced && !PlacementDirty && size == _lastPlayerRectSize && pos == _lastPlayerPos && scale == _lastPlayerScale
-            && screenHeight == _lastScreenHeight)
+        // Panel moved, grew or scaled since last time (show animation, inventory rows, other screen size)?
+        var moved = size != _lastPlayerRectSize || pos != _lastPlayerPos || scale != _lastPlayerScale
+                    || screenHeight != _lastScreenHeight;
+        if (!_worldPlaced && !PlacementDirty && !moved)
         {
             return;
         }
@@ -408,7 +410,8 @@ internal static class FilterUi
         _lastPlayerPos = pos;
         _lastPlayerScale = scale;
         _lastScreenHeight = screenHeight;
-        if (ListsShown && _buttonRT.position != before)
+        // Lists panel hang on the player panel (and stay clear of the button): follow both.
+        if (ListsShown && (moved || _buttonRT.position != before))
         {
             PositionListsPanel();
         }
@@ -697,7 +700,10 @@ internal static class FilterUi
         PositionListsPanel();
     }
 
-    // Bottom-left of the panel's visible box at the button's top-left, then kept on screen (like vanilla tooltips).
+    // Top-left of the panel's visible box right of your inventory panel, level with the panel's top, then kept on
+    // screen (like vanilla tooltips): there it cover no slot and not our button. Left edge also go past the armor and
+    // weight numbers that hang off the panel's right side, and past our button when a setting moved it out there.
+    // 0.1.0 hung the box above the button: no room there, so the clamp pushed it down over button and grid.
     private static void PositionListsPanel()
     {
         if (_listsPanel == null || _listsPanel.transform.childCount == 0)
@@ -709,22 +715,33 @@ internal static class FilterUi
         {
             return;
         }
-        RectTransform anchor = _buttonRT;
-        if (anchor == null && _gui != null)
-        {
-            anchor = _gui.m_player;
-        }
-        if (anchor == null)
+        var player = _gui != null ? _gui.m_player : null;
+        if (player == null)
         {
             return;
         }
-        anchor.GetWorldCorners(Corners);
-        var point = Corners[1];
+        player.GetWorldCorners(Corners);
+        var right = Corners[2].x;
+        right = Mathf.Max(right, RightEdge(_buttonRT));
+        right = Mathf.Max(right, RightEdge(_gui.m_armor != null ? _gui.m_armor.rectTransform : null));
+        right = Mathf.Max(right, RightEdge(_gui.m_weight != null ? _gui.m_weight.rectTransform : null));
+        var point = new Vector3(right + ButtonGap * Mathf.Abs(player.lossyScale.x), Corners[1].y, Corners[1].z);
         _listsPanel.transform.position = point;
         LayoutRebuilder.ForceRebuildLayoutImmediate(box);
         box.GetWorldCorners(Corners2);
-        _listsPanel.transform.position += point - Corners2[0];
+        _listsPanel.transform.position += point - Corners2[1];
         Utils.ClampUIToScreen(box);
+    }
+
+    // World x of the thing's right edge. Nothing there = far left, so it never win a Max.
+    private static float RightEdge(RectTransform rt)
+    {
+        if (rt == null)
+        {
+            return float.MinValue;
+        }
+        rt.GetWorldCorners(Corners2);
+        return Corners2[2].x;
     }
 
     // ---------------------------------------------------------------- gestures
@@ -857,8 +874,10 @@ internal static class FilterUi
         }
     }
 
-    // Controller, only while your inventory grid is the focused group. Chest grid: Sort chest use View/Select and L3,
-    // nobody read R3 there.
+    // Controller, only while your inventory grid is the focused group. Chest open: R3 is also the key of the game's
+    // own Place stacks button (L3 = its Take all; button pads on the prefab, seen on game 1.0.17), whatever grid is
+    // focused and with LT / RT held too (UIGamePad check no modifier). So with a chest open our R3 press also run
+    // Place stacks. Me no eat the press: which key to use is the user's call.
     private static void HandleGamepad(InventoryGui gui)
     {
         if (!Plugin.GamepadControlsOn || !PadOnly())

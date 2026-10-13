@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed: when the Encyclopedia window cannot be built (a UI mod replaced or changed the Valheim Compendium), turning
+  the mod off and on again no longer brings the optional side button back. Before, the button returned, squeezed the
+  side panel's buttons together again, and a click on it only logged the "cannot be built" warning a second time. The
+  Encyclopedia now stays away until you log out, with the side panel exactly as the game makes it.
+
 ## 0.1.0
 
 - Initial version: an **Encyclopedia** tab in the game's Valheim Compendium. The Valheim Compendium (raven button) gets

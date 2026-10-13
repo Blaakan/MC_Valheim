@@ -11,6 +11,13 @@
   leaving it out. The log warning names an empty Material setting instead of listing an empty name.
 - Fixed: turning the mod on while the Forge window is open brings the IDOLS tab back at once. Before, only the odds
   and the text came back and the tab was missing until the window was closed and opened again.
+- Fixed: with an upgrade cost set to 0, the idol's tooltip ended its upgrade line with a stray comma ("... Idols tab:
+  5 Silver, " with Level1Trophies = 0), or with nothing after "Idols tab:" when both costs were 0. A cost of 0 is now
+  left out cleanly ("... Idols tab: 5 Silver"); with both at 0 the line only says where to upgrade ("Upgrade at a
+  Forge of Potential, Idols tab.").
+- Fixed: a starred idol icon first needed while the game could not copy icons (game window minimized) came out
+  empty, so the "New material" popup of a starred idol picked up at that moment showed a white square. The plain icon
+  now shows until the starred one can be made.
 
 ## 0.1.0
 

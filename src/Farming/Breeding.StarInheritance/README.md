@@ -26,10 +26,11 @@ Tamed animals pass on the weaker parent's stars, with a chance of one extra star
   within the pen range at birth (about 10 m). If there is none, the baby starts from its parent's own level (and still
   gets the extra-star chance).
 - **The same rule for everyone in multiplayer.** The mod is installed on the server (or the host) and on every player's
-  game. The server refuses players who do not have it (unless you allow them), and its settings apply to everyone
-  (see Multiplayer).
+  game. The server refuses players whose game does not run it (not installed, turned off, or another version of it),
+  unless you allow them, and its settings apply to everyone (see Multiplayer).
 - Wild spawns, the `spawn` command, taming and summons are not touched: only births from breeding change.
 - Turn it off in the **MC Mods** panel at any time: the next births follow the vanilla rule again, no restart needed.
+  (On someone else's server, turning it off on your own game gets you refused: see Multiplayer.)
 
 Worked examples (p = the extra-star chance):
 
@@ -59,7 +60,7 @@ Multiplayer.
 | General | ChanceWithoutFarmer | `10` | Chance (percent, 0-100) of the extra star when no farmer is known at all: the game handling the birth has no character at that moment (for example while its player respawns) and no other player with the mod is within `FarmerRange`. Rare in normal play. |
 | General | FarmerRange | `60` | How close (metres, 5-64) another player must be to the animal giving birth for their Farming to count. Only players who have the mod count, and only while the game handling the birth has them loaded. The Farming of the player whose game handles the birth counts at any distance. |
 | General | MaxStars | `2` | The extra star never takes a baby above this many stars (0-10; 2 is the most the game shows). Babies whose weaker parent already has this many stars or more keep that level and get no extra star. `0` turns the extra star off. |
-| General | AllowPlayersWithoutMod | `false` | Used only by the server (or the host). Off: a player whose game does not have the mod installed is refused about a second after joining (their game shows "Incompatible version"). The check only looks at whether the mod is installed: a player who turned it off on their own game is not refused. On: players without the mod may play, and the animals their game simulates breed the normal game way (the baby takes the level of the parent that gives birth). |
+| General | AllowPlayersWithoutMod | `false` | Used only by the server (or the host). Off: a player whose game does not have the mod, has it turned off or has another version of it is refused about a second after joining, or about a second after turning it off (their game shows "Incompatible version"). On: such players may play, and the animals their game simulates breed the normal game way (the baby takes the level of the parent that gives birth). |
 
 For a single straight line from 10% at Farming 0 to 50% at Farming 100, set `ChanceAtFarming0` to `10`.
 
@@ -68,21 +69,23 @@ For a single straight line from 10% at Farming 0 to 50% at Farming 100, set `Cha
 - **Who needs it:** required on the server (or the host) and on every player's game.
 - **Multiplayer support:** works in multiplayer.
 
-Install it on the server (or the host) and on every player's game. A birth is decided by the game of the player that is simulating the animal, and a game without the mod would use the normal game rule, so the server refuses players who do not have the mod (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on. The breeding settings of the server (or host) apply to everyone. Other players' Farming counts when they stand near the animal. On a server without the mod it turns itself off. Babies and eggs are normal for everyone.
+Install it on the server (or the host) and on every player's game. A birth is decided by the game of the player that is simulating the animal, and a game that does not run the mod would use the normal game rule, so the server refuses players who do not have the mod, have it turned off or have another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on. The breeding settings of the server (or host) apply to everyone. Other players' Farming counts when they stand near the animal. On a server without the mod it turns itself off. Babies and eggs are normal for everyone.
 
 - **Who decides a birth:** the game that simulates the pregnant animal at that moment. That is usually the first
   player who came near the pen, not necessarily the one standing next to it. Its own player's Farming (always) and the
-  Farming of other players with the mod near the animal decide the result, with the server's settings. A game without
-  the mod would give the baby the level of the parent that gives birth (the vanilla coin flip): that is why every
-  player needs the mod.
-- **Players without the mod are refused.** About a second after such a player has joined (usually while their game
-  is still loading the world), the server refuses them: their game goes back to the main menu with the game's own
-  message "Incompatible version" (the game cannot show a mod name there), and the server closes the connection a few
-  seconds later if their game is still there. On a very slow machine the message can be lost, and the menu then shows
-  the game's plain disconnection message instead. The server's log names the player and says why. To let such players
-  play anyway, set `AllowPlayersWithoutMod = true` on the server: the animals their game simulates then breed the
-  normal game way, and they never count as farmers. Setting it back to `false` refuses the ones who are online about a
-  second later.
+  Farming of other players with the mod near the animal decide the result, with the server's settings. A game that
+  does not run the mod would give the baby the level of the parent that gives birth (the vanilla coin flip): that is
+  why every player needs the mod, turned on.
+- **Players whose game does not run the mod are refused.** This covers a player without the mod, a player who has it
+  turned off (`Enabled = false`, or unticked in the MC Mods panel) and a player whose version of the mod cannot talk
+  to the server's. About a second after such a player has joined (usually while their game is still loading the
+  world), the server refuses them: their game goes back to the main menu with the game's own message "Incompatible
+  version" (the game cannot show a mod name there), and the server closes the connection a few seconds later if their
+  game is still there. On a very slow machine the message can be lost, and the menu then shows the game's plain
+  disconnection message instead. The server's log names the player and says why (does not have the mod, has it
+  turned off, or has another version). To let such players play anyway, set `AllowPlayersWithoutMod = true` on the
+  server: the animals their game simulates then breed the normal game way, and they never count as farmers. Setting it
+  back to `false` refuses the ones who are online about a second later.
 - **The server's settings apply to everyone.** When you join a server that has the mod, your game asks for its five
   breeding settings (`ChanceAtFarming0`, `ChanceAtFarming100`, `ChanceWithoutFarmer`, `FarmerRange`, `MaxStars`),
   uses them for the births it handles, and says so once in its log ("Using the server's breeding settings: ...").
@@ -92,10 +95,15 @@ Install it on the server (or the host) and on every player's game. A birth is de
   follow the normal game rule.
 - **Turning it off on the server** (or the host) turns it off for every connected player too (their panel says the
   server has it turned off), and births follow the normal game rule until it is back on. When it is turned back on,
-  players without the mod who are online are refused about a second later (unless they are allowed).
-- **A player who turns the mod off on their own game** stays connected (the server only checks that the mod is
-  installed): while it is off, the animals their game simulates breed the normal game way and they do not count as a
-  farmer.
+  players whose game does not run the mod and who are online are refused about a second later (unless they are
+  allowed).
+- **A player who turns the mod off on their own game** while connected is refused about a second later, like a player
+  without the mod: their game goes back to the main menu with "Incompatible version". To play on that server again,
+  turn the mod back on (the MC Mods button is also in the main menu; or set `Enabled = true` in the config file) and
+  join again. Joining with the mod turned off is refused the same way. On a server with
+  `AllowPlayersWithoutMod = true` such a player stays connected: while the mod is off, the animals their game
+  simulates breed the normal game way and they do not count as a farmer. When they turn it back on, their game takes
+  the server's current settings again and says so in its log.
 - **Dedicated servers:** the mod runs on `valheim_server.exe` too (install BepInEx there and put the mod in its
   `BepInEx/plugins` folder). The server's settings file decides the settings for everyone. A dedicated server does not
   run the animals itself: it checks joining players and shares its settings.
@@ -108,8 +116,9 @@ Install it on the server (or the host) and on every player's game. A birth is de
 - **Babies and eggs are normal game data**: they look the same to everyone, and an egg given to a player without the
   mod (on a server that allows them) still hatches at its level.
 - **On the network** the mod exchanges a short version check with the server when you join (and when the server turns
-  it on or off), a request for the server's settings, and the settings themselves (when you join and when they
-  change). It also shares each player's Farming level on their character (see above).
+  it on or off), tells the server when you turn the mod on or off on your game, sends a request for the server's
+  settings, and receives the settings themselves (when you join and when they change). It also shares each player's
+  Farming level on their character (see above).
 - Mods that make a dedicated server simulate the world move births to the server, which runs this mod too. The server
   has no character of its own, so only players with the mod within `FarmerRange` count as farmers there (else
   `ChanceWithoutFarmer`). Not tested.

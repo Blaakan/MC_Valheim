@@ -115,8 +115,8 @@ internal static class SideButton
             Forget();
             _gui = gui;
         }
-        // Window refused on this InventoryGui before (setting turned on later, or off and on): no button, a dead one
-        // would do nothing on click.
+        // Window refused on this InventoryGui before (setting turned on later, or off and on, or the feature off and
+        // on: Destroy forgot _hidden, the window still know): no button, a dead one would do nothing on click.
         _hidden |= CompendiumWindow.RefusedFor(gui);
         if (_go != null || _hidden)
         {
@@ -155,7 +155,8 @@ internal static class SideButton
     }
 
     // Window cannot be built on this InventoryGui (texts dialog missing): button hidden until next InventoryGui, the
-    // vanilla row back as it was. Button made later (setting on after, off and on): Create ask the window again.
+    // vanilla row back as it was. Button made later (setting on after, off and on, feature off and on): Create ask the
+    // window again.
     internal static void HideForThisSession()
     {
         _hidden = true;

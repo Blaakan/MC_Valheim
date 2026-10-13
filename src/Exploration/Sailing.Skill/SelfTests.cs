@@ -18,8 +18,10 @@ namespace MC.Exploration.SailingSkillMod;
 // -Mod Sailing). Design 7.5:
 //   sailing.network  rules on the wire, pending pick, push debounce, join check verdicts (pure)
 //   sailing.math     wind factor (vanilla at level 0, grow with level, no-go cone), same top speed with faster
-//                    approach, sail boost along the bow only, brake, catch-up, damage, scaled field put back only
-//                    while it hold my value (both patch orders), XP per sample, cheat names, compat markers (pure)
+//                    approach, sail boost along the bow only, brake, catch-up (never past the target, also when the
+//                    target turn while the sail still fill; gap = vanilla's x exp(-rate * time)), damage, scaled field
+//                    put back only while it hold my value (both patch orders), XP per sample, cheat names, compat
+//                    markers (pure)
 //   sailing.skill    id formula, registered (IsSkillValid, def, words, icon), reading never add the skill, save/load
 //                    round trip, console cheats (sailing, all, clamp, reset), death penalty, Tab list, NOTE dumps
 //                    (vanilla skill steps, death factor, skill cap, Rested bonus)
@@ -39,8 +41,7 @@ namespace MC.Exploration.SailingSkillMod;
 //   SelfTests.Tools.cs        log watcher, HUD message spy, Skills panel reader, console runner, wind setter
 //   SelfTests.Skill.cs        sailing.panel (console, Skills panel, save data, death penalty, language)
 //   SelfTests.Air.cs          sailing.xp, sailing.hud, sailing.sail, sailing.map, sailing.damage, sailing.ram, sailing.toggle,
-//                             sailing.bug.wind-icon-foreign, sailing.bug.sail-overshoot, sailing.cleanlog (ship in
-//                             the air above the spawn)
+//                             sailing.cleanlog (ship in the air above the spawn)
 //   SelfTests.Sea.cs          sailing.reach, sailing.upwind, sailing.paddle, sailing.heel, sailing.crew (real water,
 //                             fixed wind)
 //   SelfTests.Multiplayer.cs  sailing.mp.* client tests and their server half (tools/Test-Multiplayer.ps1)
@@ -114,8 +115,6 @@ internal static partial class SelfTests
         SelfTest.Register(PaddleName, RunPaddle);
         SelfTest.Register(HeelName, RunHeel);
         SelfTest.Register(CrewName, RunCrew);
-        SelfTest.Register(HudForeignName, RunHudForeign);
-        SelfTest.Register(BugSailName, RunBugSailOvershoot);
         SelfTest.Register(CleanLogName, RunCleanLog);
         RegisterMultiplayer();
     }
@@ -135,8 +134,6 @@ internal static partial class SelfTests
         SelfTest.Unregister(PaddleName);
         SelfTest.Unregister(HeelName);
         SelfTest.Unregister(CrewName);
-        SelfTest.Unregister(HudForeignName);
-        SelfTest.Unregister(BugSailName);
         SelfTest.Unregister(CleanLogName);
         UnregisterMultiplayer();
     }
@@ -838,9 +835,10 @@ internal static partial class SelfTests
                 && !Compat.Matches(null, new[] { "Sailing" }),
             "compat name markers");
 
-        // Sail response: my catch-up move the stored sail force after vanilla SmoothDamp and leave its velocity alone.
-        // Real engine SmoothDamp here: force never go past the target and never turn around when the sail empties,
-        // also when the target switch mid-way (15 steps); from a settled sail (100 steps) it only ever come closer.
+        // Sail response: my catch-up move the stored sail force after vanilla SmoothDamp and shrink its velocity by the
+        // same share (SailStep = what the Ship.GetSailForce postfix do). Real engine SmoothDamp here: force never go
+        // past the target and never turn around when the sail empties, also when the target switch mid-way (15 steps);
+        // from a settled sail (100 steps) it only ever come closer.
         foreach (var rate in new[] { 0.5f, r.SailResponseAtMax, SailingRules.SailResponseMax })
         {
             foreach (var segment in new[] { 100, 15 })
@@ -849,13 +847,85 @@ internal static partial class SelfTests
                 c.Check(CatchUpStaysBeforeTarget(rate, segment, closer, out var detail),
                     $"sail catch-up at {F(rate)}/s, target switched every {segment} steps: {detail}");
             }
+            // Test list T19: the target turn a quarter while the sail still fill (wind flipped, wind from the side).
+            foreach (var fillSteps in new[] { 10, 25, 60 })
+            {
+                c.Check(CatchUpStaysInsideAfterTurn(rate, fillSteps, out var detail),
+                    $"sail catch-up at {F(rate)}/s, target turned a quarter {fillSteps} steps after the sail went up, and back 3 s later: {detail}");
+            }
+            // Force and velocity shrink together: same curve as the normal game, the gap left x exp(-rate * time).
+            foreach (var steps in new[] { 25, 50 })
+            {
+                var plainGap = GapAfterSailUp(0f, steps, dt);
+                var gap = GapAfterSailUp(rate, steps, dt);
+                var wantedGap = plainGap * Mathf.Exp(-rate * steps * dt);
+                c.Check(plainGap > 0f && Near(gap, wantedGap, plainGap * 0.01f),
+                    $"sail catch-up at {F(rate)}/s, {steps} steps after the sail went up: {F(gap * 1000f)} (x0.001) short of the target, "
+                    + $"expected the normal game's {F(plainGap * 1000f)} x exp(-rate x time) = {F(wantedGap * 1000f)}");
+            }
         }
         c.Report();
         yield break;
     }
 
-    // Vanilla Ship.GetSailForce step (SmoothDamp, 1 s, max speed 99, velocity kept between steps) then my catch-up
-    // (Lerp toward the same target), with the target going full, empty, full the other way, full, empty.
+    // One owner step of the stored sail force, as the game with my postfix do it: vanilla Ship.GetSailForce (SmoothDamp,
+    // 1 s, max speed 99, velocity kept between steps), then my catch-up (force toward the same target by share, velocity
+    // x what is left). share 0 = the normal game.
+    private static void SailStep(ref Vector3 force, ref Vector3 velocity, Vector3 target, float share, float dt)
+    {
+        force = Vector3.SmoothDamp(force, target, ref velocity, 1f, 99f, dt);
+        force = Vector3.Lerp(force, target, share);
+        velocity *= 1f - share;
+    }
+
+    // Way left to a full sail force, steps after the sail went up from empty. rate 0 = the normal game.
+    private static float GapAfterSailUp(float rate, int steps, float dt)
+    {
+        var full = new Vector3(0.02f, 0f, 0.03f);
+        var force = Vector3.zero;
+        var velocity = Vector3.zero;
+        var share = SailMath.CatchUp(rate, 1f, dt);
+        for (var i = 0; i < steps; i++)
+        {
+            SailStep(ref force, ref velocity, full, share, dt);
+        }
+        return (full - force).magnitude;
+    }
+
+    // Sail up, then the target turn a quarter while the sail still fill (fillSteps later) and turn back 3 s after: what
+    // a wind flip do with the wind from the side. Target keep its length, so the force must never get longer than it.
+    // Catch-up that leave the velocity alone (0.1.0) swing 0.06% (0.5/s) to 0.7% (5/s) past here.
+    private static bool CatchUpStaysInsideAfterTurn(float rate, int fillSteps, out string detail)
+    {
+        const float dt = 0.02f;
+        var full = new Vector3(0.02f, 0f, 0.03f);
+        var turned = new Vector3(-0.03f, 0f, 0.02f);
+        var force = Vector3.zero;
+        var velocity = Vector3.zero;
+        var share = SailMath.CatchUp(rate, 1f, dt);
+        var strongest = 0f;
+        var astray = 0f;
+        for (var i = 0; i < fillSteps; i++)
+        {
+            SailStep(ref force, ref velocity, full, share, dt);
+        }
+        foreach (var target in new[] { turned, full })
+        {
+            var way = (target - force).magnitude;
+            for (var i = 0; i < 150; i++)
+            {
+                SailStep(ref force, ref velocity, target, share, dt);
+                strongest = Mathf.Max(strongest, force.magnitude / target.magnitude);
+            }
+            astray = Mathf.Max(astray, (target - force).magnitude / way);
+        }
+        detail = $"strongest force {(strongest * 100f).ToString("0.####", CultureInfo.InvariantCulture)}% of the target's "
+                 + $"(expected never over 100%), {F(astray * 100f)}% of the way left 3 s after a turn (expected under 2%)";
+        return strongest <= 1.0001f && astray <= 0.02f;
+    }
+
+    // Vanilla Ship.GetSailForce step then my catch-up (SailStep), with the target going full, empty, full the other
+    // way, full, empty.
     private static bool CatchUpStaysBeforeTarget(float rate, int segment, bool onlyCloser, out string detail)
     {
         const float dt = 0.02f;
@@ -870,8 +940,7 @@ internal static partial class SelfTests
             var last = approach.magnitude;
             for (var i = 0; i < segment; i++)
             {
-                force = Vector3.SmoothDamp(force, target, ref velocity, 1f, 99f, dt);
-                force = Vector3.Lerp(force, target, share);
+                SailStep(ref force, ref velocity, target, share, dt);
                 var left = target - force;
                 if (Vector3.Dot(left, approach) < -1e-9f)
                 {

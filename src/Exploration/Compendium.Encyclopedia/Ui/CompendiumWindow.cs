@@ -37,7 +37,6 @@ internal static partial class CompendiumWindow
     // ---------------------------------------------------------------- objects (per InventoryGui)
 
     private static InventoryGui _gui;
-    private static bool _refused;
     private static GameObject _root;
     private static RectTransform _rootRT;
     private static Canvas _canvas;
@@ -77,6 +76,9 @@ internal static partial class CompendiumWindow
     // ---------------------------------------------------------------- session (until logout)
 
     private static InventoryGui _sessionGui;
+    // Window cannot be built on _sessionGui. Session thing, not object thing: feature off and on must not forget it
+    // (else side button come back dead and next click warn again). Only a new InventoryGui clear it (ResetSession).
+    private static bool _refused;
     private static int _tab;
     private static string _searchText = "";
     private static readonly SelKey[] LastSel = new SelKey[Tabs.Count];
@@ -85,7 +87,10 @@ internal static partial class CompendiumWindow
 
     internal static bool IsOpen { get; private set; }
 
-    /// <summary>Window refused (cannot be built) on this InventoryGui: side button stay away until the next one.</summary>
+    /// <summary>
+    /// Window refused (cannot be built) on this InventoryGui: side button stay away until the next one, also after the
+    /// feature went off and on.
+    /// </summary>
     internal static bool RefusedFor(InventoryGui gui) => _refused && gui != null && ReferenceEquals(_sessionGui, gui);
 
 #if DEBUG
@@ -216,7 +221,10 @@ internal static partial class CompendiumWindow
         }
     }
 
-    /// <summary>Feature off: close, destroy everything, give the gamepad focus back to the side panel.</summary>
+    /// <summary>
+    /// Feature off: close, destroy everything, give the gamepad focus back to the side panel. Session things stay
+    /// (tab, selection, search, and a refused build: feature back on = still refused on this InventoryGui).
+    /// </summary>
     internal static void Destroy()
     {
         var wasOpen = IsOpen;
@@ -897,7 +905,6 @@ internal static partial class CompendiumWindow
     {
         IsOpen = false;
         _gui = null;
-        _refused = false;
         _root = null;
         _rootRT = null;
         _canvas = null;
@@ -939,8 +946,10 @@ internal static partial class CompendiumWindow
         _searchDue = -1f;
     }
 
+    // New InventoryGui only (Open, SetRefusedForTest). Refusal end here: new screen get a fresh build try.
     private static void ResetSession()
     {
+        _refused = false;
         _tab = 0;
         _searchText = "";
         Array.Clear(LastSel, 0, LastSel.Length);

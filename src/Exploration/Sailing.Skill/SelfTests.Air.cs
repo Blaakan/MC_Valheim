@@ -16,19 +16,18 @@ namespace MC.Exploration.SailingSkillMod;
 // Debug build only. Me = tests on the air rig of SelfTests.cs (ship held in the air above the spawn, player at helm):
 //   sailing.xp           400 m at the helm from Sailing 0 (level-up messages, level, session Debug lines), nothing
 //                        while still or as a passenger on a moving ship, Rested +50%
-//   sailing.hud          HUD wind icon and no-go angle at Sailing 0 and 100 with a fixed wind, rudder full-lock time
-//   sailing.sail         sail response through the real patch: never past the game's target, sooner up and down,
-//                        wind flipped under a settled sail
+//   sailing.hud          HUD wind icon and no-go angle at Sailing 0 and 100 with a fixed wind, the icon on a ship
+//                        another game simulates (without the mod, with it, with it turned off; test list M13, M14),
+//                        rudder full-lock time
+//   sailing.sail        sail response through the real patch: never past the game's target, sooner up and down
+//                        (gap = the normal game's x exp(-rate * time)), wind flipped under a settled sail and while
+//                        the sail still fills (test list T18, T19)
 //   sailing.map          map bits really revealed (pixels) at the helm and on the deck, at 0 and 100, and ashore
 //   sailing.damage       every hit type a ship takes, the Debug line, a creature as attacker, player hits and the
 //                        real capsized loop not reduced
 //   sailing.ram          ship thrown at clear ground: real collision damage (vanilla ImpactEffect) at 0 and 100
 //   sailing.toggle       feature turned off and on at the helm (Plugin.TestBlocked, never the config): all effects
 //                        go and come back, nothing piles up, level kept while off, turned on mid-voyage
-//   sailing.bug.wind-icon-foreign  HUD wind icon on a ship another game simulates without the mod (real bug, test
-//                        list M13: this test fails until the mod is fixed; alone here so no other check waits on it)
-//   sailing.bug.sail-overshoot  wind flipped while the sail still fills: the sail force goes a little past its
-//                        target (real bug, small, test list T19: fails until the mod or the design claim changes)
 //   sailing.cleanlog     no warning and no error from this mod since the game started
 internal static partial class SelfTests
 {
@@ -39,8 +38,6 @@ internal static partial class SelfTests
     private const string DamageName = "sailing.damage";
     private const string RamName = "sailing.ram";
     private const string ToggleName = "sailing.toggle";
-    private const string HudForeignName = "sailing.bug.wind-icon-foreign";
-    private const string BugSailName = "sailing.bug.sail-overshoot";
     private const string CleanLogName = "sailing.cleanlog";
 
     // ---------- shared pieces ----------
@@ -518,6 +515,88 @@ internal static partial class SelfTests
             c.Check(factor[0, 3] == 0f && factor[1, 3] == 0f && SameColor(colour[1, 3], grey),
                 $"straight into the wind: pull {F(factor[0, 3])} / {F(factor[1, 3])}, expected none at any level");
 
+            // Ship another game simulates (test list M13, M14): the icon must show the pull the ship really gets, and
+            // that comes from the game that simulates it. Stand-in for that game: the ship's owner set to a session
+            // that is not here. One HUD update per case, no frame in between, everything put back in the finally.
+            //   nothing known of that game (no player of it here; a game without the mod publishes no level): the
+            //     normal game's icon
+            //   its player published a level (it runs the mod): the icon with the bonus. Stand-in for that player:
+            //     the local player's own ZDO handed to the same session for the update
+            //   that player not loaded here for a moment (it respawns: the game destroys the old character before the
+            //     new one is here): what it said last
+            //   its player published -1 (mod turned off there): the normal game's icon, also once that player is gone
+            //   the ship back on this game: the bonus again
+            HelmSkill.TestLocalLevel = 100f;
+            LevelPublisher.PublishNow();
+            SetRotation(ship, Quaternion.LookRotation(HeadingOffWind(wind.Dir, 34f), Vector3.up));
+            var d34 = Vector3.Dot(env.GetWindDir(), -ship.transform.forward);
+            var vanilla = Color.Lerp(grey, Color.white, SailMath.VanillaWindFactor(d34));
+            var bonus = Color.Lerp(grey, Color.white, SailMath.WindFactor(d34, 1f, rules.WindFloorAtMax, rules.NoGoShiftAtMax));
+            hud.UpdateShipHud(player, 0f);
+            var own = hud.m_shipWindIcon.color;
+            c.Check(own.r > 0.85f, $"own ship at Sailing 100, 34 degrees off the wind: icon {C(own)}, expected nearly white");
+            var me = ZDOMan.GetSessionID();
+            var other = me == long.MaxValue ? me - 1L : me + 1L;
+            var playerZdo = player.m_nview.GetZDO();
+            Color foreign;
+            Color modded;
+            Color gone;
+            Color turnedOff;
+            Color offGone;
+            Color back;
+            bool standIn;
+            try
+            {
+                rig.Zdo.SetOwner(other);
+                c.Check(!ship.IsOwner() && ReferenceEquals(player.GetControlledShip(), ship), "the stand-in for another game's ship did not hold");
+                hud.UpdateShipHud(player, 0f);
+                foreign = hud.m_shipWindIcon.color;
+
+                playerZdo.SetOwner(other);
+                standIn = player.GetOwner() == other && Near(HelmSkill.Published(player), 100f);
+                hud.UpdateShipHud(player, 0f);
+                modded = hud.m_shipWindIcon.color;
+                playerZdo.SetOwner(me);
+                hud.UpdateShipHud(player, 0f);
+                gone = hud.m_shipWindIcon.color;
+
+                playerZdo.SetOwner(other);
+                playerZdo.Set(HelmSkill.KeyHash, HelmSkill.NotPublished);
+                hud.UpdateShipHud(player, 0f);
+                turnedOff = hud.m_shipWindIcon.color;
+                playerZdo.SetOwner(me);
+                hud.UpdateShipHud(player, 0f);
+                offGone = hud.m_shipWindIcon.color;
+
+                rig.Zdo.SetOwner(me);
+                hud.UpdateShipHud(player, 0f);
+                back = hud.m_shipWindIcon.color;
+            }
+            finally
+            {
+                playerZdo.SetOwner(me);
+                rig.Zdo.SetOwner(me);
+                LevelPublisher.PublishNow();
+                SetRotation(ship, keep);
+            }
+            c.Check(SameColor(foreign, vanilla),
+                $"at the helm of a ship that a game without the mod simulates (34 degrees off the wind, Sailing 100): HUD wind "
+                + $"icon {C(foreign)}, expected the normal game's {C(vanilla)}: the icon promises a pull the ship does not get");
+            c.Check(standIn && !SameColor(bonus, vanilla),
+                "the stand-in for the other game's player did not hold, or the bonus changes nothing 34 degrees off the wind");
+            c.Check(SameColor(modded, bonus),
+                $"at the helm of a ship that another player's game with the mod simulates (34 degrees off the wind, Sailing 100): "
+                + $"HUD wind icon {C(modded)}, expected {C(bonus)}, the pull that game gives the ship");
+            c.Check(SameColor(gone, bonus),
+                $"same ship, that player not loaded here for a moment (as when it respawns): HUD wind icon {C(gone)}, "
+                + $"expected still {C(bonus)}");
+            c.Check(SameColor(turnedOff, vanilla) && SameColor(offGone, vanilla),
+                $"at the helm of a ship simulated by a game with the mod turned off: HUD wind icon {C(turnedOff)}, and {C(offGone)} "
+                + $"once its player is no longer loaded here, expected the normal game's {C(vanilla)}");
+            c.Check(SameColor(back, bonus) && Near(HelmSkill.Published(player), 100f),
+                $"the ship back on this game: HUD wind icon {C(back)}, expected {C(bonus)} again (level published again: "
+                + $"{F(HelmSkill.Published(player))})");
+
             // Rudder: steps of holding the key from centre to full lock (the helmsman's game makes one per physics step).
             var steps = new int[2];
             for (var li = 0; li < 2; li++)
@@ -558,9 +637,10 @@ internal static partial class SelfTests
 
     // ---------- sailing.sail ----------
 
-    // Test list T18 (own test: its checks wait on no other item's). Sail response through the real patch, wind from the
-    // side: the stored sail force never goes past where the game wants it, at the default and at the largest setting,
-    // it gets there sooner both up and down, and a wind flip under a settled sail never pulls beyond the full pull.
+    // Test list T18 and T19 (own test: its checks wait on no other item's). Sail response through the real patch, wind
+    // from the side: the stored sail force never goes past where the game wants it, at the default and at the largest
+    // setting, it gets there sooner both up and down, and a wind flip never pulls beyond the full pull, under a settled
+    // sail (T18) and while the sail still fills (T19).
     private static IEnumerator RunSail()
     {
         var c = new Checks(SailName);
@@ -615,8 +695,11 @@ internal static partial class SelfTests
     // sail setting: Full, Stop, Full, Half, Stop. Target = vanilla's own (Ship.GetSailForce). Never past it (so never
     // the other way when the sail empties). Half a second after the sail went up from empty, and half a second after it
     // came down from full (both passes start from the same state), the force is closer to its target than without the
-    // sail response. Then the wind flipped under a settled full sail and flipped back (MeasureWindFlip): the pull never
-    // beyond the full pull for that heading, and 3 s later it sits on the game's own target.
+    // sail response: the gap left is the normal game's x exp(-rate * time) (my catch-up shrink the gap and vanilla's
+    // SmoothDamp speed by the same share each step, so the curve is the normal game's, sooner). Then the wind flipped
+    // under a settled full sail and flipped back (MeasureWindFlip): the pull never beyond the full pull for that
+    // heading, and 3 s later it sits on the game's own target. Then the same flip while the sail still fills (test
+    // list T19).
     private static void CheckSailResponse(Checks c, Ship ship, SailingRules rules, float rate, WindScope wind)
     {
         var env = EnvMan.instance;
@@ -709,12 +792,41 @@ internal static partial class SelfTests
         c.Check(down[0] > 0f && down[1] < down[0] * 0.9f,
             $"sail response {F(rate)}/s at Sailing 100: {F(down[1] * 1000f)} (x0.001) of pull left half a second after the sail came down, "
             + $"against {F(down[0] * 1000f)} without it, expected clearly less");
+        // Force and vanilla's SmoothDamp speed shrink by the same share each step: the gap left is the normal game's
+        // x exp(-rate * time), up and down. (0.1.0 moved the force alone: 0.44 of the normal game's gap instead of 0.47
+        // half a second in at 1.5/s, and the speed left over could swing the force past its target.)
+        var shrink = Mathf.Exp(-rate * steps * dt);
+        c.Check(Near(left[1], left[0] * shrink, left[0] * 0.01f) && Near(down[1], down[0] * shrink, down[0] * 0.01f),
+            $"sail response {F(rate)}/s at Sailing 100, {F(steps * dt)} s in: {F(left[1] * 1000f)} (x0.001) short of full pull after the sail "
+            + $"went up and {F(down[1] * 1000f)} of pull left after it came down, expected the normal game's {F(left[0] * 1000f)} and "
+            + $"{F(down[0] * 1000f)} x {F(shrink)} (the normal game's curve, sooner)");
         // Test list T18 flips the wind "a few seconds" after the sail went up: 3 s, the sail is settled by then.
         MeasureWindFlip(ship, rules, rate, wind, 3f, out var flips, out var strongest, out var astray);
         c.Check(flips == 2 && strongest <= 1.001f && astray <= 0.02f,
             $"sail response {F(rate)}/s at Sailing 100, wind flipped to the other side and back under a settled full sail ({flips} of 2 "
             + $"flips measured): strongest pull {F(strongest * 100f)}% of the full pull for that heading (expected no more than 100%), "
             + $"{F(astray * 100f)}% of the way to the game's own target left 3 s after a flip (expected under 2%)");
+        // Test list T19: the same flip while the sail still fills, 1.2 s after Full (the item's "about a second") and
+        // 0.4 s (at the largest setting the sail is nearly full after a second). The target turn a quarter while vanilla's
+        // SmoothDamp still carry the fill speed, and Unity's own overshoot guard in SmoothDamp only catch a crossing on
+        // the line from the force to its target (sail up, sail down, flip under a settled sail): 0.1.0 (force moved,
+        // speed left alone) swung about 0.5% past the full pull here, about 2 s after the flip. The normal game alone
+        // (rate 0) stay under the full pull: measured too, else the check say nothing.
+        foreach (var fill in new[] { 1.2f, 0.4f })
+        {
+            MeasureWindFlip(ship, rules, rate, wind, fill, out var fillFlips, out var fillStrongest, out var fillAstray);
+            MeasureWindFlip(ship, rules, 0f, wind, fill, out var plainFlips, out var plain, out _);
+            c.Note($"sail response {F(rate)}/s, wind flipped {F(fill)} s after Full sail (wind from the side, step {F(dt)} s): strongest "
+                   + $"pull {F(fillStrongest * 100f)}% of the full pull, {F(plain * 100f)}% without the sail response; "
+                   + $"{F(fillAstray * 100f)}% of the way to the target left 3 s after a flip");
+            c.Check(fillFlips == 2 && plainFlips == 2 && plain <= 1.001f,
+                $"check not valid (wind flipped {F(fill)} s after Full sail): {fillFlips} and {plainFlips} of 2 flips measured, the normal "
+                + $"game's own pull reached {F(plain * 100f)}% of the full pull");
+            c.Check(fillStrongest <= 1.001f && fillAstray <= 0.02f,
+                $"sail response {F(rate)}/s at Sailing 100, wind flipped {F(fill)} s after Full sail, while the sail was still filling: the "
+                + $"pull went up to {F(fillStrongest * 100f)}% of the full pull for that heading, expected never beyond it (the normal game: "
+                + $"{F(plain * 100f)}%); {F(fillAstray * 100f)}% of the way to the game's own target left 3 s after a flip (expected under 2%)");
+        }
     }
 
     // Wind flipped to the other side under full sail (console "wind 180 1") and flipped back, 3 s each, through the real
@@ -780,142 +892,6 @@ internal static partial class SelfTests
             wind.Set(0f, 1f);
             ship.m_sailForce = keepForce;
             ship.m_windChangeVelocity = keepVelocity;
-        }
-    }
-
-    // ---------- sailing.bug.sail-overshoot ----------
-
-    // Real bug, small (test list T19). Design doc say the sail response is "bounded by the target". That hold while the
-    // force, its SmoothDamp speed and the target sit on one line (sail up, sail down, wind flip under a settled sail):
-    // Unity's own overshoot guard in SmoothDamp catch the step that would cross. Wind flipped while the sail still
-    // fill (1.2 s after Full, wind from the side): the target turn a quarter, the guard see no crossing on the new
-    // line, and my catch-up (it move the force, not its SmoothDamp speed) let the force swing a little past: about 0.5%
-    // over the full pull with the default setting, about 2 s after the flip (computed outside the game from Unity's
-    // SmoothDamp code and my catch-up; this test measure it in the game). Without the sail response the normal game
-    // stay under the full pull. Alone here: this test fail until the mod (or the claim) change.
-    private static IEnumerator RunBugSailOvershoot()
-    {
-        var c = new Checks(BugSailName);
-        var rig = ShipRig.Create(BugSailName);
-        if (rig == null)
-        {
-            yield break;
-        }
-        var wind = new WindScope();
-        try
-        {
-            var rules = new SailingRules();
-            ServerRules.TestRules = rules;
-            var ok = new Box();
-            yield return SetUpAirShip(rig, c, ok);
-            if (!ok.Ok || !c.Check(wind.Ok, "no weather (EnvMan): the wind cannot be fixed"))
-            {
-                c.Report();
-                yield break;
-            }
-            var ship = rig.Boat;
-            HelmSkill.TestLocalLevel = 100f;
-            wind.Set(0f, 1f);
-            // After these the code below run inside the physics step: Time.deltaTime is the fixed step, like for the
-            // game's own GetSailForce call.
-            yield return new WaitForFixedUpdate();
-            yield return new WaitForFixedUpdate();
-            var keep = ship.transform.rotation;
-            SetRotation(ship, Quaternion.LookRotation(HeadingOffWind(wind.Dir, 90f), Vector3.up));
-            MeasureWindFlip(ship, rules, rules.SailResponseAtMax, wind, 1.2f, out var flips, out var strongest, out var astray);
-            MeasureWindFlip(ship, rules, 0f, wind, 1.2f, out var plainFlips, out var plain, out _);
-            SetRotation(ship, keep);
-            c.Note($"wind flipped 1.2 s after Full sail (wind from the side, step {F(Time.deltaTime)} s): strongest pull "
-                   + $"{F(strongest * 100f)}% of the full pull with the sail response ({F(rules.SailResponseAtMax)}/s), {F(plain * 100f)}% "
-                   + $"without it; {F(astray * 100f)}% of the way to the target left 3 s after a flip");
-            c.Check(flips == 2 && plainFlips == 2 && plain <= 1.001f,
-                $"check not valid: {flips} and {plainFlips} of 2 flips measured, the normal game's own pull reached {F(plain * 100f)}% of the full pull");
-            c.Check(strongest <= 1.001f,
-                $"wind flipped while the sail was still filling (Sailing 100, sail response {F(rules.SailResponseAtMax)}/s): the pull went "
-                + $"up to {F(strongest * 100f)}% of the full pull for that heading, expected never beyond it (the normal game: {F(plain * 100f)}%)");
-            yield return rig.Leave(rig.Origin);
-            c.Report();
-        }
-        finally
-        {
-            wind.Restore();
-            rig.Restore();
-        }
-    }
-
-    // ---------- sailing.bug.wind-icon-foreign ----------
-
-    // Real bug (test list M13): the helmsman's HUD wind icon must match what the ship really gets. A ship simulated by
-    // a game that does not run the mod (owner published no Sailing level) sails vanilla, so the icon must be vanilla
-    // too. Stand-in for that other game: the ship's owner set to a session that is not here, for one HUD update.
-    private static IEnumerator RunHudForeign()
-    {
-        var c = new Checks(HudForeignName);
-        var rig = ShipRig.Create(HudForeignName);
-        if (rig == null)
-        {
-            yield break;
-        }
-        var wind = new WindScope();
-        try
-        {
-            var rules = new SailingRules();
-            ServerRules.TestRules = rules;
-            var ok = new Box();
-            yield return SetUpAirShip(rig, c, ok);
-            if (!ok.Ok)
-            {
-                c.Report();
-                yield break;
-            }
-            var player = rig.Player;
-            var ship = rig.Boat;
-            var hud = Hud.instance;
-            if (!c.Check(hud != null && hud.IsVisible() && hud.m_shipWindIcon != null && wind.Ok,
-                    "no visible HUD (or no weather): the wind icon cannot be read"))
-            {
-                yield return rig.Leave(rig.Origin);
-                c.Report();
-                yield break;
-            }
-            wind.Set(0f, 1f);
-            yield return new WaitForFixedUpdate();
-            yield return new WaitForFixedUpdate();
-            HelmSkill.TestLocalLevel = 100f;
-            var keep = ship.transform.rotation;
-            var grey = Hud.s_shipWindIconColor;
-            SetRotation(ship, Quaternion.LookRotation(HeadingOffWind(wind.Dir, 34f), Vector3.up));
-            var d = Vector3.Dot(EnvMan.instance.GetWindDir(), -ship.transform.forward);
-            hud.UpdateShipHud(player, 0f);
-            var own = hud.m_shipWindIcon.color;
-            c.Check(own.r > 0.85f, $"own ship at Sailing 100, 34 degrees off the wind: icon {C(own)}, expected nearly white");
-            var me = ZDOMan.GetSessionID();
-            var other = me == long.MaxValue ? me - 1L : me + 1L;
-            Color foreign;
-            try
-            {
-                rig.Zdo.SetOwner(other);
-                c.Check(!ship.IsOwner() && ReferenceEquals(player.GetControlledShip(), ship), "the stand-in for another game's ship did not hold");
-                hud.UpdateShipHud(player, 0f);
-                foreign = hud.m_shipWindIcon.color;
-            }
-            finally
-            {
-                rig.Zdo.SetOwner(me);
-                SetRotation(ship, keep);
-            }
-            var vanilla = Color.Lerp(grey, Color.white, SailMath.VanillaWindFactor(d));
-            c.Check(SameColor(foreign, vanilla),
-                $"at the helm of a ship that a game without the mod simulates (34 degrees off the wind, Sailing 100): HUD wind "
-                + $"icon {C(foreign)}, expected the normal game's {C(vanilla)}: the icon promises a pull the ship does not get");
-
-            yield return rig.Leave(rig.Origin);
-            c.Report();
-        }
-        finally
-        {
-            wind.Restore();
-            rig.Restore();
         }
     }
 

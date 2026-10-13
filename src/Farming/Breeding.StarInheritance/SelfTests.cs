@@ -333,10 +333,17 @@ internal static partial class SelfTests
             Check(!PlayerCheck.HasWork, "single player: no join check may be pending");
         }
 
-        // Join check: only a server acts, only on a player fully in and still there.
-        Check(PlayerCheck.Decide(true, true, true, false, false, false) == JoinVerdict.Refuse, "no mod, setting off -> refuse");
-        Check(PlayerCheck.Decide(true, true, true, false, false, true) == JoinVerdict.Allowed, "no mod, AllowPlayersWithoutMod on -> allowed");
-        Check(PlayerCheck.Decide(true, true, true, false, true, false) == JoinVerdict.HasMod, "mod answered -> fine");
+        // Join check: only a server acts, only on a player fully in and still there. Not compatible = no mod, mod
+        // turned off, or other network version (framework verdict; a real turned-off copy is refused in the
+        // multiplayer run, probe test probe.mp.off.<GUID>).
+        Check(PlayerCheck.Decide(true, true, true, false, false, false) == JoinVerdict.Refuse,
+            "not compatible (no mod, turned off, other network version), setting off -> refuse");
+        Check(PlayerCheck.Decide(true, true, true, false, false, true) == JoinVerdict.Allowed,
+            "not compatible, AllowPlayersWithoutMod on -> allowed");
+        Check(PlayerCheck.Decide(true, true, true, false, true, false) == JoinVerdict.Compatible,
+            "compatible (mod on, same network version) -> fine");
+        Check(PlayerCheck.Decide(true, true, true, false, true, true) == JoinVerdict.Compatible,
+            "compatible, AllowPlayersWithoutMod on -> fine too (no warning)");
         Check(PlayerCheck.Decide(false, true, true, false, false, false) == JoinVerdict.Skip, "not the server -> never acts");
         Check(PlayerCheck.Decide(true, false, true, false, false, false) == JoinVerdict.Skip, "player left before the deadline -> nothing");
         Check(PlayerCheck.Decide(true, true, false, false, false, false) == JoinVerdict.Skip, "player not fully in -> nothing");

@@ -20,22 +20,28 @@ internal static class IdolTooltip
             var idol = IdolCatalog.IdolOf(item);
             var tier = IdolCatalog.TierOf(idol);
             var target = level + 1;
-            Text.Append("\n<color=#A0A0A0>Upgrade at a Forge of Potential, Idols tab: ");
+            // Cost set to 0 = left out. ": " only before first part, ", " only between two parts (was ", " right after
+            // the metal: "5 Silver, " with trophies 0). Both 0: line only say where to upgrade, end with "." (was
+            // "Idols tab: " and nothing after).
+            Text.Append("\n<color=#A0A0A0>Upgrade at a Forge of Potential, Idols tab");
             var material = ServerRules.Current.Material[target];
             var trophies = ServerRules.Current.Trophies[target];
+            var parts = 0;
             if (material > 0 && tier != null)
             {
                 // Tier metal no item of this game (typo or empty in settings): cost still hold it (upgrade blocked,
                 // Idols tab say why in red). No name to show.
-                Text.Append(material).Append(' ')
-                    .Append(tier.Material != null ? tier.Material.m_itemData.m_shared.m_name : "metal of its biome").Append(", ");
+                Text.Append(": ").Append(material).Append(' ')
+                    .Append(tier.Material != null ? tier.Material.m_itemData.m_shared.m_name : "metal of its biome");
+                parts++;
             }
             if (trophies > 0)
             {
-                Text.Append(trophies).Append(' ').Append(IdolsTab.ClassName(target).ToLowerInvariant())
+                Text.Append(parts > 0 ? ", " : ": ").Append(trophies).Append(' ').Append(IdolsTab.ClassName(target).ToLowerInvariant())
                     .Append(trophies == 1 ? " trophy" : " trophies").Append(" of its biome");
+                parts++;
             }
-            Text.Append("</color>");
+            Text.Append(parts > 0 ? "</color>" : ".</color>");
         }
         else
         {

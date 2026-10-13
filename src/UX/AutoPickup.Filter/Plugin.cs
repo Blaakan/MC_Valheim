@@ -179,8 +179,9 @@ internal sealed partial class Plugin : ModPlugin
         GamepadControls = Config.Bind("Controls", "GamepadControls", true, new ConfigDescription(
             "Controller, with your inventory grid selected: click the right stick to add or remove the selected item; "
             + "hold LT and click the right stick to change the filter mode; hold RT and click the right stick to show "
-            + "both lists. Chest slots can only be marked with the mouse. Turn this off if another mod uses the right "
-            + "stick in the inventory.",
+            + "both lists. Chest slots can only be marked with the mouse. With a chest open, the right stick click is "
+            + "also the game's own key for Place stacks, so these gestures run Place stacks too. Turn this off if "
+            + "another mod uses the right stick in the inventory, or to leave the right stick click to the game.",
             null, new ConfigurationManagerAttributes { Order = 90 }));
 
         ShowMarkers = Config.Bind("Display", "ShowMarkers", true, new ConfigDescription(

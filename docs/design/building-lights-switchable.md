@@ -5,11 +5,12 @@
 | Mod | Switchable Lights |
 | GUID / project | `MC.Building.Lights.Switchable` (`src/Building/Lights.Switchable/`, root namespace `MC.Building.LightsSwitchableMod`) |
 | Category / scope | Building / QoL |
-| Side | Both: the server (or the host) and every player install it, the server refuses players without it (3.6); multiplayer Compatible; network version 1 (RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, no ZDO key of its own) |
+| Side | Both: the server (or the host) and every player install it, the server refuses players without it, with it turned off or with another network version (3.6); multiplayer Compatible; network version 1 (RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, no ZDO key of its own) |
 | Sheet idea | `Torches ON/OFF only, no fuel` |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` in `.ref/`; every `Fireplace` prefab dumped at runtime (Unity 6000.0.75f1) on 2026-09-29; dedicated-server code read in the local 1.0.15 server build; other mods' sources read on GitHub (2026-09-29) |
-| Status | Implemented (0.1.0), in-world self-tests pass (`lights.torch`, `lights.candle`, `lights.campfire`); in-game tests pending |
+| Status | Implemented (0.2.0). In-world self-tests passed on 0.1.0 (`lights.torch`, `lights.candle`, `lights.campfire`) and have not been run on 0.2.0 yet; in-game tests pending |
 | Changes after the first pause (user, 2026-09-29) | required on the server and every player (refusal + server list); braziers and every fire that can cook removed from the lights (decision 2) |
+| 0.2.0 (user decision, 2026-10-08) | player check upgraded to Swim Dive's: a player who has the mod turned off, or another network version of it, is refused too, also when they turn it off while connected (decision 7) |
 
 ## Goal
 
@@ -170,17 +171,28 @@ are never changed.
 
 `ModSide = Both`: whoever owns a light burns its fuel, so every player needs the mod. The server itself never
 simulates lights (1.4); its job is to check players and hand out its list:
-- **Join check** (`PlayerCheck`, copy of MC Breeding's): the server (dedicated or host) waits 1 s after a player is
-  ready, then refuses a player whose game did not answer the framework handshake (vanilla "Error" RPC with
-  ErrorVersion: their game shows "Incompatible version"; socket closed 4 s later). `AllowPlayersWithoutMod` lets them
-  in (log warning); switching it back to `false` checks the players online.
+- **Player check** (`PlayerCheck`, since 0.2.0 a copy of Swim Dive's; 0.1.0 used the older copy of MC Breeding's,
+  which only looked at whether the mod was installed): the server (dedicated or host) waits 1 s after a player is
+  ready, then refuses a player whose copy is not compatible (`NetworkGate.PeerCompatible`: the game answered the
+  framework handshake, with the same network version, and its own side is not turned off) with the vanilla "Error"
+  RPC and ErrorVersion: their game shows "Incompatible version"; the socket is closed 4 s later. The log line carries
+  the framework's reason (`NetworkGate.PeerProblem`: does not have the mod, has another version, has it turned off).
+  **Live re-check:** `PlayerCheck.Start` subscribes to `NetworkGate.PeerStateChanged` (unsubscribed in `Stop`); when a
+  connected player turns the mod off or on, that player is scheduled again with the same 1 s grace, so turning it off
+  while in is refused about a second later, and off-then-on within the grace passes (a player already waiting keeps
+  the first deadline; one already being refused is skipped). A player whose mod is inactive only because the server's
+  copy is off still counts as ready, so the server turning the mod off and on refuses nobody.
+  `AllowPlayersWithoutMod` lets every such player in (log warning with the reason); switching it back to `false`
+  checks the players online. The rules sync is unchanged: the list is still sent to every player whose game has the
+  mod, also one who has it turned off (their game does not use it).
 - **Server list** (`ServerRules`, same flow as Breeding's ServerSettings): the client asks after the handshake, the
   server answers with a `ZPackage` of `LightsRules` (layout 1: the `Lights` string) and pushes again when it changes;
   the client refuses an unknown layout, uses the list only for that ZNet session (single player, host and server use
   their own config), logs "Using the server's ..." once per change, and re-resolves the hashes and loaded lights.
 - Framework gate: a player with the mod on a server without it gets vanilla lights.
-- Hand-off (AllowPlayersWithoutMod on): players without the mod see the same lights, can refuel off ones, and their
-  ownership burns fuel normally; anyone with the mod switches a burnt-out light back on for free.
+- Hand-off (AllowPlayersWithoutMod on): players without the mod, or with it turned off, see the same lights, can
+  refuel off ones, and their ownership burns fuel normally; anyone with the mod switches a burnt-out light back on for
+  free.
 
 ### 3.7 Live toggle
 
@@ -203,7 +215,13 @@ start burning and off lights take fuel. On: flags applied to loaded lights at on
 - `lights.campfire`: fire pit stays vanilla (takes wood, burns, fuel hover line); a flag set on it by someone else
   survives `ApplyAll` and `RestoreAll`; campfires, hearth, bonfire and the three braziers count as cooking fires, no
   default light does; a list naming `fire_pit` and a brazier (server rules override) leaves the fire pit unmanaged; rules
-  wire round trip, unknown layout refused; `PlayerCheck.Decide` verdicts.
+  wire round trip, unknown layout refused; `PlayerCheck.Decide` verdicts (not compatible refused, or allowed by the
+  setting; compatible fine; only the server acts; a player who left, is not in yet or is already being refused is
+  skipped), and a peer that never answered the handshake is not compatible and gets a reason.
+- The refusal itself needs two games: the generic multiplayer probes (`./tools/Test-Multiplayer.ps1`) cover it
+  (`probe.mp.refused`: a player without mods; `probe.mp.off.MC.Building.Lights.Switchable`: turned off while in,
+  then joining with it off; scenario `open-server`: `AllowPlayersWithoutMod` lets a player without mods in). The mod
+  has no multiplayer self-test of its own.
 
 ## 4. Edge cases
 
@@ -233,6 +251,11 @@ start burning and off lights take fuel. On: flags applied to loaded lights at on
 5. **Take ownership on switch** (Sign/Turret precedent) instead of routing RPCs to the current owner: instant,
    race-free double presses, and the toggler's game stops the burn.
 6. English strings "Turn on", "Turn off", "blocked"; vanilla `$hud_on` / `$hud_off` for On/Off.
+7. **A player with the mod turned off is refused like one without it** (user, 2026-10-08; 0.2.0). 0.1.0 only checked
+   that the mod was installed, so a player could untick it and stay, and the lights their game ran burned fuel and
+   went out for everyone. The check is now Swim Dive's (3.6): not compatible = no mod, turned off, or another network
+   version; checked at the join and again whenever a player's state changes. `AllowPlayersWithoutMod` (default false)
+   still lets all of them stay. No RPC or ZDO format changed: the network version stays 1.
 
 ### Added beyond the request
 

@@ -39,6 +39,7 @@ internal static class SailMath
     // Share of the way from the stored sail force to its target done this step (exponential catch-up at rate * s per
     // second). 0 at s = 0, never over 1 (never past the target). Under 10% per 0.02 s step at the largest setting;
     // float round it to exactly 1 only for absurd rate * dt (over ~17), which is still fine (= reach the target).
+    // The same share come off vanilla's SmoothDamp speed (Ship.GetSailForce postfix): force and speed stay in step.
     internal static float CatchUp(float ratePerSecond, float s, float dt) => 1f - Mathf.Exp(-ratePerSecond * s * dt);
 
     // Acceleration on the sail: part of the force along the bow x accel, sideways part (leeway, heel) and up part

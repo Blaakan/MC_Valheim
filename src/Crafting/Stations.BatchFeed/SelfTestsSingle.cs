@@ -38,7 +38,6 @@ internal static partial class SelfTests
     private const string TamesName = "batchfeed.compat-tames";
     private const string LightsName = "batchfeed.compat-lights";
     private const string HintFollowsName = "batchfeed.hint-follows";
-    private const string HintStaleName = "batchfeed.bug.hint-stale";
     private const string ClaimName = "batchfeed.compat-claim";
     private const string LogName = "batchfeed.log";
 
@@ -69,7 +68,6 @@ internal static partial class SelfTests
         Test(TamesName, RunCompatTames),
         Test(LightsName, RunCompatLights),
         Test(HintFollowsName, RunHintFollows),
-        Test(HintStaleName, RunHintStale),
         Test(ClaimName, RunCompatClaim),
         Test(LogName, () => RunLog(LogName)),
     };

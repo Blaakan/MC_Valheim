@@ -7,7 +7,7 @@
 | Category / scope | UX / QoL |
 | Side | Client (only the player who wants it installs it) |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/`; item, creature and piece prefab names checked in the installed game data (`StreamingAssets/SoftRef/manifest_extended`) |
-| Status | Implemented (0.1.1: harvest grace covers the whole drop column of one pick, 3.2), smoke test passed on 0.1.0, in-game testing pending |
+| Status | Implemented (0.1.1: harvest grace covers the whole drop column of one pick, 3.2; badge on the left edge of the slot and lists panel right of the inventory panel, 3.4), smoke test passed on 0.1.0, in-game testing pending |
 
 ## Goal
 
@@ -158,8 +158,20 @@ registered). Fallback key: `Utils.GetPrefabName(drop.gameObject)`. Inventory ite
   pointer enter per slot. **Middle click is not wired**, although `UIInputHandler` has `m_onMiddleDown/Up/Click`.
 - Click semantics: Shift = split, Ctrl = move/drop, right click = `Player.UseItem`. Alt is not read by vanilla but is
   used by QuickStackStore and InventoryActions. Gamepad: D-pad/left stick move, A select (LT split, RT drop), X use.
-  `JoyRStick` (right stick click) is not read by vanilla in the inventory. `InventoryGrid.UpdateGamepad` only runs
-  while the grid's `m_uiGroup.IsActive` and `ZInput.IsExclusiveGamepadActive()`.
+  `JoyRStick` (right stick click) has no reader in the inventory **code**, but **with a container open it is the key
+  of the game's own Place stacks button** (and `JoyLStick`, the left stick click, the key of Take all): the buttons
+  carry `UIGamePad` components whose keys are prefab data, not visible in `.ref`. Measured in the automated runs of
+  2026-10-08 on game 1.0.17 (`docs/game/ux.md`, "Gamepad buttons with a container open"): both fire with the chest
+  grid focused and with the player grid focused. The 0.1.0 design read only the code and took R3 for free.
+  `InventoryGrid.UpdateGamepad` only runs while the grid's `m_uiGroup.IsActive` and
+  `ZInput.IsExclusiveGamepadActive()`.
+- Slot layout (`InventoryGrid.UpdateGui` enables the parts per item; where each part sits is prefab data, measured
+  on the screenshots and notes of the 2026-10-08 runs, game 1.0.17, slot 64 units wide): the hotbar number (child
+  `binding`, shown only on the first row of the player grid) top-left, its text box ending 22.4 units under the slot
+  top; `m_quality`, `m_noteleport` and `m_food` (a fork about 11 × 31 units) top-right; `m_amount` centred along the
+  bottom, nearly as wide as the slot for long amounts (`20/100`); `m_durability` a bar along the bottom; `m_equiped`
+  a slot-sized background. Every corner holds something; the left edge half-way up (and the middle of the slot) holds
+  only the item icon.
 - `InventoryGrid.GetHoveredElement()` is a **pure geometry test** of `ZInput.pointerPosition` against each slot rect:
   it also "finds" a slot covered by another panel (`m_skillsDialog`, `m_textsDialog`, `m_trophiesPanel`,
   `m_achievementsPanel`, `m_variantDialog`, `m_splitDialog`, other mods' menus).
@@ -168,7 +180,8 @@ registered). Fallback key: `Utils.GetPrefabName(drop.gameObject)`. Inventory ite
   `CanvasGroup.interactable` from its priority when its GameObject has a `CanvasGroup` (whether the player group has
   one is prefab data).
 - `UIGamePad` clicks its button when its gamepad key is pressed while its group is interactive, **with no modifier
-  check** (LT + R3 still fires an R3 `UIGamePad`).
+  check** (LT + R3 still fires an R3 `UIGamePad`, so LT + R3 and RT + R3 also press Place stacks while a container
+  is open).
 - `InventoryGui.Show(Container, int)` only sets the animator bool and the active group: in a `Show` postfix the panel
   may still sit at its hidden or animating transform. `InventoryGui.Hide` is called every frame while dead or
   teleporting.
@@ -336,9 +349,15 @@ with `$KEY_AutoPickup` / `$KEY_Use`. Item names are `$tokens` from ObjectDB (unk
 only when `FilterState.Version`, the V state or the gamepad state changes.
 
 **Lists panel (controller).** Our own instance of the tooltip prefab (`MC_LootFilterLists`, `UITooltip`/`Localize`
-removed, `Topic`/`Text` filled with localized strings), bottom-left at the button's top-left, clamped with
-`Utils.ClampUIToScreen`. Toggled by RT + R3; closed by the same chord, by `InventoryGui.Hide`, and on deactivate. While
-the controller alone is in use (`GamepadControls` on and `ZInput.IsExclusiveGamepadActive()`), the text swaps the mouse
+removed, `Topic`/`Text` filled with localized strings). Place (0.1.1): the top-left of its visible box sits **to the
+right of the player panel, level with the panel's top**: 6 px (panel units) right of the right-most of `m_player`'s
+right edge, the `m_armor` and `m_weight` text boxes (the two numbers hang off the panel's right side) and the button
+(only when an offset setting moved it out there), then clamped with `Utils.ClampUIToScreen`. There it covers neither
+the button nor any slot; it is redone when the panel or the button moves. (0.1.0 put its bottom-left on the button's
+top-left, where about 3 px of screen are left at 1440p: the clamp pushed the 737 px tall box down over the button and
+the left half of the grid, T18.) With a chest open it may cover part of what other mods put right of the container
+panel (Sort Chest's buttons; not measured). Toggled by RT + R3; closed by the same chord, by `InventoryGui.Hide`, and
+on deactivate. While the controller alone is in use (`GamepadControls` on and `ZInput.IsExclusiveGamepadActive()`), the text swaps the mouse
 lines for controller ones (LT + R3 mode, R3 mark, RT + R3 close); it switches back when the mouse is used.
 
 **Marking, mouse or keyboard** (`Controls.MarkKey`, default `Mouse2`). Cached on bind and on `SettingChanged`; every
@@ -364,13 +383,23 @@ does the same once. Per frame: `ZInput.GetKeyDown(main, logWarning: false)`, mod
 with `JoyRTrigger` held → toggle the lists panel; else `ToggleMark(m_playerGrid.GetGamepadSelectedItem())`. Chest
 slots are mouse only.
 
+**R3 is not free while a container is open** (1.9): it is the key of the game's own Place stacks button, which fires
+with the chest grid focused and with the player grid focused, and `UIGamePad` checks no modifier. So with a chest
+open, **the mod's right stick "mark" gesture also triggers the game's Place stacks** (`InventoryGui.OnStackAll`:
+every unequipped player item of a kind the container already holds moves into it), and so do LT + R3 (mode) and
+RT + R3 (lists panel). The mod does not swallow the press and 0.1.1 does not change the gesture: whether to move it
+is an open question for the user (section 5). With no container open the container panel is inactive
+(`InventoryGui.UpdateContainer`), and the Place stacks button sits on that panel (prefab data), so its pad does not
+run.
+
 **Shared gamepad map of the MC inventory mods** (the Sort Chest design, `docs/design/ux-container-sort.md` 3.3,
-carries the same table):
+carries the same table and is the reference for Sort Chest's own keys). "None of ours" = no MC mod reads it; with a
+container open the game itself runs **Take all on L3** and **Place stacks on R3** in both grid groups:
 
 | Focused group (`InventoryGui.m_uiGroups`) | View/Select (`JoyBack`) | L3 (`JoyLStick`) | R3 (`JoyRStick`) | LT + R3 | RT + R3 |
 |---|---|---|---|---|---|
-| 0 container grid | Sort Chest: sort | Sort Chest: change criterion | none of ours | none of ours | none of ours |
-| 1 player grid | none of ours | none of ours | Loot Pickup Filter: mark / unmark | Loot Pickup Filter: change mode | Loot Pickup Filter: lists panel |
+| 0 container grid | Sort Chest: sort | none of ours (the game's Take all) | none of ours (the game's Place stacks) | none of ours (the game's Place stacks) | none of ours (the game's Place stacks) |
+| 1 player grid | none of ours | none of ours (container open: the game's Take all) | Loot Pickup Filter: mark / unmark (container open: the game's Place stacks runs too) | Loot Pickup Filter: change mode (container open: Place stacks too) | Loot Pickup Filter: lists panel (container open: Place stacks too) |
 | 2 side panel | Encyclopedia: open the window (only with its optional side button; default: none of ours) | none of ours | none of ours | none of ours | none of ours |
 | 3 crafting | none of ours | none of ours | none of ours | none of ours | none of ours |
 | Valheim Compendium (vanilla dialog, priority 2, above every inventory group while open) | none of ours | none of ours | none of ours | none of ours | none of ours |
@@ -382,20 +411,26 @@ View/Select on the chest grid always reaches Sort Chest. In the Valheim Compendi
 alone pick the Encyclopedia's Texts / Encyclopedia tabs (read by its own code, not a pad; the inventory groups are off
 there). A new MC binding must not use View/Select in the side panel, nor LT / RT alone in those two dialogs.
 
-Sort Chest's `UIGamePad`s (View/Select, L3; no modifier check, so LT/RT + those keys act the same) fire only while the
-container group is active, our R3 gestures only while the player group is active: one press never reaches both, and no
-MC mod reads R3 in the container grid. Vanilla reads View/Select nowhere in the inventory and L3 only while held, as the
-multi-craft modifier (any group). InventoryActions also uses R3: `GamepadControls = false` leaves it to that mod.
+Sort Chest's only `UIGamePad` (Sort on View/Select; no modifier check, so LT/RT + View/Select act the same; its sort
+order button is mouse only since its 0.1.1) fires only while the container group is active, our R3 gestures only while
+the player group is active: one press never reaches both mods, and no MC mod reads R3 in the container grid. Vanilla
+reads View/Select nowhere in the inventory. Both stick clicks are the game's own while a container is open (Take all
+on L3, Place stacks on R3, whichever grid is focused), and in code L3 is also the held multi-craft modifier (any
+group). So with a container open **one R3 press on the player grid reaches both our gesture and the game's Place
+stacks**. InventoryActions also uses R3: `GamepadControls = false` leaves it to that mod (and to the game).
 
-**Badges** (`MarkerOverlay`). An `Image` child per slot (`MC_LootFilterMark`, 16 × 16, 3 px inset,
-`raycastTarget = false`), created lazily in the `UpdateGui` postfix for `m_playerGrid` and `ContainerGrid` only. Shown
-when `ShowMarkers` is on, the mode is not Everything and the slot's item type is in the active list: red "no entry"
-disc (Ignored) or green check disc (Selected), 32 × 32 textures drawn once in code (no asset bundle). The corner is
-picked once per grid from the real slot layout: the first of top-right, top-left, bottom-left, bottom-right that
-overlaps none of the no-teleport, food, queued and equipped icons, the quality, amount and hotbar-binding texts
-(glyph corner only) and the durability bar (else the least covered); logged at Debug. A grid that rebuilds its slots
-(other chest size, more rows) rebuilds its badges. Index guard: items outside `0 <= y*width+x < m_elements.Count`
-(extended inventory mods) get no badge. `enabled` is set only when it changes; no allocation per frame.
+**Badges** (`MarkerOverlay`). An `Image` child per slot (`MC_LootFilterMark`, 16 × 16, `raycastTarget = false`),
+created lazily in the `UpdateGui` postfix for `m_playerGrid` and `ContainerGrid` only. Shown when `ShowMarkers` is on,
+the mode is not Everything and the slot's item type is in the active list: red "no entry" disc (Ignored) or green
+check disc (Selected), 32 × 32 textures drawn once in code (no asset bundle). Place (0.1.1): **the left edge of the
+slot, half-way up** (anchor and pivot `(0, 0.5)`, 3 px in from the edge), the same on every slot of both grids,
+anchored like the game's own slot parts. It is the one place no vanilla slot part uses (1.9): on the 64-unit slot the
+badge covers 24 to 40 units under the top, the hotbar number's text box ends at 22.4, and the stack amount and the
+durability bar start at about 50. (0.1.0 picked one corner per grid by counting overlaps with the slot parts; every
+corner holds something, so it took the "least covered" one, top-left, and sat on the hotbar number of first-row slots,
+T13.) A grid that rebuilds its slots (other chest size, more rows) rebuilds its badges. Index guard: items outside
+`0 <= y*width+x < m_elements.Count` (extended inventory mods) get no badge. `enabled` is set only when it changes; no
+allocation per frame.
 
 **Messages** (top-left, `Player.Message`, never logged; One Click Repair All mutes only Center):
 
@@ -517,15 +552,15 @@ the 3 s window (M05). Dedicated servers never load it (client `BepInProcess`).
 `Plugin.cs` (config, `OnActivated` / `OnDeactivated`), `FilterMode.cs`, `FilterState.cs` (mode, lists, load/save,
 verdict caches, changes), `AutoPickupScope.cs`, `AutoPickupGuard.cs` (IL check, foreign-patch warning),
 `HarvestGrace.cs`, `ItemCatalog.cs` (ObjectDB names, tokens, Tab list), `FilterUi.cs` (button, tooltip, lists panel,
-gestures, messages), `MarkerOverlay.cs` (badges, corner, sprites), `LootFilterCommand.cs`, `DebugLayoutDump.cs` (Debug
+gestures, messages), `MarkerOverlay.cs` (badges, sprites), `LootFilterCommand.cs`, `DebugLayoutDump.cs` (Debug
 builds only), `Patches/` (`PlayerPatches`, `PickablePatches`, `ItemDropPatches`, `InventoryGuiPatches`,
 `InventoryGridPatches`).
 
 ### 3.12 Debug aids (Debug log level only)
 
 - Activation: the IL indices of the gate check; the mark key.
-- First inventory opening: the button parent (`player panel` or `inventory root ...`). The first time a grid is drawn
-  in Skip ignored or Only selected mode: its badge corner with the occupied boxes it avoided. Debug builds also dump once per `InventoryGui` the layout: screen size, every
+- First inventory opening: the button parent (`player panel` or `inventory root ...`). (The 0.1.0 line about the
+  badge corner is gone with the corner choice.) Debug builds also dump once per `InventoryGui` the layout: screen size, every
   child of `m_player`, the chain from `m_player` up with `CanvasGroup` / `UIGroupHandler` flags, `m_uiGroups`, the
   player name, armor, weight, grid, container, crafting and button rects, and the slot prefab children. Confirms the
   unverified placement facts (T01, T13, T27) from the log.
@@ -541,9 +576,10 @@ builds only), `Patches/` (`PlayerPatches`, `PickablePatches`, `ItemDropPatches`,
   prefix, and never skips the call, so the harvest record happens even when it replaces the press with a batch; its
   `MessageHud.ShowMessage` prefix mutes only Center messages during its own batch loop, and ours are top-left (C02).
 - **One Click Repair All**: mutes only Center messages during its loop; ours are top-left (C03).
-- **Sort Chest** (upcoming): buttons on the container panel, and View/Select (sort) and L3 (change criterion) while the
-  container grid is focused; it never reads R3 (gamepad map in 3.4). Its cross-mod test with this mod goes into its own
-  `TESTING.md`.
+- **Sort Chest**: buttons on the container panel (its row stands right of the panel, where our lists panel may cover
+  part of it while both are open: not measured), and View/Select (sort) while the container grid is focused; it binds neither stick
+  click (gamepad map in 3.4: with a container open L3 is the game's Take all and R3 the game's Place stacks). Its
+  cross-mod test with this mod goes into its own `TESTING.md`.
 
 ---
 
@@ -579,7 +615,11 @@ builds only), `Patches/` (`PlayerPatches`, `PickablePatches`, `ItemDropPatches`,
 | Mark gesture in Everything mode | — | No change; hint |
 | Mark gesture while dragging, with the split dialog, over a dialog or another mod's menu | — | Ignored (dialog checks + UI raycast) |
 | Marking many items quickly | — | Badges at once; messages at most one per second |
-| Controller, container grid focused, R3 | — | Nothing (no MC mod reads R3 there; Sort Chest uses View/Select and L3) |
+| Controller, container grid focused, R3 | The game's Place stacks runs (R3 is its key while a container is open) | Nothing of ours (no MC mod reads R3 there; Sort Chest uses View/Select only) |
+| Controller, container open, player grid focused, R3 (alone, with LT or with RT) | The game's Place stacks runs here too | Our gesture runs as well (mark, mode or lists panel): one press does both. Not changed in 0.1.1 (open question 6) |
+| Controller, no container open, player grid focused, R3 | No reader in the inventory code, and the container panel (which holds Place stacks, prefab data) is inactive | Our gesture (that nothing else of the game answers R3 there is not measured) |
+| Marked item in the first row (hotbar number), with a quality number, a no-portal or food icon, a stack amount, a durability bar | The slot parts | Badge on the left edge of the slot, half-way up: every part stays readable (T13; 0.1.0 covered the hotbar number) |
+| Controller lists panel opened | — | Right of the player panel, level with its top, past the armor and weight numbers; not over the button or the grid; kept on screen (T18; 0.1.0 opened it over the button and the left half of the grid) |
 | Controller: mark a chest item | — | Not possible in 0.1.0; move it to your inventory |
 | Item type you no longer carry in a list | — | Shown in tooltip / lists panel; removed by command or by picking one up and marking it |
 | Recipe clicked, then the button | Crafting group active | Button still clickable (parent choice) |
@@ -636,8 +676,11 @@ sees and have a simple alternative.
     the two ways: pick one up by hand (never filtered) and middle-click it, or use `lootfilter` /
     `lootfilter_ignore` / `lootfilter_select`. The editor panel is planned for 0.2.0.
 14. **Shared gamepad map** (3.4): our controller gestures work only while the player grid is focused; chest slots are
-    marked with the mouse only. Sort Chest uses View/Select and L3 only while the container grid is focused, so no
-    press reaches both mods, and no MC mod reads R3 in the container grid.
+    marked with the mouse only. Sort Chest uses View/Select only while the container grid is focused, so no press
+    reaches both mods, and no MC mod reads R3 in the container grid. **The game does**: with a container open R3 is
+    its Place stacks key (and L3 its Take all key) in both grid groups, which the 0.1.0 design did not know (the keys
+    are prefab data). So with a chest open our R3 gestures also run Place stacks. Kept as it is in 0.1.1; moving the
+    gesture is open question 6.
 15. **Mark messages rate-limited** to one per second; badges are the main feedback.
 16. **Display name "Loot Pickup Filter"** (lead decision, to confirm with the user: the GUID `MC.UX.AutoPickup.Filter`
     and the display name are permanent after release). UI labels keep "Auto pickup".
@@ -646,8 +689,9 @@ sees and have a simple alternative.
 
 The grey hover line (`ShowInHoverText`, T04), the mode message when V turns auto pickup back on (T10), marking from
 chests (T12), controller gestures and the lists panel (T18, T35), the three commands (T17), the `Defaults` config lists
-(T16), the foreign-patch warning (C07), the automatic badge corner (T13), the unreadable-`MarkKey` guard (T34). The
-harvest grace is not an extra: it is how goal 4 holds for hand harvesting.
+(T16), the foreign-patch warning (C07), the unreadable-`MarkKey` guard (T34). The harvest grace is not an extra: it is
+how goal 4 holds for hand harvesting. (0.1.0 also had an automatic badge corner; 0.1.1 replaced it with one fixed
+place, T13.)
 
 ### Differences from the pre-implementation design
 
@@ -658,13 +702,15 @@ harvest grace is not an extra: it is how goal 4 holds for hand harvesting.
   64 boxes, one per frame (one per scythe swing); records only for Use targets that drop items (list in 3.2; added
   `ArcheryTarget` and Shift + E saddle off, excluded the armor stand's pose switch); the `Player.Interact` prefix
   skips the calls vanilla refuses (attack, dodge, hold repeat).
-- **Badge corner** chosen from the real slot layout instead of a fixed top-right.
+- **Badge place**: 0.1.0 chose a corner from the real slot layout instead of the planned fixed top-right; 0.1.1 uses
+  one fixed place, the left edge of the slot half-way up, because every corner holds a vanilla slot part (3.4).
 - **MarkKey** validated on bind (`IsKeyCodeValid` + `TryKeyCodeToKey`) with a catch for the rest; the mark key has its
   own try/catch in `Tick`.
 - Extra skip rules: the pause menu; for keyboard mark keys, a focused IMGUI field. The chat, console and focused
   text-field checks apply to the mouse too.
 - Button placement is redone while the panel moves or scales (open animation) and when the screen height changes, and
-  is clamped on screen. The lists panel moves only when the button moved.
+  is clamped on screen. The lists panel is placed again when the player panel or the button moved (0.1.0: only when
+  the button moved; it hung on the button then).
 - The clone is built inside an inactive holder and also loses `UIInputHint` and `UITooltip` (as in Crafting Search and
   Sort). No extra click sound (the clone keeps its own). The label uses `textWrappingMode = NoWrap`
   (`enableWordWrapping` is obsolete in this TMP version).
@@ -695,18 +741,35 @@ harvest grace is not an extra: it is how goal 4 holds for hand harvesting.
    `m_addFoodSwitch` (not its fuel switch), so baked food taken out of the oven is exempt like food from a cooking
    station (T37). Any other `CookingStation` with a food switch (the Frost Foundry's cast slot) follows the same
    rule; whether its output drops on the ground is unverified.
+6. **The controller gestures and the game's Place stacks share the right stick click** (found 2026-10-08, pending
+   user decision; nothing changed in 0.1.1). With a container open, each R3 press on the player grid (alone, with LT
+   or with RT) runs our gesture and the game's Place stacks (3.4). Options:
+   - (a) keep it and document it (done in the README, the `GamepadControls` description and T18);
+   - (b) ignore our gestures while a container is open (`InventoryGui.IsContainerOpen`): marking with the controller
+     only with the chest closed, no double action, smallest change;
+   - (c) move the three gestures to View/Select (`JoyBack`) on the player grid: no vanilla reader in the inventory,
+     and in the shared map it is used only on the container grid (Sort Chest) and the side panel (Encyclopedia's
+     optional button); changes the controls, the in-game texts, the README and T18 / T35;
+   - (d) keep R3 and stop the game's Place stacks from firing while the player grid is focused (a prefix on
+     `UIGamePad.ButtonPressed` for that one pad): the game's own shortcut then only works from the chest grid, which
+     changes a vanilla control;
+   - a modifier alone does not help: `UIGamePad` checks none, so LT + R3 and RT + R3 press Place stacks too.
 
 ### Unverified names and values
 
-- Where the button ends up (room above the panel at 1080p and 1440p, overlap with the player name), which parent it
-  gets (whether the player group's `UIGroupHandler` has a `CanvasGroup`), the badge corner and the lists panel
-  position: confirmed only by the Debug layout lines and in game (T01, T13, T18, T27).
+- Where the button ends up (room above the panel at 1080p and 1440p, overlap with the player name) and which parent
+  it gets (whether the player group's `UIGroupHandler` has a `CanvasGroup`): confirmed only by the Debug layout lines
+  and in game (T01, T27). The 0.1.1 badge place and lists panel place are computed from rectangles measured at
+  2560x1440 on game 1.0.17 (the hotbar number's text box, the player panel, the slots, the button); they are not yet
+  seen in game: the self-tests `lootfilter.badges` and `lootfilter.gamepad` measure them (T13, T18). Not measured: the
+  rects of the `m_armor` / `m_weight` texts (the lists panel goes right of them), the stack amount's text box (about
+  50 units under the slot top on the screenshot), a second resolution.
 - The physical buttons behind `JoyRStick`, `JoyLTrigger`, `JoyRTrigger` on the Alternative 1 and 2 layouts.
 - Which thrown weapons use `m_respawnItemOnHit` (spears); which smelter-family stations have an empty switch
   (`m_emptyOreSwitch`: windmill, spinning wheel?); cooking, fermenting and production times; the scythe's harvest
   radius; whether spawned pickables and crops can be picked and scythed at once; saddling a Lox right after `tame`;
-  whether the item stand takes a `TrophyBoar`; whether `SpearFlint` shows a quality number (`m_maxQuality > 1`); the
-  oven's `BreadDough` recipe and baking time.
+  whether the item stand takes a `TrophyBoar`; the oven's `BreadDough` recipe and baking time. (`SpearFlint` shows a
+  quality number: max quality 4 and the number in its slot, notes of `lootfilter.badges` in the 2026-10-08 runs.)
 - The `m_player` children `Armor` / `Weight` (names from QuickStackStore's source; the dump logs `m_armor` /
   `m_weight` rects instead).
 - Checked: item, creature and piece prefab names used in `TESTING.md` exist in the 1.0.16 game data; `debugmode` + K

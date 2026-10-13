@@ -181,7 +181,10 @@ internal static class ShipSailPatches
 {
     // S2: wind factor with skill (floor 0.7 -> WindFloorAtMax, no-go cone smaller). Delta form: other mods' change to
     // the result stay. Owner step (inside GetSailForce): helmsman level from ShipTick. Elsewhere (helmsman's HUD wind
-    // icon, Hud.UpdateShipHud, every frame): HelmSkill.Physics01, cached; the helmsman there is the local player.
+    // icon, Hud.UpdateShipHud, every frame): HelmSkill.Physics01, cached; the helmsman there is the local player. The
+    // icon must show the pull the ship really get, and that come from the game that simulate it: a game that no run me
+    // (player without me, or me off there; only with AllowPlayersWithoutMod) pull like vanilla, so there the icon stay
+    // vanilla too (HelmSkill.SimulatedWithMod).
     [HarmonyPostfix]
     [HarmonyPatch(typeof(Ship), nameof(Ship.GetWindAngleFactor))]
     private static void GetWindAngleFactor_Postfix(Ship __instance, ref float __result)
@@ -203,6 +206,12 @@ internal static class ShipSailPatches
                     return;
                 }
                 s = HelmSkill.Physics01(__instance);
+                // Not my step: ship maybe simulated by another game. That game no run me = no bonus pull = no bonus
+                // on the icon.
+                if (s > 0f && !HelmSkill.SimulatedWithMod(__instance))
+                {
+                    return;
+                }
             }
             if (s <= 0f)
             {
@@ -224,8 +233,12 @@ internal static class ShipSailPatches
 
     // Owner step only (ShipTick), two parts.
     // S5 sail response: vanilla SmoothDamp the sail force toward its target with a 1 s literal (no field). After it, me
-    // move the stored force a bit further toward the same target (1 - exp(-rate * s * dt)): sail fill and empty faster,
-    // never past the target, nothing compound. Target = vanilla's (3 lines copied from Ship.GetSailForce, 1.0.16: keep
+    // move the stored force a bit further toward the same target (1 - exp(-rate * s * dt)) and shrink vanilla's
+    // SmoothDamp speed (m_windChangeVelocity, only GetSailForce use it) by the same share. Gap and speed shrink
+    // together = same curve as vanilla, only sooner (gap left = vanilla's gap x exp(-rate * s * time)): sail fill and
+    // empty faster, never past the target where vanilla's own smoothing is not, nothing compound. Force moved alone
+    // (0.1.0) left the speed too big for the gap: after a wind shift while the sail still fill, the force swung ~0.5%
+    // past the target. Target = vanilla's (3 lines copied from Ship.GetSailForce, 1.0.16, same in 1.0.17: keep
     // in step after game updates), with the vanilla m_sailForceFactor (me never scale it).
     // G5 acceleration on the sail: only the part of the returned force along the bow x ShipTick.Accel (SailMath.BowBoost);
     // sideways push (leeway, heel) stay vanilla. Returned value only: stored m_sailForce stay unboosted, nothing compound.
@@ -253,8 +266,11 @@ internal static class ShipSailPatches
                 var target = Vector3.Normalize(env.GetWindDir() + __instance.transform.forward)
                              * (factor * __instance.m_sailForceFactor * sailSize);
                 var before = __instance.m_sailForce;
-                var after = Vector3.Lerp(before, target, SailMath.CatchUp(rules.SailResponseAtMax, s, dt));
+                var share = SailMath.CatchUp(rules.SailResponseAtMax, s, dt);
+                var after = Vector3.Lerp(before, target, share);
                 __instance.m_sailForce = after;
+                // Speed of vanilla's SmoothDamp x what is left of the gap: no swing past the target next steps.
+                __instance.m_windChangeVelocity *= 1f - share;
                 // Delta: another mod's change to the returned force stay.
                 __result += after - before;
             }

@@ -6,15 +6,19 @@ namespace MC.Crafting.StationsBatchFeedMod;
 // Me = hint line "[L-Shift + E] Add item x5" put right below vanilla Use line of a covered spot.
 // Hover text is asked every frame: one-slot cache (last hovered component -> spot), line rebuilt only when
 // spot, input device, controller layout or settings change, or every RebuildInterval (catch key rebinds).
+// Spot me keep looking at is asked again every ResolveInterval: other mod can flip a coverage flag under the
+// crosshair (Switchable Lights turn m_canRefill off and on), and vanilla hover read those flags live.
 // Anchor = first "[<color=yellow><b>" (vanilla key line style), never key text: vanilla hover can come from
 // Localize cache with the OLD key after a rebind, so text match would miss.
 internal static class HoverHint
 {
     private const string Anchor = "[<color=yellow><b>";
     private const float RebuildInterval = 0.5f;
+    private const float ResolveInterval = 0.5f;
     private const float BatchableInterval = 0.25f;
 
     private static Component _component;
+    private static float _resolvedAt;
     private static bool _covered;
     private static FeedTarget _target;
     private static bool _batchable;
@@ -47,20 +51,29 @@ internal static class HoverHint
             return;
         }
 
-        if (!ReferenceEquals(instance, _component))
+        // Other component under crosshair = new spot. Same component for long = ask it again every ResolveInterval:
+        // its "covered or not" answer can change while me look. Per frame only compares, the search run twice a second.
+        var now = Time.time;
+        var moved = !ReferenceEquals(instance, _component);
+        if (moved || now - _resolvedAt >= ResolveInterval)
         {
+            var kind = _target.Kind;
             _component = instance;
+            _resolvedAt = now;
             _covered = FeedTarget.TryResolve(instance, out _target);
-            _insert = null;
-            _batchable = true;
-            _batchableAt = -1000f;
+            if (moved || _target.Kind != kind)
+            {
+                // New spot, or same spot with a new answer: line and cooked item check start over.
+                _insert = null;
+                _batchable = true;
+                _batchableAt = -1000f;
+            }
         }
         if (!_covered)
         {
             return;
         }
 
-        var now = Time.time;
         if (_target.Kind == FeedKind.CookFood && now - _batchableAt >= BatchableInterval)
         {
             // Finished item on station: E take it first, batch not possible, hint hidden. Check build strings: throttle.

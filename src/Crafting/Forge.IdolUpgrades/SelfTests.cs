@@ -34,8 +34,9 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 // write config in a single-player test: rules through ServerRules.TestRules, roll through ForgeRefine.TestRoll,
 // IdolChoice through IdolChoice.TestPick, empty GPU copy through StarIcons.TestForceEmpty, mod off through
 // Plugin.TestSetOff.
-// Tests named forge.bug.* hold only the checks a real game run showed the mod fail (real bug, mod not fixed yet): kept
-// apart so the other checks of the same TESTING.md item still pass. Mod fixed = they pass, nothing to change here.
+// Test named forge.bug.<what> = one check a real game run showed the mod fail (real bug, mod not fixed yet), kept apart
+// so the other checks of the same TESTING.md item still pass. None now: the five bugs the first runs found are fixed
+// in 0.1.1 and their checks are back in the normal tests.
 internal static partial class SelfTests
 {
     private const string CatalogName = "forge.catalog";
@@ -148,13 +149,11 @@ internal static partial class SelfTests
         Test(TimerLossName, RunTimerLoss),
         Test(BadMaterialName, RunBadMaterial),
         Test(ZeroCostName, RunZeroCost),
-        Test(BugZeroCostName, RunBugZeroCost),
         // SelfTests.Inventory.cs
         Test(IconRowsName, RunIconRows),
         Test(GridName, RunGrid),
         Test(StacksName, RunStacks),
         Test(EmptyCopyName, RunEmptyCopy),
-        Test(BugEmptyCopyName, RunBugEmptyCopy),
         // SelfTests.Toggle.cs
         Test(ToggleName, RunToggle),
         Test(OffUpgradeName, RunOffUpgrade),

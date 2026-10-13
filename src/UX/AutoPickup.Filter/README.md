@@ -18,9 +18,9 @@ pickup key (V) still turns auto pickup on and off, and picking up or harvesting 
 - **Two separate lists.** Ignored and Selected are kept apart: switching modes never changes them. Only the list of
   the current mode is used.
 - **Red and green marks.** In Skip ignored mode, ignored items show a small red "no entry" mark; in Only selected
-  mode, selected items show a small green check. The marks show in your inventory and in chests, in the slot corner
-  that hides the least of the game's own slot details (stack size, quality number, no-portal icon). No marks in
-  Everything mode.
+  mode, selected items show a small green check. The marks show in your inventory and in chests, on the left edge of
+  the slot, half-way up: the one place where the game shows none of its own slot details (hotbar number, quality
+  number, no-portal icon, food icon, stack size, durability bar). No marks in Everything mode.
 - **See your lists.** Hover the button: its tooltip explains the modes and lists both lists (the one in use first),
   up to 40 names each.
 - **The auto pickup key stays the master switch.** Press V (the game's own key) to turn auto pickup off: nothing is
@@ -75,12 +75,21 @@ With a controller, while **your inventory grid** is selected (not the chest grid
 
 - click the right stick: add the selected item to the list of the current mode, or remove it;
 - hold LT and click the right stick: change the mode;
-- hold RT and click the right stick: show or hide a panel with both lists next to the button (it also closes with
-  the inventory).
+- hold RT and click the right stick: show or hide a panel with both lists, to the right of your inventory panel (it
+  also closes with the inventory).
 
 Chest slots can only be marked with the mouse: on a controller, move the item into your inventory first. The button
-itself cannot be selected with the D-pad (it never takes the selection away from your items). Turn the controller
-gestures off with `GamepadControls` if another mod uses the right stick in the inventory.
+itself cannot be selected with the D-pad (it never takes the selection away from your items).
+
+**With a chest open, the right stick click is also a key of the game itself.** While a chest (or any container) is
+open, the game uses the right stick click for its own **Place stacks** button and the left stick click for **Take
+all**, whether the chest grid or your inventory grid is selected, and it does not look at LT or RT. So with a chest
+open, each of the three gestures above also runs Place stacks: every item in your inventory of a kind the chest
+already holds moves into the chest (equipped items stay). The mark, the mode change or the lists panel still happens.
+To avoid it, mark items with the chest closed or with the mouse.
+
+Turn the controller gestures off with `GamepadControls` if another mod uses the right stick in the inventory, or if
+you want the right stick click to be only the game's Place stacks.
 
 ## Configuration
 
@@ -95,7 +104,7 @@ by editing the file (the game picks up the change while it runs).
 | General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
 | Filter | ExemptHarvest | `true` | Items that drop when you harvest or collect by hand (the use key on berry bushes, mushrooms, crops, pickable stones, a fermenter, a cooking station or stone oven, a beehive, a sap collector, an item or armor stand, an archery target, the empty switch of a production station, or a scythe swing) are picked up whatever the filter mode, like picking them up by hand. Turn this off to filter them like any other item. Mining, chopping and fighting drops are filtered, except a drop that appears within 4 m of something you harvested in the last 3 seconds (at any height above it). |
 | Controls | MarkKey | `Mouse2` | Key or mouse button that adds the item under the mouse pointer to the list of the current filter mode, or removes it, in your inventory or an open chest. Default: middle mouse button (Mouse2). Avoid Mouse0 and Mouse1: the inventory already uses the left and right buttons. Set to None to turn marking off. Mouse5, Mouse6 and some keys (F13-F15, some symbol keys such as # or @) cannot be read by the game; if you pick one, marking is turned off and the log says so. |
-| Controls | GamepadControls | `true` | Controller, with your inventory grid selected: click the right stick to add or remove the selected item; hold LT and click the right stick to change the filter mode; hold RT and click the right stick to show both lists. Chest slots can only be marked with the mouse. Turn this off if another mod uses the right stick in the inventory. |
+| Controls | GamepadControls | `true` | Controller, with your inventory grid selected: click the right stick to add or remove the selected item; hold LT and click the right stick to change the filter mode; hold RT and click the right stick to show both lists. Chest slots can only be marked with the mouse. With a chest open, the right stick click is also the game's own key for Place stacks, so these gestures run Place stacks too. Turn this off if another mod uses the right stick in the inventory, or to leave the right stick click to the game. |
 | Display | ShowMarkers | `true` | Show a small mark on items of the active list in your inventory and in chests (red: ignored, green: selected). |
 | Display | ShowInHoverText | `true` | When you look at an item on the ground that auto pickup will skip, say so under its name. |
 | Display | ButtonOffsetX | `0` | Moves the Auto pickup button sideways (pixels, positive = right) if it overlaps something added by another mod. |

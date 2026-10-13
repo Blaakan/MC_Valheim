@@ -9,7 +9,7 @@
 | Side | Client (only the player who wants it installs it), multiplayer Compatible |
 | Sheet idea | `Compendium` |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`; `.ref/game-version.json` is missing), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/`; English strings checked in the 1.0.16 localization table (`valheim_Data/resources.assets`); prefab names checked in `StreamingAssets/SoftRef/manifest_extended`; third-party sources read on GitHub (2026-09-29) |
-| Status | Implemented (0.1.0), build OK, smoke test passed, in-world self tests passed on earlier builds, after the review fixes, after the second review's fixes and again after the nesting under the Valheim Compendium (2026-09-29, build `00103ab+dirty`, runs `20260929-154511` and `20260929-154751`); no hands-on in-game test yet |
+| Status | Implemented (0.1.0), build OK, smoke test passed, in-world self tests passed on earlier builds, after the review fixes, after the second review's fixes and again after the nesting under the Valheim Compendium (2026-09-29, build `00103ab+dirty`, runs `20260929-154511` and `20260929-154751`); no hands-on in-game test yet. 0.1.1: a refused window build survives a live toggle of the mod (3.6 step 8); builds OK, self tests not run on it yet |
 | Implementation | Done in two steps, both built: data layer first (catalog, discovery, own records, details, list rows, data patches, data self tests: 3.1-3.5, 3.9 data rows, 3.10), then the UI on top of it (button, window, input, UI patches, layout dumps, UI self tests: 3.6-3.9, 3.15). The UI deviations from the first design are decisions 29-45; the review fixes are decisions 4, 15 and 46-52, the second review's 53-55; the user's pause review (rename, nesting under the Valheim Compendium, optional side button) 1, 2, 12 and 56-63. |
 
 **Naming.** The vanilla inventory already has a button and a dialog called **"Valheim Compendium"**
@@ -978,6 +978,12 @@ destroyed and the row put back exactly (`SideRow.Restore`, step 5). `Create` (th
    the rest of the world session (`HideForThisSession`) and the vanilla row goes back exactly as it was; the top tabs
    go too (`TopTabs.HideForThisSession`). Turning the setting on later in that session (or off and on) makes no button
    either: `Create` asks `CompendiumWindow.RefusedFor(gui)` first, since a button there would do nothing on click.
+   Turning the mod itself off and on (`Enabled`) in that session changes nothing either (0.1.1): the refusal is part of
+   the window's session state, kept by `CompendiumWindow.Destroy` and cleared only when a new `InventoryGui` starts a
+   session (`ResetSession`), like the top tabs' own flag. After the toggle `Create` still gets `RefusedFor(gui)`, and
+   `Open()` returns false without a second build attempt or warning. (0.1.0 cleared the flag with the window's objects:
+   the button came back in a re-spaced row, and a click on it logged the warning again; T39, self test
+   `compendium.refused-toggle`.)
 
 ### 3.7 UI: the window (`Ui/CompendiumWindow.cs`, `.Build.cs`, `.Details.cs`; rows `Ui/RowView.cs`)
 
@@ -1315,7 +1321,8 @@ and off (then `SideButton.Sync`), never writing the `ConfigEntry`.
   unregister the UI self tests. Then data: unsubscribe the language hook; stop the build coroutine on the plugin host
   and clear its handle, forget the catalog (`CatalogService.Stop`, 3.2.2); clear the records and tames caches;
   unregister the data self tests and the console command. The session memory (tab, selections, search, remembered top
-  tab) is kept.
+  tab) is kept, and so is a refused window build (3.6 step 8): back on, the window, the top tabs and the optional
+  button stay away until a new `InventoryGui`.
 - While off, nothing is recorded (met creatures, biomes); kills, trophies, materials and recipes keep being recorded
   by the game and show when the mod is back.
 - A new `InventoryGui` (logout, new world): the old objects died with it; statics are checked with
@@ -1712,6 +1719,7 @@ mentions of this mod.
 | `resetknownitems` | Recipes, stations, materials, trophies cleared | Items "???"; pieces "???" unless placed at least once; creatures discovered only through their trophy "???"; killed, tamed and met creatures and biomes stay discovered |
 | UI mod removed the side panel | — | Optional button on: no button, one warning; the tabs are not affected |
 | UI mod changed the Valheim Compendium (no list, no text area, no room left of the title) | — | No tabs on it (one warning); a refused window build removes the tabs for the session |
+| Mod turned off and on after a refused window build (same session) | — | Still refused until logout: no tabs, no optional button (the side row exactly the game's), no second warning |
 | Optional button on: no room for one more control in the side-panel row (vanilla) | — | The row is laid out again: 6 controls evenly spaced inside the panel background, ours after the Valheim Compendium button; restored exactly when the mod turns off |
 | Another mod keeps moving the side controls | — | Its places are kept; after the third change we give up: our layout undone, our button after the last control, one warning; the controls it moved are never pulled back later, also not when the mod turns off |
 | Row laid out, then another mod hides the Valheim Compendium button (or adds controls until the row no longer fits at 50 % scale) | — | At the next `Show` the row layout is dropped: the controls we still hold back on their places, both D-pad links back to vanilla, ours `Automatic` and after the last control; laid out again when the button is back |
@@ -1944,8 +1952,9 @@ The ones marked **(to confirm with the user)** change what the player sees and h
     Checked free (1.4, the Debug dump of the dialog's pads): the vanilla dialog's three pads have no key,
     `TextsDialog` reads only the D-pad and the sticks, B closes it in `InventoryGui.Update`; the crafting tabs' LT / RT
     pads and the grids' LT / RT modifiers belong to inventory groups that are inactive under a priority-2 dialog and
-    under our window; LB/RB are our category tabs; View/Select, L3 and R3 are Sort Chest's and Loot Pickup Filter's on
-    their grids. Rejected: View/Select (the map's button in the world, Sort Chest's on the chest grid: one button with
+    under our window; LB/RB are our category tabs; View/Select and R3 are Sort Chest's and Loot Pickup Filter's on
+    their grids (L3 and R3 are also the game's own Take all and Place stacks while a container is open; Sort Chest
+    dropped L3 in 0.1.1 for that reason). Rejected: View/Select (the map's button in the world, Sort Chest's on the chest grid: one button with
     three meanings in the same screen), X/Y (Y closes the inventory in vanilla), LB/RB (our category tabs), D-pad
     left/right (easy to hit while moving up and down the lists with the D-pad). No glyph on the tabs: the vanilla hint objects are
     stripped with the pads (decision 23) and the game hides its key hints while a side dialog is open; README and

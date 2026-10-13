@@ -4,15 +4,22 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
-Mods panel). Committed build `1254c75` (2026-09-29), the version needed on the server and every player (join check,
-server settings for everyone): Debug and Release build without warnings; smoke test (`./tools/Test-Smoke.ps1`, all MC
-mods) passed; automated in-world self-tests (`./tools/Test-InWorld.ps1`) passed on the same code: `breeding.rule`,
-`breeding.farmer`, `breeding.birth`, `breeding.egg` and `breeding.network` (17/17 tests of the run). No hands-on
-in-game test yet; the multiplayer items need two players.
+**Build under test:** 0.2.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+Mods panel). 0.2.0 changes who the server refuses: also a player who has the mod turned off or has another version of
+it, when joining and about a second after turning it off while connected (M02, M03, M07, M08, M14 and T18 were
+reworded and reset to `[ ]`, M17 to M19 are new), and it fixes the log of a client whose copy is turned off while the
+server sends its settings (no `Using the server's breeding settings` line while off, exactly one when the copy is
+turned on again: M16 was reset to `[ ]`). Debug and Release build without warnings, and the self-tests ran on 0.2.0 on
+2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): all of this mod's tests passed,
+and in the each-off scenario the server refuses the player who turns the mod off, while connected and when joining
+with it off. Before that, 0.1.0: committed build `1254c75` (2026-09-29), the version needed on the server and every
+player (join check, server settings for everyone): Debug and Release build without warnings; smoke test
+(`./tools/Test-Smoke.ps1`, all MC mods) passed; automated in-world self-tests (`./tools/Test-InWorld.ps1`) passed on
+the same code: `breeding.rule`, `breeding.farmer`, `breeding.birth`, `breeding.egg` and `breeding.network` (17/17
+tests of the run). No hands-on in-game test yet; the multiplayer items need two players.
 
-**Automated checks (2026-10-08):** 36 of 37 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 36 of 36 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -54,14 +61,22 @@ line, and the tests read the partner level, the farmer, the chance and the roll 
   other players.`; withdraw `Withdrew the published Farming level (mod turned off).`
 - Multiplayer log lines. Client, Info: `Using the server's breeding settings: ChanceAtFarming0 <a>, ChanceAtFarming100
   <b>, ChanceWithoutFarmer <c>, FarmerRange <r>, MaxStars <m>. Your own settings apply again in single player and when
-  you host.` (once per new set of values). Server or host, Warning: `Refused <player> (<platform id>): their game does
-  not run Breeding Star Inheritance, which this server requires on every player ...`, or with
-  `AllowPlayersWithoutMod` on `<player> (<platform id>) joined without Breeding Star Inheritance. AllowPlayersWithoutMod
-  is on, ...`; Debug: `<player> (<platform id>) has Breeding Star Inheritance installed: allowed.` and `Sent the
-  breeding settings to <n> player(s): 1|<a>|<b>|<c>|<r>|<m>.` The framework adds its own Warning on the server for a player
-  without the mod (`... connected without Breeding Star Inheritance; its multiplayer part will not work for them.`).
+  you host.` (once per new set of values; never while the mod is turned off on that game, and once again when it is
+  turned back on). Server or host, Warning: `Refused <player> (<platform id>): <reason>. This server requires Breeding
+  Star Inheritance on every player (a game that does not run it would breed the animals it simulates the vanilla
+  way). Their game shows "Incompatible version". To let such players in, set AllowPlayersWithoutMod = true.`, or with
+  `AllowPlayersWithoutMod` on `<player> (<platform id>) <reason>; AllowPlayersWithoutMod is on, so they may play, but
+  the animals their game simulates breed the vanilla way (the pregnant parent's own level).` The `<reason>` is `does
+  not have the mod`, `has the mod turned off` or `has another version of the mod (network version <n>, the server has
+  1)`. Debug: `<player> (<platform id>) has Breeding Star Inheritance on, with the same network version: allowed.` and
+  `Sent the breeding settings to <n> player(s): 1|<a>|<b>|<c>|<r>|<m>.` The framework adds its own lines on the server:
+  a Warning for a player without the mod (`... connected without Breeding Star Inheritance; its multiplayer part will
+  not work for them.`) and an Info line when a connected player turns the mod off or on (`<player> turned Breeding
+  Star Inheritance off on their game.`).
 - A player "without the mod": a game without BepInEx, or with this mod's folder removed from
-  `BepInEx/plugins/MC_Valheim/Farming/` (a mod turned off with `Enabled = false` still counts as installed).
+  `BepInEx/plugins/MC_Valheim/Farming/`. A player "with the mod turned off": the mod is installed, with `Enabled =
+  false` in its config file or unticked in the MC Mods panel. The server refuses both unless `AllowPlayersWithoutMod`
+  is on (M07, M17, M18).
 
 ## 0.1.0 — single player
 
@@ -144,11 +159,12 @@ line, and the tests read the partner level, the farmer, the chance and the roll 
   (server settings on the wire: the defaults travel as `1|15|50|10|60|2`, decimals come back exact also with a
   German system language, out-of-range values are clamped to the config ranges, unreadable messages are refused whole;
   in the single-player world the own settings are used, a settings message from the network is ignored, and the
-  self-test override still works; the join-check verdicts refuse only a fully connected player without the mod on a
-  server; every species with breeding has a breeding tick longer than the 5 s a refused game can stay (1 s check + 4 s
-  disconnect delay): a `NOTE` line lists each species' tick and the shortest one). The screenshot
-  `piglets_with_stars` shows piglets with 1★ and one with 2★ in their health bars. If a `NOTE` line gives breeding
-  values that differ from the Setup above, update the Setup.
+  self-test override still works; the join-check verdicts refuse only a fully connected player whose game does not
+  run the mod (not installed, turned off, or another version) on a server, and let that player stay when
+  `AllowPlayersWithoutMod` is on; every species with breeding has a breeding tick longer than the 5 s a refused game
+  can stay (1 s check + 4 s disconnect delay): a `NOTE` line lists each species' tick and the shortest one). The
+  screenshot `piglets_with_stars` shows piglets with 1★ and one with 2★ in their health bars. If a `NOTE` line gives
+  breeding values that differ from the Setup above, update the Setup.
   *Automated: `breeding.rule`, `breeding.farmer`, `breeding.birth`, `breeding.egg`, `breeding.network`,
   `breeding.stars`, `breeding.setup`.*
 - [x] **T19 No Farming entry added:** a new character that has never farmed (no Farming row in the Skills tab), in a
@@ -177,22 +193,25 @@ server's breeding settings` line). To give B's character some Farming, B loads i
   *Partly automated (`breeding.mp.settings`, `breeding.farmer-range`); by hand: Two real players: B's game simulates
   the pen, A (Farming 100) stands in it and B's birth lines name A '(published)' with 1-star piglets; A steps back to
   20-30 m and B's lines name B; FarmerRange 40 brings A back.*
-- [x] **M02 Turned off on the farmer's game:** M01 settings. A (`resetskill Farming`) sets up a 0★ + 0★ pen and stays
-  about 20 m from it, so A's game simulates it; B (Farming 100, see above) stands in the pen. Expected: A's Debug names
-  B with Farming 100 `(published)`, piglets 1★. B turns the mod off in the MC Mods panel → B's withdraw line, and B
-  stays connected (the server checks that the mod is installed, not that it is on); A's Debug names only A (`own`,
-  Farming 0), piglets 0★. B turns it on again → B's log shows the server settings line again, and B counts again
-  within a few seconds.
-  *Partly automated (`breeding.mp.off-stays`, `breeding.farmer-range`,
-  `probe.mp.off.MC.Farming.Breeding.StarInheritance`); by hand: Two real players: A's birth lines name B with Farming
-  100 while B has the mod on, only A after B turned it off, and B again a few seconds after B turned it back on.*
-- [x] **M03 Hand-off (simulating game without the mod):** A sets `AllowPlayersWithoutMod = true`. B without the mod
-  joins and is not refused (A's log: `... joined without Breeding Star Inheritance. AllowPlayersWithoutMod is on, ...`).
-  B simulates a 0★ + 2★ pen set up by A, A far away. Expected: births follow vanilla (2★ piglets appear), no Debug
-  birth line on A; the piglets look normal to both. Set `AllowPlayersWithoutMod` back to `false` afterwards.
+- [ ] **M02 Turned off on the farmer's game:** M01 settings, and A sets `AllowPlayersWithoutMod = true` (without it B
+  is refused when turning the mod off: M17). A (`resetskill Farming`) sets up a 0★ + 0★ pen and stays about 20 m from
+  it, so A's game simulates it; B (Farming 100, see above) stands in the pen. Expected: A's Debug names B with Farming
+  100 `(published)`, piglets 1★. B turns the mod off in the MC Mods panel → B's withdraw line, B stays connected, and
+  A's log shows the Warning `B (<platform id>) has the mod turned off; AllowPlayersWithoutMod is on, so they may play,
+  ...`; A's Debug names only A (`own`, Farming 0), piglets 0★. B turns it on again → B's log shows the server settings
+  line again, and B counts again within a few seconds. A sets `AllowPlayersWithoutMod` back to `false` afterwards: B,
+  with the mod on, stays.
+  *Partly automated (`breeding.mp.off-stays`, `breeding.farmer-range`); by hand: Two real players, the host with
+  AllowPlayersWithoutMod = true: A's birth lines name B with Farming 100 while B has the mod on, only A after B turned
+  it off, and B again a few seconds after B turned it back on.*
+- [ ] **M03 Hand-off (simulating game without the mod):** A sets `AllowPlayersWithoutMod = true`. B without the mod
+  joins and is not refused (A's log: Warning `B (<platform id>) does not have the mod; AllowPlayersWithoutMod is on, so
+  they may play, ...`). B simulates a 0★ + 2★ pen set up by A, A far away. Expected: births follow vanilla (2★ piglets
+  appear), no Debug birth line on A; the piglets look normal to both. Set `AllowPlayersWithoutMod` back to `false`
+  afterwards.
   *Partly automated (`scenario:open-server`, `breeding.toggle`); by hand: A real player without the mod simulating a
   0-star + 2-star pen set up by the host: 2-star piglets appear, no Debug birth line on the host, and the piglets look
-  normal to both players.*
+  normal to both players; the host's Warning for that player says 'does not have the mod'.*
 - [x] **M04 Hand-off (egg):** A with `AllowPlayersWithoutMod = true` and all chances 100 gets an "Egg[2]" from a 0★ hen
   pair and gives it to B without the mod; B hatches it at B's base. Expected: a 1★ chick that grows into a 1★ hen; A
   sees the same stars.
@@ -218,25 +237,25 @@ server's breeding settings` line). To give B's character some Farming, B loads i
   *Partly automated (`breeding.respawn`, `breeding.mp.farmer`); by hand: Two real players: after A dies twice (the
   second death inside the no-skill-drain time) B's next birth line names A with the level after the first death; and
   after B leaves and rejoins, A's next birth line names B.*
-- [x] **M07 Player without the mod refused:** default settings (`AllowPlayersWithoutMod = false`). B without the mod
+- [ ] **M07 Player without the mod refused:** default settings (`AllowPlayersWithoutMod = false`). B without the mod
   joins A. Expected: B's game starts loading the world, then, about a second after B got in (usually still during the
   loading screen), goes back to the main menu with the message "Incompatible version". A's log: the framework Warning,
-  then `Refused B (<platform id>): their game does not run Breeding Star Inheritance, ...`; B's character is not in
-  A's world; A keeps playing, no error on either side. B joins again: same result. If B's menu shows the plain
-  disconnection message instead, mark it `[!]` and note how long B's loading screen lasted (the server closes the
-  connection 4 s after the refusal; a single frame longer than that loses the message). (unverified: the message is
-  read from the game code and its English text table, not seen in game yet)
+  then `Refused B (<platform id>): does not have the mod. This server requires Breeding Star Inheritance on every
+  player ...`; B's character is not in A's world; A keeps playing, no error on either side. B joins again: same
+  result. If B's menu shows the plain disconnection message instead, mark it `[!]` and note how long B's loading
+  screen lasted (the server closes the connection 4 s after the refusal; a single frame longer than that loses the
+  message). (unverified: the message is read from the game code and its English text table, not seen in game yet)
   *Partly automated (`probe.mp.refused`, `breeding.network`); by hand: With only this mod deciding (the harness runs
   every MC mod and the first one to refuse wins): the server log shows the framework warning and this mod's own
-  'Refused <player> ...' line, the player's menu shows the text 'Incompatible version', and a second join gives the
-  same result.*
-- [x] **M08 Allow setting on, then off:** A sets `AllowPlayersWithoutMod = true`; B without the mod joins and stays
+  'Refused <player> ...: does not have the mod. ...' line, the player's menu shows the text 'Incompatible version',
+  and a second join gives the same result.*
+- [ ] **M08 Allow setting on, then off:** A sets `AllowPlayersWithoutMod = true`; B without the mod joins and stays
   (A's log: the "AllowPlayersWithoutMod is on" Warning). A sets it back to `false` while B is online → B is refused
-  about a second later (M07's message and log line). A player with the mod online at the same time stays (A's Debug:
-  `... has Breeding Star Inheritance installed: allowed.`).
-  *Partly automated (`scenario:open-server`, `breeding.mp.allow`); by hand: A player without the mod is online when
-  the host sets AllowPlayersWithoutMod back to false: refused about a second later with 'Incompatible version' and the
-  'Refused' line.*
+  about a second later (M07's message and log line). A player with the mod on who is online at the same time stays
+  (A's Debug: `... has Breeding Star Inheritance on, with the same network version: allowed.`).
+  *Partly automated (`scenario:open-server`, `breeding.mp.allow`, `breeding.mp.off-stays`); by hand: A player without
+  the mod is online when the host sets AllowPlayersWithoutMod back to false: refused about a second later with
+  'Incompatible version' and the 'Refused' line.*
 - [x] **M09 Settings change live:** B connected. A changes `ChanceAtFarming0` and `MaxStars` in its config file in
   one save. Expected: A's Debug `Sent the breeding settings to 1 player(s): 1|...` once; within a second B's log shows
   one `Using the server's breeding settings` line with both new values; B's next birth uses them (`chance`, cap).
@@ -279,14 +298,15 @@ server's breeding settings` line). To give B's character some Farming, B loads i
   *Partly automated (`breeding.network`); by hand: The real race: a player without the mod closes the game the moment
   the loading screen appears, two or three times; the host's log shows nothing from this mod or the 'Refused' line,
   never an error.*
-- [x] **M14 Turned on while connecting (optional):** A hosts with a password, so B gets the password prompt. B (with
+- [ ] **M14 Turned on while connecting (optional):** A hosts with a password, so B gets the password prompt. B (with
   the mod, `Enabled = false` in its config file) joins A and, while the password prompt is shown, sets `Enabled = true`
-  in its config file and saves it; then B enters the password. Expected: once in, B's MC Mods panel shows the mod
-  Active, B's log shows `Using the server's breeding settings: ...` with A's values, and the birth lines of a pen B's
-  game simulates end with `server settings`; no error.
+  in its config file and saves it; then B enters the password. Expected: B is not refused (the mod was on before B got
+  in; entering the password with it still off is M18); once in, B's MC Mods panel shows the mod Active, B's log shows
+  `Using the server's breeding settings: ...` with A's values, and the birth lines of a pen B's game simulates end
+  with `server settings`; no error.
   *Partly automated (`breeding.mp.off-stays`); by hand: The case of the item itself: join with Enabled = false, set
-  Enabled = true in the config file while the password prompt is shown, then enter the password: Active, settings
-  line, 'server settings' births, no error.*
+  Enabled = true in the config file while the password prompt is shown, then enter the password: not refused, Active,
+  settings line, 'server settings' births, no error.*
 - [ ] **M15 Birth on another game than the conception:** host A and client B, both with the mod, all chances 0. A pen
   with a 0★ and a 2★ boar that A's game simulates. When A's Debug shows `Conceived: Boar (level 3) with partner level
   1`, move the 0★ partner more than 10 m away from the pen (or kill it). Then A leaves (more than about 130 m, or
@@ -300,13 +320,46 @@ server's breeding settings` line). To give B's character some Farming, B loads i
   and B's game decides the birth: B's line must say 'own 3, partner 1 (recorded)', end with 'server settings', and the
   piglet must be 0-star. A dedicated server never simulates animals, so no second deciding game exists in the
   harness.*
-- [!] **M16 Settings change while the mod is off on a client:** B connected with the mod, then B turns it off in the MC
-  Mods panel. A changes a breeding setting (or turns its own copy off and on, which also sends the settings).
-  Expected: B's log shows no `Using the server's breeding settings` line while B has the mod off (B's births follow
-  vanilla then). B turns the mod on again: exactly one such line, with A's current values.
-  **FAILED:** automated test: Server settings pushed while a client's copy is turned off: the 'Using the server's
-  breeding settings' line is logged while off and is missing when the mod is turned on again (self-test
-  `breeding.mp.bug.off-push-line`)
+- [x] **M16 Settings change while the mod is off on a client:** A has `AllowPlayersWithoutMod = true` (without it B is
+  refused when turning the mod off: M17). B connected with the mod, then B turns it off in the MC Mods panel. A changes
+  a breeding setting (or turns its own copy off and on, which also sends the settings). Expected: B stays connected,
+  and B's log shows no `Using the server's breeding settings` line while B has the mod off (B's births follow vanilla
+  then). B turns the mod on again: exactly one such line, with A's current values. Set `AllowPlayersWithoutMod` back
+  to `false` afterwards.
+  *Automated: `breeding.mp.off-push`.*
+- [ ] **M17 Turned off while connected: refused:** default settings (`AllowPlayersWithoutMod = false`), B connected
+  with the mod on. B turns the mod off in the MC Mods panel (or sets `Enabled = false` in its config file). Expected:
+  B's withdraw line, and about a second later B's game goes back to the main menu with the message "Incompatible
+  version". A's log: the Info line `B turned Breeding Star Inheritance off on their game.`, then the Warning `Refused B
+  (<platform id>): has the mod turned off. This server requires Breeding Star Inheritance on every player ...`; B's
+  character is gone from A's world; A keeps playing, no error on either side. B turns the mod back on in the main menu
+  (MC Mods button, or `Enabled = true` in the config file) and joins again: not refused, the mod is Active and B's log
+  shows the server settings line.
+  *Partly automated (`probe.mp.off.MC.Farming.Breeding.StarInheritance`, `breeding.mp.off-stays`); by hand: The host's
+  log: '<player> turned Breeding Star Inheritance off on their game.' and then this mod's 'Refused <player> ...: has
+  the mod turned off. ...' line; the refused player's menu shows the text 'Incompatible version'; after turning the
+  mod back on in the main menu the player joins again and stays (Active, settings line).*
+- [ ] **M18 Joining with the mod turned off: refused:** default settings. B has the mod installed with `Enabled =
+  false` in its config file and joins A. Expected: as M07 (back to the main menu with "Incompatible version" about a
+  second after B got in), but A's log has no framework `connected without` Warning (B has the mod) and this mod's line
+  gives the reason: `Refused B (<platform id>): has the mod turned off. ...`. B joins again with it still off: same
+  result. (A copy of the mod with another network version is refused the same way, with the reason `has another
+  version of the mod (network version <n>, the server has 1)`; only network version 1 exists so far, so that case
+  cannot be tested yet.)
+  *Partly automated (`probe.mp.off.MC.Farming.Breeding.StarInheritance`, `breeding.network`); by hand: The host's log:
+  no 'connected without' warning, and this mod's 'Refused <player> ...: has the mod turned off. ...' line; the
+  player's menu shows the text 'Incompatible version'.*
+- [ ] **M19 AllowPlayersWithoutMod and a player with the mod turned off:** A sets `AllowPlayersWithoutMod = true`. B
+  joins with the mod turned off (`Enabled = false`): not refused; A's log shows the Warning `B (<platform id>) has the
+  mod turned off; AllowPlayersWithoutMod is on, so they may play, but the animals their game simulates breed the
+  vanilla way ...`, and B's MC Mods panel shows "Off (disabled in settings)". B turns the mod on while connected:
+  Active, B's log shows the server settings line, and A's Debug shows `B (<platform id>) has Breeding Star Inheritance
+  on, with the same network version: allowed.` B turns it off again: B stays, and A's Warning appears again. A sets
+  `AllowPlayersWithoutMod = false` while B still has the mod off: B is refused about a second later (M17's message and
+  `Refused` line).
+  *Partly automated (`breeding.mp.off-stays`, `scenario:open-server`); by hand: Join with the mod turned off while the
+  host has AllowPlayersWithoutMod = true (not refused, the host's Warning says 'has the mod turned off'), and the host
+  setting it back to false while that player still has the mod off: refused about a second later.*
 
 ## 0.1.0 — cross-mod
 

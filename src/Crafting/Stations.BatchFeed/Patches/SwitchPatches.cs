@@ -5,7 +5,8 @@ using MC.Shared;
 namespace MC.Crafting.StationsBatchFeedMod.Patches;
 
 // Hover of station switches: smelter input/fuel, cooking station food/fuel switch, shield generator fuel.
-// Every frame while hovering a switch: HoverHint keep it cheap (one-slot cache, no search when not covered).
+// Every frame while hovering a switch: HoverHint keep it cheap (one-slot cache: station search run only when the
+// crosshair move to other switch and twice a second after, covered or not).
 // Low: run after other mods' postfixes, so me see (and anchor in) their final text.
 [HarmonyPatch]
 internal static class SwitchPatches

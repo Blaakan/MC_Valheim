@@ -14,15 +14,15 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 //   forge.icons.rows        star rows as pixels: 1, 2, 3 gold stars top right; lower row for requirement slots
 //   forge.grid              inventory and chest slots, drag icon: stars, no quality number (other items keep theirs)
 //   forge.stacks            levels never merge: drag both ways, split, pickup, chest; chest saved and read again
-//   forge.icons.empty-copy  GPU copy come back empty: plain icon on every call after the first, stars a second later
-//   forge.bug.empty-copy-icon  (real bug, fail until mod fixed) the very first call then: plain icon, never no icon
+//   forge.icons.empty-copy  GPU copy come back empty: plain icon on first call, on calls after, on a new try that come
+//                           back empty too (never no icon); stars a second after copy work; "New material" popup of an
+//                           idol picked up right then get plain icon
 internal static partial class SelfTests
 {
     private const string IconRowsName = "forge.icons.rows";
     private const string GridName = "forge.grid";
     private const string StacksName = "forge.stacks";
     private const string EmptyCopyName = "forge.icons.empty-copy";
-    private const string BugEmptyCopyName = "forge.bug.empty-copy-icon";
 
     private static bool IsGold(Color p) => p.a > 0.95f && p.r > 0.7f && p.g > 0.35f && p.b < 0.5f;
 
@@ -355,13 +355,18 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------- forge.icons.empty-copy (T22; the very first call: forge.bug.empty-copy-icon) ----------
+    // ---------- forge.icons.empty-copy (T22, T05) ----------
 
-    // Game window minimized: GPU copy of icon come back empty. Mod must give plain icon until a later try work.
-    // Me check here every call after the first one, and the later try. First call = the bug test below.
+    // Game window minimized: GPU copy of icon come back empty. Mod must give plain icon until a later try work: on the
+    // very first call, on every call after it, on a new try that come back empty too. 0.1.1: before (run 2026-10-07),
+    // each try that came back empty gave no sprite at all (StarIcons.Make ended with "entry.Failed ? source :
+    // entry.Made", and after an empty copy Failed is false and Made is null), so a never-seen 2-star idol picked up at
+    // that moment queued its "New material" popup with no icon (white square).
     private static IEnumerator RunEmptyCopy()
     {
-        var c = new Checks(EmptyCopyName);
+        var rig = new Rig(EmptyCopyName);
+        var c = rig.C;
+        var hud = MessageHud.instance;
         try
         {
             var icon = PlainIconOf(SilverIdol);
@@ -376,7 +381,8 @@ internal static partial class SelfTests
             StarIcons.TestForceEmpty = true;
             // Mod try again 1 s after an empty copy (StarIcons.RetrySeconds): me judge only calls well inside it.
             var failedAt = Time.realtimeSinceStartup;
-            StarIcons.Get(icon, 2); // first try fail here (what it give back: forge.bug.empty-copy-icon)
+            var first = StarIcons.Get(icon, 2); // first try fail here
+            c.Check(first == icon, $"first call while the GPU copy is empty: the plain icon, got {Describe(first)}");
             var next = StarIcons.Get(icon, 2);
             c.Check(next == icon, $"while the GPU copy is empty, the calls after the first give the plain icon: {Describe(next)}");
             // Same through the game's own way to ask (what grid, hotbar and messages call).
@@ -400,41 +406,23 @@ internal static partial class SelfTests
                 SelfTest.Note(EmptyCopyName, "a slow frame used up the retry second: the 'a frame later' checks are skipped in this run");
             }
 
+            // Second over, copy still empty: the new try come back empty like the first one. Plain icon again, never
+            // no icon (before 0.1.1 each such try gave nothing once more).
+            StarIcons.TestForceEmpty = true;
+            yield return new WaitForSecondsRealtime(1.2f);
+            var again = item.GetIcon();
+            c.Check(again == icon, $"a new try about a second later that comes back empty too still gives the plain icon: {Describe(again)}");
+
             // Later copy work again: stars come.
             StarIcons.TestForceEmpty = false;
             yield return new WaitForSecondsRealtime(1.2f);
             var later = item.GetIcon();
             c.Check(StarIcons.IsStarSprite(later) && later == StarIcons.Get(icon, 2), $"about a second later the starred icon is made: {Describe(later)}");
-            c.Report();
-        }
-        finally
-        {
-            StarIcons.TestForceEmpty = false;
-            StarIcons.Clear();
-        }
-    }
 
-    // ---------- forge.bug.empty-copy-icon (T22, T05: real bug, fail until mod fixed) ----------
-
-    // Run 2026-10-07: first StarIcons.Get while the copy is empty gave no sprite at all (StarIcons.Make end with
-    // "entry.Failed ? source : entry.Made", and after an empty copy Failed is false and Made is null), so a never-seen
-    // 2-star idol picked up at that moment queue its "New material" popup with no icon (white square).
-    private static IEnumerator RunBugEmptyCopy()
-    {
-        var rig = new Rig(BugEmptyCopyName);
-        var c = rig.C;
-        var hud = MessageHud.instance;
-        try
-        {
-            var icon = PlainIconOf(SilverIdol);
+            // What player see: never-seen 2-star idol picked up while the copy is empty and no starred icon is made yet.
             var idolName = NameOf(SilverIdol);
             StarIcons.Clear();
             StarIcons.TestForceEmpty = true;
-            var first = StarIcons.Get(icon, 2);
-            c.Check(first == icon, $"first call while the GPU copy is empty: the plain icon, got {Describe(first)}");
-
-            // What player see: never-seen 2-star idol picked up at that moment.
-            StarIcons.Clear();
             rig.P.m_knownMaterial.Remove(idolName);
             var dropped = rig.Drop(SilverIdol, 3, 1, 1.5f);
             yield return null;

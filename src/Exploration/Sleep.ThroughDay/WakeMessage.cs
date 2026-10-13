@@ -2,13 +2,16 @@ using MC.Shared;
 
 namespace MC.Exploration.SleepThroughDayMod;
 
-// Me = client part of wake-up. Me remember date and "after 06:00?" (raw world time) when local player fall asleep.
+// Me = client part of wake-up. Me remember date, "after 06:00?" and "after 18:00?" (raw world time) when local
+// player fall asleep.
 // Wake from day sleep = me swap vanilla "$msg_goodmorning" for WakeUpMessage AT ITS SOURCE: SetSleeping prefix arm
 // swap text, Player.Message prefix change that one message, SetSleeping postfix disarm. Vanilla order stay: wake
 // text first, then Rested start message (that one replace wake text in same frame when Rested is new, exactly as it
 // replace "Good morning" in vanilla). Me never show message after SetSleeping: Rested message must stay last.
-// Client need no server setting: day sleep start after 06:00 and wake before next date's 05:00 (IsDaySleepWake);
-// any other sleep that start after 06:00 wake at later date's morning. Server send final time just before SleepStop
+// Client need no server setting: day sleep start between 06:00 and 18:00 (widest day window server can have,
+// DayClock.Today) and wake before next date's 05:00 (IsDaySleepWake); any other sleep that start in day wake at
+// later date's morning. Sleep that start after 18:00 = night sleep always, also when it end on same date (other
+// mod's SkipToMorning start no time skip: no date change to tell it). Server send final time just before SleepStop
 // (DaySleep.BeforeTick): wake time is right.
 // State = few statics, one local player per game. Reset on use and when feature go off.
 internal static class WakeMessage
@@ -18,12 +21,13 @@ internal static class WakeMessage
     // Day sleep target at most 23:00 same date, but stop can come late: server wait for dream video on host
     // (Game.UpdateSleeping wait CinematicsManager.IsPlaying). With other players online game no pause (Game.CanPause),
     // world time run on, so wake can pass midnight. Wake on next date before this hour still = day sleep. Every other
-    // sleep that start after 06:00 wake at next 06:00 or later: far from it.
+    // sleep that start in day wake at next 06:00 or later: far from it.
     private const float LateWakeLimitHour = 5f;
 
     private static bool _haveStart;
     private static int _startDay;
     private static bool _startedAfterDawn;
+    private static bool _startedAfterNightfall;
 
     // Armed only inside one SetSleeping(false) call of day-sleep wake. Null = nothing armed: Message prefix read
     // only this for every other message.
@@ -35,6 +39,7 @@ internal static class WakeMessage
         _haveStart = false;
         _startDay = 0;
         _startedAfterDawn = false;
+        _startedAfterNightfall = false;
         SwapText = null;
         _swapped = false;
     }
@@ -67,6 +72,7 @@ internal static class WakeMessage
     internal static bool HaveStart => _haveStart;
     internal static int StartDay => _startDay;
     internal static bool StartedAfterDawn => _startedAfterDawn;
+    internal static bool StartedAfterNightfall => _startedAfterNightfall;
 #endif
 
     // Player.Message prefix, only while armed: vanilla "Good morning" of this wake become WakeUpMessage (MessageHud
@@ -114,8 +120,10 @@ internal static class WakeMessage
         {
             _startDay = env.GetDay(now);
             _startedAfterDawn = DayClock.IsAfterDawn(env, now);
+            _startedAfterNightfall = DayClock.IsAfterNightfall(env, now);
             _haveStart = true;
-            Log.Debug($"Sleep started at {Clock(env, now)}, day {_startDay} ({(_startedAfterDawn ? "after dawn" : "before dawn")}).");
+            var part = !_startedAfterDawn ? "before dawn" : _startedAfterNightfall ? "after nightfall" : "after dawn";
+            Log.Debug($"Sleep started at {Clock(env, now)}, day {_startDay} ({part}).");
             return;
         }
 
@@ -142,10 +150,11 @@ internal static class WakeMessage
         SleepSelfTests.RecordWake(now, daySleep);
     }
 
-    // Start after 06:00 of its date, wake same date, or next date before LateWakeLimitHour (late stop, above).
+    // Start in day (06:00 to 18:00 of its date), wake same date, or next date before LateWakeLimitHour (late stop,
+    // above). Start after 18:00 = never day sleep, whenever it end.
     private static bool IsDaySleepWake(EnvMan env, double now)
     {
-        if (!_haveStart || !_startedAfterDawn)
+        if (!_haveStart || !_startedAfterDawn || _startedAfterNightfall)
         {
             return false;
         }

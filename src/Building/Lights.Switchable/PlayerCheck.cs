@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using MC.Shared;
 using UnityEngine;
@@ -7,22 +8,25 @@ namespace MC.Building.LightsSwitchableMod;
 // What server do with one joined player after the grace.
 internal enum JoinVerdict : byte
 {
-    Skip,     // not for me: not server, player gone or not in, already being kicked
-    HasMod,   // their game answered our handshake: fine
-    Allowed,  // no mod, but AllowPlayersWithoutMod on: let in, warn
-    Refuse,   // no mod: refuse
+    Skip,        // not for me: not server, player gone or not in, already being kicked
+    Compatible,  // has me, same network version, not turned off: fine
+    Allowed,     // not compatible, but AllowPlayersWithoutMod on: let in, warn
+    Refuse,      // not compatible: refuse
 }
 
-// Me = server (dedicated or host) refuse players whose game no have this mod: user want every player of a server on
-// same light rules (MC rule: mod that change the game is required on every player). Copy of MC Breeding's check.
-// Host own player is not a peer, single player has none: me never touch them. Me only see "installed" (framework
-// hello), not "turned on".
+// Me = server (dedicated or host) refuse players whose game cannot play by the server's light rules: no mod, mod turned
+// off, or other network version (user rule: mod that change the game is required on every player). Copy of Swim Dive's
+// check, with framework verdict NetworkGate.PeerCompatible (has mod + same network version + side not off) and reason
+// NetworkGate.PeerProblem. Host own player is not a peer, single player has none: me never touch them.
 // Flow: ZNet.RPC_PeerInfo postfix on server, peer ready (m_uid set) = fully in -> me wait Grace s (our hello always
-// come before PeerInfo on same connection, so grace only safety) -> NetworkGate.PeerHasMod. No mod and setting off ->
+// come before PeerInfo on same connection, so grace only safety) -> PeerCompatible. Not compatible and setting off ->
 // vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version", go back to menu, like vanilla version
 // check) + peer in vanilla kick list (ZNet.Update disconnect it DisconnectDelay s later). Me check early and cut late:
 // refused game sit on loading screen (long frames); if socket close before it read Error, vanilla UpdatePeers drop
 // the Error and menu say "Disconnected". Many seconds = many frames to read it and log out alone.
+// Live re-check: player turn me off (or on) while connected -> framework HelloState -> NetworkGate.PeerStateChanged
+// -> me schedule that peer again with same grace. Peer already waiting keep first deadline (off + on within grace =
+// pass).
 // Timer = ZNet.Update postfix: empty list = one compare.
 // Feature off mid-grace = list cleared (cancel). Feature on later, or setting switched back to refuse = check all.
 internal static class PlayerCheck
@@ -42,32 +46,36 @@ internal static class PlayerCheck
     internal static bool HasWork => Queue.Count > 0;
 
     // Pure: self test hammer it.
-    internal static JoinVerdict Decide(bool isServer, bool connected, bool ready, bool beingKicked, bool hasMod,
+    internal static JoinVerdict Decide(bool isServer, bool connected, bool ready, bool beingKicked, bool compatible,
         bool allowWithoutMod)
     {
         if (!isServer || !connected || !ready || beingKicked)
         {
             return JoinVerdict.Skip;
         }
-        if (hasMod)
+        if (compatible)
         {
-            return JoinVerdict.HasMod;
+            return JoinVerdict.Compatible;
         }
         return allowWithoutMod ? JoinVerdict.Allowed : JoinVerdict.Refuse;
     }
 
-    // OnActivated: server turned on with players already in = check them all.
+    // OnActivated: listen for players who turn me on/off (never twice), check everyone already in.
     internal static void Start()
     {
         _active = true;
         Queue.Clear();
+        NetworkGate.PeerStateChanged -= OnPeerStateChanged;
+        NetworkGate.PeerStateChanged += OnPeerStateChanged;
         ScheduleAllConnected();
     }
 
-    // OnDeactivated: pending checks cancelled. Player already refused still go (vanilla kick list).
+    // OnDeactivated (and game quit): stop listening, pending checks cancelled. Player already refused still go
+    // (vanilla kick list).
     internal static void Stop()
     {
         _active = false;
+        NetworkGate.PeerStateChanged -= OnPeerStateChanged;
         Queue.Clear();
     }
 
@@ -85,7 +93,7 @@ internal static class PlayerCheck
         }
     }
 
-    // RPC_PeerInfo postfix on server, peer ready. Same peer twice = keep first deadline.
+    // RPC_PeerInfo postfix on server (peer ready), and live state change. Same peer twice = keep first deadline.
     internal static void Schedule(ZNetPeer peer)
     {
         if (!_active || peer == null || !peer.IsReady())
@@ -118,6 +126,20 @@ internal static class PlayerCheck
         }
     }
 
+    // Framework event (server): a connected player turned me on or off on their game. Event raised from rpc code:
+    // never throw back.
+    private static void OnPeerStateChanged(ZNetPeer peer)
+    {
+        try
+        {
+            Schedule(peer);
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("PlayerCheck.OnPeerStateChanged", e);
+        }
+    }
+
     private static void Check(ZNetPeer peer)
     {
         var net = ZNet.instance;
@@ -127,15 +149,16 @@ internal static class PlayerCheck
                         && peer.m_rpc.IsConnected();
         var ready = connected && peer.IsReady();
         var kicked = connected && ZNet.PeersToDisconnectAfterKick.ContainsKey(peer);
-        var hasMod = connected && NetworkGate.PeerHasMod(peer);
+        var compatible = connected && NetworkGate.PeerCompatible(peer);
         var allow = Plugin.AllowPlayersWithoutMod != null && Plugin.AllowPlayersWithoutMod.Value;
-        switch (Decide(isServer, connected, ready, kicked, hasMod, allow))
+        switch (Decide(isServer, connected, ready, kicked, compatible, allow))
         {
-            case JoinVerdict.HasMod:
-                Log.Debug($"{Who(peer)} has Switchable Lights installed: allowed.");
+            case JoinVerdict.Compatible:
+                Log.Debug($"{Who(peer)} has {ModInfo.Name} on, with the same network version: allowed.");
                 break;
             case JoinVerdict.Allowed:
-                Log.Warning($"{Who(peer)} joined without Switchable Lights. AllowPlayersWithoutMod is on, so "
+                // Their game run no light code: lights it own burn fuel like vanilla.
+                Log.Warning($"{Who(peer)} {Problem(peer)}; AllowPlayersWithoutMod is on, so they may play, but "
                             + "the lights their game runs burn fuel the normal game way.");
                 break;
             case JoinVerdict.Refuse:
@@ -146,8 +169,8 @@ internal static class PlayerCheck
 
     private static void Refuse(ZNetPeer peer)
     {
-        Log.Warning($"Refused {Who(peer)}: their game does not run Switchable Lights, which this server requires on "
-                    + "every player (the lights their game runs would burn fuel and go out). Their game shows \"Incompatible version\". "
+        Log.Warning($"Refused {Who(peer)}: {Problem(peer)}. This server requires {ModInfo.Name} on every player "
+                    + "(the lights their game runs would burn fuel and go out). Their game shows \"Incompatible version\". "
                     + "To let such players in, set AllowPlayersWithoutMod = true.");
         // Vanilla client: RPC_Error set connection status, Game.FixedUpdate log out, main menu show the text. Me cut
         // socket only DisconnectDelay s later (vanilla kick use 1 s): client read Error first, even on slow loading.
@@ -157,6 +180,9 @@ internal static class PlayerCheck
             ZNet.PeersToDisconnectAfterKick[peer] = Time.time + DisconnectDelay;
         }
     }
+
+    // Framework reason; null (became compatible between Decide and log, never expected) = generic text.
+    private static string Problem(ZNetPeer peer) => NetworkGate.PeerProblem(peer) ?? "cannot play by this server's rules";
 
     private static string Who(ZNetPeer peer)
     {

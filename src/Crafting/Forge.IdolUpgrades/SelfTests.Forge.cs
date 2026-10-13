@@ -36,8 +36,8 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 //   forge.timer.loss     cost, idol or item gone before timer end: nothing happen, nothing used
 //   forge.rules.bad-material   unknown or empty tier metal: upgrade stay blocked (never free), panel say why in red,
 //                              panel and tooltip cost still count the metal, log name the bad name or empty setting
-//   forge.tooltip.zero-cost    metal cost 0: tooltip show trophies only
-//   forge.bug.tooltip-zero-cost    (real bug, fail until mod fixed) trophy cost 0: no comma hanging in tooltip
+//   forge.tooltip.zero-cost    cost of 0 left out of idol tooltip: trophies only, metal only (no comma hanging), both 0
+//                              = line only say where to upgrade
 internal static partial class SelfTests
 {
     private const string TabName = "forge.tab";
@@ -59,7 +59,6 @@ internal static partial class SelfTests
     private const string TimerLossName = "forge.timer.loss";
     private const string BadMaterialName = "forge.rules.bad-material";
     private const string ZeroCostName = "forge.tooltip.zero-cost";
-    private const string BugZeroCostName = "forge.bug.tooltip-zero-cost";
 
     private const string WoodIdol = "Upgrader0Weapon";
     private const string BronzeIdol = "Upgrader1Weapon";
@@ -1445,9 +1444,13 @@ internal static partial class SelfTests
 
     // ---------- forge.tooltip.zero-cost (T25) ----------
 
+    // 0.1.1: cost of 0 is left out clean. Before (run 2026-10-07), Level1Trophies = 0 gave cost line "5 Silver, " (comma
+    // with nothing after) and both costs 0 gave "Idols tab: " with nothing after: IdolTooltip.Rewrite wrote ", " right
+    // after the metal, and the ": " before it knew a cost follow.
     private static IEnumerator RunZeroCost()
     {
         var c = new Checks(ZeroCostName);
+        var provoked = 0;
         try
         {
             var item = Prefab(SilverIdol).m_itemData.Clone();
@@ -1459,42 +1462,47 @@ internal static partial class SelfTests
             ServerRules.TestRules = DefaultRules(r => r.Material[1] = 0);
             line = CostLine(L(item.GetTooltip()));
             c.Check(line == "5 common trophies of its biome", $"Level1Material = 0: only the trophies, is '{line}'");
-            c.Report();
-        }
-        finally
-        {
-            ServerRules.TestRules = null;
-        }
-        yield break;
-    }
-
-    // ---------- forge.bug.tooltip-zero-cost (T25: real bug, fail until mod fixed) ----------
-
-    // Run 2026-10-07: Level1Trophies = 0 give cost line "5 Silver, " (comma with nothing after), both costs 0 give an
-    // empty "Idols tab: " line. IdolTooltip.Rewrite write ", " right after the metal and trophies only when > 0.
-    private static IEnumerator RunBugZeroCost()
-    {
-        var c = new Checks(BugZeroCostName);
-        try
-        {
-            var item = Prefab(SilverIdol).m_itemData.Clone();
-            item.m_quality = 1;
-            var silver = L(NameOf("Silver"));
             ServerRules.TestRules = DefaultRules(r => r.Trophies[1] = 0);
-            var line = CostLine(L(item.GetTooltip()));
+            line = CostLine(L(item.GetTooltip()));
             c.Check(line == "5 " + silver, $"Level1Trophies = 0: the cost line is just '5 {silver}', is '{line}'");
             ServerRules.TestRules = DefaultRules(r =>
             {
                 r.Material[1] = 0;
                 r.Trophies[1] = 0;
             });
+            var text = L(item.GetTooltip());
+            line = CostLine(text);
+            c.Check(line == null, $"both 0: no 'Idols tab:' line with nothing after it, is '{line}'");
+            // What player read then (words written out here, not taken from mod code).
+            c.Check(text.Contains("Upgrade at a Forge of Potential, Idols tab.</color>"),
+                $"both 0: the line only says where to upgrade ('Upgrade at a Forge of Potential, Idols tab.'), tooltip is '{text}'");
+            c.Check(text.Contains("Level: <color=orange>no star</color> (0 of 3)") && text.Contains("Refinement chance: <color=orange>35%</color>"),
+                $"both 0: the level and chance lines are still there, tooltip is '{text}'");
+            // Next step keep its own cost: only the step set to 0 lose it.
+            item.m_quality = 2;
             line = CostLine(L(item.GetTooltip()));
-            c.Check(line == null || line.Trim().Length > 0, $"both 0: no 'Idols tab:' line with nothing after it, is '{line}'");
+            c.Check(line == $"10 {silver}, 3 elite trophies of its biome", $"both Level1 costs 0: a 1-star idol still shows the Level2 cost, is '{line}'");
+            item.m_quality = 1;
+
+            // Tier metal no item of this game (forge.rules.bad-material) with trophy cost 0: same code write the metal
+            // part, so no comma hanging there either. Typo make a log warning on purpose: clean-log test no count it.
+            provoked++;
+            LogWatch.Provoking++;
+            ServerRules.TestRules = DefaultRules(r =>
+            {
+                r.TierMaterial[3] = "Silverr";
+                r.Trophies[1] = 0;
+            });
+            line = CostLine(L(item.GetTooltip()));
+            c.Check(line == "5 metal of its biome", $"unknown metal name and Level1Trophies = 0: the cost line is just '5 metal of its biome', is '{line}'");
             c.Report();
         }
         finally
         {
             ServerRules.TestRules = null;
+            LogWatch.Provoking -= provoked;
+            // Idol table back on real rules now (not later, inside other test's log window).
+            IdolCatalog.IdolAt(0, true);
         }
         yield break;
     }

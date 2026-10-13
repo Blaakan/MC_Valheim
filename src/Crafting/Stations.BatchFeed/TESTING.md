@@ -4,12 +4,15 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
-MC Mods panel. Smoke test passed 2026-09-29 (loads, patches cleanly, JitCheck clean: 236 methods, 0 failures). No
-in-game test yet.
+**Build under test:** 0.1.1, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+MC Mods panel. Smoke test passed 2026-09-29 on 0.1.0 (loads, patches cleanly, JitCheck clean: 236 methods, 0
+failures). No in-game test yet. 0.1.1 fixed the hover hint that stayed wrong when another mod changed a fire while you
+kept looking at it (the hint now asks the spot under the crosshair again every half second): C05 was reset, and the
+self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): all of
+this mod's tests passed.
 
-**Automated checks (2026-10-08):** 33 of 34 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 33 of 33 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -303,13 +306,14 @@ Debug line of each batch then says `owner=other`.
   as a batch target: that holds only while Switchable Lights is off, not installed, or has the Sconce removed from
   its `Lights` list.)
   *Automated: `batchfeed.compat-lights`.*
-- [!] **C05 Hint follows Switchable Lights (MC) turned on or off:** start with Switchable Lights off (MC Mods panel
+- [ ] **C05 Hint follows Switchable Lights (MC) turned on or off:** start with Switchable Lights off (MC Mods panel
   or F1) and look at a Sconce: the "x5" hint shows. Keep the crosshair on the Sconce (or look at a chest and back)
   and turn Switchable Lights on. Expected: within about half a second the hover shows `[E] Turn off` with no batch
   hint, and Shift+E switches the light once. Turn Switchable Lights off again while still looking at the Sconce.
   Expected: the "x5" hint is back within about half a second, without looking at another fire first.
-  **FAILED:** automated test: Hover hint keeps its cached covered / not covered answer when another mod flips a fire's
-  flags while the crosshair stays on it (self-test `batchfeed.bug.hint-stale`)
+  *Partly automated (`batchfeed.hint-follows`); by hand: The real Switchable Lights (MC) turned on and then off while
+  you keep looking at a Sconce: `[E] Turn off` with no batch hint and Shift+E switching the light once, then the "x5"
+  hint back, each within about half a second (the test flips the same flag on a Campfire by itself).*
 - [ ] **C06 Mod that takes a station over before an add** (only if such a mod is installed, for example
   ValheimCommunityPatch with its "Fix Fuel And Ore Loss" setting on, which makes you the owner of a smelter, kiln or
   fire right before fuel or ore is added; else `[-]`): in multiplayer, the friend owns an empty Smelter. Press Shift+E

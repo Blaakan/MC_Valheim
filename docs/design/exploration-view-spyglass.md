@@ -185,9 +185,15 @@ the overlay (which outlives scenes) never stays over the main menu.
 ### 2.4 Overlay without a shader (G4)
 
 No asset bundle means no custom shader. `ScopeCapture` (`OnRenderImage` on a component added last to the main camera,
-on only while the overlay shows) shrinks the finished frame by 2 four times and back up once (bilinear = soft blur)
-into a 1/8-size render texture without alpha (`RGB111110Float`, else `RGB565`), then copies the frame through
-unchanged. The overlay is its own screen-space canvas at sort order HUD−1 (399; above the render-scale picture at 0),
+on only while the overlay shows with `EdgeBlur` on) shrinks the finished frame by 2 four times and back up once
+(bilinear = soft blur) into a 1/8-size render texture without alpha (`RGB111110Float`, else `RGB565`), then copies the
+frame through unchanged. `ScopeOverlay.Show` switches it on and off with `EdgeBlur` on every frame the overlay shows,
+so the setting also takes effect while looking. Switched off, the component stays on the camera and keeps its texture
+(only the first frame after it was added has none: no blur ring on that frame, and the copy keeps running). (Fixed in
+0.1.1: with `EdgeBlur` turned off while looking, only the ring was hidden and the copy went on until the spyglass was
+lowered; test T28.)
+
+The overlay is its own screen-space canvas at sort order HUD−1 (399; above the render-scale picture at 0),
 with two UI graphics building ring meshes: `BlurRing` (RawImage showing the small texture full screen, vertex alpha 0
 inside the sharp circle rising to 1 at 1.3 times its radius) and `DarkRing` (black, from 1.02 to 1.7 times the radius,
 then up to `EdgeDarkness`). `UI/Default` multiplies the texture by the vertex colour, so vertex alpha draws the soft

@@ -5,10 +5,10 @@
 | Mod | Breeding Star Inheritance |
 | GUID / project | `MC.Farming.Breeding.StarInheritance` (`src/Farming/Breeding.StarInheritance/`, root namespace `MC.Farming.BreedingStarInheritanceMod`, package `BreedingStarInheritance`) |
 | Category / scope | Farming / Revamp |
-| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. A birth is decided by the game that simulates the parent (1.11), so the server refuses players whose game does not have the mod installed (setting `AllowPlayersWithoutMod` to let them in) and sends its breeding settings to everyone (3.9, decisions 10, 22-26). The user's review (2026-09-29): the vanilla 50/50 rule must never apply; server-only was asked about and rejected (decision 22). |
+| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. A birth is decided by the game that simulates the parent (1.11), so the server refuses players whose game does not run the mod: not installed, turned off, or another network version (setting `AllowPlayersWithoutMod` to let them in), and sends its breeding settings to everyone (3.9, decisions 10, 22-27). The user's review (2026-09-29): the vanilla 50/50 rule must never apply; server-only was asked about and rejected (decision 22). |
 | Sheet idea | `Breeding revamp` |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim` in `.ref/`; the dedicated server's own `assembly_valheim` (installed `valheim_server`, `Game` and `ZNet` decompiled to a scratch folder, 2026-09-29) for 1.11; prefab names checked in the installed game's `StreamingAssets/SoftRef/manifest_extended` and English names in the `resources.assets` localization table (2026-09-29); per-species breeding facts from valheim.weirdgloop.org (2026-09-29); sources of Star Level System 1.18.1, AllTameable and FeedLikeGrandma read on GitHub (2026-09-29); HarmonyX 2.9.0 in the installed `BepInEx/core` |
-| Status | Implemented (0.1.0). The client-only build passed the build, the smoke test and the in-world self-tests (2026-09-29); the server-and-client build (join check, settings sync) builds in Debug and Release, smoke test, in-world self-tests and in-game tests pending |
+| Status | Implemented (0.2.0: the join check now also refuses a player whose copy is turned off or has another network version, when joining and live, decision 27 and 3.9.1; and the client's log stays silent while its copy is off, 3.9.2 step 3). The client-only build passed the build, the smoke test and the in-world self-tests (2026-09-29); the server-and-client build (join check, settings sync) builds in Debug and Release, smoke test, in-world self-tests and in-game tests pending |
 
 "Breeding" and not "Procreation" in the GUID: it is the player's word. "StarInheritance" names what changes (how stars pass
 from parents to babies), so a later breeding mod (for example "Breeding.OneBabyPerPair") gets its own GUID.
@@ -42,10 +42,12 @@ Requirements from the user (2026-09-29), made precise:
 7. **Multiplayer: the vanilla rule never applies because a game lacks the mod** (user's review, 2026-09-29: "could the
    mod be server side only? or needed to be installed on both client and server"; the requirement behind it is that
    the vanilla 50/50 rule must never apply). The mod is required on the server (or host) and on every player: the
-   server refuses a player whose game does not answer the mod's handshake about a second after they got in (their game
-   shows the vanilla "Incompatible version" message), unless the server's `AllowPlayersWithoutMod` is on; and the
-   server's five breeding settings apply to every game connected to it (3.9). Server-only is not feasible (decision
-   22).
+   server refuses a player whose game does not run the mod (no answer to the mod's handshake, the mod turned off, or
+   another network version) about a second after they got in, and about a second after they turn it off while
+   connected (their game shows the vanilla "Incompatible version" message), unless the server's
+   `AllowPlayersWithoutMod` is on; and the server's five breeding settings apply to every game connected to it (3.9).
+   Server-only is not feasible (decision 22). Refusing a copy that is installed but turned off is the user's decision
+   of 2026-10-08 (decision 27).
 
 Items 1-2 are the user's behaviour 1, item 3 behaviour 2, item 4 behaviour 3. Item 5 follows from item 1 for egg
 layers. Item 6 is an MC rule for every mod. Item 7 is the user's review answer.
@@ -263,7 +265,11 @@ vanilla and saved with the world. A player's ZDO is not saved and is replaced at
   the framework's `NetworkGate` postfix then sends the mod's `Hello`. The client sends `PeerInfo` only after the
   server's `ClientHandshake` answer (and the password, if any). `ZRpc` keeps order on a connection, so the server
   always has a modded client's `Hello` before its `PeerInfo`: `NetworkGate.PeerHasMod(peer)` is already final when
-  the server's `RPC_PeerInfo` completes.
+  the server's `RPC_PeerInfo` completes. The `Hello` also carries the copy's network version and whether it is on,
+  and the framework sends a `HelloState` message whenever that on/off state changes later (also between `Hello` and
+  `PeerInfo`, for example at the password prompt), so `NetworkGate.PeerCompatible(peer)` (has the mod, same network
+  version, not turned off) can be asked from then on; on the server each later change raises
+  `NetworkGate.PeerStateChanged`.
 - **"Fully in"**: at the end of a successful server `RPC_PeerInfo`, the peer gets `m_uid` (`ZNetPeer.IsReady()`),
   `m_playerName`, the server's own `PeerInfo`, and joins `ZDOMan` and `ZRoutedRpc`. Every vanilla refusal (network
   version, ban or allow list, session ticket, crossplay, full, password, already connected) invokes `Error(n)` and
@@ -285,9 +291,11 @@ vanilla and saved with the world. A player's ZDO is not saved and is replaced at
   `Procreate` call on any animal comes at least that species' `m_updateInterval` after it got in (the
   `breeding.network` self-test lists the value of every species and checks it against the join check's 5 s).
 - **Unknown RPC names are ignored** (`ZRpc.HandlePackage` looks the hash up and does nothing when it is missing), so
-  vanilla games ignore the mod's messages. `ZRpc.Register` replaces a handler with the same name; there is no
-  unregister. An `EndOfStreamException` while reading a package counts as an incompatible version and drops the
-  connection, so the settings travel as one `string` (always readable) that the mod parses itself.
+  vanilla games ignore the mod's messages. `ZRpc.Register` replaces a handler with the same name;
+  `ZRpc.Unregister(name)` removes one (read in 1.0.17; the mod does not use it: its handlers stay registered and look
+  at the mod's own on/off flag, 3.10). An `EndOfStreamException` while reading a package counts as an incompatible
+  version and drops the connection, so the settings travel as one `string` (always readable) that the mod parses
+  itself.
 
 ---
 
@@ -337,8 +345,8 @@ parent + chance of +1 scaled by a skill"; nobody records the partner in a small 
    ZDO (when the character spawns, then throttled on breeding ticks, only when it differs from what is there), so the
    game that decides a birth can also use the skill of another player standing at the pen (3.4).
 5. **Everyone runs it, with the server's numbers** (Goal 7). The server (dedicated or host) refuses players whose
-   game does not have the mod installed, and sends its five breeding settings to every game with the mod; those games
-   use them instead of their own (3.9).
+   game does not run the mod (not installed, turned off, or another network version), and sends its five breeding
+   settings to every game with the mod; those games use them instead of their own (3.9).
 
 ### 3.2 The birth rule (`BirthRule.Decide`)
 
@@ -487,7 +495,7 @@ only when there is one.
 | `Procreation.Procreate()` | Finalizer, `BirthState __state`, `Exception __exception` | Only when `__exception != null` and `Swapped` (the original or a postfix threw, so our postfix may not have run) → `m_character.m_level = OriginalLevel` (idempotent). | Exception path: the parent never keeps the baby's level. A `void` finalizer leaves the exception as it was. It does nothing on the normal path, so it never overwrites a level another mod's later postfix may set. |
 | `Player.OnSpawned(bool)` (`PlayerPatches`) | Postfix | Only for `Player.m_localPlayer` (vanilla calls it only from `Game.SpawnPlayer`, for the local character): `FarmerSkill.PublishNow()` (guarded, 3.4). | Joining, respawning and reconnecting give the player a new ZDO without the published level; without this, a friend would not count until the next breeding tick on their game (30-45 s after a pen loads). Once per spawn, after the skills are loaded (decision 19). |
 | `ZNet.OnNewConnection(ZNetPeer)` (`ZNetPatches`) | Postfix | Server: register `<GUID>.SettingsRequest` on the peer's `ZRpc`. Client: forget the settings of an older session, register `<GUID>.Settings` (3.9). | The per-peer `ZRpc` exists from here; the client handler must exist before the server's answer arrives. |
-| `ZNet.RPC_PeerInfo(ZRpc, ZPackage)` (`ZNetPatches`) | Postfix | Only when the peer is ready (vanilla accepted it, 1.14). Server: `PlayerCheck.Schedule(peer)` (grace timer). Client: register `<GUID>.Settings` again (without forgetting anything), then send `<GUID>.SettingsRequest` to the server. | The end of the handshake: the peer is fully in, and `PeerHasMod` is final (1.14). A postfix never skips vanilla code, so version-check mods that refuse in a prefix keep working. The client registers here too because a copy turned on during the connecting screen missed the `OnNewConnection` postfix, and its `OnActivated` found no server peer yet (`ZNet.GetServerPeer()` is null until the client's own `RPC_PeerInfo` sets Connected); without the handler the server's answer would be dropped silently (unknown RPC). `ZRpc.Register` replaces, so twice is safe. |
+| `ZNet.RPC_PeerInfo(ZRpc, ZPackage)` (`ZNetPatches`) | Postfix | Only when the peer is ready (vanilla accepted it, 1.14). Server: `PlayerCheck.Schedule(peer)` (grace timer). Client: register `<GUID>.Settings` again (without forgetting anything), then send `<GUID>.SettingsRequest` to the server. | The end of the handshake: the peer is fully in, and the framework's hello (installed, network version, on or off) is there, so `PeerCompatible` can be asked (1.14). A player who turns the mod off or on later is scheduled again from `NetworkGate.PeerStateChanged`, not from a patch (3.9.1). A postfix never skips vanilla code, so version-check mods that refuse in a prefix keep working. The client registers here too because a copy turned on during the connecting screen missed the `OnNewConnection` postfix, and its `OnActivated` found no server peer yet (`ZNet.GetServerPeer()` is null until the client's own `RPC_PeerInfo` sets Connected); without the handler the server's answer would be dropped silently (unknown RPC). `ZRpc.Register` replaces, so twice is safe. |
 | `ZNet.Update()` (`ZNetPatches`) | Postfix | Two bool reads; when there is work: `PlayerCheck.Update()` (deadlines) and `ServerSettings.Update()` (send the settings after a change). | The timer. Runs on every game and on the dedicated server; removed with the other patches when the feature turns off. |
 
 No transpiler; no patch on `Character.SetLevel`, `ItemDrop.SetQuality`, `EggGrow`, `Growup` or any per-frame method
@@ -524,8 +532,10 @@ or postfix would see the swapped level; with no birth prediction, the rule still
   useServer, serverRule, serverRange)`; `Effective(own)` (the server's numbers only for a connected client that got
   them in the current `ZNet` session); the wire (`RegisterServer`, `RegisterClient`, `Request`, the two handlers,
   `Receive(payload)`); `Start`/`Stop` (activation), `MarkChanged` + `Update` (send after a change) (3.9).
-- `PlayerCheck` (static): the join check (3.9): `JoinVerdict` and the pure `Decide(isServer, connected, ready,
-  beingKicked, hasMod, allowWithoutMod)`; `Schedule(peer)`, `ScheduleAllConnected()`, `Update()`, `Start`/`Stop`.
+- `PlayerCheck` (static): the join check (3.9): `JoinVerdict` (Skip / Compatible / Allowed / Refuse) and the pure
+  `Decide(isServer, connected, ready, beingKicked, compatible, allowWithoutMod)`; `Schedule(peer)`,
+  `ScheduleAllConnected()`, `Update()`, `Start`/`Stop` (which also subscribe to and unsubscribe from
+  `NetworkGate.PeerStateChanged`). A copy of Swim Dive's `PlayerCheck` with this mod's log texts.
 - `Plugin.OwnSettings()` (this game's config values) and `Plugin.CurrentSettings()`: the only door to a birth's
   numbers: the Debug override (rule only) over `ServerSettings.Effective(OwnSettings())`.
 - `SelfTests` (Debug builds only): the in-world self-tests (6.1) and `Override`, rule settings a test forces without
@@ -547,11 +557,12 @@ of the server (or host) is used for everyone."
 | General | ChanceWithoutFarmer | float `10`, 0-100 | Chance (percent) of the extra star when no farmer is known at all: the game handling the birth has no character at that moment (for example while its player respawns) and no other player with this mod is within FarmerRange. Rare in normal play. (Order 70) |
 | General | FarmerRange | float `60`, 5-64 (metres) | How close another player must be to the animal giving birth for their Farming skill to count. Only players who have this mod count, and only while the game handling the birth has them loaded. The Farming of the player whose game handles the birth counts at any distance. (Order 60) |
 | General | MaxStars | int `2`, 0-10 | The extra star never takes a baby above this many stars (2 is the most the game shows). Babies whose weaker parent already has this many stars or more keep that level and get no extra star. 0 turns the extra star off. (Order 50) |
-| General | AllowPlayersWithoutMod | bool `false` | Used only by the server (or the host). Off (default): a player whose game does not have this mod installed is refused about a second after joining, and their game shows "Incompatible version", because the animals their game simulates would breed the normal game way. The check only looks at whether the mod is installed: a player who turned it off on their own game is not refused. On: players without the mod may play, and the animals their game simulates breed the normal game way (the baby takes the level of the parent that gives birth). (Order 40) |
+| General | AllowPlayersWithoutMod | bool `false` | Used only by the server (or the host). Off (default): a player whose game does not have this mod, has it turned off or has another version of it is refused about a second after joining, or about a second after turning it off, and their game shows "Incompatible version", because the animals their game simulates would breed the normal game way. On: such players may play, and the animals their game simulates breed the normal game way (the baby takes the level of the parent that gives birth). (Order 40) |
 
 `SettingChanged` handlers, subscribed only while Active: the five breeding settings → `ServerSettings.MarkChanged()`
 (the server sends them again on the next `ZNet.Update`, once for a whole config-file save); `AllowPlayersWithoutMod`
-switched to `false` → `PlayerCheck.ScheduleAllConnected()` (players already online are checked too). Nothing is
+switched to `false` → `PlayerCheck.ScheduleAllConnected()` (players already online are checked too; switching it to
+`true` checks nobody). Nothing is
 cached for the rule itself. The ranges are enforced by BepInEx (`AcceptableValueRange`, bounds shared with
 `ServerSettings` so the received values are clamped to the same ranges) and the chances are clamped again in
 `BirthRule.Chance`.
@@ -595,9 +606,10 @@ player and its view of the other players nearby, with the server's settings (3.9
 | The simulating game runs the mod | The mod's rule with the server's settings; farmers = that game's own player, plus other players running the mod within `FarmerRange` (through their published level); the best one counts. |
 | A player whose game does not have the mod joins a server with the mod on | Refused about 1 s after getting in and disconnected 4 s later at the latest (3.9.1): their game is gone before its first breeding tick, as long as every species' tick is longer than those 5 s (checked on the real prefabs by the `breeding.network` self-test; see Unverified names and values). |
 | Same, with the server's `AllowPlayersWithoutMod` on (or while the server has the mod off) | Plays; animals their game simulates get vanilla births (the baby takes that parent's own level). The record, if any, is ignored and becomes stale. Warning in the server log. |
-| A player with the mod installed but turned off (`Enabled = false`, or an error state) on their own game | Not refused (the handshake only says the mod is installed); vanilla births for the animals their game simulates while it is off; not a farmer (withdrawn). Known limit (open question 7). |
+| A player with the mod installed but turned off (`Enabled = false`, unticked in the MC Mods panel, or an error state) on their own game | Refused like a player without it (decision 27): about 1 s after getting in when they join with it off, and about 1 s after turning it off while connected (the framework tells the server at once, 3.9.1 step 1). The server's log gives the reason "has the mod turned off". With `AllowPlayersWithoutMod` on they stay: vanilla births for the animals their game simulates while it is off; not a farmer (withdrawn). |
+| A player whose copy of the mod has another network version (a later release) | Refused the same way, reason "has another version of the mod (network version n, the server has m)"; with `AllowPlayersWithoutMod` on they stay, and the framework keeps their copy off (ServerMismatch). Only network version 1 exists so far. |
 | A player with the mod on a server (or host) without it | Framework: the mod turns itself off on that game for the session (ServerMissing): vanilla births there. |
-| The server turns the mod off | Framework: every client's copy turns off with it (the server tells them): vanilla births everywhere until it is back on; nobody is refused meanwhile. Back on: clients turn on and ask for the settings again, players without the mod are checked again (refused after the grace). |
+| The server turns the mod off | Framework: every client's copy turns off with it (the server tells them): vanilla births everywhere until it is back on; nobody is refused meanwhile. Back on: clients turn on and ask for the settings again, and every player online is checked again (those whose game does not run the mod are refused after the grace; a client that only followed the server's off state still counts as on). |
 | Pregnancy conceived on a game without the mod, born on a game with it | Partner found at birth within the population range (3.3); the mod's rule. |
 | Pregnancy conceived with the mod, ownership moves to another game with the mod | The record travels with the parent's ZDO; the new owner uses it. |
 | A player without the mod stands at the pen | Does not count as a farmer (nothing published); the deciding game's own player still counts. |
@@ -615,22 +627,33 @@ player and its view of the other players nearby, with the server's settings (3.9
 On the server (dedicated or host), while the feature is Active. Never in single player (no peer) and never on the
 host's own player (not a peer).
 
-1. **Hook:** `ZNet.RPC_PeerInfo` postfix; only a ready peer (`IsReady()`: vanilla accepted it, 1.14) is scheduled,
-   with a deadline `Time.unscaledTime + 1 s` (`GraceSeconds`). The same peer twice keeps its first deadline.
+1. **Hooks:** the `ZNet.RPC_PeerInfo` postfix, and the framework event `NetworkGate.PeerStateChanged` (a connected
+   player turned the mod off or on on their game; `PlayerCheck` listens to it while Active and its handler catches
+   its own exceptions). Either way only a ready peer (`IsReady()`: vanilla accepted it, 1.14) is scheduled, with a
+   deadline `Time.unscaledTime + 1 s` (`GraceSeconds`). The same peer twice keeps its first deadline, so a player who
+   turns the mod off and on again within the second passes.
 2. **Timer:** `ZNet.Update` postfix; nothing to do = one bool read. Due entries leave the list before they are
    checked.
 3. **Check** (`Decide`, pure): not the server, or the peer is gone (not in `ZNet.GetPeers()` or its `ZRpc` no longer
-   connected), not ready, or already in the vanilla kick list → nothing. `NetworkGate.PeerHasMod(peer)` → fine (Debug
-   line). Otherwise `AllowPlayersWithoutMod` on → let in (Warning: the animals their game simulates breed the vanilla
-   way); off → **refuse**.
-4. **Refuse** the vanilla way: Warning naming the player (name and platform id) and why; `peer.m_rpc.Invoke("Error",
-   (int)ZNet.ConnectionStatus.ErrorVersion)`; the peer goes into vanilla's `ZNet.PeersToDisconnectAfterKick` with
-   `Time.time + 4 s` (`DisconnectDelay`), so vanilla's own `ZNet.Update` disconnects it after the message left (the
-   vanilla kick path, 1.14, with a longer delay: see below). The client logs out and its main menu shows
-   "Incompatible version".
-5. **Cancel and re-check:** `OnDeactivated` clears the list (a pending check is cancelled; a refusal already sent
-   still completes, through vanilla's list). `OnActivated` schedules every ready peer (the server turned on later with
-   players online). `AllowPlayersWithoutMod` switched to `false` schedules every ready peer too.
+   connected), not ready, or already in the vanilla kick list → nothing. `NetworkGate.PeerCompatible(peer)` (the
+   player's game has the mod, with the same network version, and has not said it is off; a copy that never said
+   either way counts as on) → fine (Debug line). Otherwise `AllowPlayersWithoutMod` on → let in (Warning with the
+   reason: the animals their game simulates breed the vanilla way); off → **refuse**. The reason comes from
+   `NetworkGate.PeerProblem(peer)`: "does not have the mod", "has the mod turned off" or "has another version of the
+   mod (network version n, the server has m)".
+4. **Refuse** the vanilla way: Warning naming the player (name and platform id) and the reason; `peer.m_rpc.Invoke(
+   "Error", (int)ZNet.ConnectionStatus.ErrorVersion)`; the peer goes into vanilla's
+   `ZNet.PeersToDisconnectAfterKick` with `Time.time + 4 s` (`DisconnectDelay`), so vanilla's own `ZNet.Update`
+   disconnects it after the message left (the vanilla kick path, 1.14, with a longer delay: see below). The client
+   logs out and its main menu shows "Incompatible version". This is the same for a player on the loading screen and
+   for one who is playing (a player who turned the mod off while in): the client's `Game.FixedUpdate` logs out as
+   soon as the connection status is an error.
+5. **Cancel and re-check:** `OnDeactivated` clears the list and stops listening (a pending check is cancelled; a
+   refusal already sent still completes, through vanilla's list). `OnActivated` schedules every ready peer (the server
+   turned on later with players online). `AllowPlayersWithoutMod` switched to `false` schedules every ready peer too.
+
+Before 0.2.0 step 3 asked `NetworkGate.PeerHasMod` (installed, whatever its state), so a player who had the mod
+turned off stayed and bred the animals their game simulates the vanilla way (decision 27).
 
 Why 1 s + 4 s: the modded client's `Hello` is always there before `PeerInfo` (1.14), so the grace is only a safety
 margin and can be short. The disconnect delay is long because the refusal lands while the refused game is on its
@@ -640,8 +663,10 @@ closed server socket, sets `ErrorDisconnected` and drops the peer before its sec
 and the menu shows the disconnection text. With vanilla's 1 s kick delay one long loading frame is enough; with 4 s
 the client gets many frames to read the `Error` and log out by itself. The sum, 5 s, must stay below the first
 breeding tick a joining game can run (at least `m_updateInterval` after it received the animals; 30 s for boars and
-hens), so a refused game never decides a birth. The `breeding.network` self-test checks this on every prefab with
-`Procreation` and logs each species' tick in a `NOTE` line.
+hens), so a game refused when it joins never decides a birth. The `breeding.network` self-test checks this on every
+prefab with `Procreation` and logs each species' tick in a `NOTE` line. A player who turns the mod off while playing
+already simulates their animals: its patches are removed at once, the refusal follows about a second later, and a
+birth that falls due on that game in between is a vanilla one. The server cannot prevent that (section 4).
 
 #### 3.9.2 Server settings for everyone (`ServerSettings`)
 
@@ -658,7 +683,14 @@ hens), so a refused game never decides a birth. The `breeding.network` self-test
    else the whole message is refused (Warning once per session; the last good values, or the own ones, stay in use).
    Out-of-range values are clamped to the config ranges (chances 0-100, `FarmerRange` 5-64, `MaxStars` 0-10) with a
    Warning. Accepted values are stored with the `ZNet` instance they came on, and an Info line gives them (once per new
-   set of values).
+   set of values). **While the client's copy is off** (turned off on that game while connected, on a server that
+   lets such a player stay with `AllowPlayersWithoutMod`, or in the seconds before the server cuts it: its handler
+   stays registered, and the server sends to every player who has the mod installed, on or off) a message is still
+   checked and stored,
+   but `Receive` writes no log line (no Info line, no Warning) and remembers none as written: the births on that game
+   are vanilla then, so the line would be wrong. When the copy turns on it asks again (step 1), and that answer writes
+   the Info line once, with the server's current values (M16; fixed in 0.2.0: before, the line appeared while off and
+   was missing after turning on).
 4. **Effective settings** (`Plugin.CurrentSettings`, the only accessor, read at every birth): the Debug self-test
    override (rule only) over the server's values when this game is a client (`!IsServer()`) of the same `ZNet`
    session that delivered them, else the own config. Single player, host and dedicated server: always the own config
@@ -668,11 +700,11 @@ hens), so a refused game never decides a birth. The `breeding.network` self-test
 The birth Debug line ends with `own settings`, `server settings` or `self-test settings`.
 
 `ModMultiplayerNotes` (player-facing, in the csproj): "Install it on the server (or the host) and on every player's
-game. A birth is decided by the game of the player that is simulating the animal, and a game without the mod would
-use the normal game rule, so the server refuses players who do not have the mod (their game shows Incompatible
-version), unless its AllowPlayersWithoutMod setting is on. The breeding settings of the server (or host) apply to
-everyone. Other players' Farming counts when they stand near the animal. On a server without the mod it turns itself
-off. Babies and eggs are normal for everyone."
+game. A birth is decided by the game of the player that is simulating the animal, and a game that does not run the
+mod would use the normal game rule, so the server refuses players who do not have the mod, have it turned off or have
+another version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on. The
+breeding settings of the server (or host) apply to everyone. Other players' Farming counts when they stand near the
+animal. On a server without the mod it turns itself off. Babies and eggs are normal for everyone."
 
 ### 3.10 Live toggle
 
@@ -681,17 +713,24 @@ off. Babies and eggs are normal for everyone."
   birth handled by a game with the mod on clears them). A level
   swap cannot be in progress (toggles apply between frames). Network part: the `SettingChanged` handlers are removed,
   pending join checks are cancelled, the server stops answering settings requests (its handlers stay registered on
-  the peers' `ZRpc`, which has no unregister, and check a flag), and a client forgets the server's values. On the
-  server, the framework then tells every client that its copy is off, so their copies turn off too (3.9).
+  the peers' `ZRpc` and check a flag), the server stops listening for players who turn the mod on or off, and a
+  client forgets the server's values and which log lines it wrote. On a client connected to a server, the framework
+  tells the server that the copy is off, and a server with the mod on refuses that player about a second later
+  (3.9.1) unless its `AllowPlayersWithoutMod` is on. A client that stays connected (allowed, or not cut yet) keeps its
+  settings handler too: what the server sends while the copy is off is stored without any log line (3.9.2 step 3). On
+  the server, the framework then tells every client that its copy is off, so their copies turn off too (3.9).
 - **Turned on**: patches applied; `OnActivated` resets the Star Level System lookup (done again at the first breeding
   tick, decision 17), clears the stand-aside log flag, and publishes the Farming level at once if the local player
   exists. Pregnancies conceived while off use the partner found at birth. Network part: a server registers the
-  settings request on peers that joined while it was off, sends its settings to every player with the mod, and
-  schedules a join check for every ready peer; a client already connected registers the settings handler and asks
-  for the settings.
+  settings request on peers that joined while it was off, sends its settings to every player with the mod,
+  schedules a join check for every ready peer and listens for players who turn the mod on or off; a client already
+  connected (on a server that let it stay while off) registers the settings handler and asks for the settings, and
+  the answer writes the `Using the server's breeding settings` line once (also when the same values had already
+  arrived while the copy was off); the framework tells the server that the copy is on, and the server checks that
+  player again (Debug line).
 - `Enabled = false` + restart: no patch, no key written, vanilla breeding; `Status` "Off (disabled in settings)". On a
-  client the framework still answers the server's handshake, so the server counts it as having the mod (open question
-  7).
+  client the framework's handshake tells the server that the mod is installed but turned off, so a server with the
+  mod refuses that player about a second after they got in (3.9.1), unless its `AllowPlayersWithoutMod` is on.
 
 ### 3.11 Compatibility
 
@@ -762,13 +801,18 @@ conditionally until T16 is done.
   ChanceAtFarming0 <a>, ChanceAtFarming100 <b>, ChanceWithoutFarmer <c>, FarmerRange <r>, MaxStars <m>. Your own
   settings apply again in single player and when you host.` (once per new set of values); client Warning `The server
   sent breeding settings outside the allowed ranges; they were brought back into range: ...` and `The server sent
-  breeding settings this version cannot read (...); ...` (once per session); server Warning `Refused <player>
-  (<platform id>): their game does not run Breeding Star Inheritance, which this server requires on every player (a
-  game without it would breed the animals it simulates the vanilla way). Their game shows "Incompatible version". To
-  let such players in, set AllowPlayersWithoutMod = true.` or `<player> (<platform id>) joined without Breeding Star
-  Inheritance. AllowPlayersWithoutMod is on, so the animals their game simulates breed the vanilla way (the pregnant
-  parent's own level).`; server Debug `<player> (<platform id>) has Breeding Star Inheritance installed: allowed.` and `Sent
-  the breeding settings to <n> player(s): <payload>.`
+  breeding settings this version cannot read (...); ...` (once per session); none of these three client lines is
+  written while the client's copy is off, and the Info line comes once when it is turned on again (3.9.2 step 3);
+  server Warning `Refused <player> (<platform id>): <reason>. This server requires Breeding Star Inheritance on every
+  player (a game that does not run it would breed the animals it simulates the vanilla way). Their game shows
+  "Incompatible version". To let such players in, set AllowPlayersWithoutMod = true.` or `<player> (<platform id>)
+  <reason>; AllowPlayersWithoutMod is on, so they may play, but the animals their game simulates breed the vanilla way
+  (the pregnant parent's own level).`, where `<reason>` is the framework's `does not have the mod`, `has the mod
+  turned off` or `has another version of the mod (network version <n>, the server has <m>)`; server Debug `<player>
+  (<platform id>) has Breeding Star Inheritance on, with the same network version: allowed.` and `Sent the breeding
+  settings to <n> player(s): <payload>.` The framework itself writes, on the server, a Warning for a player who
+  joined without the mod and an Info line `<player> turned Breeding Star Inheritance off on their game.` (or `on`)
+  when a connected player toggles it.
 
 These lines are how every test reads the partner level, the farmer, the chance and the roll.
 
@@ -881,16 +925,23 @@ These lines are how every test reads the partner level, the farmer, the chance a
 | Game quit with the mod on | n/a | `OnDeactivated` runs; guarded withdraw skips the write when `ZNet` or the player is gone; no error |
 | Player without the mod joins a server with the mod | Plays | Refused about 1 s after getting in: vanilla `Error(3)` ("Incompatible version" in their menu), disconnected 4 s later through vanilla's kick list; Warning with name and platform id in the server log |
 | Same, `AllowPlayersWithoutMod` on | Plays | Plays; Warning in the server log; their simulated births are vanilla, they are never farmers |
-| `AllowPlayersWithoutMod` switched from on to off with such players online | n/a | Every ready player is checked again: those without the mod are refused about 1 s later |
+| `AllowPlayersWithoutMod` switched from on to off with such players online | n/a | Every ready player is checked again: those whose game does not run the mod (not installed, turned off, another network version) are refused about 1 s later |
+| `AllowPlayersWithoutMod` switched from off to on | n/a | Nobody is checked again; a refusal already sent still completes |
 | Player without the mod leaves before the 1 s deadline | n/a | Nothing (the check finds the peer gone from `ZNet.GetPeers()` or its connection closed) |
 | Player leaves and joins again within 1 s | n/a | The new connection is a new peer with its own deadline; the old entry is skipped |
 | Server turns the mod off during a player's 1 s wait | n/a | Check cancelled (list cleared); the player stays. Turned on again later: every ready player is checked again |
 | Server turns the mod off after a refusal was sent | n/a | The refusal completes (vanilla's kick list disconnects the player) |
 | Host's own player; single player | n/a | Never checked (not a peer) |
-| Modded client whose copy is off (`Enabled = false`) | n/a | Counted as having the mod (framework handshake still answers): not refused; its simulated births are vanilla while off (open question 7) |
-| Modded client with another network version (a future release) | n/a | Framework: its copy stays off (ServerMismatch) and it is still counted as having the mod by `PeerHasMod`: not refused (open question 7) |
+| Modded client that joins with its copy off (`Enabled = false`, or an error state) | n/a | The handshake says "installed, off": refused about 1 s after getting in, reason "has the mod turned off" (no framework "connected without" Warning). With `AllowPlayersWithoutMod` on: plays, Warning in the server log, its simulated births are vanilla |
+| Modded client that turns its copy off while connected | n/a | Its game tells the server at once (framework); the server checks that player again and refuses them about 1 s later, as above. A birth that falls due on their game in that second is vanilla (their patches are already gone). With `AllowPlayersWithoutMod` on: stays, one Warning in the server log |
+| Same player turns the copy off and on again within the 1 s | n/a | One check, at the first deadline: the copy is on by then, so the player stays |
+| Modded client that turns its copy on while connected (it was let in with `AllowPlayersWithoutMod`) | n/a | Checked again about 1 s later: fine (Debug line); it asks for the server's settings and logs them (3.9.2) |
+| Modded client that turns its copy on between the handshake and getting in (for example at the password prompt) | n/a | The framework tells the server before the player is ready; the check after they got in finds the copy on: not refused (M14) |
+| Modded client with another network version (a future release) | n/a | Refused about 1 s after getting in, reason "has another version of the mod (network version n, the server has m)". With `AllowPlayersWithoutMod` on: plays; the framework keeps its copy off (ServerMismatch), so its simulated births are vanilla |
+| A copy built before the framework sent its on/off state (no state in its handshake) | n/a | Counts as on (the framework's rule): not refused for that. The mod has not been released yet, so players do not have such a copy |
 | Client connected to a server with the mod, before the settings answer arrives | n/a | Own settings (one round trip after the handshake; no birth can happen before the world has loaded on that game) |
 | Server changes several settings in one config save | n/a | One settings message on the next frame; clients log one Info line with the new values |
+| Server sends its settings while a client's copy is off (turned off on that game while connected) | n/a | Stored without any log line (that game's births are vanilla then). When the copy is turned on it asks again and logs the Info line once, with the server's current values (M16) |
 | Unreadable or out-of-range settings from the server | n/a | Unreadable: refused whole, the previous values (or the own ones) stay, Warning once per session. Out of range: clamped to the config ranges, Warning |
 | Client disconnects, then plays single player or hosts | n/a | Own settings at once (the stored values belong to the old `ZNet` session) |
 | Client's own settings file differs from the server's | n/a | Ignored while connected (not overwritten); used again offline |
@@ -1041,10 +1092,24 @@ request or change what the player sees.
     player and hosting use the own settings without any cleanup hook. `AllowPlayersWithoutMod` is not synced (only the
     server reads it). `Plugin.CurrentSettings()` is the only accessor; the Debug self-test override keeps working on
     top of it.
-25. **The join check trusts the framework handshake** (`NetworkGate.PeerHasMod`, as asked; `src/Shared` unchanged): it
-    proves the mod is installed, not that it is on or of the same network version (open question 7).
+25. **The join check trusts the framework handshake** (`src/Shared` unchanged). Up to 0.1.0 it asked
+    `NetworkGate.PeerHasMod`, which proves the mod is installed, not that it is on or of the same network version.
+    Replaced by decision 27.
 26. **The host is checked like a dedicated server**: a host is the server for its guests, so its guests without the
     mod are refused too; the host's own player is not a peer and is never checked.
+27. **A copy that is installed but not running is refused too** (user's decision, 2026-10-08; it settles open
+    question 7: with the older check a player who turned the mod off stayed connected, which the multiplayer test
+    script reported as "older player check"). The check is upgraded to the one Swim Dive uses:
+    `NetworkGate.PeerCompatible` (has the mod, same network version, has not said it is off) instead of `PeerHasMod`,
+    the reason for the log from `NetworkGate.PeerProblem`, and a live re-check through
+    `NetworkGate.PeerStateChanged`, so a player who turns the mod off while connected is refused about a second later
+    (3.9.1). `AllowPlayersWithoutMod` (default off) lets all three kinds of player stay. The accepted
+    cost: unticking the mod in the MC Mods panel on someone else's server disconnects that player (README). Not
+    changed: the settings sync still sends to every player who has the mod installed, on or off (3.9.2), so a copy
+    that is allowed to stay while off has the server's values the moment it turns on; no RPC, payload or ZDO key
+    changed, so the network version stays 1. The mod's own multiplayer self-tests that turned the client's copy off
+    (`breeding.mp.off-stays`, `breeding.mp.off-push`) now switch the server's `AllowPlayersWithoutMod` on first; the
+    refusal itself is proven by the probe's `probe.mp.off.<GUID>` test (scenario `each-off`).
 
 Other implementation details that differ from the first version of this design (all technical, no behaviour change
 the player sees):
@@ -1082,13 +1147,12 @@ in the birth Debug line.
 5. Show the recorded partner level or "pregnant" in the animal's hover?
 6. If T16 shows eggs have no quality number in the inventory (`m_maxQuality` 1): show the egg's star level in the
    inventory and tooltip, and keep eggs of different levels from merging on drag, as a follow-up idea?
-7. **Installed but not running** (decision 25): the framework handshake says only that a player's game has the mod.
-   A player who turns it off on their own game (`Enabled = false`, or an error state), or a future release with
-   another network version (its copy stays off), is not refused, and the animals their game simulates breed the
-   vanilla way meanwhile. Stricter option, all inside this mod: the server requires this mod's own
-   `SettingsRequest` (sent only by an active copy, with the network version) within the grace instead of
-   `PeerHasMod`, and an active client tells the server when its copy turns off, so the server can refuse it then.
-   Cost: a player who toggles the mod off in the MC Mods panel gets disconnected.
+7. ~~Installed but not running~~: done in 0.2.0 (decision 27). A player who has the mod turned off (`Enabled =
+   false`, or an error state), or a copy with another network version, is now refused, also when the mod is turned
+   off while connected. The framework had meanwhile learned to tell the server a copy's on/off state and network
+   version (`PeerCompatible`, `PeerStateChanged`), so the stricter option first sketched here (this mod's own
+   `SettingsRequest` as proof) was not needed. The cost named then stands: a player who unticks the mod in the MC
+   Mods panel on a server gets disconnected.
 8. Join check timing: 1 s grace + 4 s disconnect delay (decision 23, changed from 5 s + 1 s in review). The sum must
    stay below the shortest breeding tick (`breeding.network` fails otherwise); a longer delay makes a lost message even
    rarer on slow machines.
@@ -1180,19 +1244,25 @@ both games; B gets Farming by `raiseskill` in a single-player world before joini
 | ID | Covers | Test |
 |---|---|---|
 | M01 | Goal 4, decisions 2-3, 24 | A sets `ChanceWithoutFarmer 0`, `ChanceAtFarming0 0`, `ChanceAtFarming100 100`, `FarmerRange 10` (B's log: the server settings line). Host A sets up a 0★ + 0★ pen (`spawn`, `tame`) and leaves far away (more than 200 m, or through a portal). Client B (a fresh character, Farming 0) arrives first, so B's game simulates the pen, and stays about 20 m from it. A runs `raiseskill Farming 100`, comes back and stands in the pen: babies 1★, B's Debug names A with Farming 100 (`published`) and ends with `server settings`. A steps back to 20-30 m: B's Debug names B (`own`, Farming 0), babies 0★. A sets `FarmerRange 40`: A counts again. |
-| M02 | Goal 4, open question 7 | M01 settings; A (Farming 0) simulates the pen from about 20 m; B (Farming 100) in the pen: A's Debug names B. B turns the mod off → B's withdraw line, B stays connected (not refused); A's Debug names only A (`own`, Farming 0), babies 0★. B turns it on again → B's server settings line, B counts again within a few seconds. |
+| M02 | Goal 4, decision 27 | M01 settings and `AllowPlayersWithoutMod = true` on A (without it B is refused when turning the mod off, M17); A (Farming 0) simulates the pen from about 20 m; B (Farming 100) in the pen: A's Debug names B. B turns the mod off → B's withdraw line, B stays connected, A's Warning "has the mod turned off; AllowPlayersWithoutMod is on"; A's Debug names only A (`own`, Farming 0), babies 0★. B turns it on again → B's server settings line, B counts again within a few seconds. |
 | M03 | Hand-off (owner without the mod), decision 23 | A sets `AllowPlayersWithoutMod = true`; B without the mod joins (Warning on A, not refused) and simulates a 0★ + 2★ pen set up by A, A far away: births follow vanilla (2★ babies appear), no Debug birth line on A; babies look normal to both. |
 | M04 | Hand-off (egg), goal 5 | A (`AllowPlayersWithoutMod = true`, chances 100) gets an "Egg[2]" from a 0★ hen pair; gives it to B without the mod; B hatches it at B's base → a 1★ chicken that grows into a 1★ hen; A sees the same stars. |
 | M05 | Decision 24 | A with chances 100, B's own file with chances 0: B's log shows the server settings line with 100; births simulated by B get the extra star (`chance 100%`, `server settings`). B then plays single player: its own settings (`chance 0%`, `own settings`), its file unchanged. |
 | M06 | Publishing after a respawn (3.4, decision 19) | M01 setup, A (Farming 100) in the pen. A runs `die`, respawns (a bed near the pen helps) and runs `die` again within the "No skill drain" time (a second death inside it keeps the skills), respawns and returns to the pen: each time A's character appears, A's Debug shows a publish line at once (the level after the first death), and B's next birth line names A with that Farming. Reconnection: B (a client with the mod) leaves and rejoins the running server while A keeps simulating the pen: B's publish line appears as soon as B's character appears, and A's next birth line names B when B is the best farmer near the pen. |
-| M07 | Goal 7, decision 23 | B without the mod joins A (defaults): about 1 s after getting in (usually on the loading screen), B's game returns to the main menu with "Incompatible version" (the plain disconnection text = `[!]` with the loading time noted); A's log: the framework Warning and the `Refused` Warning with B's name and platform id; no error. |
-| M08 | Decision 23 | `AllowPlayersWithoutMod = true`: B without the mod stays (Warning). Back to `false` with B online → B refused about 1 s later; a modded player online stays (Debug `has Breeding Star Inheritance installed: allowed`). |
+| M07 | Goal 7, decision 23 | B without the mod joins A (defaults): about 1 s after getting in (usually on the loading screen), B's game returns to the main menu with "Incompatible version" (the plain disconnection text = `[!]` with the loading time noted); A's log: the framework Warning and the `Refused` Warning with B's name and platform id and the reason "does not have the mod"; no error. |
+| M08 | Decision 23 | `AllowPlayersWithoutMod = true`: B without the mod stays (Warning). Back to `false` with B online → B refused about 1 s later; a player with the mod on who is online stays (Debug `has Breeding Star Inheritance on, with the same network version: allowed`). |
 | M09 | Decision 24 | B connected; A changes two settings in one config save → one `Sent the breeding settings` Debug line on A, one server settings Info line on B with both values; B's next birth uses them. |
 | M10 | Side Both | Dedicated server (updated to 1.0.16) with BepInEx and the mod: `[MC:ready]`, `Activated.`, no MC error or warning. `MaxStars = 1` in its config: a modded player's log shows it, a 1★ + 1★ pen simulated by that player gives 1★ (`at the cap`, `server settings`); the pen is built with cheats in single player (or hosted) on a test world that the dedicated server then runs, since cheats never work for a client of a dedicated server. A player without the mod is refused (server log). |
 | M11 | 3.9.1 step 5 | A turns the mod off with B (modded) online: B's panel says the server has it off. B rejoins without the mod: not refused while off. A turns it on → B refused about 1 s later. |
 | M12 | Decision 10 | B with the mod joins a host or server without it: B's panel "Inactive: the server does not have this mod ..."; vanilla births on B's game; no error; single player afterwards: Active. |
 | M13 | 3.9.1 step 3 (optional) | B without the mod closes its game the moment the loading screen appears, two or three times (a race with the 1 s check): each time A's log has either nothing from this mod or the `Refused` line, never an error. Turning the mod off during the 1 s wait (step 5, cancel) is too short to test by hand. |
-| M14 | 3.9.2 step 1 (optional) | Password host; B joins with `Enabled = false` and turns it on in its config file at the password prompt: once in, Active, B's server settings line with A's values, births end with `server settings`; no error. |
+| M14 | 3.9.2 step 1, 3.9.1 step 1 (optional) | Password host; B joins with `Enabled = false` and turns it on in its config file at the password prompt: not refused; once in, Active, B's server settings line with A's values, births end with `server settings`; no error. |
+| M17 | Decision 27 | Defaults; B, connected with the mod on, turns it off: B's withdraw line, about 1 s later back at the main menu with "Incompatible version"; A's log: the framework's "turned ... off on their game" line and the `Refused` Warning with the reason "has the mod turned off". B turns it on in the main menu and joins again: stays. |
+| M18 | Decision 27 | Defaults; B joins with `Enabled = false`: refused as M07, without the framework's "connected without" Warning, reason "has the mod turned off". (Another network version is refused the same way; only version 1 exists, so it cannot be tested yet.) |
+| M19 | Decision 27 | `AllowPlayersWithoutMod = true`: B joins with the mod off and stays (Warning with the reason); B turns it on while connected: Active, settings line, A's Debug "allowed" line; off again: stays, Warning again; A sets the setting back to `false` while B has it off: B refused about 1 s later. |
+
+M15 (a birth decided on another game than the conception) and M16 (the server's settings arriving while a client's
+copy is off) were added after this table was written and are described in `TESTING.md` only.
 
 Cross-mod:
 
@@ -1217,7 +1287,7 @@ mode) and reads the `[selftest] PASS|FAIL|NOTE|SHOT` lines. Rule settings are fo
 | `breeding.farmer` | `PublishNow` writes the own effective Farming (`OwnLevel`) on the local player's ZDO; `FindBest` names the local player at 500 m; `Withdraw` writes -1 and the local player still counts; publishing again restores the value; a character without a Farming entry still has none afterwards (the PASS line says "none added" or that the character already has one). |
 | `breeding.birth` | Two tamed `Boar` (levels 1 and 3) 6 m in front of the camera; their own `Procreate` ticks are cancelled and the test drives vanilla `Procreate` itself (love points set one short, pregnancy chance -1 so no tick is skipped, pregnancy duration -1 so the next call is due, population limit raised, ranges fixed to the code defaults 3 / 10 m). Every birth checks: conception happened, the partner note holds the mate's level, the birth happened, the parent's level is restored, the note is cleared by overwriting (stamp key present and 0; a missing key fails as "removed instead of cleared"), a new `Boar_piggy` (if another mod makes more than one, a NOTE says so and the extra ones within 10 m of the mother are destroyed). Phases: chance 0 (3 births by the level-3 parent, 2 by the level-1 one) → level 1; chance 100 → level 2; defaults with the character's own Farming (12 births) → only 1 or 2 (distribution in the PASS line); note cleared and partner 6 m away → partner found at birth → 1; note cleared and partner 25 m away → own level 3; 3 + 3 at 100% → 3; 5 + 5 at 100% → 5; parents 1 + 1 with `m_minOffspringLevel` 2 → 2 at 0%, 3 at 100%. Screenshot `piglets_with_stars` (two 1★ piglets and one 2★ piglet in front of the camera, health bars shown). A NOTE line logs the boar's prefab breeding values. |
 | `breeding.egg` | The same with two tamed `Hen` (levels 1 and 3): egg (`ChickenEgg`) quality 1 at chance 0, 2 at chance 100, 1 or 2 with the defaults, 3 for a 3 + 3 pair at 100%. A NOTE line logs the hen's breeding values and the egg's `m_maxQuality`, hatch prefab and `m_tamed` (settles T16's question and the unverified egg values). |
-| `breeding.network` | Mostly pure (3.9): RPC names `<GUID>.Settings` / `<GUID>.SettingsRequest`; the defaults encode as `1\|15\|50\|10\|60\|2` and decode back unchanged; decimals (12.5 / 49.75 / 0.1 / 33.3 / 1) come back exact, also with the thread culture set to de-DE (skipped with a NOTE if the runtime lacks it); out-of-range values clamp to the config ranges (0-100, 5-64, 0-10) and say so, the edges do not; 15 unreadable messages are refused whole (null, empty, other protocol, 5 or 7 fields, text, NaN, infinities, 1e40, a decimal MaxStars, a comma decimal, blanks); `Pick` gives the server's numbers only when told to. In this single-player world: it is its own server with no peer; `CurrentSettings()` is the own config (source Own); `Receive` of a settings message returns NotAClient and changes nothing; with `Override` set the rule is the override (source Test) and the range stays the effective one; no join check pending. Join-check verdicts: refuse only a ready, connected peer without the mod, not already being kicked, on a server with the setting off; allow with the setting on; fine with the mod; skip otherwise. Every prefab with `Procreation` (from `ZNetScene`, real prefab values) has an `m_updateInterval` longer than grace + disconnect delay (1 s + 4 s); a `NOTE` line lists each species' tick and the shortest one. |
+| `breeding.network` | Mostly pure (3.9): RPC names `<GUID>.Settings` / `<GUID>.SettingsRequest`; the defaults encode as `1\|15\|50\|10\|60\|2` and decode back unchanged; decimals (12.5 / 49.75 / 0.1 / 33.3 / 1) come back exact, also with the thread culture set to de-DE (skipped with a NOTE if the runtime lacks it); out-of-range values clamp to the config ranges (0-100, 5-64, 0-10) and say so, the edges do not; 15 unreadable messages are refused whole (null, empty, other protocol, 5 or 7 fields, text, NaN, infinities, 1e40, a decimal MaxStars, a comma decimal, blanks); `Pick` gives the server's numbers only when told to. In this single-player world: it is its own server with no peer; `CurrentSettings()` is the own config (source Own); `Receive` of a settings message returns NotAClient and changes nothing; with `Override` set the rule is the override (source Test) and the range stays the effective one; no join check pending. Join-check verdicts: refuse only a ready, connected peer whose game is not compatible (no mod, mod turned off, or another network version), not already being kicked, on a server with the setting off; allow with the setting on; fine when compatible, whatever the setting; skip otherwise. Every prefab with `Procreation` (from `ZNetScene`, real prefab values) has an `m_updateInterval` longer than grace + disconnect delay (1 s + 4 s); a `NOTE` line lists each species' tick and the shortest one. |
 
 With Star Level System installed, the birth and egg tests report PASS "skipped" (the mod leaves births to it by
 design).

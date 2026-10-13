@@ -4,8 +4,10 @@ using MC.Shared;
 
 namespace MC.Farming.BreedingStarInheritanceMod.Patches;
 
-// Me = network part (server settings for everyone, refuse players without mod). Only while Active, like every patch.
-// Framework NetworkGate patch same methods under own Harmony id (handshake); all postfixes, no order needed.
+// Me = network part (server settings for everyone, refuse players whose game not run the mod). Only while Active, like
+// every patch. Framework NetworkGate patch same methods under own Harmony id (handshake); all postfixes, no order
+// needed. Live re-check of a player who turn the mod off come from NetworkGate.PeerStateChanged (PlayerCheck), not
+// from here.
 //   OnNewConnection: server listen for settings request; client listen for settings (new session = forget old).
 //   RPC_PeerInfo:    peer ready = handshake done. Server: start grace for join check. Client: listen (again) and ask
 //                    server settings.

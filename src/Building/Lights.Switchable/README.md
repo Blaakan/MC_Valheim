@@ -38,7 +38,7 @@ ConfigurationManager, or by editing the file (the game picks up the change while
 | General | Enabled | `true` | Turn the feature on or off. Takes effect immediately. |
 | General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
 | General | Lights | every vanilla torch, sconce, lantern and candle (see below) | Pieces that become switchable lights: comma-separated prefab names (the names the spawn command uses). Pieces from other mods can be added if they are fires that work like a torch. A fire that can be used for cooking always keeps burning fuel, even when listed. In multiplayer the list of the server (or host) is used for everyone. |
-| General | AllowPlayersWithoutMod | `false` | Used only by the server (or the host). Off: a player whose game does not have the mod installed is refused about a second after joining (their game shows "Incompatible version"). The check only looks at whether the mod is installed: a player who turned it off on their own game is not refused. On: players without the mod may play; the lights their game runs burn fuel the normal game way. |
+| General | AllowPlayersWithoutMod | `false` | Used only by the server (or the host). Off: a player whose game does not have the mod, has it turned off or has another version of it is refused about a second after joining, or about a second after turning it off (their game shows "Incompatible version"). On: they may play; the lights their game runs burn fuel the normal game way. |
 
 Default `Lights`: `piece_groundtorch_wood, piece_groundtorch, piece_groundtorch_green, piece_groundtorch_blue,
 piece_walltorch, piece_jackoturnip, piece_snowlantern, Candle_resin, CastleKit_groundtorch_unlit`.
@@ -48,30 +48,35 @@ piece_walltorch, piece_jackoturnip, piece_snowlantern, Candle_resin, CastleKit_g
 - **Who needs it:** required on the server (or the host) and on every player's game.
 - **Multiplayer support:** works in multiplayer.
 
-Install it on the server (or the host) and on every player's game: the server refuses players without it, because the
-lights their game runs would burn fuel and go out, and its list of lights applies to everyone. Players without the mod
-(only with AllowPlayersWithoutMod on) see the same lights on or off; a light switched off simply looks empty to them
-and they can refuel it. On a server without the mod it turns itself off.
+Install it on the server (or the host) and on every player's game: the server refuses players who do not have it, have
+it turned off or have another version of it (their game shows Incompatible version), because the lights their game
+runs would burn fuel and go out, and its list of lights applies to everyone. Players let in without it (only with
+AllowPlayersWithoutMod on) see the same lights on or off; a light switched off simply looks empty to them and they can
+refuel it. On a server without the mod it turns itself off.
 
 - **Why everyone:** in Valheim, the game of one nearby player runs each light (its "owner"). If that player has the
-  mod, the light burns nothing. If not, it burns fuel at the normal rate and can go out; anyone with the mod can
-  switch it back on for free. When you switch a light, your game becomes its owner.
-- **Players without the mod are refused.** About a second after such a player has joined, the server refuses them:
-  their game goes back to the main menu with the game's own message "Incompatible version" (the game cannot show a mod
-  name there). The server's log names the player and says why. To let them play anyway, set
+  mod turned on, the light burns nothing. If not, it burns fuel at the normal rate and can go out; anyone with the mod
+  can switch it back on for free. When you switch a light, your game becomes its owner.
+- **Players whose game does not run the mod are refused.** This covers a player without the mod, a player who has it
+  turned off (`Enabled = false`, or unticked in the MC Mods panel) and a player whose version of the mod cannot talk
+  to the server's. About a second after such a player has joined, the server refuses them: their game goes back to the
+  main menu with the game's own message "Incompatible version" (the game cannot show a mod name there). A player who
+  turns the mod off while connected is refused the same way about a second later; turning it back on within that
+  second keeps them in. The server's log names the player and says why. To let them play anyway, set
   `AllowPlayersWithoutMod = true` on the server. Setting it back to `false` refuses the ones who are online about a
   second later.
-- **Players without the mod** (when allowed in) see exactly the same lights: on is a full light, off is an empty one.
-  They can refuel an off light with the usual fuel, which turns it on for everybody. They cannot switch a light off,
-  except the resin candle, which works as in vanilla for them (E switches it on or off; it never needs refuelling).
-  The lights their game runs burn fuel as usual.
+- **Players without the mod, or with it turned off** (when allowed in) see exactly the same lights: on is a full
+  light, off is an empty one. They can refuel an off light with the usual fuel, which turns it on for everybody. They
+  cannot switch a light off, except the resin candle, which works as in vanilla for them (E switches it on or off; it
+  never needs refuelling). The lights their game runs burn fuel as usual.
 - **The server's list applies to everyone.** When you join a server that has the mod, your game uses its `Lights`
   list and says so once in its log ("Using the server's ..."). Your own settings file is not changed; your own list
   applies again in single player and when you host. `AllowPlayersWithoutMod` is read only by the server.
 - **On a server without the mod** the mod turns itself off on your game (the MC Mods panel says why): lights behave as
   in vanilla.
 - **Dedicated servers:** install BepInEx on the server and put the mod in its `BepInEx/plugins` folder. The server
-  itself never runs lights (the players' games do): it checks that each player has the mod and sends them its list.
+  itself never runs lights (the players' games do): it checks that each player has the mod turned on and sends them
+  its list.
 - The mod adds nothing to the world save: on and off are the game's own fuel and on/off values.
 
 ## Good to know

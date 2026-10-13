@@ -52,6 +52,7 @@ internal static partial class SleepSelfTests
     private const string StartLine = "Day sleep: everyone is in bed at";
     private const string RetargetLine = "Day sleep: a sleep started at";
     private const string OutsideLine = "Day sleep not started:";
+    private const string SleptLine = "Sleep started at";
     private const string WokeLine = "Woke up at";
     private const string CycleWarning = "Could not read the day cycle";
 

@@ -127,6 +127,16 @@ internal static class DayClock
         return t >= day * len + RawFractionForHour(env, DawnHour) * len;
     }
 
+    // Raw time t is past 18:00 on its own date (client: did this sleep start in the night?). Day window never reach
+    // past 18:00 (Today: LatestStart), so sleep that start here is never day sleep. Exactly 18:00 = not past: same
+    // side and same maths as DayWindow.InWindow with widest window.
+    internal static bool IsAfterNightfall(EnvMan env, double t)
+    {
+        var day = env.GetDay(t);
+        var len = (double)env.m_dayLengthSec;
+        return t > day * len + RawFractionForHour(env, NightfallHour) * len;
+    }
+
     private static bool TryInvert(EnvMan env, float target, out float result)
     {
         result = 0f;

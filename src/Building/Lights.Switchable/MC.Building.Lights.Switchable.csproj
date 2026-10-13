@@ -2,7 +2,7 @@
   <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
   <PropertyGroup>
     <ModName>Switchable Lights</ModName>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <ModScope>QoL</ModScope>
     <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
     <ModIdea>Torches ON/OFF only, no fuel</ModIdea>
@@ -10,7 +10,7 @@
          Dedicated server itself never simulate fires. -->
     <ModSide>Both</ModSide>
     <ModMultiplayer>Compatible</ModMultiplayer>
-    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game: the server refuses players without it, because the lights their game runs would burn fuel and go out, and its list of lights applies to everyone. Players without the mod (only with AllowPlayersWithoutMod on) see the same lights on or off; a light switched off simply looks empty to them and they can refuel it. On a server without the mod it turns itself off.</ModMultiplayerNotes>
+    <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game: the server refuses players who do not have it, have it turned off or have another version of it (their game shows Incompatible version), because the lights their game runs would burn fuel and go out, and its list of lights applies to everyone. Players let in without it (only with AllowPlayersWithoutMod on) see the same lights on or off; a light switched off simply looks empty to them and they can refuel it. On a server without the mod it turns itself off.</ModMultiplayerNotes>
     <!-- No RPC, no ZDO key of me own (vanilla fuel and state only): only framework handshake. Bump when that change. -->
     <ModNetworkVersion>1</ModNetworkVersion>
     <ModRequires></ModRequires>

@@ -37,10 +37,7 @@ namespace MC.UX.AutoPickupFilterMod;
 //                         lootfilter.filtered (T25), lootfilter.door (T32), lootfilter.kiln (T33),
 //                         lootfilter.scythe (T30, T31), lootfilter.scythe-swing (real swing, T30),
 //                         lootfilter.pick-column (T38), lootfilter.compat-batch (C02)
-//   lootfilter.bug.*      one check each that the mod does not meet today (red until the mod is fixed), kept alone so
-//                         the other checks of its item stay green: lootfilter.bug.badge-hotbar-number (T13, Ui),
-//                         lootfilter.bug.lists-panel-over-grid (T18, Ui)
-//   SelfTests.Mp.cs       lootfilter.mp.filter (M01, M04), lootfilter.mp.handoff (M02), lootfilter.mp.remote-harvest
+//   SelfTests.Mp.cs      lootfilter.mp.filter (M01, M04), lootfilter.mp.handoff (M02), lootfilter.mp.remote-harvest
 //                         (M05). Mod is client only: it never load on the dedicated server, so no server step.
 // Me never write config: settings forced in memory with TestHooks (then the entry's real change handlers are run with
 // RaiseChanged), mouse / key / controller played with TestHooks, feature turned off with TestHooks.ForceOff. Rig put
@@ -96,13 +93,11 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(SpearName, RunSpear),
         new KeyValuePair<string, Func<IEnumerator>>(ChestName, RunChest),
         new KeyValuePair<string, Func<IEnumerator>>(BadgesName, RunBadges),
-        new KeyValuePair<string, Func<IEnumerator>>(BugBadgeHotbarName, RunBugBadgeHotbar),
         new KeyValuePair<string, Func<IEnumerator>>(OutsideGridName, RunOutsideGrid),
         new KeyValuePair<string, Func<IEnumerator>>(PersistName, RunPersist),
         new KeyValuePair<string, Func<IEnumerator>>(FutureDataName, RunFutureData),
         new KeyValuePair<string, Func<IEnumerator>>(CommandsName, RunCommands),
         new KeyValuePair<string, Func<IEnumerator>>(GamepadName, RunGamepad),
-        new KeyValuePair<string, Func<IEnumerator>>(BugListsPanelName, RunBugListsPanel),
         new KeyValuePair<string, Func<IEnumerator>>(MarkKeyName, RunMarkKey),
         new KeyValuePair<string, Func<IEnumerator>>(DialogsName, RunDialogs),
         new KeyValuePair<string, Func<IEnumerator>>(ToggleName, RunToggle),

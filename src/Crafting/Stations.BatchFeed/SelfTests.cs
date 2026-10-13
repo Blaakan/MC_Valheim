@@ -38,8 +38,8 @@ namespace MC.Crafting.StationsBatchFeedMod;
 //   batchfeed.toggle           T21 patches off = vanilla, back on = batch (framework toggle played by hand)
 //   batchfeed.othermod         C03 other batch mod inside the press (stand-in patch)
 //   batchfeed.compat-repair    C01, batchfeed.compat-tames C02, batchfeed.compat-lights C04
-//   batchfeed.hint-follows     C05 press follow a coverage flag another mod flip; hint right after a look elsewhere
-//   batchfeed.bug.hint-stale   C05 hint of the spot me keep looking at stay old (known bug: fail until fixed)
+//   batchfeed.hint-follows     C05 press follow a coverage flag another mod flip at once; hint follow after a look
+//                              elsewhere and within half a second on the spot me keep looking at; hint never blink
 //   batchfeed.compat-claim     C06 other mod take the station over before vanilla's add (stand-in patch)
 //   batchfeed.log              T23 no error line of this mod since it started
 // Multiplayer (scenario modded; this mod is client-only, so the dedicated server never has it. One client and a

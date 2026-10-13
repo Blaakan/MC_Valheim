@@ -22,11 +22,17 @@ before).
 **0.1.1, added after that run (2026-10-08):** an unknown or empty tier `Material` now shows on screen why the idol
 upgrade is blocked (T24, reset), and turning the mod on with the Forge window open brings the IDOLS tab back at once
 (T28, reset). The checks of the removed self-tests `forge.bug.bad-material-silent` and `forge.bug.tab-after-on` are
-back in `forge.rules.bad-material` and `forge.on.at-forge`. Debug and Release build; the self-tests ran on this code
-on 2026-10-13 (game 1.0.17, every MC mod loaded): all of this mod's tests passed apart from the two open `forge.bug.*`
-tests (T25, T22).
+back in `forge.rules.bad-material` and `forge.on.at-forge`.
 
-**Automated checks (2026-10-13):** 54 of 56 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+**0.1.1, the last two fixes (2026-10-08):** a cost of 0 is left out of the idol tooltip's upgrade line cleanly (no
+comma left behind; with both costs at 0 the line only says where to upgrade) (T25, reset), and a starred icon asked
+for while the game cannot copy the icon gives the plain icon from the first request on, never an empty one (T22 and
+T05, reset). The checks of the removed self-tests `forge.bug.tooltip-zero-cost` and `forge.bug.empty-copy-icon` are
+back in `forge.tooltip.zero-cost` and `forge.icons.empty-copy`; no `forge.bug.*` test is left. The self-tests ran on
+all 0.1.1 fixes together on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): all
+of this mod's tests passed.
+
+**Automated checks (2026-10-13):** 54 of 54 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
 `./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
@@ -67,14 +73,17 @@ the idol and refinement tests: it makes everything free.
   of 2+ plain idols, a full inventory and no 1-star stack: the button tooltip says "You need more free inventory
   space".
   *Automated: `forge.idols`, `forge.missing`.*
-- [x] **T05 Stars everywhere:** look at upgraded idols in your inventory, a chest, the hotbar (drag one into row 1),
+- [ ] **T05 Stars everywhere:** look at upgraded idols in your inventory, a chest, the hotbar (drag one into row 1),
   while dragging, and in the pickup message. Expected: 1, 2 or 3 gold stars at the top right of the icon; no quality
   number in the slot corner. Under the Forge requirements the stars sit lower, below the idol's name. Drop a 2-star
   idol on the ground: its hover reads "(2 stars)". Pick up a starred idol you never had (new character): the "Added"
   and "New material" popups show the starred icon, never a blank square, also when you turn the mod off right after
-  the pickup (T14) or alt-tab out of the game.
-  *Automated test failing: First starred-icon request while the icon copy is empty returns no icon (white square in
-  the 'New material' popup) (self-test `forge.bug.empty-copy-icon`) (the box was ticked by hand).*
+  the pickup (T14) or alt-tab out of the game (while the game cannot copy the icon, for example with its window
+  minimized, the popups show the plain icon instead: T22).
+  *Partly automated (`forge.icons`, `forge.icons.rows`, `forge.grid`, `forge.tooltip`, `forge.popup`,
+  `forge.popup.off`, `forge.odds`, `forge.icons.empty-copy`); by hand: A real alt-tab out of the game right after
+  picking up a starred idol you never had (the self-tests force the failed icon copy instead), and a look at the stars
+  on screen (top right of the icon; lower, below the idol's name, under the Forge requirements).*
 - [x] **T06 Tooltip:** hover plain, 1, 2 and 3-star idols. Expected: "Level: no star / 1 star / 2 stars / 3 stars
   (n of 3)", "Refinement chance: 35 / 55 / 75 / 95%", and the next upgrade's cost (or "Maximum level"); no "Quality"
   line.
@@ -151,12 +160,13 @@ the idol and refinement tests: it makes everything free.
 - [x] **T17 Clean log:** play through T01-T12 while `./tools/Watch-Log.ps1 -Mine` runs. Expected: no error from Forge
   Idol Upgrades, and no "Unknown item name(s)" warning with the default settings.
   *Automated: `forge.cleanlog`.*
-- [!] **T22 Starred icon while the game window is minimized:** the first time a starred icon is needed while the game
+- [x] **T22 Starred icon while the game window is minimized:** the first time a starred icon is needed while the game
   cannot copy the icon (window minimized), for example a never-seen 2-star idol taken by auto pickup. It cannot be
-  forced by hand: the self-test `forge.icons.empty-copy` forces it. Expected: the plain icon shows until the starred
-  one can be made about a second later; the "New material" popup shows the plain icon, never a white square.
-  **FAILED:** automated test: First starred-icon request while the icon copy is empty returns no icon (white square in
-  the 'New material' popup) (self-test `forge.bug.empty-copy-icon`)
+  forced by hand: the self-test `forge.icons.empty-copy` forces it. Expected: the plain icon shows from the very first
+  request, and again each time a new try (about one a second) still cannot copy the icon; about a second after the
+  game can copy it again, the starred icon shows. The "New material" popup of an idol picked up at that moment shows
+  the plain icon, never a white square.
+  *Automated: `forge.icons.empty-copy`.*
 - [x] **T23 Turned off during a refinement:** at the Forge, on the UPGRADE tab, press Attempt Refinement, then during
   the timer open ConfigurationManager (F1) and untick `Enabled`. Expected: the timer stops, the panel shows the vanilla
   refinement text, the item keeps its level and durability and the idol is not used (no vanilla roll follows).
@@ -170,11 +180,13 @@ the idol and refinement tests: it makes everything free.
   its biome, 5 common trophies of its biome"), and the log warning names `Silverr`. The same with an empty `Material`;
   the log warning then names the setting, "(empty Material of Tier 3 - Silver idols)", not an empty name.
   *Automated: `forge.rules.bad-material`, `forge.rules.wiring`.*
-- [!] **T25 Cost of 0 in the tooltip:** set `Level1Trophies = 0` and hover a plain idol. Expected: the cost line reads
+- [x] **T25 Cost of 0 in the tooltip:** set `Level1Trophies = 0` and hover a plain idol. Expected: the cost line reads
   "Upgrade at a Forge of Potential, Idols tab: 5 Silver", with no comma after it. With `Level1Material = 0` instead:
-  only the trophies. With both at 0: no "Idols tab:" line with nothing after it.
-  **FAILED:** automated test: Idol tooltip cost line ends with a dangling comma, or is empty, when a cost is 0
-  (self-test `forge.bug.tooltip-zero-cost`)
+  only the trophies ("... Idols tab: 5 common trophies of its biome"). With both at 0: the line only says where to
+  upgrade, "Upgrade at a Forge of Potential, Idols tab.", with no colon and nothing after it; the level and chance
+  lines above it stay, and a 1-star idol still shows its own cost ("... Idols tab: 10 Silver, 3 elite trophies of its
+  biome").
+  *Automated: `forge.tooltip.zero-cost`, `forge.rules.wiring`.*
 - [x] **T26 Tab switched during a timer:** on the IDOLS tab press Upgrade idol and click UPGRADE while the timer runs;
   then on the UPGRADE tab press Attempt Refinement and click IDOLS while the timer runs. Expected: each started job
   still ends, once: the idol gains its star and its cost is used once; the refinement rolls once and uses one idol;

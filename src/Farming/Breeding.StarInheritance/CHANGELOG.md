@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0
+
+- The server (or host) now also refuses a player who has the mod turned off, or who has another version of it that
+  cannot talk to the server's, and not only a player without the mod: such a game would breed the animals it simulates
+  the normal game way. This happens about a second after joining, and about a second after a player turns the mod off
+  while connected (their game shows "Incompatible version"; turn the mod back on and join again). Before, a player
+  with the mod installed but turned off could stay.
+- `AllowPlayersWithoutMod = true` on the server lets all of these players stay. The server's log names each of them
+  and says why (does not have the mod, has it turned off, or has another version).
+- Fixed the log of a player who has the mod turned off on a server that lets them stay: when the server changed its
+  breeding settings meanwhile, that player's log said "Using the server's breeding settings: ..." although their game
+  was breeding the normal game way, and the line was then missing when they turned the mod back on. The log now stays
+  silent while the mod is off and shows the line once, with the server's current settings, when it is turned on again.
+  Births were not affected.
+
 ## 0.1.0
 
 - Initial version.

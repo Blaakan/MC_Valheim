@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Sailing revamp` |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/`; research briefs on ship physics, the custom skill and the Both-side framework (2026-10-01); sources of blaxxun-boop SkillManager, Jotunn SkillManager, Smoothbrain Sailing, GrindstoneSkills and ImpactfulSkills read on GitHub by the skill brief (2026-10-01). Ship prefab values are not in `.ref`: the in-world self tests measured them in 1.0.16 (section 9). |
-| Status | Implemented (v0.1.0 code), build OK; smoke test and all six in-world self tests passed 2026-10-01 on the final code (earlier runs: one wrong `sailing.math` check and one noisy `sailing.ship` sample, both fixed); in-game tests pending |
+| Status | Implemented (v0.1.0 code), build OK; smoke test and all six in-world self tests passed 2026-10-01 on the final code (earlier runs: one wrong `sailing.math` check and one noisy `sailing.ship` sample, both fixed); in-game tests pending. v0.1.1 (the HUD wind icon follows the game that simulates the ship, D17; the sail response also scales the game's smoothing velocity, so the sail force no longer swings past its target, D18) builds; its self tests have not been run yet |
 
 ## Goal
 
@@ -182,12 +182,21 @@ read never adds the skill, Breeding's `FarmerSkill` trick). No RPC, no ownership
 | Reader | Where | Level |
 |---|---|---|
 | Handling (G2-G5) | ship owner, per fixed step (cached 0.5 s per ship) | the helmsman: the player in `ship.m_players` whose id is the helm `user` (vanilla `HaveControllingPlayer`); none = 0 |
-| HUD wind icon (G2) | helmsman's game | the helmsman = the local player (fresh) |
+| HUD wind icon (G2) | helmsman's game | the helmsman = the local player (fresh), and only when the game that simulates the ship runs the mod (below) |
 | Rudder (G3) | helmsman's game | own level |
 | Map reveal (G6) | each player | own level |
 | Damage (G7) | ship owner, per hit | the best level of all players aboard |
 
 Missing key or -1 (no mod, mod off) = 0.
+
+The same key also tells the helmsman's game whether the game that simulates the ship runs the mod
+(`HelmSkill.SimulatedWithMod`, asked only for the HUD wind icon, D17): this game itself = yes; the server while this
+game is its client = yes (a client's copy is only active while the server answered "on"); another player's game = yes
+when that player (the loaded `Player` whose ZDO owner is the ship's owner: a player always owns its own player ZDO)
+published a level, no when the key is missing or -1. When that player is not loaded on the helmsman's game for a
+moment (it respawns: the game destroys the old character, `Player.FixedUpdate`, and the new one has not arrived yet),
+the last answer for that owner is kept (one entry, cleared with the caches), so the icon does not flicker; an owner
+never seen, or no owner at all, = no. A dead player's character stays loaded until the respawn, with its key.
 
 ### 2.4 Catch the wind (G2)
 
@@ -196,7 +205,11 @@ Missing key or -1 (no mod, mod off) = 0.
 * s, d))`. Defaults 0.9 and 0.1: at Sailing 100 the dead run pulls 0.9 (+29%), close-hauled angles gain most (140
 degrees off the wind: forward drive 0.18 -> 0.32), the no-go cone shrinks from ~37 to ~26 degrees. `NoGoShiftAtMax` is
 capped at 0.15 (~18 degrees) so it never becomes "sail into the wind". Inside the owner's step the helmsman's `s` comes
-from the step context; elsewhere (the HUD) from `HelmSkill.Physics01`.
+from the step context; elsewhere (the HUD) from `HelmSkill.Physics01`. The HUD wind icon must show the pull the ship
+really gets, and that pull is computed by the game that simulates the ship: outside the owner's step the bonus is added
+only when that game runs the mod (`HelmSkill.SimulatedWithMod`, section 2.3). On a ship simulated by a player without
+the mod, or with it turned off (possible only with `AllowPlayersWithoutMod`), the icon stays the normal game's (0.1.0
+added the bonus there too: the icon stayed white down to ~26 degrees on a ship that pulled from ~37).
 
 ### 2.5 Accelerate (G5)
 
@@ -215,9 +228,16 @@ from the step context; elsewhere (the HUD) from `HelmSkill.Physics01`.
   reached that factor sooner. The boost goes into the returned value only; the stored `m_sailForce` stays unboosted,
   so nothing compounds.
 - Sail response, same postfix, before the boost: after vanilla's SmoothDamp, the stored `m_sailForce` moves further
-  toward the same target by `1 - exp(-SailResponseAtMax * s * dt)` (3 vanilla lines copied for the target, with the
-  vanilla `m_sailForceFactor`: keep them in step after game updates). Bounded by the target, nothing compounds; the
-  returned force changes by the same delta.
+  toward the same target by the share `c = 1 - exp(-SailResponseAtMax * s * dt)` (3 vanilla lines copied for the
+  target, with the vanilla `m_sailForceFactor`: keep them in step after game updates), and the SmoothDamp velocity
+  `m_windChangeVelocity` (read and written only by `Ship.GetSailForce`) is multiplied by `1 - c` (0.1.1, D18). The gap
+  to the target and the velocity shrink by the same share each step, so the pair keeps the shape of vanilla's own
+  smoothing and stays critically damped (decay rate `2 + SailResponseAtMax * s` per second instead of 2): with a fixed
+  target, the gap is vanilla's gap from the same state `x exp(-SailResponseAtMax * s * t)`. The stored force therefore
+  always lies on the straight line between the target and the value vanilla's smoothing alone would have reached: it
+  never passes the target where vanilla's smoothing does not, also when the wind shifts while the sail is still
+  filling. At Sailing 100 with the default the sail has 90% of its pull after 0.98 s (vanilla 1.96 s). The steady
+  state is vanilla's target; nothing compounds; the returned force changes by the same delta as the stored one.
 
 ### 2.6 Turn (G3)
 
@@ -278,6 +298,8 @@ Flagged items are repeated at the pause.
 | D14 | Console name | `sailing` / also the number | Both (`itemset` resets every def by its number). Another sailing mod's prefix that already handled `sailing` wins (`__runOriginal`). |
 | D15 | Other sailing mods | LocalBlocker / compose | **Compose**, one Info log line per found mod; no blocker. |
 | D16 | Top speed | Bonus / none | **None from the handling bonuses**; the wind floor (D7) raises the speed at poor angles (dead run about +13% at Sailing 100). |
+| D17 | HUD wind icon on a ship another game simulates (0.1.1) | Always the helmsman's own bonus (0.1.0) / only when the simulating game is known to run the mod / ask the server about that player | **Only when the simulating game is known to run the mod**, read from the level key that game's player publishes (section 2.3): no new RPC or ZDO key, works the same on a client and on the host. Not known (that player never seen on this game) = the normal game's icon: the icon never promises a pull the ship may not get. The last answer is kept while that player is not loaded for a moment (a respawn), so with everyone on the mod the icon does not flicker to the normal game's. |
+| D18 | Sail response and the game's smoothing velocity (0.1.1) | Move only the stored force (0.1.0) / also clamp the force at its target / also scale the SmoothDamp velocity by the same share | **Scale the velocity by the same share** (one line, no saved state). Moving only the force left the velocity too large for the gap that remained: the pair was slightly underdamped. On a straight line (sail up, sail down, wind flip under a settled sail) Unity's own overshoot guard in SmoothDamp stops the step that would cross; when the wind shifts while the sail is still filling the target turns, the guard sees no crossing, and the force swung about 0.5% past the full pull about 2 s later (self-test, default setting: 100.49% of the full pull, the normal game 98.3%). A clamp at the target was rejected: without remembering where the force came from, it would also cut a force that is rightly above a target that just dropped (Full to Half, turning toward the wind) down to that target in one step. Cost: the fill is exactly the normal game's curve `x exp(-rate * s * t)`, a little slower in its last part than 0.1.0 (Sailing 100, default: 90% of the pull after 0.98 s instead of 0.86 s, 99% after 1.76 s instead of 1.28 s; the normal game 1.96 s and 3.34 s). The setting, its default, its meaning (extra catch-up rate per second) and the steady state are unchanged. |
 
 ## 4. Multiplayer
 
@@ -289,7 +311,8 @@ Flagged items are repeated at the pause.
 | XP | the helmsman's game |
 | Level publishing | every player's game (own player ZDO) |
 | Wind factor, acceleration, sail response, turning force, brake | the ship's owner (possibly a passenger), helmsman's published level |
-| Rudder speed, HUD wind icon | the helmsman's game, own level |
+| Rudder speed | the helmsman's game, own level |
+| HUD wind icon | the helmsman's game, own level, only when the game that simulates the ship runs the mod (section 2.3) |
 | Map reveal | each player's game, own level |
 | Damage cut | the ship's owner, best published level aboard |
 | Join check, rules push | the server (dedicated or host) |
@@ -318,7 +341,9 @@ The server refuses players without the mod, with it turned off or with another n
 - With `AllowPlayersWithoutMod` on: a ship simulated by a player without the mod gets none of the owner-side bonuses
   (their game runs no patch); only a modded helmsman's rudder speed, applied on the helmsman's own game, still reaches
   it through the vanilla Rudder RPC (documented, small, only with this setting on). A player without the mod publishes
-  no level, so their helm gives no bonus and their presence no damage cut; they earn no Sailing.
+  no level, so their helm gives no bonus and their presence no damage cut; they earn no Sailing. A modded helmsman's
+  HUD wind icon on such a ship is the normal game's too (the missing level key of the simulating player says so,
+  section 2.3), so it matches the pull the ship gets.
 - Mod removed from a character's game: the level is dropped at the next load and lost at the next save (vanilla
   `Skills.Load`).
 
@@ -401,9 +426,10 @@ No transpiler.
 
 ### 7.3 State and lifetime
 
-Static only: rules snapshots, the per-ship helmsman cache (4 slots, 0.5 s), the local level cache (0.5 s), the owner
-step context (`ShipTick`, set in the prefix, cleared in the finalizer), the XP sample, the publish timer. The skill
-def and icon live for the session.
+Static only: rules snapshots, the per-ship helmsman cache (4 slots, 0.5 s), the local level cache (0.5 s), the last
+other game looked up for the HUD wind icon and its answer (one entry, cleared with the caches), the owner step context
+(`ShipTick`, set in the prefix, cleared in the finalizer), the XP sample, the publish timer. The skill def and icon
+live for the session.
 
 ### 7.4 Live toggle
 
@@ -451,13 +477,16 @@ skills changed by a test are restored from a `Skills.Save` copy; every ship is d
   names with the self test that checks each.
 - **Single player:** T01 skill shown, T02 XP, T03 no XP without moving or steering, T04 wind (G2), T05 turning (G3),
   T06 stopping (G4), T07 accelerating (G5), T08 map reveal (G6), T09 damage (G7), T10 not reduced, T11 level kept, T12
-  console `all`, T13 death penalty, T14 language, T15 Rested, T16 no extra drift or heel (G5).
+  console `all`, T13 death penalty, T14 language, T15 Rested, T16 no extra drift or heel (G5), T17 swimmer next to
+  the hull (G7), T18 sail fills and empties without overshoot (G5), T19 wind shift while the sail is still filling
+  (G5; fixed in 0.1.1, D18).
 - **Live toggle / Enabled = false / clean log / turned on mid-voyage:** L01-L04.
 - **Multiplayer** (cheat commands work only in single player or on the host: characters are prepared at Sailing 0 and
   100 before joining): M01 server rules, M02 refused, M03 passenger owner with a high-level helmsman, M04 only the helmsman
   earns, M05 best sailor protects, M06 personal map reveal, M07 hand-off to a player without the mod, M08 server
   without the mod, M09 turned off refused, M10 other network version, M11 dedicated server, M12 rudder on a ship
-  another game simulates.
+  another game simulates, M13 wind icon on a ship a player without the mod simulates, M14 wind icon on a ship another
+  player with the mod simulates (0.1.1).
 - **Cross-mod:** X01 Encyclopedia, X02 Swim Dive, X03 Sneak Ambush, X04 other sailing mods.
 
 ## 9. Open questions and unverified
@@ -488,7 +517,7 @@ skills changed by a test are restored from a `Skills.Save` copy; every ship is d
 | Item | Checked by |
 |---|---|
 | Top speed with the defaults (the voyage is too short to reach it) | T07 |
-| Unity's SmoothDamp never overshoots after the catch-up moved the value (engine code) | T07 (no oscillation), `sailing.ship` sail speed |
+| The sail force never passes its target with the sail response. 0.1.0 assumed Unity's SmoothDamp would not overshoot after the catch-up moved the value; that was wrong when the target turns while the sail is still filling (D18). 0.1.1 scales the SmoothDamp velocity too | T18, T19 (`sailing.sail` through the real patch, `sailing.math` on the engine's SmoothDamp); not run on 0.1.1 yet |
 | External mod GUIDs / names (GrindstoneSkills, Smoothbrain Sailing, ImpactfulSkills, ValheimRAFT) | Debug "Loaded plugins" line; X04 |
 | Creature prefab `Serpent` (used by T09 / M05) | `spawn Serpent` in T09 |
 

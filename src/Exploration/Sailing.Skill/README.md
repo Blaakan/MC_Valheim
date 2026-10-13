@@ -107,7 +107,8 @@ the Sailing skill from your character at its next save.
   turned off): a ship their game simulates gets none of the bonuses that run on the simulating game (wind, speed-up,
   turning force, brake, damage); only the rudder of a helmsman who has the mod still swings faster (the rudder turns on
   the helmsman's own game). Their own level (if any) counts for nothing, and they earn no Sailing. A player with the
-  mod who steers a ship simulated by their game gets the normal game's handling, except for their faster rudder.
+  mod who steers a ship simulated by their game gets the normal game's handling, except for their faster rudder; the
+  wind icon on that helmsman's HUD shows the normal game's angles too, like the ship really sails.
 - **Dedicated servers:** install BepInEx on the server and put the mod in its `BepInEx/plugins` folder; the server's
   config file decides the rules and it checks who joins. It normally does not simulate ships (the players' games do);
   a ship left near the world centre can be simulated by the server itself, which then uses the published levels the

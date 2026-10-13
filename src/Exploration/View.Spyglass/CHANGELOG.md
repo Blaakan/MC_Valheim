@@ -11,6 +11,8 @@
   was lowered for a while and raised again, the spyglass stayed at the lower zoom until you used the mouse wheel. A
   lower limit now only limits the view, and your zoom comes back with the limit. If you change the zoom while the
   lower limit applies, that new zoom is kept.
+- Fixed wasted work after turning EdgeBlur off while looking through the spyglass: the mod kept copying the picture
+  for the blur on every frame until you lowered the spyglass. It now stops at once. Nothing changes on screen.
 
 ## 0.1.0
 

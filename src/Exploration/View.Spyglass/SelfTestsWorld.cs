@@ -16,8 +16,8 @@ namespace MC.Exploration.ViewSpyglassMod;
 //   spyglass.overlay         round view numbers (size, blur, dark edge), no crosshair, no hover name, HUD still on,
 //                            canvas order [T04 T17]
 //   spyglass.settings        each view setting changes the view on the next frames; zoom capped by the rules [T16]
-//   spyglass.blur-off        EdgeBlur turned off while looking: no blur ring; raised with it off: no frame copy
-//   spyglass.bug.blur-off-capture   (fail today) EdgeBlur turned off while looking also stops the frame copy
+//   spyglass.blur-off        EdgeBlur turned off while looking: no blur ring and no frame copy at once; on again:
+//                            both back; raised with it off: no frame copy [T28]
 //   spyglass.close          near plane at the game's minimum: a wall or roof right before the face stays drawn; own
 //                            body hidden on every frame the camera is in the head or at the feet [T20 T21]
 //   spyglass.no-horizons     without Distant Horizons the fog is never touched [T11]
@@ -36,7 +36,6 @@ internal static partial class SelfTests
     private const string OverlayTest = "spyglass.overlay";
     private const string SettingsTest = "spyglass.settings";
     private const string BlurOffTest = "spyglass.blur-off";
-    private const string BlurOffBugTest = "spyglass.bug.blur-off-capture";
     private const string CloseTest = "spyglass.close";
     private const string NoHorizonsTest = "spyglass.no-horizons";
     private const string HorizonsTest = "spyglass.horizons";
@@ -71,7 +70,6 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(OverlayTest, RunOverlay),
         new KeyValuePair<string, Func<IEnumerator>>(SettingsTest, RunSettings),
         new KeyValuePair<string, Func<IEnumerator>>(BlurOffTest, RunBlurOff),
-        new KeyValuePair<string, Func<IEnumerator>>(BlurOffBugTest, RunBlurOffBug),
         new KeyValuePair<string, Func<IEnumerator>>(CloseTest, RunClose),
         new KeyValuePair<string, Func<IEnumerator>>(NoHorizonsTest, RunNoHorizons),
         new KeyValuePair<string, Func<IEnumerator>>(HorizonsTest, RunHorizons),
@@ -858,8 +856,9 @@ internal static partial class SelfTests
 
     // ---------- spyglass.blur-off ----------
 
-    // What EdgeBlur off does that player can see (no blur ring) and what a raise with it off cost (no frame copy).
-    // The frame copy left running after a switch-off while looking has own test below.
+    // What EdgeBlur off does that player can see (no blur ring) and what it cost: frame copy stop at once when switched
+    // off while looking (0.1.0 left it running until lowered), start again when switched on again, never start on a
+    // raise with it off.
     private static IEnumerator RunBlurOff()
     {
         var c = new Checks(BlurOffTest);
@@ -880,53 +879,25 @@ internal static partial class SelfTests
             yield return RaiseUp(c, player, "blur");
             yield return Frames(12);
             c.Check(ScopeOverlay.TestBlurOn && ScopeCapture.TestOn, "EdgeBlur on: blur ring drawn from a copy of the frame");
-            ScopeOverlay.TestEdgeBlur = false;
-            yield return Frames(4);
-            c.Check(!ScopeOverlay.TestBlurOn && ScopeOverlay.Shown, "EdgeBlur off while looking: no blur ring, round view still shown");
-            yield return LowerDown();
-            c.Check(!ScopeCapture.TestOn, "lowered: the frame is no longer copied");
-            // Raised with EdgeBlur already off: copy never start.
-            yield return RaiseUp(c, player, "no blur");
-            yield return Frames(8);
-            c.Check(!ScopeOverlay.TestBlurOn && !ScopeCapture.TestOn && ScopeOverlay.Shown, "raised with EdgeBlur off: no blur ring and no frame copy");
-            yield return LowerDown();
-            c.Report();
-        }
-        finally
-        {
-            rig.Restore();
-        }
-    }
-
-    // ---------- spyglass.bug.blur-off-capture ----------
-
-    // Known to fail today, alone here so spyglass.blur-off pass: ScopeOverlay.Show stop drawing the blur ring but
-    // leave ScopeCapture copying and shrinking every frame until spyglass lowered (ScopeCapture.Disable only called
-    // from Hide). Nothing to see on screen: cost only.
-    private static IEnumerator RunBlurOffBug()
-    {
-        var c = new Checks(BlurOffBugTest);
-        if (!Ready(BlurOffBugTest, out var player, out _))
-        {
-            yield break;
-        }
-        var rig = new SpyRig(player, BlurOffBugTest);
-        try
-        {
-            var spy = Hold(rig, c);
-            if (spy == null)
-            {
-                c.Report();
-                yield break;
-            }
-            ScopeOverlay.TestEdgeBlur = true;
-            yield return RaiseUp(c, player, "blur");
-            yield return Frames(12);
             var copied = ScopeCapture.TestOn;
             ScopeOverlay.TestEdgeBlur = false;
             yield return Frames(4);
+            c.Check(!ScopeOverlay.TestBlurOn && ScopeOverlay.Shown, "EdgeBlur off while looking: no blur ring, round view still shown");
             c.Check(copied && !ScopeCapture.TestOn,
                 $"EdgeBlur off while looking: the frame is no longer copied for the blur (copied before {copied}, still copied {ScopeCapture.TestOn}, blur ring drawn {ScopeOverlay.TestBlurOn})");
+            // On again while still looking: copy start again, ring drawn from it. Stay on for the lowering: that one
+            // must stop the copy by itself.
+            ScopeOverlay.TestEdgeBlur = true;
+            yield return Frames(4);
+            c.Check(ScopeOverlay.TestBlurOn && ScopeCapture.TestOn && ScopeOverlay.Shown,
+                $"EdgeBlur on again while looking: blur ring drawn from a copy of the frame again (blur ring drawn {ScopeOverlay.TestBlurOn}, frame copied {ScopeCapture.TestOn})");
+            yield return LowerDown();
+            c.Check(!ScopeCapture.TestOn, "lowered: the frame is no longer copied");
+            // Raised with EdgeBlur already off: copy never start.
+            ScopeOverlay.TestEdgeBlur = false;
+            yield return RaiseUp(c, player, "no blur");
+            yield return Frames(8);
+            c.Check(!ScopeOverlay.TestBlurOn && !ScopeCapture.TestOn && ScopeOverlay.Shown, "raised with EdgeBlur off: no blur ring and no frame copy");
             yield return LowerDown();
             c.Report();
         }

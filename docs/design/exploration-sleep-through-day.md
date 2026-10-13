@@ -8,7 +8,7 @@
 | Side | Both: the server (or the host) and every player install it (3.9); multiplayer Compatible; network version 1 (no RPC and no ZDO key of its own). **The first Both mod in the repo** (3.9, M10) |
 | Sheet idea | `Sleep through the day` |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim` in `.ref/`; English strings checked in the installed 1.0.16 localization table (`valheim_Data/resources.assets`); bed and fire prefab names checked in `StreamingAssets/SoftRef/manifest_extended`; the sources of BedRules (including its config defaults), Sleepover, SkipSleep, AFKManager and Seasons read on GitHub (2026-09-29) |
-| Status | Implemented (0.1.0), build OK, smoke test passed (before the review fixes; to re-run); in-world self-tests to re-run after the review fixes (first run: 2 of 4 failed on a wrong message expectation, fixed); in-game tests pending |
+| Status | Implemented (0.1.0; fix version 0.1.1, see "Changes in 0.1.1" in section 5), build OK, smoke test passed (before the review fixes; to re-run); in-world self-tests to re-run after the review fixes (first run: 2 of 4 failed on a wrong message expectation, fixed); in-game tests pending |
 
 ## Goal
 
@@ -299,8 +299,8 @@ Three small hooks, no RPC of its own, no ZDO key, nothing saved:
    Vanilla's stop branch ends every sleep. Just before it does, the prefix sends the final world time to the clients
    (vanilla's own `NetTime` message), so every client wakes up with the right clock.
 3. **Client: the wake-up message.** A prefix/postfix pair on `Player.SetSleeping` remembers the date and whether the
-   sleep started after 06:00 (raw time); waking up on the same date (or just after midnight, 3.6) means a day sleep.
-   Then, inside that wake-up call only, a prefix on `Player.Message` swaps vanilla's "$msg_goodmorning" for
+   sleep started in the day, from 06:00 to 18:00 (raw time); for such a sleep, waking up on the same date (or just
+   after midnight, 3.6) means a day sleep. Then, inside that wake-up call only, a prefix on `Player.Message` swaps vanilla's "$msg_goodmorning" for
    "Good evening" at its source, so vanilla's order stays: the wake-up text, then the Rested message (1.5).
 
 ### 3.2 Clock helpers (`DayClock`)
@@ -332,6 +332,9 @@ Three small hooks, no RPC of its own, no ZDO key, nothing saved:
   The range 13-23 of `wakeHour` keeps `LatestStart` at noon or later (so the window always covers the whole morning,
   where the client lets players lie down) and `Target` inside the same date.
 - `IsAfterDawn(EnvMan env, double t)`: `t ≥ GetDay(t) * len + RawFractionForHour(6) * len` (client, 3.6).
+- `IsAfterNightfall(EnvMan env, double t)` (0.1.1): `t > GetDay(t) * len + RawFractionForHour(18) * len` (client,
+  3.6). Exactly 18:00 is not "after": the same side and the same arithmetic as `InWindow` when the window is at its
+  widest (`LatestStart` at 18:00), so in single player and on a host the client and the server always agree.
 
 ### 3.3 Patches
 
@@ -409,9 +412,10 @@ chose; only its end moves. Calling `SkipToMorning` first also keeps every other 
 
 ### 3.6 Client: the wake-up message (`WakeMessage`)
 
-- **Day-sleep wake-up** (`IsDaySleepWake(now)`): the sleep started after 06:00 of its date (`startedAfterDawn`) and
-  the wake-up is on the same date (`GetDay(now) == startDay`), **or** on the next date before 05:00 (`GetDay(now) ==
-  startDay + 1 && FractionAt(now) < 5/24`, `LateWakeLimitHour`).
+- **Day-sleep wake-up** (`IsDaySleepWake(now)`): the sleep started in the day, from 06:00 to 18:00 of its date
+  (`startedAfterDawn && !startedAfterNightfall`; the upper bound was added in 0.1.1), and the wake-up is on the same
+  date (`GetDay(now) == startDay`), **or** on the next date before 05:00 (`GetDay(now) == startDay + 1 &&
+  FractionAt(now) < 5/24`, `LateWakeLimitHour`).
 - `Before(player, sleep)` (SetSleeping prefix): disarms; then, only for `player == Player.m_localPlayer` (Unity `==`)
   when `player.m_sleeping && !sleep` (a wake-up is about to happen): if it is a day-sleep wake-up and `WakeUpMessage`
   is not empty (after `Trim`), arms `SwapText = WakeUpMessage`.
@@ -422,20 +426,30 @@ chose; only its end moves. Calling `SkipToMorning` first also keeps every other 
   were still Rested as they lay down, and the Rested message otherwise: vanilla's behaviour with our text.
 - `After(player, wasSleeping)` (SetSleeping postfix): disarms; then only for the local player and when `wasSleeping !=
   player.m_sleeping` (a real change):
-  - sleep started (`player.m_sleeping` now true): remember `startDay = EnvMan.instance.GetDay(now)` and
-    `startedAfterDawn = DayClock.IsAfterDawn(env, now)`; Debug line.
+  - sleep started (`player.m_sleeping` now true): remember `startDay = EnvMan.instance.GetDay(now)`,
+    `startedAfterDawn = DayClock.IsAfterDawn(env, now)` and `startedAfterNightfall = DayClock.IsAfterNightfall(env,
+    now)`; Debug line (it says "before dawn", "after dawn" or "after nightfall").
   - woke up (now false): Debug line saying which text was shown (ours instead of "Good morning", vanilla kept because
     `WakeUpMessage` is empty, vanilla for a night sleep, or "no Good morning to replace" when another mod changed or
     skipped it); `SleepSelfTests.RecordWake` (Debug build); clear the remembered state.
-- Why this rule: a sleep that starts after 06:00 and is not a day sleep (vanilla, or another mod's) ends at a later
+- Why this rule: a sleep that starts in the day and is not a day sleep (vanilla, or another mod's) ends at a later
   date's morning, at 06:00 or later; a vanilla sleep that ends on the same date started after midnight, before 06:00. A
-  day sleep starts after 06:00 and normally ends the same date (target at most 23:00). It can end later when the
+  sleep that starts after 18:00 is never a day sleep: the server's day window never reaches past 18:00 (3.2), whatever
+  its `WakeUpHour` and `IncludeAfternoon`. The start has to say so, because the end cannot always: when no time skip
+  runs (another mod's `SkipToMorning` that starts none, section 4), a sleep that starts at 20:00 ends two seconds later
+  on the same date. 0.1.0 only asked "after 06:00?" and showed "Good evening" there (T21; fixed in 0.1.1). A day sleep
+  starts between 06:00 and 18:00 and normally ends the same date (target at most 23:00). It can end later when the
   server's stop is held: on a host with other players online, a dream video on the host keeps the stop waiting while
   the world time runs on (1.5), and with `WakeUpHour` 23 the wake-up can pass midnight (23:00 to midnight is 45 real
   seconds on the 1800-s day, 30 s on a 1200-s day, less under Seasons' short summer night). The next-date window up to
   05:00 keeps such a wake-up a day sleep, and stays an in-game hour away from the 06:00 end of every other sleep. Both
   ends read the **raw** world time, not the flags, so a sleep retargeted in the first second after 06:00 (flags still
   night) still reads as a day sleep, and the client never needs the server's `WakeUpHour` or `IncludeAfternoon`.
+- Limit of the rule (accepted; it needs a mod that stops the time skip, and none is known): a sleep without a time
+  skip that starts **in the day** still reads as a day sleep on the client ("Good evening" two seconds after lying
+  down). For a morning start that matches the server, which started it as a day sleep (3.4 step 4). For an afternoon
+  start the client cannot tell: it does not know the server's `IncludeAfternoon`, and with 06:00-18:00 it assumes the
+  widest window.
 - Why swap at the source: the first implementation showed `WakeUpMessage` from the postfix, i.e. after the Rested
   message, which it then hid (the in-world self-test run caught the vanilla order). Swapping inside the call keeps
   every vanilla message and its order.
@@ -449,8 +463,8 @@ chose; only its end moves. Calling `SkipToMorning` first also keeps every other 
   evening" at dawn. With the final time sent first, the lag at wake-up is zero.
 - Side effect, also for night sleeps: a remote client's `m_wakeupTime` is now set from the final time, so its 30-s
   cooldown after any sleep is a real 30 s (in vanilla it often passes at once, 1.4).
-- The state is a few static fields per game (one local player): the start (`startDay`, `startedAfterDawn`) and the
-  swap (`SwapText`, `swapped`, set only inside one wake-up call); the postfix and every `SetSleeping` prefix disarm
+- The state is a few static fields per game (one local player): the start (`startDay`, `startedAfterDawn`,
+  `startedAfterNightfall`) and the swap (`SwapText`, `swapped`, set only inside one wake-up call); the postfix and every `SetSleeping` prefix disarm
   the swap, and `Plugin.OnDeactivated` clears everything.
 
 ### 3.7 Configuration
@@ -476,8 +490,8 @@ where the server runs and are read only through `Plugin.ReadDaySettings` (Debug 
 - Server: `__state` of the `UpdateSleeping` patches (per tick) and one static "Debug line already written" flag.
   Vanilla fields written: `Game.m_sleeping` (as vanilla), `EnvMan.m_skipToTime`/`m_timeSkipSpeed` (as `SkipToMorning`
   does). None of them is saved by the game.
-- Client: `WakeMessage.startDay`/`startedAfterDawn` and the swap state `SwapText`/`swapped` (static; cleared on use,
-  at every `SetSleeping` call and in `OnDeactivated`).
+- Client: `WakeMessage.startDay`/`startedAfterDawn`/`startedAfterNightfall` and the swap state `SwapText`/`swapped`
+  (static; cleared on use, at every `SetSleeping` call and in `OnDeactivated`).
 - Network: no RPC and no ZDO key of its own; `ModNetworkVersion` 1. Traffic: the framework handshake
   (`<GUID>.Hello`/`HelloAck`) and one extra vanilla `NetTime` message per sleep end (every 2 s while a dream cinematic
   holds the stop).
@@ -575,7 +589,8 @@ or time state.
 - Server, Debug (once until the next sleep): `Day sleep not started: everyone is in bed, but the world time 19:05 is
   outside the day window 06:00-12:00 (forced time of day?).` (window end 17:00 with `IncludeAfternoon` on)
 - Warning, once per session: the day-cycle fallback of 3.2.
-- Client, Debug: `Sleep started at 08:24, day 12 (after dawn).` / `Woke up at 18:00, day 12: daytime sleep, message
+- Client, Debug: `Sleep started at 08:24, day 12 (after dawn).` (`(before dawn)` before 06:00, `(after nightfall)`
+  after 18:00 of that date, since 0.1.1) / `Woke up at 18:00, day 12: daytime sleep, message
   "Good evening" instead of "Good morning".` / `...: daytime sleep, WakeUpMessage empty, vanilla message kept.` /
   `...: daytime sleep, but the game showed no "Good morning" to replace (another mod?).` / `Woke up at 06:00, day 13:
   night sleep, vanilla message.`
@@ -599,12 +614,12 @@ or time state.
 
 | File | Responsibility |
 |---|---|
-| `MC.Exploration.Sleep.ThroughDay.csproj` | Metadata: `ModName` Sleep Through the Day, `Version` 0.1.0, `ModScope` QoL, `<ModIdea>Sleep through the day</ModIdea>`, `ModSide` Both, `ModMultiplayer` Compatible, `ModMultiplayerNotes` (3.9), `ModNetworkVersion` 1, `ModDescription`. |
+| `MC.Exploration.Sleep.ThroughDay.csproj` | Metadata: `ModName` Sleep Through the Day, `Version` 0.1.1, `ModScope` QoL, `<ModIdea>Sleep through the day</ModIdea>`, `ModSide` Both, `ModMultiplayer` Compatible, `ModMultiplayerNotes` (3.9), `ModNetworkVersion` 1, `ModDescription`. |
 | `Plugin.cs` | `BindConfig` (`WakeUpHour`, `IncludeAfternoon`, `WakeUpMessage`); `ReadDaySettings` (the one reader of `WakeUpHour`/`IncludeAfternoon`, with the Debug test overrides); `OnActivated`: register the Debug self-tests; `OnDeactivated`: `WakeMessage.Reset()`, `DaySleep.Reset()`, unregister and clean up the self-tests. |
 | `Patches/EnvManPatches.cs` | `CalculateCanSleep` postfix. |
 | `Patches/GamePatches.cs` | `UpdateSleeping` prefix (state, final time) and postfix. |
 | `Patches/PlayerPatches.cs` | `SetSleeping` prefix (state, arm the swap) and postfix; `Message` prefix (the swap). |
-| `DayClock.cs` | `IsMorning`, `WakeHour`, `ClockText`/`HourText`/`FractionAt`, `RawFractionForHour` (bisection + fallback), `Today` (dawn, window end, target) returning the `DayWindow` struct, `IsAfterDawn`. |
+| `DayClock.cs` | `IsMorning`, `WakeHour`, `ClockText`/`HourText`/`FractionAt`, `RawFractionForHour` (bisection + fallback), `Today` (dawn, window end, target) returning the `DayWindow` struct, `IsAfterDawn`, `IsAfterNightfall`. |
 | `DaySleep.cs` | `BeforeTick` (final time), `AfterTick`, `Retarget`, `Reset`, server log lines. |
 | `WakeMessage.cs` | Start/wake tracking, day-sleep rule (`IsDaySleepWake`), `Before`/`Swap`/`After`, `Reset`. |
 | `SleepSelfTests.cs` | Debug build only (body in `#if DEBUG`, entry points `[Conditional("DEBUG")]`): the in-world self-tests (3.16), `RecordWake` (called by `WakeMessage`, vanishes in Release) and the in-memory setting overrides read by `Plugin.ReadDaySettings`. |
@@ -709,7 +724,7 @@ timeouts (5 s flags, 15 s start, 75 s wake-up) keep each test under the probe's 
 | `tod` forced to morning while the real time is later | Flags follow the forced time | Players may lie down; no sleep starts while the real time is outside the window (Debug line when the real time is before 06:00 or after 18:00); `tod -1` restores |
 | Seasons with a long winter night or a short summer night | — | Wake-up at Seasons' nightfall (its `RescaleDayFraction`); the message stays right (3.6) |
 | Skip-speed mod (skip lasts 6 s) | — | The day skip lasts 6 s too; the message stays right (3.6) |
-| Another mod's `SkipToMorning` starts no skip | Sleep screen, no time change | Same in the morning: no forced skip (3.4 step 4) |
+| Another mod's `SkipToMorning` starts no skip | Sleep screen, no time change | Same in the morning: no forced skip (3.4 step 4). The wake-up text follows the start of the sleep (3.6): "Good morning" after a start at night (T21; 0.1.0 showed "Good evening" there when the sleep started after 18:00), the `WakeUpMessage` after a start in the day |
 | BedRules at its defaults ("sleep any time" on) | Any-time sleep to the next morning | A sleep started in the morning (and in the afternoon with `IncludeAfternoon` on) ends at nightfall; afternoon (by default), night and the last hour before the wake-up hour unchanged |
 | Vote or AFK sleep mod hooking `EverybodyIsTryingToSleep` | Partial sleep at night | Partial sleep in the day too |
 | Other vote mods | Partial sleep at night | **Unverified** (3.11) |
@@ -719,7 +734,7 @@ timeouts (5 s flags, 15 s start, 75 s wake-up) keep each test under the probe's 
 | `WakeUpMessage` = `$msg_goodnight` | — | "Good night" in the game language |
 | `WakeUpHour` = 30 in the file | — | Clamped to 23 by BepInEx |
 | `WakeUpHour` = 13 | — | Window 06:00-12:00 whatever `IncludeAfternoon` says: morning sleeps wake at 13:00, afternoon sleeps go to the next morning |
-| `WakeUpHour` = 23, `IncludeAfternoon` on | — | Window 06:00-18:00: a sleep at 17:50 wakes at 23:00; at 18:05 it is a night sleep, to the next morning |
+| `WakeUpHour` = 23, `IncludeAfternoon` on | — | Window 06:00-18:00: a sleep at 17:50 wakes at 23:00 with "Good evening"; at 18:05 it is a night sleep, to the next morning (T23). On a remote client, a start a fraction of a second either side of 18:00 may show "Good morning" after the day sleep instead (its clock is not exactly the server's): message only, as at 06:00 |
 | Remote client after any sleep | Cooldown often already over when the late time arrives | A real 30-s cooldown (3.6) |
 | Player dies, disconnects or gets up during the wait | Vanilla | Vanilla |
 | Player joins during a day skip | Sees the time race (night skip) | Same |
@@ -822,6 +837,24 @@ The ones marked **(to confirm with the user)** change what the player sees or pi
     closed at 14:00 and the test failed); a test cut short while asleep now wakes the player before restoring.
   - Docs: the network traffic of the mod (README), forced time of day (README), the dedicated server's game version
     (3.9, M10), the day length (1800 s) and the sample Info line.
+
+### Changes in 0.1.1
+
+- **Wake-up message after a sleep that starts at night and ends on the same date** (T21, found by the self-test
+  `sleep.noskip`, which makes `EnvMan.SkipToMorning` start no time skip, the stand-in for another mod; no such mod is
+  known). Cause: the client rule of 3.6 only asked whether the sleep started after 06:00 of its date, on the
+  assumption that every sleep that is not a day sleep ends at a later date's morning. Without a time skip that is
+  false: a sleep started at 20:00 ended two seconds later on the same date and was shown as a daytime sleep ("Good
+  evening", Debug line `daytime sleep`), although the server never treated it as one. Fix: the start must also be at
+  or before 18:00 of its date (`DayClock.IsAfterNightfall`, remembered as `startedAfterNightfall`), the latest moment
+  the server's day window can reach (3.2). The client still needs no server setting, and nothing changes for a sleep
+  that starts in the day. The start Debug line now tells the three cases apart (3.12).
+- **Tests**: the wake-up text and label check is part of `sleep.noskip` again (while the bug was open it lived alone
+  in a separate failing self-test, now removed); `sleep.noskip` also checks that the start is noted as "after
+  nightfall". New self-test `sleep.nightfall` (T23) for the other side of the new bound: with the widest window
+  (`IncludeAfternoon` on, `WakeUpHour` 23) a sleep that starts at 17:45 is still a day sleep (23:00, "Good evening"),
+  and one that starts at 18:05 is a night sleep.
+- No change to the server part, the settings, the patches or the network (network version 1).
 
 ### Added beyond the request
 

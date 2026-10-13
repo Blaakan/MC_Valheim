@@ -32,11 +32,16 @@ after "ZNet OnDestroy" in the client log of the server-without-mods scenario (fo
 **0.1.1, zoom fix (2026-10-08, after the run above):** a lower zoom limit no longer replaces the zoom you picked. The
 pick is now changed only by the mouse wheel or the gamepad zoom buttons, and the limit applies to the view alone (T25,
 reset to `[ ]`). The check of the removed self-test `spyglass.bug.zoom-pick-lost` (one of the two that failed in the
-run above) is back in `spyglass.zoom-pick`, which now also lowers the limit and puts it back while looking. Both
-builds compile; the self-tests ran on this change on 2026-10-13 (game 1.0.17, every MC mod loaded): all of this mod's
-tests passed apart from the open `spyglass.bug.blur-off-capture`.
+run above) is back in `spyglass.zoom-pick`, which now also lowers the limit and puts it back while looking.
 
-**Automated checks (2026-10-13):** 37 of 37 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+**0.1.1, blur fix (2026-10-08, after the run above):** turning EdgeBlur off while you look now also stops the copy of
+the picture that the blur is drawn from; before, that copy went on every frame until the spyglass was lowered (nothing
+to see on screen, only wasted work). New item T28; no existing item was reset. The check of the removed self-test
+`spyglass.bug.blur-off-capture` (the other one that failed in the run above) is back in `spyglass.blur-off`, which now
+also turns EdgeBlur on again while looking. The self-tests ran on the three 0.1.1 fixes together on 2026-10-13 (game
+1.0.17, in-world and with a dedicated server, every MC mod loaded): all of this mod's tests passed.
+
+**Automated checks (2026-10-13):** 38 of 38 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
 `./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
@@ -259,3 +264,12 @@ changed one back afterwards.
   *Partly automated (`spyglass.item`); by hand: The real thing: log out to the main menu from a server without the
   mod, and from one that has it turned off, and read the log for Spyglass warnings; back at the menu the MC Mods panel
   shows the mod active again.*
+
+## 0.1.1 — EdgeBlur turned off while looking
+
+- [x] **T28 EdgeBlur off while looking:** raise the spyglass with EdgeBlur on, then turn EdgeBlur off without lowering
+  it. Expected: the blur outside the circle is gone at once and the round view stays; from that moment the mod also
+  stops copying the picture for the blur, instead of going on until you lower the spyglass (this part does not show on
+  screen: it only saves work on every frame). Turn EdgeBlur on again while still looking: the blur is back at once.
+  Lower, turn EdgeBlur off and raise again: no blur. Put EdgeBlur back on.
+  *Automated: `spyglass.blur-off`.*

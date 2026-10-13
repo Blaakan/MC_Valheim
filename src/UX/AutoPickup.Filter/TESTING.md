@@ -8,13 +8,16 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 MC Mods panel. Smoke test passed 2026-09-29 on 0.1.0 (loads, patches cleanly, the activation check of
 `Player.AutoPickup` passed, JitCheck clean: 310 methods, 0 failures). No in-game test yet. 0.1.1 fixes the harvest
 exemption for one pick that gives 8 items or more (the items that pop out highest are now collected too) and resets
-T38 to `[ ]`; the smoke test and the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, every MC mod loaded):
-`lootfilter.pick-column` and the others passed, apart from the two open `lootfilter.bug.*` tests (T13, T18). Twelve of
-them needed a second run without the other mods' tests before them (a Torch left in the first inventory slot), and
-`lootfilter.stations` passes about one run in two (the two sap drops of its sap collector are sometimes not picked up
-within its 2 seconds).
+T38 to `[ ]`. It also moves the mark to the left edge of the slot, half-way up (it covered the hotbar number of
+first-row slots), and opens the controller lists panel to the right of the inventory panel (it opened over the Auto
+pickup button and the left half of the grid): T13 and T18 are reset to `[ ]`. The smoke test and the self-tests ran on
+0.1.1 on 2026-10-13 (game 1.0.17, every MC mod loaded): every test of this mod passed on it at least once. Run right
+after other mods' tests, twelve of them failed on a Torch left in the first inventory slot and passed in a run of
+their own; `lootfilter.stations` passed twice and then failed most runs that day, on a wait of its fermenter step or
+its sap collector step (drops that do not appear in time, or two sap drops tagged as harvested that are not picked up
+in time); it failed the same way in 2 of 3 runs on the code before the fixes, so T24 and T37 keep their marks.
 
-**Automated checks (2026-10-13):** 38 of 40 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+**Automated checks (2026-10-13):** 38 of 38 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
 `./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
@@ -44,19 +47,20 @@ without materials or a workbench nearby (type it again to turn it off); pieces c
   harvest radius; cooking, fermenting and bee/sap production times; which production stations have an "empty" switch
   that drops their output (windmill, spinning wheel); which thrown weapons fall back to the ground as items (spears);
   that a Lox can be saddled with `SaddleLox` right after `tame`; that an item stand (`itemstand`) takes a
-  `TrophyBoar` (T24); that `SpearFlint` shows a quality number in its slot (T13); that the stone oven bakes
-  `BreadDough` into bread, and how long it takes (T37); where the button, the badges and the controller lists panel
-  end up on screen (T01, T13, T18, T27); the physical buttons behind the right stick click, LT and RT on the
-  Alternative 1 and 2 gamepad layouts (T18).
+  `TrophyBoar` (T24); that the stone oven bakes `BreadDough` into bread, and how long it takes (T37); where the
+  button, the marks and the controller lists panel end up on screen (T01, T13, T18, T27); the physical buttons behind
+  the right stick click, LT and RT on the Alternative 1 and 2 gamepad layouts (T18).
+- Game fact used by T18 (measured in the automated runs of 2026-10-08, game 1.0.17): while a chest is open, the
+  right stick click is the game's own controller key for the chest's **Place stacks** button and the left stick click
+  its key for **Take all**, whether the chest grid or your own grid is focused. Holding LT or RT does not stop them
+  (the game's button code checks no modifier; not measured).
 
 Keep `./tools/Watch-Log.ps1 -Mine` open. With Debug logging (`./tools/Setup.ps1 -DevBepInExConfig`), the mod also
 logs:
 - at start: `Player.AutoPickup gate checked: ...` and `Loot filter mark key: Mouse2.`;
 - on the first inventory opening: `Loot filter button parent: player panel.` (or `inventory root ...`); Debug builds
   (the default `dotnet build`) also log `Inventory layout (world rects = screen pixels ...)` with the rects of the
-  player panel, its children, the player name, armor, weight, grid and the button;
-- the first time a grid is drawn in Skip ignored or Only selected mode: `Loot filter badges on the player grid:
-  corner ...` (and `... container grid ...` for chests) with the slot parts it avoided;
+  player panel, its children, the player name, armor, weight, grid and the button, and the parts of one slot;
 - each character load (`Loot filter loaded for this character: ...` or `... character never used it ...`), each
   mode or list change (`Loot filter: added Stone to Ignored ...`), and each harvest drop that gets through the filter
   (`Harvest grace: Raspberry dropped by your own harvest will be picked up despite the filter.`).
@@ -120,13 +124,14 @@ logs:
   Resin is not auto-picked. Close and reopen the chest: mark still there. Also try a cart or ship storage if you have
   one (same panel).
   *Automated: `lootfilter.chest`, `lootfilter.mark-colours`.*
-- [!] **T13 Mark placement (unverified corner):** ignore `CopperOre` (not teleportable) and `SpearFlint` (has a
-  quality level), carry a stack of `ArrowWood`, put the spear on the hotbar (first row), equip it and hit a tree once
-  so its durability bar shows. Expected: our mark, the vanilla no-portal icon, the quality number, the stack amount,
-  the hotbar number, the equipped marker and the durability bar are all readable; none hides another. With Debug logging, note the corner in the `Loot filter badges
-  on the player grid` line (and the chest one).
-  **FAILED:** automated test: The mark covers the hotbar number on first-row slots (self-test
-  `lootfilter.bug.badge-hotbar-number`)
+- [x] **T13 Mark placement (unverified place):** ignore `CopperOre` (not teleportable), `SpearFlint` (has a quality
+  level), `ArrowWood` (carry a stack) and `Raspberry` (food: the game shows a fork icon on it). Put the spear, the ore
+  and the arrows on the hotbar (first row), equip the spear and hit a tree once so its durability bar shows. Expected:
+  our mark sits on the left edge of the slot, half-way up, in the same place on every marked slot; our mark, the
+  vanilla no-portal icon, the quality number, the food icon, the stack amount, the hotbar number, the equipped marker
+  and the durability bar are all readable; none hides another. Bug in 0.1.0, fixed in 0.1.1: the mark sat in the
+  top-left corner of the slot and covered the hotbar number of first-row slots.
+  *Automated: `lootfilter.badges`.*
 - [x] **T14 Thrown spear (unverified which weapons fall back as items):** Only selected with Coins only, throw
   `SpearFlint` (secondary attack) at the ground, walk over it. Expected: it stays on the ground (it is not
   selected), E picks it up.
@@ -156,16 +161,25 @@ logs:
   cheat prompt at any time.
   *Partly automated (`lootfilter.commands`); by hand: Typing in the real chat and console input fields: Enter, the
   leading slash, the Tab key cycling through matches.*
-- [!] **T18 Gamepad:** with a controller, open the inventory (your grid focused), select a slot with the D-pad, click
-  the right stick. Expected: the item is marked or unmarked (list of the current mode). Hold LT and click the right
-  stick. Expected: the mode cycles, with its message. Hold RT and click the right stick. Expected: a panel next to the
-  button (unverified position: fully on screen, not over the grid) lists both lists; again: it closes; close the
-  inventory with it open, reopen: it is gone. In Everything mode, the right stick click shows "... hold LT and click
-  the right stick.". Switch to the chest grid with a chest open (bumpers) and click the right stick: nothing of ours
-  happens. The D-pad never selects the Auto pickup button. Set `GamepadControls = false`: right stick clicks do
-  nothing. If you can, repeat on the Alternative 1 and 2 layouts (unverified buttons).
-  **FAILED:** automated test: The controller lists panel opens over the Auto pickup button and the left half of the
-  inventory grid (self-test `lootfilter.bug.lists-panel-over-grid`)
+- [ ] **T18 Gamepad:** with a controller and no chest open, open the inventory (your grid focused), select a slot
+  with the D-pad, click the right stick. Expected: the item is marked or unmarked (list of the current mode). Hold LT
+  and click the right stick. Expected: the mode cycles, with its message. Hold RT and click the right stick. Expected:
+  a panel to the right of your inventory panel, level with its top (unverified position: fully on screen, not over
+  the Auto pickup button, the inventory grid or the armor and weight numbers), lists both lists; again: it closes;
+  close the inventory with it open, reopen: it is gone. In Everything mode, the right stick click shows "... hold LT
+  and click the right stick.". The D-pad never selects the Auto pickup button. Now open a chest that holds some Wood
+  while you carry Wood and Stone. Switch to the chest grid (bumpers) and click the right stick. Expected: nothing of
+  ours happens (no mark, no mode change, no panel); the game's own Place stacks runs (your Wood moves into the chest:
+  with a chest open the right stick click is the game's key for that button, see Setup). Take some Wood back, switch
+  to your grid, select the Stone and click the right stick. Expected: the Stone is marked or unmarked, and the game's
+  Place stacks runs as well, so the Wood moves into the chest again (same key: one press does both in this version;
+  the same goes for LT + and RT + right stick click). Set `GamepadControls = false`: right stick clicks do nothing of
+  ours (with a chest open the game's Place stacks still runs). If you can, repeat on the Alternative 1 and 2 layouts
+  (unverified buttons). Bug in 0.1.0, fixed in 0.1.1: the lists panel opened over the Auto pickup button and the left
+  half of the inventory grid.
+  *Partly automated (`lootfilter.gamepad`); by hand: A real controller: the physical right stick click, LT and RT
+  (also on the Alternative 1 and 2 layouts), the bumpers to the chest grid, and that the game's own Place stacks runs
+  on the same click while a chest is open (the test plays the stick click for the mod only).*
 - [x] **T19 Custom mark key:** set `MarkKey = L`. Hover an item and press L. Expected: marked (the tooltip now says
   "Hover an item ... and press L"). Open the F5 console and type a word with "l" while hovering a slot. Expected: no
   mark toggles. Set it back to `Mouse2`.

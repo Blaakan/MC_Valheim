@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed: at the helm of a ship simulated by the game of a player without the mod, or with it turned off (only possible
+  when the server has AllowPlayersWithoutMod on), the wind icon on the ship's HUD stayed white at angles where the ship
+  got no pull: it showed your Sailing bonus although that ship sails like in the normal game. The icon now shows the
+  pull the ship really gets. On your own ship, and on a ship simulated by the server or by another player with the mod,
+  nothing changes.
+- Fixed: when the wind shifted while the sail was still filling, the sail's pull could swing slightly past its normal
+  strength for a moment (about half a percent at Sailing 100, too small to notice). The faster sail of a higher
+  Sailing level now follows the normal game's own curve, only sooner, and no longer goes past the full pull for the
+  heading. At Sailing 100 the sail still fills and empties in about a second instead of about two; the last part of
+  the way is a little gentler than before (90% of the pull after about 1.0 seconds instead of 0.9).
+
 ## 0.1.0
 
 - Initial version. New skill, Sailing, shown in the Skills panel with its own icon: the helmsman earns 50 XP per

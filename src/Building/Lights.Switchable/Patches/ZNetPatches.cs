@@ -4,8 +4,10 @@ using MC.Shared;
 
 namespace MC.Building.LightsSwitchableMod.Patches;
 
-// Me = network part (server rules for everyone, refuse players without mod). Only while Active, like every patch.
-// Framework NetworkGate patch same methods under own Harmony id (handshake); all postfixes, no order needed.
+// Me = network part (server rules for everyone, refuse players who cannot play by them). Only while Active, like
+// every patch. Framework NetworkGate patch same methods under own Harmony id (handshake); all postfixes, no order
+// needed. Live re-check of a player who turn me off come from NetworkGate.PeerStateChanged (PlayerCheck), not from
+// here.
 //   OnNewConnection: server listen for rules request; client listen for rules (new session = forget old).
 //   RPC_PeerInfo:    peer ready = handshake done. Server: start grace for join check. Client: listen (again) and ask
 //                    server rules.

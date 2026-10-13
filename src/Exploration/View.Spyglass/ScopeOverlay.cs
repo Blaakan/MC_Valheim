@@ -122,6 +122,12 @@ internal static class ScopeOverlay
         else
         {
             _blur.enabled = false;
+            if (!blurOn)
+            {
+                // EdgeBlur turned off while looking: frame copy stop now, no wait for lowering. (Blur on but no
+                // picture yet = first frame of the copy: it must keep running.)
+                ScopeCapture.Disable();
+            }
         }
     }
 
@@ -362,7 +368,8 @@ internal sealed class DarkRing : MaskableGraphic
 // Me = small blurred copy of what the main camera drew this frame (after its image effects, before any UI), for
 // the blur ring. OnRenderImage of a component added last to the camera = last image effect. Shrunk by 2 four times
 // (each bilinear step averages 2x2: a soft blur), then once back up to 1/8 size: that texture stay for the UI.
-// Format without alpha channel (sampled alpha = 1, whatever the effects left there). On only while shown.
+// Format without alpha channel (sampled alpha = 1, whatever the effects left there). On only while shown with
+// EdgeBlur on.
 internal sealed class ScopeCapture : MonoBehaviour
 {
     private static ScopeCapture _instance;

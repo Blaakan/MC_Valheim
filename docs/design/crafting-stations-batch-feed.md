@@ -294,6 +294,11 @@ vanilla's hold repeat (+1 per 0.2 s where the spot repeats).
 - Postfixes (priority Low, so they see other mods' changes) on `Switch`, `Fireplace`, `CookingStation` and
   `Turret.GetHoverText`. Early return when `ShowHint` is off or the text is empty. A one-slot cache (last hovered
   component → spot or "not covered") avoids per-frame lookups; the cooking done-item check runs at most every 0.25 s.
+  While the same component stays under the crosshair, the spot is asked again every 0.5 s: `Fireplace.GetHoverText`
+  reads its flags live, and another mod can change them at any time (Switchable Lights sets `m_canRefill` on the
+  lights it manages when it is turned on or off), so the hint appears or goes away within half a second without
+  looking elsewhere (since 0.1.1; before, the answer was kept until the hovered component changed). The press itself
+  resolves the spot every time and never used this cache.
 - **Anchor by structure**: insert the line at the end of the line holding the first `"[<color=yellow><b>"` (the Use
   line in every covered hover). No anchor → no hint (ballista without access, a mod that restyled the text). The key
   text is never searched for: a cached vanilla string can still show an old key after a rebind (1.2).
@@ -377,6 +382,7 @@ feeding the same station in the same second remain the vanilla race.
 | Smelter fuel at 17/20 | 1 per press while fuel ≤ 19 | Adds 3 (vanilla rule replayed) |
 | Campfire 7/10 | Adds 1 | Adds 3, "Adding 3 Wood to the fire (10/10)" |
 | Infinite fire, Resin Candle | No fuel line | No hint, vanilla |
+| Another mod stops or restarts a fire's refilling while you look at it (Switchable Lights turned on or off) | Hover changes at once | Press follows at once; the hint goes away or comes back within 0.5 s |
 | Hold Shift+E on a fire | +1 per 0.2 s | +5, then +1 per 0.2 s |
 | Cooking station with a finished item | E takes it | No hint; Shift+E takes one (vanilla) |
 | Frost Foundry cast slot (1 slot) | Places 1 | Not covered: no hint, places 1; its Liquid Frost slot is batched |

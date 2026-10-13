@@ -181,7 +181,9 @@ internal static class StarIcons
             LogOnce(source, e);
         }
         Cache[key] = entry;
-        return entry.Failed ? source : entry.Made;
+        // No sprite made (failed, or copy came back empty and me wait for next try): game sprite, never nothing.
+        // Nothing = white square where caller keep it (the "New material" popup of an idol picked up right then).
+        return entry.Made != null ? entry.Made : source;
     }
 
     private static Texture2D Compose(Sprite source, int stars, bool middle)

@@ -25,19 +25,25 @@ namespace MC.Farming.BreedingStarInheritanceMod;
 //                            on the new character after a respawn
 //   breeding.mp.handoff      partner note reaches the server's copy (readable there) and its cleared value too; egg
 //                            quality 2 hatches and grows at level 2 on the server's copy as well
-//   breeding.mp.allow        server switches AllowPlayersWithoutMod on and back off: player with the mod checked
+//   breeding.mp.allow        server switches AllowPlayersWithoutMod on and back off: player with the mod on checked
 //                            again and kept
 //   breeding.mp.server-off   server turns the mod off: client inactive with the "turned off" text, vanilla births;
 //                            on again: one settings line, rule back, player with the mod kept
-//   breeding.mp.off-stays    client turns the mod off: withdraw reaches the server's copy, player stays connected;
-//                            on again: settings line again, Farming published again
-//   breeding.mp.off-push     server changes a setting while the client's copy is off: turned on again the copy uses
-//                            the server's current numbers and a birth says so
-//   breeding.mp.bug.off-push-line  same case, the log line only: no settings line while off, exactly one when turned
-//                            on again (KNOWN BUG of the mod, log only: the line comes while off and is missing after)
+//   breeding.mp.off-stays    server has AllowPlayersWithoutMod on, client turns the mod off: withdraw reaches the
+//                            server's copy, player stays connected, server counts the copy as off and warns once that
+//                            it lets the player stay; on again: settings line again, Farming published again, server
+//                            checks the player again (live) and keeps it; AllowPlayersWithoutMod back off: checked
+//                            again, kept
+//   breeding.mp.off-push     server (AllowPlayersWithoutMod on) changes a setting while the client's copy is off: no
+//                            settings line while off (and no warning for a message it cannot read then); turned on
+//                            again exactly one settings line, the copy uses the server's current numbers and a birth
+//                            says so
 // Scenario "vanilla-server" (server without the mod; this mod is inactive there, so that test stays registered):
 //   breeding.mp.vanilla-server  status text, no patch, nothing published, vanilla births, no note
-// Client's own copy is turned off through its Enabled entry (config files of a multiplayer run are throwaway).
+// Client's own copy is turned off through its Enabled entry (config files of a multiplayer run are throwaway). The
+// server refuses a player whose copy is off about a second later, so a test that turns it off asks the server for
+// AllowPlayersWithoutMod first. The refusal itself (turned off while in, and joining with it off) is the probe's own
+// test probe.mp.off.<GUID> of scenario "each-off": a test here cannot get its player refused and still ask the server.
 internal static partial class SelfTests
 {
     private const string MpServerLogName = "breeding.mp.server-log";
@@ -48,7 +54,6 @@ internal static partial class SelfTests
     private const string MpServerOffName = "breeding.mp.server-off";
     private const string MpOffStaysName = "breeding.mp.off-stays";
     private const string MpOffPushName = "breeding.mp.off-push";
-    private const string MpBugOffPushLineName = "breeding.mp.bug.off-push-line";
     private const string MpVanillaServerName = "breeding.mp.vanilla-server";
 
     // Scenario names of tools/Test-Multiplayer.ps1 (SelfTest only names "modded").
@@ -61,13 +66,20 @@ internal static partial class SelfTests
     private const string StepPlayer = "breeding.mp.step.player";
     private const string StepZdo = "breeding.mp.step.zdo";
     private const string StepAllow = "breeding.mp.step.allow";
+    private const string StepAllowSet = "breeding.mp.step.allow-set";
     private const string StepLog = "breeding.mp.step.log";
 
     // Server probe's own step: "<GUID>=on|off" = the server owner ticking the mod in the MC Mods panel.
     private const string ProbeSetEnabled = "probe.set-enabled";
 
     private const string SentLineStart = "Sent the breeding settings to ";
-    private const string AllowedLineEnd = " has Breeding Star Inheritance installed: allowed.";
+    private const string UnreadableLineStart = "The server sent breeding settings this version cannot read";
+    // Server lines of the join check (PlayerCheck): Debug for a player it keeps, Warning for one it lets stay although
+    // their game does not run the mod (any reason), and that Warning for a copy that is turned off.
+    private const string AllowedLineEnd = " has " + ModInfo.Name + " on, with the same network version: allowed.";
+    private const string LetInText = "; AllowPlayersWithoutMod is on, so they may play, but the animals their game simulates breed the vanilla way";
+    private const string TurnedOffLetInText = " has the mod turned off" + LetInText;
+    private const string TurnedOffProblem = "has the mod turned off";
     private const string ServerOffStatus = "Inactive: the server has this mod turned off (or it is not working there).";
     private const string ServerMissingStatus = "Inactive: the server does not have this mod. It must be installed on the server too.";
     private const string DisabledStatus = "Off (disabled in settings).";
@@ -87,7 +99,6 @@ internal static partial class SelfTests
         SelfTest.RegisterMultiplayer(MpServerOffName, SelfTest.Modded, RunMpServerOff);
         SelfTest.RegisterMultiplayer(MpOffStaysName, SelfTest.Modded, RunMpOffStays);
         SelfTest.RegisterMultiplayer(MpOffPushName, SelfTest.Modded, RunMpOffPush);
-        SelfTest.RegisterMultiplayer(MpBugOffPushLineName, SelfTest.Modded, RunMpBugOffPushLine);
         SelfTest.RegisterMultiplayer(MpVanillaServerName, VanillaServerScenario, RunMpVanillaServer);
         SelfTest.RegisterServerStep(StepReset, ServerReset);
         SelfTest.RegisterServerStep(StepState, ServerState);
@@ -96,6 +107,7 @@ internal static partial class SelfTests
         SelfTest.RegisterServerStep(StepPlayer, ServerPlayer);
         SelfTest.RegisterServerStep(StepZdo, ServerZdo);
         SelfTest.RegisterServerStep(StepAllow, ServerAllow);
+        SelfTest.RegisterServerStep(StepAllowSet, ServerAllowSet);
         SelfTest.RegisterServerStep(StepLog, ServerLog);
     }
 
@@ -111,7 +123,6 @@ internal static partial class SelfTests
         SelfTest.UnregisterMultiplayer(MpServerOffName);
         SelfTest.UnregisterMultiplayer(MpOffStaysName);
         SelfTest.UnregisterMultiplayer(MpOffPushName);
-        SelfTest.UnregisterMultiplayer(MpBugOffPushLineName);
         SelfTest.UnregisterServerStep(StepReset);
         SelfTest.UnregisterServerStep(StepState);
         SelfTest.UnregisterServerStep(StepSet);
@@ -119,6 +130,7 @@ internal static partial class SelfTests
         SelfTest.UnregisterServerStep(StepPlayer);
         SelfTest.UnregisterServerStep(StepZdo);
         SelfTest.UnregisterServerStep(StepAllow);
+        SelfTest.UnregisterServerStep(StepAllowSet);
         SelfTest.UnregisterServerStep(StepLog);
     }
 
@@ -264,7 +276,8 @@ internal static partial class SelfTests
     }
 
     // "want=<value>;timeout=<s>": wait until the server's copy of the player's character carries this published
-    // Farming (-1 = withdrawn). Tells who the player is for the server.
+    // Farming (-1 = withdrawn). Tells who the player is for the server, and what its join check thinks of their game
+    // (hasmod = installed; compatible = installed, on, same network version; problem = the reason when not).
     private static IEnumerator ServerPlayer(string arg, object[] reply)
     {
         var fields = Fields(arg);
@@ -298,7 +311,8 @@ internal static partial class SelfTests
         SelfTest.Answer(reply, has && value == want,
             $"published={(has ? value.ToString(c) : "missing")};character={(peer != null ? peer.m_characterID.ToString() : "none")};"
             + $"peers={(net != null ? net.GetPeers().Count : 0)};hasmod={peer != null && NetworkGate.PeerHasMod(peer)};"
-            + $"compatible={peer != null && NetworkGate.PeerCompatible(peer)}");
+            + $"compatible={peer != null && NetworkGate.PeerCompatible(peer)};"
+            + $"problem={(peer != null ? NetworkGate.PeerProblem(peer) ?? "none" : "no player")}");
     }
 
     // "id=<user>:<n>;want=note|cleared|level:<n>;timeout=<s>": wait until the server's copy of that object shows it.
@@ -383,11 +397,36 @@ internal static partial class SelfTests
         var net = ZNet.instance;
         var allowed = CountLines(mark, AllowedLineEnd);
         var refused = CountLines(mark, "Refused ");
-        SelfTest.Answer(reply, true, $"allowed={allowed};refused={refused};without={CountLines(mark, "joined without Breeding Star Inheritance")};"
+        SelfTest.Answer(reply, true, $"allowed={allowed};refused={refused};letin={CountLines(mark, LetInText)};"
                                      + $"peers={(net != null ? net.GetPeers().Count : 0)};pending={PlayerCheck.HasWork}");
     }
 
-    // "since=<mark>" (0 or missing = whole session): what this mod logged on the server.
+    // "true" | "false": the server owner switching AllowPlayersWithoutMod, left like that (ServerReset puts it back
+    // off). A join check still waiting (the player just joined, or the test before switched the setting) is let
+    // through first, so the log after the mark belongs to this switch and to what the test does next.
+    // before / pending = a join check was waiting before / is waiting right after the switch (same frame: only
+    // switching back to refuse queues one); mark = the server's log just before the switch.
+    private static IEnumerator ServerAllowSet(string arg, object[] reply)
+    {
+        if (arg != "true" && arg != "false")
+        {
+            SelfTest.Answer(reply, false, $"bad argument '{arg}' (wanted true or false)");
+            yield break;
+        }
+        var want = arg == "true";
+        yield return WaitFor(() => !PlayerCheck.HasWork, PlayerCheck.GraceSeconds + 2f);
+        var mark = LogMark();
+        var before = PlayerCheck.HasWork;
+        Plugin.AllowPlayersWithoutMod.Value = want;
+        var pending = PlayerCheck.HasWork;
+        yield return null;
+        SelfTest.Answer(reply, Plugin.AllowPlayersWithoutMod.Value == want,
+            $"allow={Plugin.AllowPlayersWithoutMod.Value};before={before};pending={pending};mark={mark}");
+    }
+
+    // "since=<mark>" (0 or missing = whole session): what this mod logged on the server. allowed = players the join
+    // check kept (Debug), refused = players it refused, letin = players it let stay although their game does not run
+    // the mod (AllowPlayersWithoutMod), off = those of them whose copy is turned off.
     private static IEnumerator ServerLog(string arg, object[] reply)
     {
         int.TryParse(Field(Fields(arg), "since"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var since);
@@ -397,8 +436,19 @@ internal static partial class SelfTests
         var activated = 0;
         var allowed = 0;
         var refused = 0;
+        var letIn = 0;
+        var off = 0;
         foreach (var line in lines)
         {
+            if (line.Text.IndexOf(LetInText, StringComparison.Ordinal) >= 0)
+            {
+                letIn++;
+                if (line.Text.IndexOf(TurnedOffLetInText, StringComparison.Ordinal) >= 0)
+                {
+                    off++;
+                }
+                continue;
+            }
             if (line.Text.StartsWith(Log.ReadyMarker + " " + ModInfo.Guid + " ", StringComparison.Ordinal))
             {
                 ready++;
@@ -420,6 +470,7 @@ internal static partial class SelfTests
         yield return null;
         var first = troubles.Count > 0 ? FirstLine(troubles[0].Text).Replace(';', ',') : "none";
         SelfTest.Answer(reply, true, $"lines={lines.Count};ready={ready};activated={activated};allowed={allowed};refused={refused};"
+                                     + $"letin={letIn};off={off};"
                                      + $"troubles={troubles.Count};dedicated={net != null && net.IsDedicated()};state={MyState()};first={first}");
     }
 
@@ -725,6 +776,8 @@ internal static partial class SelfTests
             c.Check(reply.Answered && reply.Ok, $"the server's copy of the player must carry the published Farming {Inv(own)} ({reply})");
             c.Check(Field(f, "hasmod") == "True" && Field(f, "character") == first.GetZDOID().ToString(),
                 $"the server must know this player with the mod and this character ({reply.Detail}; character {first.GetZDOID()})");
+            c.Check(Field(f, "compatible") == "True" && Field(f, "problem") == "none",
+                $"the server's join check must count this player's game as running the mod (on, same network version) ({reply.Detail})");
 
             // 2. A raise goes out with the next breeding tick (the throttled publish a tick does).
             SetFarming(first, 42f);
@@ -887,13 +940,14 @@ internal static partial class SelfTests
         {
             var f = Fields(reply.Detail);
             c.Check(int.TryParse(Field(f, "allowed"), out var allowed) && allowed >= 1,
-                $"switching AllowPlayersWithoutMod back off must check the connected player again ('... has Breeding Star Inheritance installed: allowed.'; {reply.Detail})");
-            c.Check(Field(f, "refused") == "0" && Field(f, "without") == "0", $"a player with the mod must not be refused or reported as without it ({reply.Detail})");
+                $"switching AllowPlayersWithoutMod back off must check the connected player again ('...{AllowedLineEnd}'; {reply.Detail})");
+            c.Check(Field(f, "refused") == "0" && Field(f, "letin") == "0",
+                $"a player with the mod on must not be refused or reported as let in although their game does not run it ({reply.Detail})");
             c.Check(Field(f, "peers") == "1", $"the player must still be connected for the server ({reply.Detail})");
         }
         yield return WaitRealtime(PlayerCheck.DisconnectDelay + 1f);
-        c.Check(Connected(), "the player with the mod lost the connection after AllowPlayersWithoutMod was switched back off");
-        c.Report($"the server switched AllowPlayersWithoutMod on and back off: the player with the mod was checked again and kept ({reply.Detail})");
+        c.Check(Connected(), "the player with the mod on lost the connection after AllowPlayersWithoutMod was switched back off");
+        c.Report($"the server switched AllowPlayersWithoutMod on and back off: the player with the mod on was checked again and kept ({reply.Detail})");
     }
 
     // ---------- breeding.mp.server-off ----------
@@ -975,7 +1029,7 @@ internal static partial class SelfTests
             {
                 var f = Fields(reply.Detail);
                 c.Check(int.TryParse(Field(f, "allowed"), out var allowed) && allowed >= 1 && Field(f, "refused") == "0",
-                    $"server on again: the server must check the connected player again and keep it ('... installed: allowed.', no 'Refused'; {reply.Detail})");
+                    $"server on again: the server must check the connected player again and keep it ('...{AllowedLineEnd}', no 'Refused'; {reply.Detail})");
                 c.Check(Field(f, "troubles") == "0", $"the mod logged a warning or error on the server while it was turned off and on: {Field(f, "first")}");
             }
             c.Check(Connected(), "server on again: the connection was lost");
@@ -993,11 +1047,15 @@ internal static partial class SelfTests
 
     // ---------- breeding.mp.off-stays ----------
 
+    // A player whose copy is off stays only while the server has AllowPlayersWithoutMod on (off = refused a second
+    // later: the probe's probe.mp.off.<GUID>, scenario each-off). So the server switches it on first, and back at the
+    // end. Cut short in between: the next test's MpPrepare turns this copy on and the server's setting back off.
     private static IEnumerator RunMpOffStays()
     {
         var c = new Checks(MpOffStaysName);
         var pen = new Pen(MpOffStaysName, egg: false);
         var enabled = MyEnabled();
+        var allowOn = false;
         try
         {
             var box = new Box();
@@ -1015,8 +1073,26 @@ internal static partial class SelfTests
             var reply = new SelfTest.ServerReply();
             yield return SelfTest.CallServer(StepPlayer, $"want={Inv(own)};timeout=8", reply);
             c.Check(reply.Answered && reply.Ok, $"before: the server's copy of the player must carry the published Farming {Inv(own)} ({reply})");
+            var f = Fields(reply.Detail);
+            c.Check(Field(f, "compatible") == "True", $"before: the server's join check must count this player's game as running the mod ({reply.Detail})");
 
-            // 1. This player turns the mod off: withdraw, visible on the server; the player stays connected.
+            // 0. The server owner lets players stay whose game does not run the mod. Switching it on checks nobody.
+            reply = new SelfTest.ServerReply();
+            yield return SelfTest.CallServer(StepAllowSet, "true", reply);
+            f = Fields(reply.Detail);
+            allowOn = reply.Answered && reply.Ok && Field(f, "allow") == "True";
+            var serverMark = Field(f, "mark");
+            if (!c.Check(allowOn && serverMark.Length > 0, $"the server could not switch AllowPlayersWithoutMod on ({reply})"))
+            {
+                // Without it the server would refuse this player a second after the mod goes off here.
+                c.Report("");
+                yield break;
+            }
+            c.Check(Field(f, "pending") == Field(f, "before"),
+                $"switching AllowPlayersWithoutMod on must not make the server check its players again ({reply.Detail})");
+
+            // 1. This player turns the mod off: withdraw, visible on the server; the player stays connected (the
+            //    server allows it), and the server knows the copy is off and says once that it lets the player stay.
             var mark = LogMark();
             enabled.Value = false;
             yield return null;
@@ -1028,12 +1104,22 @@ internal static partial class SelfTests
             c.Check(reply.Answered && reply.Ok, $"turned off: the server's copy of the player must say -1 (not a farmer any more) ({reply})");
             // A refusal would come after the 1 s grace and cut the connection 4 s later.
             yield return WaitRealtime(PlayerCheck.GraceSeconds + PlayerCheck.DisconnectDelay + 2f);
-            c.Check(Connected(), $"turned off: the player did not stay connected (status {ZNet.GetConnectionStatus()})");
+            c.Check(Connected(), "turned off while the server has AllowPlayersWithoutMod on: the player did not stay connected "
+                                 + $"(status {ZNet.GetConnectionStatus()})");
             reply = new SelfTest.ServerReply();
             yield return SelfTest.CallServer(StepPlayer, "want=-1;timeout=2", reply);
-            var f = Fields(reply.Detail);
+            f = Fields(reply.Detail);
             c.Check(reply.Answered && Field(f, "peers") == "1" && Field(f, "hasmod") == "True",
                 $"turned off: the server must still have this player, counted as having the mod installed ({reply})");
+            c.Check(Field(f, "compatible") == "False" && Field(f, "problem") == TurnedOffProblem,
+                $"turned off: the server's join check must know this player's copy is off ('{TurnedOffProblem}'; {reply.Detail})");
+            reply = new SelfTest.ServerReply();
+            yield return SelfTest.CallServer(StepLog, "since=" + serverMark, reply);
+            f = Fields(reply.Detail);
+            c.Check(reply.Answered && reply.Ok && Field(f, "off") == "1" && Field(f, "letin") == "1",
+                $"turned off: the server must warn exactly once '<player>{TurnedOffLetInText} ...' ({reply})");
+            c.Check(Field(f, "refused") == "0" && Field(f, "allowed") == "0",
+                $"turned off: with AllowPlayersWithoutMod on the server must neither refuse this player nor report the copy as on ({reply.Detail})");
 
             // 2. On again: the settings line again, Farming published again.
             mark = LogMark();
@@ -1049,6 +1135,9 @@ internal static partial class SelfTests
             reply = new SelfTest.ServerReply();
             yield return SelfTest.CallServer(StepPlayer, $"want={Inv(own)};timeout=8", reply);
             c.Check(reply.Answered && reply.Ok, $"turned on again: the server's copy of the player must carry Farming {Inv(own)} again ({reply})");
+            f = Fields(reply.Detail);
+            c.Check(Field(f, "compatible") == "True" && Field(f, "problem") == "none",
+                $"turned on again: the server's join check must count this player's game as running the mod again ({reply.Detail})");
 
             // 3. A copy turned on while connected decides births with the server's numbers.
             if (!PenBlocked(MpOffStaysName) && SetupPen(pen, "Boar", 1, 3))
@@ -1060,10 +1149,38 @@ internal static partial class SelfTests
                 c.Check(LastBirth.Settings == SettingsSource.Server, $"turned on while connected: the birth used {LastBirth.Settings} settings");
                 RollOverride = null;
             }
-            c.Report("this player turned the mod off: withdraw line, -1 on the server's copy of the player, still connected "
-                     + $"{Inv(PlayerCheck.GraceSeconds + PlayerCheck.DisconnectDelay + 2f)} s later and still known to the server as having the mod; on "
-                     + "again: one settings line with the server's numbers, Farming on the server's copy again, and a birth with "
-                     + "'server settings'");
+
+            // 4. The server checked this player again when the copy came back on (told live by this game, checked
+            //    after the grace) and kept it: one Debug line, still the one Warning from step 1, nobody refused.
+            yield return WaitRealtime(PlayerCheck.GraceSeconds);
+            reply = new SelfTest.ServerReply();
+            yield return SelfTest.CallServer(StepLog, "since=" + serverMark, reply);
+            f = Fields(reply.Detail);
+            c.Check(reply.Answered && reply.Ok && Field(f, "allowed") == "1",
+                $"turned on again: the server must check this player once more and keep it (one '...{AllowedLineEnd}' line; {reply})");
+            c.Check(Field(f, "refused") == "0" && Field(f, "off") == "1" && Field(f, "letin") == "1",
+                $"turned on again: no refusal and no second warning expected on the server ({reply.Detail})");
+
+            // 5. The server owner goes back to refusing while this player's copy is on: checked again, kept.
+            reply = new SelfTest.ServerReply();
+            yield return SelfTest.CallServer(StepAllowSet, "false", reply);
+            f = Fields(reply.Detail);
+            allowOn = !(reply.Answered && reply.Ok && Field(f, "allow") == "False");
+            c.Check(!allowOn, $"the server could not switch AllowPlayersWithoutMod back off ({reply})");
+            c.Check(Field(f, "pending") == "True", $"switching AllowPlayersWithoutMod back off must make the server check its players again ({reply.Detail})");
+            yield return WaitRealtime(PlayerCheck.GraceSeconds + 1.5f);
+            reply = new SelfTest.ServerReply();
+            yield return SelfTest.CallServer(StepLog, "since=" + serverMark, reply);
+            f = Fields(reply.Detail);
+            c.Check(reply.Answered && reply.Ok && Field(f, "allowed") == "2" && Field(f, "refused") == "0",
+                $"AllowPlayersWithoutMod back off: the server must check the player with the mod on again and keep it ({reply})");
+            c.Check(Connected(), $"AllowPlayersWithoutMod back off: the player with the mod on lost the connection (status {ZNet.GetConnectionStatus()})");
+            c.Report("the server had AllowPlayersWithoutMod on and this player turned the mod off: withdraw line, -1 on the server's "
+                     + $"copy of the player, still connected {Inv(PlayerCheck.GraceSeconds + PlayerCheck.DisconnectDelay + 2f)} s later, "
+                     + "the server counts the copy as installed but turned off and warned once that it lets the player stay; on "
+                     + "again: one settings line with the server's numbers, Farming on the server's copy again, the server checked "
+                     + "the player again and kept it, and a birth with 'server settings'; AllowPlayersWithoutMod back off: checked "
+                     + "again and kept");
         }
         finally
         {
@@ -1071,6 +1188,11 @@ internal static partial class SelfTests
             if (enabled != null && !enabled.Value)
             {
                 enabled.Value = true;
+            }
+            if (allowOn)
+            {
+                SelfTest.Note(MpOffStaysName, "the server's AllowPlayersWithoutMod may still be on (the test ended before putting it "
+                                              + "back; the next breeding test puts it back off)");
             }
             Cleanup(pen);
         }
@@ -1086,13 +1208,20 @@ internal static partial class SelfTests
     {
         internal bool Done;         // whole sequence ran (prepare ok, server answered)
         internal bool WentOff;      // copy was off before the server changed its number
+        internal bool StayedWhileOff; // still connected at the end of the time off (server let the player stay)
+        internal bool KeptWhileOff; // push reached the copy while off: server's new numbers kept in memory
         internal int LinesWhileOff; // 'Using the server's breeding settings' lines logged while off
-        internal readonly List<string> LinesAfterOn = new List<string>(); // same lines after turned on again
+        internal ServerSettings.ReceiveResult BadWhileOff; // what the copy did with unreadable numbers while off
+        internal int BadLinesWhileOff;                     // 'cannot read' warnings it logged for them
+        internal readonly List<string> LinesAfterOn = new List<string>(); // settings lines after turned on again
     }
 
-    // Same steps for breeding.mp.off-push and breeding.mp.bug.off-push-line: this player turn mod off (Enabled entry),
-    // server change ChanceAtFarming0 to 25 meanwhile (push go to every player with mod installed), player turn mod on
-    // again. Server left at the changed numbers: caller ask reset when done.
+    // Steps of breeding.mp.off-push: server switch AllowPlayersWithoutMod on (a copy that is off stay connected only
+    // then; else server refuse this player a second later), this player turn mod off (Enabled entry), server change
+    // ChanceAtFarming0 to 25 meanwhile (push go to every player with mod installed), copy that is off also get numbers
+    // it cannot read (given straight to the handler's code: real server never send such), player turn mod on again.
+    // Server left at the changed numbers and with AllowPlayersWithoutMod on: caller ask reset when done (it put both
+    // back).
     private static IEnumerator OffPushSequence(Checks c, BepInEx.Configuration.ConfigEntry<bool> enabled, OffPushRun run)
     {
         var box = new Box();
@@ -1102,18 +1231,30 @@ internal static partial class SelfTests
             c.Check(enabled != null, "the mod's Enabled setting was not found");
             yield break;
         }
+        var reply = new SelfTest.ServerReply();
+        yield return SelfTest.CallServer(StepAllowSet, "true", reply);
+        if (!c.Check(reply.Answered && reply.Ok && Field(Fields(reply.Detail), "allow") == "True",
+                $"the server could not switch AllowPlayersWithoutMod on ({reply})"))
+        {
+            yield break;
+        }
         enabled.Value = false;
         yield return WaitFor(() => !MyActive(), 5f);
         run.WentOff = !MyActive();
         var markOff = LogMark();
-        var reply = new SelfTest.ServerReply();
+        reply = new SelfTest.ServerReply();
         yield return SelfTest.CallServer(StepSet, "25|50|10|60|2", reply);
         if (!c.Check(reply.Answered && reply.Ok, $"server set (ChanceAtFarming0 25): {reply}"))
         {
             yield break;
         }
         yield return WaitRealtime(1.5f);
+        // Off for more than the server's 1 s grace by now: a refusal would have logged this game out.
+        run.StayedWhileOff = Connected();
+        run.KeptWhileOff = UsingServer(OffPushNumbers, 60f);
         run.LinesWhileOff = CountLines(markOff, ServerSettingsLineStart);
+        run.BadWhileOff = ServerSettings.Receive("not breeding settings");
+        run.BadLinesWhileOff = CountLines(markOff, UnreadableLineStart);
 
         var markOn = LogMark();
         enabled.Value = true;
@@ -1124,8 +1265,10 @@ internal static partial class SelfTests
         run.Done = true;
     }
 
-    // Everything of the case but the log line (that part = breeding.mp.bug.off-push-line): number changed on the server
-    // while this copy was off is the one in use after it is on again, and a birth says so.
+    // Whole case: number changed on the server while this copy was off (server let the player stay:
+    // AllowPlayersWithoutMod on). While off: push arrive and numbers are kept, but log say nothing (no settings line:
+    // births here are vanilla then; no warning for numbers it cannot read). On again: exactly one settings line with
+    // the server's current numbers, they are the ones in use, and a birth says so.
     private static IEnumerator RunMpOffPush()
     {
         var c = new Checks(MpOffPushName);
@@ -1141,7 +1284,18 @@ internal static partial class SelfTests
                 yield break;
             }
             c.Check(run.WentOff, "turned off: this game's copy of the mod was still active");
+            c.Check(run.StayedWhileOff, "turned off while the server has AllowPlayersWithoutMod on: the player did not stay connected");
+            c.Check(run.KeptWhileOff, "while the mod is turned off on this game the server's changed numbers must still reach it and be kept "
+                                      + "(else the checks on its log while off prove nothing)");
+            c.Check(run.LinesWhileOff == 0,
+                "while the mod is turned off on this game its log must not say 'Using the server's breeding settings' (births here are "
+                + $"vanilla then); found {run.LinesWhileOff} such line(s)");
+            c.Check(run.BadWhileOff == ServerSettings.ReceiveResult.Unreadable && run.BadLinesWhileOff == 0,
+                "while the mod is turned off on this game, settings it cannot read must be refused without a warning in its log "
+                + $"(result {run.BadWhileOff}, {run.BadLinesWhileOff} warning line(s))");
             c.Check(MyActive(), $"turned on again: state {MyState()} '{MyStatus()}'");
+            c.Check(run.LinesAfterOn.Count == 1 && run.LinesAfterOn[0] == SettingsLine(OffPushNumbers, 60f),
+                $"turned on again: exactly one line '{SettingsLine(OffPushNumbers, 60f)}' expected, found {run.LinesAfterOn.Count}");
             c.Check(UsingServer(OffPushNumbers, 60f), $"turned on again: the numbers in use must be the server's current ones (source {Plugin.CurrentSettings().Source}, "
                                                       + $"{ServerSettings.Describe(Plugin.CurrentSettings().Rule, Plugin.CurrentSettings().FarmerRange)})");
             var chance = -1f;
@@ -1156,12 +1310,14 @@ internal static partial class SelfTests
                     $"turned on after the change: the birth used {LastBirth.Settings} settings, chance {Pct(LastBirth.Decision.Chance)}%; expected Server, {Pct(chance)}%");
                 RollOverride = null;
             }
+            // Defaults again, and AllowPlayersWithoutMod back off (the reset answers ok only with both).
             var reply = new SelfTest.ServerReply();
             yield return SelfTest.CallServer(StepReset, "", reply);
             c.Check(reply.Answered && reply.Ok, $"server back to defaults: {reply}");
-            c.Report("the server changed ChanceAtFarming0 to 25 while this game's copy was off: turned on again the copy is active, uses "
-                     + $"the server's current numbers, and a birth has chance {Pct(chance)}% with 'server settings' (the log line of this "
-                     + $"case is checked by {MpBugOffPushLineName})");
+            c.Report("the server (AllowPlayersWithoutMod on) changed ChanceAtFarming0 to 25 while this game's copy was off: the player "
+                     + "stayed connected, the numbers reached the copy and its log said nothing while off (no settings line, no "
+                     + "warning for an unreadable message); turned on again the copy is active, logs exactly one settings line with "
+                     + $"the server's current numbers, uses them, and a birth has chance {Pct(chance)}% with 'server settings'");
         }
         finally
         {
@@ -1171,45 +1327,6 @@ internal static partial class SelfTests
                 enabled.Value = true;
             }
             Cleanup(pen);
-        }
-    }
-
-    // ---------- breeding.mp.bug.off-push-line ----------
-
-    // KNOWN BUG of the mod (log only), alone here so it block nothing else: client handler stay on the connection while
-    // the copy is off, so the server's push is logged as "Using the server's breeding settings" by a copy that is off;
-    // turned on again the answer has the same text and the line that should come is left out.
-    private static IEnumerator RunMpBugOffPushLine()
-    {
-        var c = new Checks(MpBugOffPushLineName);
-        var enabled = MyEnabled();
-        try
-        {
-            var run = new OffPushRun();
-            yield return OffPushSequence(c, enabled, run);
-            if (!run.Done)
-            {
-                c.Report("");
-                yield break;
-            }
-            c.Check(run.WentOff, "turned off: this game's copy of the mod was still active");
-            c.Check(run.LinesWhileOff == 0,
-                "while the mod is turned off on this game its log must not say 'Using the server's breeding settings' (births here are "
-                + $"vanilla then); found {run.LinesWhileOff} such line(s)");
-            c.Check(run.LinesAfterOn.Count == 1 && run.LinesAfterOn[0] == SettingsLine(OffPushNumbers, 60f),
-                $"turned on again: exactly one line '{SettingsLine(OffPushNumbers, 60f)}' expected, found {run.LinesAfterOn.Count}");
-            var reply = new SelfTest.ServerReply();
-            yield return SelfTest.CallServer(StepReset, "", reply);
-            c.Check(reply.Answered && reply.Ok, $"server back to defaults: {reply}");
-            c.Report("server setting changed while this game's copy was off: no settings line while off, exactly one with the current "
-                     + "numbers when turned on again");
-        }
-        finally
-        {
-            if (enabled != null && !enabled.Value)
-            {
-                enabled.Value = true;
-            }
         }
     }
 

@@ -11,9 +11,11 @@ namespace MC.Exploration.SailingSkillMod;
 //   Damage01(ship)   ship owner (S7): best level of all players aboard (crew's best sailor protect the ship, also
 //                    with nobody at the helm).
 //   Local01()        rudder (helmsman's own game) and map reveal: own level.
+//   SimulatedWithMod(ship)  helmsman HUD only: the game that simulate the ship run me? Same published key tell it.
 // Missing key or -1 (no mod, mod off) = 0 = no bonus. Level = vanilla GetSkillLevel (stored + status effects, floored),
 // s = level / 100 clamped to 0..1.
-// Caches: own level 0.5 s; per ship helmsman value 0.5 s in 4 slots (physics ask several times per fixed step).
+// Caches: own level 0.5 s; per ship helmsman value 0.5 s in 4 slots (physics ask several times per fixed step); one
+// remembered answer of SimulatedWithMod (see there).
 internal static class HelmSkill
 {
     internal const string Key = ModInfo.Guid + ".Level";
@@ -31,6 +33,10 @@ internal static class HelmSkill
     private static readonly float[] SlotValue = new float[Slots];
     private static readonly float[] SlotUntil = new float[Slots];
     private static int _nextSlot;
+
+    // SimulatedWithMod: last other player's game me found, and what its player said (0 = none yet).
+    private static long _ownerSeen;
+    private static bool _ownerSeenWithMod;
 
 #if DEBUG
     private static float? _testLocalLevel;
@@ -56,6 +62,8 @@ internal static class HelmSkill
         {
             SlotShip[i] = null;
         }
+        _ownerSeen = 0L;
+        _ownerSeenWithMod = false;
     }
 
     // Own effective Sailing, same number as Skills.GetSkillLevel, but never add the skill: vanilla GetSkill add a
@@ -189,6 +197,57 @@ internal static class HelmSkill
         var slot = _nextSlot;
         _nextSlot = (_nextSlot + 1) % Slots;
         return Store(slot, ship, now);
+    }
+
+    // Game that simulate this ship run me, as far as this game can know? Helmsman's HUD wind icon ask (every frame at a
+    // helm, only above Sailing 0): the pull come from that game, so the icon must show what that game give.
+    //   this game                 yes (me patched = me on)
+    //   the server, me a client   yes (client only on while the server said "on": NetworkGate), dedicated or host
+    //   another player's game     its player published a level (0-100) = yes; no key or -1 (no mod, mod off) = no.
+    //                             Its player not loaded here for a moment (it respawn: vanilla destroy the old
+    //                             character, the new one not here yet) = what that player said last time, so the icon
+    //                             no flicker; never seen = no (icon promise nothing the ship may not get)
+    //   no owner                  no (nobody simulate the ship right now)
+    // Few compares and one loop over the loaded players, no allocation.
+    internal static bool SimulatedWithMod(Ship ship)
+    {
+        var nview = ship != null ? ship.m_nview : null;
+        if (nview == null || !nview.IsValid())
+        {
+            return false;
+        }
+        var zdo = nview.GetZDO();
+        if (zdo.IsOwner())
+        {
+            return true;
+        }
+        var owner = zdo.GetOwner();
+        if (owner == 0L)
+        {
+            return false;
+        }
+        var net = ZNet.instance;
+        if (net != null && !net.IsServer())
+        {
+            var server = net.GetServerPeer();
+            if (server != null && server.m_uid == owner)
+            {
+                return true;
+            }
+        }
+        // Player always own its own player ZDO: owner of a player = that player's game.
+        var players = Player.GetAllPlayers();
+        for (var i = 0; i < players.Count; i++)
+        {
+            var p = players[i];
+            if (p != null && p.GetOwner() == owner)
+            {
+                _ownerSeen = owner;
+                _ownerSeenWithMod = Published(p) >= 0f;
+                return _ownerSeenWithMod;
+            }
+        }
+        return owner == _ownerSeen && _ownerSeenWithMod;
     }
 
     // Best s of all players aboard (not cached: hits are rare).

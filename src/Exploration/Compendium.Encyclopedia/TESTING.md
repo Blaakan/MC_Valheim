@@ -4,14 +4,17 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the
-MC Mods panel). Committed build `1254c75` (2026-09-29), nested under the Valheim Compendium and named Encyclopedia:
-Debug and Release build without warnings; smoke test (`./tools/Test-Smoke.ps1`, all MC mods) passed; automated
-in-world self-tests (T00, `./tools/Test-InWorld.ps1`) passed on the same code at 2560x1440: all 6 `compendium.*` tests
-(17/17 tests of the run). No hands-on in-game test yet.
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+Mods panel). 0.1.0, committed build `1254c75` (2026-09-29), nested under the Valheim Compendium and named
+Encyclopedia: Debug and Release build without warnings; smoke test (`./tools/Test-Smoke.ps1`, all MC mods) passed;
+automated in-world self-tests (T00, `./tools/Test-InWorld.ps1`) passed on the same code at 2560x1440: all 6
+`compendium.*` tests (17/17 tests of the run). No hands-on in-game test yet. 0.1.1 fixes T39: a window that could not
+be built stays refused when the mod is turned off and on (the optional side button no longer comes back); T39 was
+reset to `[ ]`. Debug and Release build of 0.1.1 without warnings; the self-tests ran on 0.1.1 on 2026-10-13 (game
+1.0.17, every MC mod loaded): all of this mod's tests passed.
 
-**Automated checks (2026-10-08):** 51 of 52 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 52 of 52 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -344,14 +347,13 @@ Log lines (Debug level unless noted):
   inventory open: the book button appears at once right after the raven, the six buttons evenly spaced; set it back
   to `false`: the button vanishes at once and the five buttons are exactly back where the game puts them (G1).
   *Automated: `compendium.siderow`, `compendium.sidecount`.*
-- [!] **T39 Live toggle after a refused window:** the automated `compendium.bug.refused-toggle` plays it. With
+- [x] **T39 Live toggle after a refused window:** the automated `compendium.refused-toggle` plays it. With
   `SideButton = true`, on an inventory screen where the Encyclopedia window could not be built (as with a UI mod: one
   "Encyclopedia window cannot be built" warning, no tab, no button), set `Enabled = false`, then `true` again without
   logging out. Expected: the window stays refused until you log out: no Encyclopedia button comes back in the side
   panel (the five vanilla buttons stay exactly where the game puts them), the Valheim Compendium still has no Texts /
   Encyclopedia tabs, and the log gets no new warning.
-  **FAILED:** automated test: A live toggle (Enabled off and on) forgets that the window was refused: the optional
-  side button comes back and the side row is re-spaced (self-test `compendium.bug.refused-toggle`)
+  *Automated: `compendium.refused-toggle`.*
 - [x] **T40 Unlock modes and recipes the crafting panel never offers:** the automated `compendium.unlocks-dlc`
   compares with the game's own list (`Player.GetAvailableRecipes` in `nocost` mode). With `nocost` on, or with
   `setkey AllRecipesUnlocked`: every item the unlock mode discovers is one the crafting panel offers in `nocost` mode;

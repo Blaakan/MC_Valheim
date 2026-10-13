@@ -12,8 +12,7 @@ namespace MC.Exploration.SleepThroughDayMod;
 // Debug build only. Single-player tests of cases a lone player cannot make by hand:
 //   sleep.sim.*     second player stood in for by the game's "is everybody in bed?" answer (TESTING.md M01, M04,
 //                   M06, M09): server part is the same code in single player and on a host;
-//   sleep.latewake, sleep.dawn, sleep.tod, sleep.noskip   edge cases (T18-T21);
-//   sleep.bug.noskip-evening   the one check of T21 the mod fail (real bug, not fixed here): alone, so others pass;
+//   sleep.latewake, sleep.dawn, sleep.tod, sleep.noskip, sleep.nightfall   edge cases (T18-T21, T23);
 //   sleep.compat.*  other MC mods that are really loaded (X01, X02), and stand-ins for what BedRules, SkipSleep and
 //                   Seasons do to the game (X03-X05): real third-party mod still need a hand test.
 internal static partial class SleepSelfTests
@@ -25,7 +24,7 @@ internal static partial class SleepSelfTests
     private const string Dawn = "sleep.dawn";
     private const string Tod = "sleep.tod";
     private const string NoSkipName = "sleep.noskip";
-    private const string BugNoSkipEvening = "sleep.bug.noskip-evening";
+    private const string Nightfall = "sleep.nightfall";
     private const string CompatCounts = "sleep.compat.counts";
     private const string CompatInteract = "sleep.compat.interact";
     private const string CompatAnyTime = "sleep.compat.anytime";
@@ -47,7 +46,7 @@ internal static partial class SleepSelfTests
         T(Dawn, RunDawn),
         T(Tod, RunTod),
         T(NoSkipName, RunNoSkip),
-        T(BugNoSkipEvening, RunBugNoSkipEvening),
+        T(Nightfall, RunNightfall),
         T(CompatCounts, RunCompatCounts),
         T(CompatInteract, RunCompatInteract),
         T(CompatAnyTime, RunCompatAnyTime),
@@ -445,15 +444,11 @@ internal static partial class SleepSelfTests
 
     // T21: 20:00, another mod's SkipToMorning start no time skip (stand-in: prefix that skip it). Vanilla start the
     // sleep and stop it 2 s later, same date; server part of the mod no touch it (no Info line), player get Rested.
-    private static IEnumerator RunNoSkip() => NoSkipSleep(NoSkipName, false);
-
-    // T21, the one check the mod fail (run 1: "Good evening", "daytime sleep"): server never made that 20:00 sleep a
-    // day sleep, so it must stay night sleep with "Good morning". WakeMessage.IsDaySleepWake call every sleep that
-    // start after 06:00 and wake on same date a day sleep. Alone here, so sleep.noskip can pass. Fail until mod fixed.
-    private static IEnumerator RunBugNoSkipEvening() => NoSkipSleep(BugNoSkipEvening, true);
-
-    private static IEnumerator NoSkipSleep(string N, bool messageCheck)
+    // Sleep started after nightfall = night sleep, also when it end on its own date: "Good morning", never
+    // WakeUpMessage (0.1.0 called it daytime sleep: "Good evening").
+    private static IEnumerator RunNoSkip()
     {
+        const string N = NoSkipName;
         yield return Settle();
         var setup = new Setup
         {
@@ -485,47 +480,94 @@ internal static partial class SleepSelfTests
             {
                 yield break;
             }
-            var noSkip = !c.Skipping && c.Player.IsSleeping();
-            if (!messageCheck)
-            {
-                Report(c, noSkip, $"sleep started at {Clock(c.Env, c.StartTime)} without a time skip (time skip running: {c.Skipping})");
-            }
-            else if (!noSkip)
-            {
-                Fail(c, $"cannot make the case: the sleep started at {Clock(c.Env, c.StartTime)} with a time skip (running: {c.Skipping})");
-                yield break;
-            }
+            Report(c, !c.Skipping && c.Player.IsSleeping(), $"sleep started at {Clock(c.Env, c.StartTime)} without a time skip (time skip running: {c.Skipping})");
+            Report(c, WakeMessage.HaveStart && WakeMessage.StartedAfterDawn && WakeMessage.StartedAfterNightfall && WakeMessage.StartDay == c.Day
+                      && _watch.Count(c.LogMark, SleptLine) == 1 && _watch.Has(c.LogMark, SleptLine, "(after nightfall)."),
+                $"the player's game notes the start as after dawn {WakeMessage.StartedAfterDawn}, after nightfall {WakeMessage.StartedAfterNightfall}, "
+                + $"day {WakeMessage.StartDay}, Debug line {Quote(_watch.First(c.LogMark, SleptLine))} (expected after dawn and after nightfall, day "
+                + $"{c.Day}, one \"{SleptLine} ... (after nightfall).\")");
             yield return WaitWake(c, 10f);
             if (!c.OK)
             {
                 yield break;
             }
             var wakeDay = c.Env.GetDay(_wakeTime);
+            Report(c, wakeDay == c.Day && _wakeTime - c.StartTime < 10.0,
+                $"woke up at {Clock(c.Env, _wakeTime)} of day {wakeDay}, {_wakeTime - c.StartTime:0.0} s of world time later (expected the same day {c.Day})");
+            var lines = _watch.Count(c.LogMark, StartLine) + _watch.Count(c.LogMark, RetargetLine);
+            Report(c, lines == 0, $"no \"Day sleep:\" Info line of the mod for this sleep, started by the game at night (found {lines})");
+            var rested = c.Player.GetSEMan().HaveStatusEffect(SEMan.s_statusEffectRested);
             var centre = WakeCentre();
+            Report(c, rested && centre.Count > 0, $"the wake-up ran as usual: Rested {rested}, {centre.Count} center message(s)");
+
+            // Text and label of the wake-up: server never made this sleep a day sleep, player's game must not either.
             var verdict = !_modWoke ? "the mod said nothing" : _modWakeDay ? "the mod calls it a daytime sleep" : "the mod calls it a night sleep";
-            if (messageCheck && wakeDay != c.Day)
+            var line = _watch.First(c.LogMark, WokeLine);
+            Report(c, _modWoke && !_modWakeDay && centre.Count > 0 && centre[0] == WakeMessage.GoodMorningToken
+                      && _watch.Count(c.LogMark, WokeLine) == 1 && _watch.Has(c.LogMark, WokeLine, "night sleep, vanilla message."),
+                $"a sleep that started at {Clock(c.Env, c.StartTime)}, after nightfall, ended at {Clock(c.Env, _wakeTime)} of day {wakeDay} without a time "
+                + $"skip, and that the server never turned into a daytime sleep: wake-up messages {DescribeWake()}, {verdict}, Debug line {Quote(line)} "
+                + $"(expected \"{Localize(WakeMessage.GoodMorningToken)}\" first, night sleep, \"{WokeLine} ...: night sleep, vanilla message.\")");
+            EndChecks(c);
+        }
+        finally
+        {
+            Cleanup();
+        }
+        CheckRestored(c);
+    }
+
+    private static bool NoSkip() => !_noSkip;
+
+    // T23: other side of the 18:00 rule. Widest day window (IncludeAfternoon on, WakeUpHour 23 = window until 18:00):
+    // sleep that start at 17:45 is still day sleep (end 23:00 same date, WakeUpMessage); at 18:05 night sleep (next
+    // morning, "Good morning"). Player's game note each start on right side of nightfall.
+    private static IEnumerator RunNightfall()
+    {
+        const string N = Nightfall;
+        yield return Settle();
+        var setup = new Setup { Afternoon = true, WakeHour = 23f };
+        var error = Begin(N, 17.75f, setup, out var c, "17:45");
+        if (error != null)
+        {
+            SelfTest.Fail(N, error);
+            Cleanup();
+            yield break;
+        }
+        try
+        {
+            var plan = Plan.ToHour(17.75f, 23f, DefaultMessage, Starter.Retarget);
+            yield return FallAsleep(c, plan);
+            if (!c.OK)
             {
-                Fail(c, $"cannot make the case: the sleep ended on day {wakeDay}, not on the day it started ({c.Day})");
+                yield break;
             }
-            else if (messageCheck)
+            Report(c, WakeMessage.HaveStart && WakeMessage.StartedAfterDawn && !WakeMessage.StartedAfterNightfall && WakeMessage.StartDay == c.Day
+                      && _watch.Count(c.LogMark, SleptLine) == 1 && _watch.Has(c.LogMark, SleptLine, "(after dawn)."),
+                $"sleep started at {Clock(c.Env, c.StartTime)}: the player's game notes the start as after dawn {WakeMessage.StartedAfterDawn}, after "
+                + $"nightfall {WakeMessage.StartedAfterNightfall}, day {WakeMessage.StartDay}, Debug line {Quote(_watch.First(c.LogMark, SleptLine))} "
+                + $"(expected after dawn, not after nightfall, day {c.Day}, one \"{SleptLine} ... (after dawn).\")");
+            yield return WakeUp(c, plan);
+            if (!c.OK)
             {
-                // The one check of sleep.bug.noskip-evening.
-                var line = _watch.First(c.LogMark, WokeLine);
-                Report(c, _modWoke && !_modWakeDay && centre.Count > 0 && centre[0] == WakeMessage.GoodMorningToken
-                          && _watch.Count(c.LogMark, WokeLine) == 1 && _watch.Has(c.LogMark, WokeLine, "night sleep, vanilla message."),
-                    $"a sleep that started at {Clock(c.Env, c.StartTime)}, after nightfall, ended at {Clock(c.Env, _wakeTime)} of the same day without a time "
-                    + $"skip, and that the server never turned into a daytime sleep: wake-up messages {DescribeWake()}, {verdict}, Debug line {Quote(line)} "
-                    + $"(expected \"{Localize(WakeMessage.GoodMorningToken)}\" first, night sleep, \"{WokeLine} ...: night sleep, vanilla message.\")");
+                yield break;
             }
-            else
+
+            SetRun(c, 18.0833f, setup, "18:05");
+            plan = Plan.ToMorning(18.0833f);
+            yield return FallAsleep(c, plan);
+            if (!c.OK)
             {
-                Report(c, wakeDay == c.Day && _wakeTime - c.StartTime < 10.0,
-                    $"woke up at {Clock(c.Env, _wakeTime)} of day {wakeDay}, {_wakeTime - c.StartTime:0.0} s of world time later (expected the same day {c.Day})");
-                var lines = _watch.Count(c.LogMark, StartLine) + _watch.Count(c.LogMark, RetargetLine);
-                Report(c, lines == 0, $"no \"Day sleep:\" Info line of the mod for this sleep, started by the game at night (found {lines})");
-                var rested = c.Player.GetSEMan().HaveStatusEffect(SEMan.s_statusEffectRested);
-                Report(c, rested && centre.Count > 0, $"the wake-up ran as usual: Rested {rested}, {centre.Count} center message(s)");
-                Note(c, $"wake-up messages {DescribeWake()}, {verdict}: the text and the label are checked by {BugNoSkipEvening}");
+                yield break;
+            }
+            Report(c, WakeMessage.HaveStart && WakeMessage.StartedAfterDawn && WakeMessage.StartedAfterNightfall && WakeMessage.StartDay == c.Day
+                      && _watch.Count(c.LogMark, SleptLine) == 1 && _watch.Has(c.LogMark, SleptLine, "(after nightfall)."),
+                $"sleep started at {Clock(c.Env, c.StartTime)}: the player's game notes the start as after dawn {WakeMessage.StartedAfterDawn}, after "
+                + $"nightfall {WakeMessage.StartedAfterNightfall}, day {WakeMessage.StartDay}, Debug line {Quote(_watch.First(c.LogMark, SleptLine))} "
+                + $"(expected after dawn and after nightfall, day {c.Day}, one \"{SleptLine} ... (after nightfall).\")");
+            yield return WakeUp(c, plan);
+            if (c.OK)
+            {
                 EndChecks(c);
             }
         }
@@ -533,13 +575,8 @@ internal static partial class SleepSelfTests
         {
             Cleanup();
         }
-        if (!messageCheck)
-        {
-            CheckRestored(c);
-        }
+        CheckRestored(c);
     }
-
-    private static bool NoSkip() => !_noSkip;
 
     // ---------- other mods ----------
 

@@ -1,8 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
-using MC.Shared;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,6 +10,11 @@ namespace MC.UX.AutoPickupFilterMod;
 // panel grid. Badge = Image child of the slot, made the first time a slot need it, raycastTarget off (never eat
 // clicks or hover). Sprites drawn in code once (no asset bundle). Per frame: loop live item list, int lookups,
 // Image.enabled set only when it change; no allocation.
+// Place = left edge of the slot, half-way up, same for every slot. Game slot parts all sit in a corner or at the
+// bottom (slot prefab, measured in runs on game 1.0.17; slot is 64 wide): hotbar number top-left (first row of your
+// grid, its text box end 22.4 under the slot top), quality number / no-portal icon / food icon top-right, stack
+// amount and durability bar along the bottom. Left middle (24 to 40 under the top) is the one place none of them
+// use. 0.1.0 picked a corner and sat on the hotbar number.
 internal static class MarkerOverlay
 {
     private const string MarkName = "MC_LootFilterMark";
@@ -20,17 +22,8 @@ internal static class MarkerOverlay
     private const float Inset = 3f;
     private const int TexSize = 32;
 
-    private enum Corner
-    {
-        TopRight,
-        TopLeft,
-        BottomLeft,
-        BottomRight,
-    }
-
     private sealed class GridMarks
     {
-        public string Name;
         public InventoryGrid Grid;
         public InventoryElement First;
         public int Count = -1;
@@ -39,14 +32,10 @@ internal static class MarkerOverlay
         public bool[] Want = new bool[0];
         public Sprite ShownSprite;
         public bool AnyShown;
-        public bool CornerChosen;
-        public Corner Corner;
     }
 
-    private static readonly GridMarks PlayerMarks = new GridMarks { Name = "player grid" };
-    private static readonly GridMarks ContainerMarks = new GridMarks { Name = "container grid" };
-    private static readonly Vector3[] Corners = new Vector3[4];
-    private static readonly List<Rect> Occupied = new List<Rect>();
+    private static readonly GridMarks PlayerMarks = new GridMarks();
+    private static readonly GridMarks ContainerMarks = new GridMarks();
 
     private static Texture2D _texIgnored, _texSelected;
     private static Sprite _ignored, _selected;
@@ -95,10 +84,6 @@ internal static class MarkerOverlay
         if (n == 0)
         {
             return;
-        }
-        if (!marks.CornerChosen && !TryPickCorner(marks, elements[0]))
-        {
-            return; // grid at zero scale this frame: try next frame
         }
         var inv = grid.m_inventory;
         if (inv == null)
@@ -160,7 +145,7 @@ internal static class MarkerOverlay
                 {
                     continue;
                 }
-                badge = CreateBadge(element, marks.Corner);
+                badge = CreateBadge(element);
                 marks.Marks[i] = badge;
             }
             if (w)
@@ -257,20 +242,20 @@ internal static class MarkerOverlay
         marks.Want = new bool[0];
         marks.ShownSprite = null;
         marks.AnyShown = false;
-        marks.CornerChosen = false;
     }
 
-    private static Image CreateBadge(InventoryElement element, Corner corner)
+    // Anchored on the slot like the game's own slot parts: left edge, half-way up (why there: top of file).
+    private static Image CreateBadge(InventoryElement element)
     {
         var go = new GameObject(MarkName, typeof(RectTransform));
         var rt = (RectTransform)go.transform;
         rt.SetParent(element.transform, false);
-        var anchor = Anchor(corner);
+        var anchor = new Vector2(0f, 0.5f);
         rt.anchorMin = anchor;
         rt.anchorMax = anchor;
         rt.pivot = anchor;
         rt.sizeDelta = new Vector2(Size, Size);
-        rt.anchoredPosition = new Vector2(anchor.x > 0.5f ? -Inset : Inset, anchor.y > 0.5f ? -Inset : Inset);
+        rt.anchoredPosition = new Vector2(Inset, 0f);
         rt.localScale = Vector3.one;
         rt.localRotation = Quaternion.identity;
         var image = go.AddComponent<Image>();
@@ -279,183 +264,6 @@ internal static class MarkerOverlay
         image.enabled = false;
         rt.SetAsLastSibling();
         return image;
-    }
-
-    private static Vector2 Anchor(Corner c)
-    {
-        switch (c)
-        {
-            case Corner.TopLeft:
-                return new Vector2(0f, 1f);
-            case Corner.BottomLeft:
-                return new Vector2(0f, 0f);
-            case Corner.BottomRight:
-                return new Vector2(1f, 0f);
-            default:
-                return new Vector2(1f, 1f);
-        }
-    }
-
-    // ---------------------------------------------------------------- corner
-
-    // Pick the slot corner that hide least of vanilla bits (quality number, no-portal icon, food icon, amount,
-    // hotbar number, durability bar), from the real slot layout. Order of wish: top-right, top-left, bottom-left,
-    // bottom-right. Big full-slot things (icon, background) are ignored. False = slot at zero scale, try again later.
-    private static bool TryPickCorner(GridMarks marks, InventoryElement element)
-    {
-        marks.CornerChosen = true;
-        marks.Corner = Corner.TopRight;
-        if (element == null || !(element.transform is RectTransform root))
-        {
-            return true;
-        }
-        if (Mathf.Abs(root.lossyScale.x) < 1e-4f || Mathf.Abs(root.lossyScale.y) < 1e-4f)
-        {
-            marks.CornerChosen = false;
-            return false;
-        }
-        var slot = root.rect;
-        var bigArea = slot.width * slot.height * 0.4f;
-        Occupied.Clear();
-        AddGraphic(root, element.m_noteleport, bigArea);
-        AddGraphic(root, element.m_food, bigArea);
-        AddGraphic(root, element.m_queued, bigArea);
-        AddGraphic(root, element.m_equiped, bigArea);
-        AddText(root, element.m_quality, bigArea);
-        AddText(root, element.m_amount, bigArea);
-        var binding = element.transform.Find("binding");
-        AddText(root, binding != null ? binding.GetComponent<TMP_Text>() : null, bigArea);
-        if (element.m_durability != null)
-        {
-            AddRect(root, element.m_durability.transform as RectTransform, bigArea);
-        }
-
-        var best = Corner.TopRight;
-        var bestHits = int.MaxValue;
-        for (var c = Corner.TopRight; c <= Corner.BottomRight; c++)
-        {
-            var box = BadgeBox(slot, c);
-            var hits = 0;
-            foreach (var r in Occupied)
-            {
-                if (r.Overlaps(box))
-                {
-                    hits++;
-                }
-            }
-            if (hits < bestHits)
-            {
-                best = c;
-                bestHits = hits;
-            }
-            if (hits == 0)
-            {
-                break;
-            }
-        }
-        marks.Corner = best;
-        LogCorner(marks, slot, best, bestHits);
-        return true;
-    }
-
-    private static Rect BadgeBox(Rect slot, Corner c)
-    {
-        var a = Anchor(c);
-        var x = a.x > 0.5f ? slot.xMax - Inset - Size : slot.xMin + Inset;
-        var y = a.y > 0.5f ? slot.yMax - Inset - Size : slot.yMin + Inset;
-        return new Rect(x, y, Size, Size);
-    }
-
-    private static void AddGraphic(RectTransform root, Graphic g, float bigArea)
-    {
-        if (g != null)
-        {
-            AddRect(root, g.rectTransform, bigArea);
-        }
-    }
-
-    private static bool LocalRect(RectTransform root, RectTransform rt, out Rect rect)
-    {
-        rect = default;
-        if (rt == null)
-        {
-            return false;
-        }
-        rt.GetWorldCorners(Corners);
-        var a = root.InverseTransformPoint(Corners[0]);
-        var b = root.InverseTransformPoint(Corners[2]);
-        if (float.IsNaN(a.x) || float.IsNaN(b.x) || float.IsInfinity(a.x) || float.IsInfinity(b.x))
-        {
-            return false;
-        }
-        rect = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
-        return true;
-    }
-
-    private static void AddRect(RectTransform root, RectTransform rt, float bigArea)
-    {
-        if (LocalRect(root, rt, out var r) && r.width * r.height <= bigArea && r.width > 0f && r.height > 0f)
-        {
-            Occupied.Add(r);
-        }
-    }
-
-    // Text box often span whole slot width: me take only the glyph corner its alignment point to (about 18 x 14).
-    private static void AddText(RectTransform root, TMP_Text text, float bigArea)
-    {
-        if (text == null || !LocalRect(root, text.rectTransform, out var r))
-        {
-            return;
-        }
-        var w = Mathf.Min(r.width, 18f);
-        var h = Mathf.Min(r.height, 14f);
-        float x, y;
-        switch (text.horizontalAlignment)
-        {
-            case HorizontalAlignmentOptions.Left:
-                x = r.xMin;
-                break;
-            case HorizontalAlignmentOptions.Right:
-                x = r.xMax - w;
-                break;
-            default:
-                x = r.center.x - w * 0.5f;
-                break;
-        }
-        switch (text.verticalAlignment)
-        {
-            case VerticalAlignmentOptions.Top:
-            case VerticalAlignmentOptions.Capline:
-                y = r.yMax - h;
-                break;
-            case VerticalAlignmentOptions.Bottom:
-            case VerticalAlignmentOptions.Baseline:
-                y = r.yMin;
-                break;
-            default:
-                y = r.center.y - h * 0.5f;
-                break;
-        }
-        var box = new Rect(x, y, w, h);
-        if (box.width * box.height <= bigArea)
-        {
-            Occupied.Add(box);
-        }
-    }
-
-    private static void LogCorner(GridMarks marks, Rect slot, Corner corner, int hits)
-    {
-        var sb = new StringBuilder();
-        sb.Append("Loot filter badges on the ").Append(marks.Name).Append(": corner ").Append(corner)
-            .Append(hits > 0 ? " (every corner overlaps something; least covered)" : " (free)")
-            .Append(", slot ").Append(slot.width.ToString("F0")).Append('x').Append(slot.height.ToString("F0"))
-            .Append(", occupied boxes:");
-        foreach (var r in Occupied)
-        {
-            sb.Append(" (").Append(r.xMin.ToString("F0")).Append(',').Append(r.yMin.ToString("F0")).Append(")-(")
-                .Append(r.xMax.ToString("F0")).Append(',').Append(r.yMax.ToString("F0")).Append(')');
-        }
-        Log.Debug(sb.ToString());
     }
 
     // ---------------------------------------------------------------- sprites

@@ -23,6 +23,20 @@ Fixes for the problems the automated in-game tests found on 2026-10-08 (none of 
 - Spyglass 0.1.1: the zoom you picked comes back after a lower zoom limit.
 - Forge Idol Upgrades 0.1.1: a tier with a bad Material setting says why its idols cannot be upgraded; the IDOLS tab
   comes back at once when the mod is turned on with the Forge open.
+- Encyclopedia 0.1.1: when its window cannot be built, turning the mod off and on no longer brings the side button
+  back.
+- Batch Station Feeding 0.1.1: the hover hint follows a station that changes while you keep looking at it.
+- Sleep Through the Day 0.1.1: no "Good evening" after a sleep that started at night and ended on the same day.
+- Breeding Star Inheritance 0.2.0 and Switchable Lights 0.2.0: the server also refuses a player who has the mod turned
+  off, not only one without it (AllowPlayersWithoutMod still lets them stay). Breeding Star Inheritance: its log no
+  longer says "Using the server's breeding settings" while the mod is turned off.
+- Sailing Skill 0.1.1: the wind icon shows the pull the ship really gets when a game without the mod simulates it;
+  the sail's pull no longer swings past its full strength after a wind shift.
+- Loot Pickup Filter 0.1.1: the mark no longer covers the hotbar number; the controller lists panel opens beside the
+  inventory, not over it.
+- Forge Idol Upgrades 0.1.1: the idol tooltip's cost line reads right when a cost is 0; a starred icon that cannot be
+  made yet shows the plain icon, not a white square.
+- Spyglass 0.1.1: turning EdgeBlur off while looking also stops the work behind the blur.
 
 ## 0.4.0
 
