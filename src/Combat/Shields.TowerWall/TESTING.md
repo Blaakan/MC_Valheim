@@ -18,10 +18,15 @@ any case. Built (Debug and Release, no warnings). The in-world self-tests then r
 test Draugr, so the bash hit the rock (each bash's punch steps the player forward, and the earlier bash tests had
 walked him up to it; the screenshot `tower.ng__bash.png` shows it). The self-tests now turn the player to a free lane
 before each bash and put him back where he started after each test; rebuilt (Debug, no warnings), not run again yet.
-The smoke test has not been run on this build yet.
+The smoke test passed on this build on 2026-10-13. 0.1.1 (2026-10-08) also ends a press kept for the bash cooldown
+when the tower shield leaves your hands or the mod is turned off (it used to start a punch or a sword swing by
+itself): T37 is reset, T42 and C11 are new, and T13 now says a Troll takes two to four bashes, now and then five
+(wording only, the mod is unchanged there). Built (Debug and Release, no warnings); the self-tests (`tower.press` now
+holds every kept-press check) and the smoke test ran on this change on 2026-10-13 (game 1.0.17, every MC mod loaded):
+all of this mod's tests passed, `tower.group` on a second run alone.
 
-**Automated checks (2026-10-08):** 40 of 41 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 40 of 40 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -113,13 +118,11 @@ to the hit, estimated from the clip data; T34).
   *Partly automated (`tower.train`, `tower.tips`, `tower.bash`, `tower.data`); by hand: Watch one bash (or the
   screenshot tower.bash__default-1): it is the shield arm that strikes.*
 - [ ] **T13 Bash stagger:** `ShieldIronTower`, Blocking 0. Expected: a `Greydwarf` and a `Draugr` stagger in one bash,
-  a `Troll` in two to four bashes (2 s apart; two or three for about four Trolls in five, four for the rest, more when
-  you bash slower). Hit a staggered enemy with a sword right away (quick swap). Expected: the critical hit effect
-  (double damage).
-  *Partly automated (`tower.follow`, `tower.bash`); by hand: The Troll count is a matter of dice and the test only
-  accepts two to six and notes how many it took. The item (and the README) say two to four, but the re-run needed five
-  bashes at the 2 s cadence, so 'four for the rest' does not always hold: bash a few Trolls, note the counts, and
-  decide whether the wording or the numbers change.*
+  a `Troll` in two to four bashes, now and then five (2 s apart; two or three for about four Trolls in five, four or
+  now and then five for the rest, more when you bash slower). Hit a staggered enemy with a sword right away (quick
+  swap). Expected: the critical hit effect (double damage).
+  *Partly automated (`tower.follow`, `tower.bash`); by hand: The Troll count is a matter of dice: the test accepts two
+  to six and notes how many it took. Bash a few Trolls and note the counts: two to four, now and then five.*
 - [x] **T14 Bash from guard:** hold block and press attack. Expected: the bash plays and the guard is back right after
   it (keep block held).
   *Automated: `tower.guard`.*
@@ -218,12 +221,11 @@ to the hit, estimated from the clip data; T34).
   (it is in its 8 s limit). Expected: neither staggers. Turn to face the other and bash. Expected: it staggers. Same
   with three `Greydwarf` at once: one bash staggers one of them.
   *Automated: `tower.group`, `tower.lock`.*
-- [!] **T37 Kept press ends with the tower shield:** set `BashCooldown = 6`. Bash, press attack once right after the
+- [x] **T37 Kept press ends with the tower shield:** set `BashCooldown = 6`. Bash, press attack once right after the
   swing is over, wait a second, then unequip the tower shield from the inventory. Another time, equip `SwordIron`
   instead. Expected: nothing swings by itself, no punch and no sword swing: the press was waiting for the next bash
   only. (A press made less than half a second before the switch may still start an attack, as in the normal game.)
-  **FAILED:** automated test: A press kept for the bash cooldown starts a punch or a sword swing once the tower shield
-  leaves the hand (self-test `tower.bug.keptpress`)
+  *Automated: `tower.press`.*
 - [x] **T38 Tower shield leaves the list mid-bash:** set `BashAnimationSpeed = 0.3` (a slow swing), bash a `Troll`
   and, during the swing, remove `ShieldIronTower` from `Towers` (on a server the host does it). Expected: no hit and
   no damage number from that bash; the shield in your hand is a normal one-handed shield at once (no "Two-handed" on
@@ -399,13 +401,19 @@ to the hit, estimated from the clip data; T34).
   *Partly automated (`tower.creature`); by hand: The line in Creature Kill and Tame Counts gaining one melee kill (the
   probe player is in god mode, which marks kills as cheated).*
 
-## 0.1.1 — false log messages
+## 0.1.1 — false log messages, kept press
 
 0.1.1 (2026-10-08) fixes a false "The Towers setting names items this game does not have (MISSING)" warning that
 listed every default tower shield (seen in the logs of the automated runs of 2026-10-07 and 2026-10-08). Run on 0.1.1
 (2026-10-08, game 1.0.17, with the other installed mods, one of them Jotunn-based): in-world self-tests 29 of 30 (the
-one that fails is the open `tower.bug.keptpress`), multiplayer scenarios all passed; no Towers warning at the main
-menu, and none after "ZNet OnDestroy" in the client log of the server-without-mods scenario.
+one that failed was the check of the kept press, a problem fixed after that run, see below), multiplayer scenarios all
+passed; no Towers warning at the main menu, and none after "ZNet OnDestroy" in the client log of the
+server-without-mods scenario.
+
+0.1.1 also fixes the kept press (T37 above, reset): a press of the attack button that waited for the bash cooldown
+started a punch or a sword swing by itself once the tower shield left the hand, up to half a second later. The press
+now ends with the tower shield (it keeps only the half second the normal game gives every press), also when the mod is
+turned off. Not run in the game yet.
 
 - [ ] **T41 No false Towers warning at the main menu:** with the default settings and a Jotunn-based item mod
   installed (any mod that adds items through Jotunn), start the game while `./tools/Watch-Log.ps1 -Mine` runs, wait
@@ -422,3 +430,13 @@ menu, and none after "ZNet OnDestroy" in the client log of the server-without-mo
   *Partly automated (`tower.warn`); by hand: The real thing: log out to the main menu from a server without the mod,
   and from one that has it turned off, and read the log for the MISSING warning; back at the menu the MC Mods panel
   shows the mod active again.*
+- [x] **T42 Kept press ends when the mod is turned off:** set `BashCooldown = 10`. Bash, press attack once right after
+  the swing is over, then, before the 10 s are up, untick `Enabled` in ConfigurationManager (F1), or Esc → MC Mods →
+  untick Tower Shield Wall. Expected: nothing swings by itself when the mod goes off (the tower shield in your hand is
+  a normal shield again, and the waiting press does not punch). Press attack again. Expected: a punch. (Hard to time by
+  hand: the `tower.press` self-test checks the same case, so mark this `[-]` if you cannot make it.)
+  *Automated: `tower.press`.*
+- [ ] **C11 Spyglass, Music Instruments (MC):** set `BashCooldown = 6`. Bash, press attack once right after the swing
+  is over, then equip the spyglass (names in Spyglass' `TESTING.md`); another time an instrument (names in Music
+  Instruments' `TESTING.md`). Expected: nothing swings by itself while it comes out; a click with it does what it did
+  before (no punch); put it away again. Expected: still no punch by itself.

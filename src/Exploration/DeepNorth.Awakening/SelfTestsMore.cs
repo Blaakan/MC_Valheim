@@ -21,8 +21,9 @@ namespace MC.Exploration.DeepNorthAwakeningMod;
 //                  broken stone
 //   dn.mapdetail   map paint: fill and border colours, no border between two invaded areas, sea untouched, minimap
 //                  and large map share the texture under the fog, fewer areas at stage 1, none at 0
-//   dn.bug.killtarget  real bug, own small test: kill target lowered to or below an area's kills must clear it without
-//                  another kill (live and at load); today it stays "9 of 8" until the next Jotun dies
+//   dn.killtarget  after Kall, kill target lowered to or below an area's kills (fake deaths): cleared without another
+//                  kill once the rules stayed still, and at a fresh scan (load); a value that only passes by clears
+//                  nothing; the status never shows more kills than the area needs
 //   dn.x.kills     cross-mod: a player's kill of an area Krigen counts under Krigen in Creature Kill and Tame Counts
 //   dn.cleanlog    no error line of this mod since it was turned on (registered last)
 internal static partial class SelfTests
@@ -628,16 +629,18 @@ internal static partial class SelfTests
         c.Report();
     }
 
-    // ---------- dn.bug.killtarget ----------
+    // ---------- dn.killtarget ----------
 
-    // Real bug, alone here (the run said "9 of 8 Jotun defeated, spawns its Jotun when entered"): the server lowers
-    // ClearKillsMin / Max to or below the kills an area already has. Expected: cleared on the server's next look, no
-    // further kill needed; never more kills shown than the target. Today only the next Jotun death compares kills and
-    // target (HeldCells.OnDestroyed); a rules change and the load (ScanMarks) do not. Fails until the mod is fixed.
+    // The server lowers ClearKillsMin / Max to or below the kills an area already has (once the run said "9 of 8 Jotun
+    // defeated, spawns its Jotun when entered"). Expected: cleared by the server alone, no further kill needed: live once
+    // the rules stayed still HeldCells.RulesSettleSeconds (a value that only passes by clears nothing: a clear is for
+    // good), and at load right after the scan; never more kills shown than the target. Deaths made without creatures at
+    // the area's seed point; the player stays at the spawn.
     private static IEnumerator RunKillTarget()
     {
         var c = new Checks(KillTargetName);
         var cell = HeldCells.NoTag;
+        var tap = EnsureTap();
         try
         {
             ServerRules.TestRules = Rules(r =>
@@ -665,6 +668,45 @@ internal static partial class SelfTests
             }
             yield return Until(() => HeldCells.TestKills(cell) >= 9, 4f);
             var counted = HeldCells.TestKills(cell) == 9 && !HeldCells.IsCleared(cell);
+            // The status line reads the list the server sends to the players (about a second after a kill).
+            yield return Until(() => HeldCells.KillsIn(cell) == 9, 3f);
+            var text = HeldCells.DescribeArea(land, ServerRules.Current);
+            c.Check(ReadOf(text, JotunDefeated, out var shownKills, out var shownTarget) && shownKills == 9 && shownTarget == 12,
+                $"9 kills at a target of 12: deepnorth_stones there shows 9 of 12 Jotun defeated ('{text}')");
+
+            // A value that only passes by (slider drag, typed number): down to 8, back to 12 before the rules stayed
+            // still. Nothing is cleared (a clear is for good); meanwhile the status never shows more kills than needed.
+            ServerRules.TestRules = Rules(r =>
+            {
+                r.ClearKillsMin = 8;
+                r.ClearKillsMax = 8;
+            });
+            ServerRules.OwnChanged();
+            WorldState.Refresh();
+            yield return Frames(5);
+            text = HeldCells.DescribeArea(land, ServerRules.Current);
+            c.Check(ReadOf(text, JotunDefeated, out shownKills, out shownTarget) && shownKills == 8 && shownTarget == 8,
+                $"a moment after the target went down to 8 (the server has not compared yet): the status shows 8 of 8, never 9 of 8 ('{text}')");
+            ServerRules.TestRules = Rules(r =>
+            {
+                r.ClearKillsMin = 12;
+                r.ClearKillsMax = 12;
+            });
+            ServerRules.OwnChanged();
+            WorldState.Refresh();
+            yield return new WaitForSecondsRealtime(HeldCells.RulesSettleSeconds + 1f);
+            text = HeldCells.DescribeArea(land, ServerRules.Current);
+            c.Check(!HeldCells.IsCleared(cell) && !HeldCells.TestServerCleared(cell) && !HeldCells.TestMarkedAnywhere(cell)
+                    && HeldCells.TestKills(cell) == 9 && ReadOf(text, JotunDefeated, out shownKills, out shownTarget)
+                    && shownKills == 9 && shownTarget == 12,
+                $"the target back at 12 before the settings stayed still for {F(HeldCells.RulesSettleSeconds)} s: nothing was cleared, "
+                + $"9 of 12 again (cleared {HeldCells.TestServerCleared(cell)}, {HeldCells.TestKills(cell)} kills kept, status '{text}')");
+
+            // Now it stays at 8. The server's log line of this clearing (this area, not another one).
+            Cells.FromId(cell, out var ci, out var cj);
+            var logLine = $"9 Jotun defeated in Deep North area {ci},{cj}, where 8 are enough now: the area is cleared for good.";
+            HeldCells.TestResetNews();
+            var mark = tap.Mark();
             ServerRules.TestRules = Rules(r =>
             {
                 r.ClearKillsMin = 8;
@@ -674,11 +716,15 @@ internal static partial class SelfTests
             ServerRules.OwnChanged();
             WorldState.Refresh();
             yield return Until(() => HeldCells.IsCleared(cell), 3f);
-            var text = HeldCells.DescribeArea(land, ServerRules.Current);
+            text = HeldCells.DescribeArea(land, ServerRules.Current);
             c.Check(counted && HeldCells.IsCleared(cell) && HeldCells.TestMarkedAnywhere(cell) && HeldCells.TestKillSlots(cell) == 0,
                 $"9 kills, then the target lowered to 8: the area is cleared without another kill (cleared {HeldCells.IsCleared(cell)}, "
                 + $"{HeldCells.TestKills(cell)} kills kept, status '{text}')");
             c.Check(text.IndexOf("9 of 8", StringComparison.Ordinal) < 0 && text.Contains("is cleared"), $"deepnorth_stones says the area is cleared and never shows more kills than it needs ('{text}')");
+            HeldCells.TestLastNews(out var kind, out var newsCell, out _);
+            c.Check(kind == HeldCells.NewsCleared && newsCell == cell && tap.Count(mark, logLine) == 1,
+                $"cleared like after a last kill: news \"The Jotun Retreat\" for that area (news {kind}) and the log line "
+                + $"\"{logLine}\" once ({tap.Count(mark, logLine)})");
 
             // At load: the world holds 9 kills, the server starts with the target at 8.
             HeldCells.TestUnmarkEverywhere(cell);
@@ -695,6 +741,7 @@ internal static partial class SelfTests
             }
             yield return Until(() => HeldCells.TestKills(cell) >= 9, 4f);
             counted = HeldCells.TestKills(cell) == 9 && !HeldCells.IsCleared(cell) && HeldCells.TestKillSlots(cell) == 1;
+            mark = tap.Mark();
             ServerRules.TestRules = Rules(r =>
             {
                 r.ClearKillsMin = 8;
@@ -707,6 +754,9 @@ internal static partial class SelfTests
                 $"9 kills kept in the world, then a server start with the target at 8: the area is cleared at once (cleared "
                 + $"{HeldCells.IsCleared(cell)}, {HeldCells.TestKills(cell)} kills read back, status '{text}')");
             c.Check(text.IndexOf("9 of 8", StringComparison.Ordinal) < 0 && text.Contains("is cleared"), $"deepnorth_stones says cleared, no \"9 of 8\", after the start too ('{text}')");
+            c.Check(HeldCells.TestKillSlots(cell) == 0 && tap.Count(mark, logLine) == 1,
+                $"after the start its kill count is gone from the world ({HeldCells.TestKillSlots(cell)} slot(s)) and the log has "
+                + $"the same line once ({tap.Count(mark, logLine)})");
         }
         finally
         {

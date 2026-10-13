@@ -8,7 +8,7 @@
 | Side | Client (only the player who wants it installs it), multiplayer Compatible |
 | Sheet idea | `Sort chest` |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/`; item and piece prefab names checked against the installed 1.0.16 game data (`StreamingAssets/SoftRef/manifest_extended`) and the JotunnDoc item list (generated from 1.0.7) / piece list (1.0.12); item sources checked on valheim.weirdgloop.org (2026-09-28) |
-| Status | Implemented (0.1.0), smoke test passed 2026-09-29 (loads, patches cleanly, JitCheck clean: 278 methods, 0 failures), in-game testing pending |
+| Status | Implemented (0.1.1: a Sort that moves nothing no longer reorders the item list, 3.4 step 6; the game methods involved were read in the 1.0.17 `.ref`; user decisions of 2026-10-08 applied: the criterion button is mouse only, the buttons stay right of the container panel without a warning, tankards belong to Other: decisions 9 and 14-16), smoke test passed 2026-09-29 on 0.1.0 (loads, patches cleanly, JitCheck clean: 278 methods, 0 failures), 0.1.1 built but not run in the game yet, in-game testing pending |
 
 "Container" and not "Chest" in the GUID: carts, ships and barrels use the same panel. A "Sort bags" mod for the
 player inventory would have been `Inventory.Sort` (the idea is cancelled in the sheet).
@@ -91,27 +91,31 @@ favourite slots, a keyboard hotkey, search/filter (separate idea "Search chest")
 - Two serialized fields are inherited by a clone: `alternativeGroupHandler` (private; when that group is active,
   `IsInteractive` returns true **whatever the button's own group**) and `m_blockingElements` (the key is ignored while
   any of them is active). Both are prefab data.
-- Which keys `m_takeAllButton` / `m_stackAllButton` use is prefab data, not in `.ref`: the Debug layout dump (3.12)
-  prints it, and `SortChestUi.CheckVanillaKeys` gives up our key (mouse only, one Warning) if a vanilla button already
-  uses it.
+- Which keys `m_takeAllButton` / `m_stackAllButton` use is prefab data, not in `.ref`. Seen in the automated runs of
+  2026-10-08 (game 1.0.17, also in a run with MC mods only): **Take all listens to `JoyLStick` (left stick click) and
+  Place stacks to `JoyRStick` (right stick click)**, with no keyboard key, and both are also usable while the player
+  grid is focused. The Debug layout dump (3.12) prints them. `SortChestUi.CheckVanillaKeys` gives up Sort's key (mouse
+  only, one Warning) if a vanilla button already uses it.
 - Glyph text: `Localization.instance.Localize("$KEY_JoyBack")` → `ZInput.GetBoundKeyString` returns a TMP sprite tag
   (xbox, ps5 or switch2 by controller). It works for every registered button.
 - Which gamepad buttons are free while the inventory shows a container:
   - `Player.TakeInput` returns false while `InventoryGui.IsVisible()`: player actions do not read any button.
   - `JoyBack` (the View/Select button): no reader in `assembly_valheim`. On Xbox layouts `JoyMap` shares the Select
     button, but `Minimap.Update` ignores it while `InventoryGui.IsVisible()`. **Free.**
-  - `JoyLStick` (left stick click): read by `InventoryGui` only as a **held** multi-craft modifier, whatever group is
-    active (recipe preview, and when Craft is pressed): pressing it with the container group active only shows the
-    multi-craft preview while held. `BuildUi` (focus the build search) and `GameCamera` (free fly) are not active with
-    the inventory open. The left stick also **moves** the grid selection (`InventoryGrid`, `JoyLStickLeft/Right/Up/
-    Down`), so accidental clicks are likely: only a harmless action may sit on it.
-  - `JoyRStick` (right stick click): no vanilla reader in the inventory. The MC Loot Pickup Filter reads it (and
-    LT/RT + R3) **only while the player grid is focused** (`FilterUi.HandleGamepad` checks
-    `m_playerGrid.m_uiGroup.IsActive`); chest slots are marked with the mouse only. This mod never binds it, so no MC
-    mod reads R3 in the container grid.
+  - `JoyLStick` (left stick click): in code, read by `InventoryGui` only as a **held** multi-craft modifier, whatever
+    group is active (recipe preview, and when Craft is pressed); `BuildUi` (focus the build search) and `GameCamera`
+    (free fly) are not active with the inventory open. But with a container open it is **the key of the game's Take
+    all button** (prefab data, see above): a press moves the container's content to the player. **Not free.** The
+    0.1.0 design missed this (the key is not in `.ref`) and put the criterion button on it; `CheckVanillaKeys` then
+    gave the key up and logged a Warning at every button creation.
+  - `JoyRStick` (right stick click): no reader in the inventory code, but with a container open it is **the key of the
+    game's Place stacks button** (prefab data, see above). **Not free.** The MC Loot Pickup Filter reads it (and LT/RT
+    + R3) while the player grid is focused (`FilterUi.HandleGamepad` checks `m_playerGrid.m_uiGroup.IsActive`); what
+    that means together with Place stacks is that mod's subject. This mod never binds it.
   - Crafting Search and Sort binds no gamepad key (its decision 6); its `UIGamePad.ButtonPressed` prefix blocks every
     `UIGamePad` while its search field has the keyboard.
-  - So: Sort = `JoyBack`, criterion = `JoyLStick` (decision 9).
+  - So: Sort = `JoyBack`. The criterion button has **no controller key**: both stick clicks are the game's own
+    (decision 9, as revised by the user on 2026-10-08).
 
 ### 1.3 Containers and ownership (`Container`)
 
@@ -244,8 +248,8 @@ Two buttons cloned from **Place stacks** (`m_stackAllButton`) are added to the c
 **criterion button** that shows the current criterion ("By name" / "By type" / "By biome"). A click on Sort, only when
 the local client owns the open container and its local copy matches the saved data, cancels any drag (like Take all),
 optionally merges partial stacks of **identical** items, orders the items with the chosen comparator, reassigns
-`m_gridPos` row by row from (0,0), reorders the live list to match, and calls `Inventory.Changed()` **once** if
-anything was written. `Container.OnContainerChanged` then saves the ZDO once; the grid repaints next frame.
+`m_gridPos` row by row from (0,0) and, **only if anything was written**, reorders the live list to match and calls
+`Inventory.Changed()` **once**. `Container.OnContainerChanged` then saves the ZDO once; the grid repaints next frame.
 
 No per-frame patch at all: the buttons live under the vanilla panel and hide with it.
 
@@ -257,7 +261,7 @@ All bodies catch their own exceptions and call `PatchGuard.Report(site, e)`. App
 | Target | Type | What it does | Why |
 |---|---|---|---|
 | `InventoryGui.Awake()` (private, no overload) | Postfix | `SortChestUi.Create(__instance)`: clone the two buttons (3.3). No measuring here (`m_container` was just deactivated, and other UI mods may not have moved anything yet). | Normal load path: one creation per `InventoryGui` (world session). |
-| `InventoryGui.Show(Container, int)` | Postfix | `SortChestUi.OnShow(__instance)`: read **`__instance.m_currentContainer`** (not the argument: HarmonyX runs postfixes even when another mod's prefix skipped the original); create the buttons if missing; set them active only for an eligible container (3.6); re-apply the layout from the **current** positions of Take all / Place stacks with the row choice remembered for this size combination (3.3); refresh labels, tooltips and glyphs; put our pads on the container grid group; Debug log `Opened <name> <w>x<h>`; start the layout self-check for a size combination not seen before. | `m_currentContainer` only changes here, so eligibility is decided once per opening; language/controller changes and UI mods that move the vanilla buttons after `Awake` are picked up at each opening. |
+| `InventoryGui.Show(Container, int)` | Postfix | `SortChestUi.OnShow(__instance)`: read **`__instance.m_currentContainer`** (not the argument: HarmonyX runs postfixes even when another mod's prefix skipped the original); create the buttons if missing; set them active only for an eligible container (3.6); re-apply the layout from the **current** positions of Take all / Place stacks with the row choice remembered for this size combination (3.3); refresh labels, tooltips and the Sort glyph; put Sort's pad on the container grid group; Debug log `Opened <name> <w>x<h>`; start the layout self-check for a size combination not seen before. | `m_currentContainer` only changes here, so eligibility is decided once per opening; language/controller changes and UI mods that move the vanilla buttons after `Awake` are picked up at each opening. |
 
 Button clicks and the criterion change are **UnityEvent listeners**, not patches: they exist only while the buttons
 exist, i.e. while the feature is active. Their bodies also use `try/catch` + `PatchGuard.Report`.
@@ -281,29 +285,37 @@ visibility):
 3. `onClick` is replaced by a new event with our listener (drops any persistent listener); every `Selectable` in the
    clone gets `Navigation.Mode.None` (the D-pad never moves onto our buttons).
 4. Only the `UIGamePad` on the button itself is kept; other pads in children are removed. Vanilla glyph switchers
-   (`UIInputHint`) and their in-clone hint objects are removed (they would show Place stacks' keys), except our pad's
-   own hint. `Localize` components are removed (our texts are plain English, never `$tokens`).
+   (`UIInputHint`) and their in-clone hint objects are removed (they would show Place stacks' keys), except, on the
+   Sort button, the pad's own hint. `Localize` components are removed (our texts are plain English, never `$tokens`).
 5. Label = the first `TMP_Text` not inside a hint object.
-6. Gamepad, in the same frame as the Instantiate: `m_keyCode = None`, `m_zinputKey = <our key>`,
-   `alternativeGroupHandler = null` (the clone never fires because some **other** group is active). The glyph
-   (`Localize("$KEY_" + key)`) is written into the hint's `TMP_Text`, refreshed at each opening (the controller type may
-   change); a hint without text is hidden (key still works). The inherited `m_blockingElements` are kept.
+6. Gamepad, in the same frame as the Instantiate:
+   - **Sort** (key `JoyBack`): `m_keyCode = None`, `m_zinputKey = JoyBack`, `alternativeGroupHandler = null` (the
+     clone never fires because some **other** group is active). The glyph (`Localize("$KEY_" + key)`) is written into
+     the hint's `TMP_Text`, refreshed at each opening (the controller type may change); a hint without text is hidden
+     (key still works). The inherited `m_blockingElements` are kept.
+   - **Criterion button** (no key, decision 9): its `UIGamePad` is removed and its in-clone hint object is hidden and
+     destroyed (without the pad nothing would hide it, and it would show Place stacks' glyph). The button has no
+     controller part at all: no key can press it and it never shows a glyph. It is a plain mouse `Button`.
 7. Tooltip: Place stacks' `UITooltip` if it has a prefab, else the inventory slot tooltip prefab; `Set(topic, text)`.
    `m_gamepadFocusObject` is cleared (it may point outside the clone).
-8. `CheckVanillaKeys`: if Take all or Place stacks already uses one of our keys, our button for that key becomes mouse
-   only (one Warning); a press would otherwise fire whichever pad updates first (shared 2-frame lock).
-9. `FixPadGroups`: `UIGamePad.Start` takes the nearest parent `UIGroupHandler`; after `Start` ran, our pads' group is
-   set to the container grid's group (`ContainerGrid.m_uiGroup`, fallback `m_uiGroups[0]`), so our keys and glyphs
+8. `CheckVanillaKeys`: if Take all or Place stacks already uses Sort's key (another game version, a UI mod), Sort
+   becomes mouse only (one Warning); a press would otherwise fire whichever pad updates first (shared 2-frame lock).
+   The game's own bindings (Take all on the left stick click, Place stacks on the right stick click) clash with
+   nothing of ours, so nothing is logged for them.
+9. `FixPadGroups`: `UIGamePad.Start` takes the nearest parent `UIGroupHandler`; after `Start` ran, Sort's pad group is
+   set to the container grid's group (`ContainerGrid.m_uiGroup`, fallback `m_uiGroups[0]`), so its key and glyph
    work only while the container grid is focused. Called at each opening and by the self-check as soon as the panel is
-   up. Safety net for the frames before that: a click that arrives while our key is down and the container group is
-   not active is ignored (`PadPressOutsideGrid`).
+   up. Safety net for the frames before that: a Sort click that arrives while its key is down and the container group
+   is not active is ignored (`PadPressOutsideGrid`).
 
-**Gamepad map** (decision 9). Shared gamepad map of the MC inventory mods (the Loot Pickup Filter design carries the
-same table, `docs/design/ux-autopickup-filter.md` 3.4):
+**Gamepad map** (decision 9). Shared gamepad map of the MC inventory mods (the Loot Pickup Filter design carries a
+copy of this table, `docs/design/ux-autopickup-filter.md` 3.4; for Sort Chest's own keys this one is the reference).
+"None of ours" = no MC mod reads it; with a container open the game itself still runs **Take all on L3** and **Place
+stacks on R3** (1.2):
 
 | Focused group (`InventoryGui.m_uiGroups`) | View/Select (`JoyBack`) | L3 (`JoyLStick`) | R3 (`JoyRStick`) | LT + R3 | RT + R3 |
 |---|---|---|---|---|---|
-| 0 container grid | Sort Chest: sort | Sort Chest: change criterion | none of ours | none of ours | none of ours |
+| 0 container grid | Sort Chest: sort | none of ours (the game's Take all) | none of ours (the game's Place stacks) | none of ours | none of ours |
 | 1 player grid | none of ours | none of ours | Loot Pickup Filter: mark / unmark | Loot Pickup Filter: change mode | Loot Pickup Filter: lists panel |
 | 2 side panel | Encyclopedia: open the window (only with its optional side button; default: none of ours) | none of ours | none of ours | none of ours | none of ours |
 | 3 crafting | none of ours | none of ours | none of ours | none of ours | none of ours |
@@ -316,23 +328,29 @@ View/Select on the chest grid always reaches Sort Chest. In the Valheim Compendi
 alone pick the Encyclopedia's Texts / Encyclopedia tabs (read by its own code, not a pad; the inventory groups are off
 there). A new MC binding must not use View/Select in the side panel, nor LT / RT alone in those two dialogs.
 
-Sort Chest's `UIGamePad`s (View/Select, L3; no modifier check, so LT/RT + those keys act the same) fire only while the
-container group is active, Loot Pickup Filter's R3 gestures only while the player group is active: one press never
-reaches both, and no MC mod reads R3 in the container grid. Vanilla reads View/Select nowhere in the inventory and L3
-only while held, as the multi-craft modifier (any group). InventoryActions also uses R3 (Loot Pickup Filter's
-`GamepadControls = false` leaves it to that mod). The right stick click is never bound by this mod.
+Sort Chest's only `UIGamePad` (Sort on View/Select; no modifier check, so LT/RT + View/Select act the same) fires only
+while the container group is active, Loot Pickup Filter's R3 gestures only while the player group is active: one press
+never reaches both mods. Vanilla reads View/Select nowhere in the inventory. The stick clicks are the game's own with
+a container open (Take all on L3, Place stacks on R3, prefab data, 1.2), and L3 is also the held multi-craft modifier
+(any group). InventoryActions also uses R3 (Loot Pickup Filter's `GamepadControls = false` leaves it to that mod).
+Neither stick click is ever bound by this mod.
 
-Sort sits on a button that is never pressed by accident; the left stick click, easy to hit while moving in the grid,
-only changes the criterion label (harmless: nothing moves).
+Sort sits on a button that is never pressed by accident. The criterion is changed with the mouse only (decision 9, a
+user decision): both stick clicks are the game's own with a container open, and the mod takes neither.
 
 **Placement** (`ApplyLayout`): offsets from Place stacks in its parent's space, so the buttons follow the vanilla
 buttons (and UI mods that move them). Rects are measured in the parent's space from world corners (any pivot,
 anchor or scale). The row direction and gap are taken from Take all → Place stacks (gap kept if 0-24 px, else 8 px;
 no usable Take all → horizontal, 8 px). `pitch` = Place stacks' width (or height for a vertical row) + gap.
 
-- **Row A** (default): Sort at `PlaceStacks + pitch`, criterion at `PlaceStacks + 2·pitch` (the row continues).
+- **Row A** (default): Sort at `PlaceStacks + pitch`, criterion at `PlaceStacks + 2·pitch` (the row continues). On
+  the game's own panel (seen in the 2026-10-08 runs, game 1.0.17, same for every container size) Take all sits at the
+  panel's left end, the container name in the middle and Place stacks at the right end, so row A stands **right of the
+  panel, just past its right edge**. The user looked at it and keeps it there (decision 15): this is the intended
+  place, and it is never a reason for a warning.
 - **Row B** (second row): a new row on the side of the vanilla buttons **away from the container grid**
-  (row height + 6 px): criterion under Place stacks, Sort under the slot before it (under Take all).
+  (row height + 6 px): criterion under Place stacks, Sort under the slot before it (under Take all). Used only when
+  row A overlaps something (below).
 - If the buttons' parent has a `LayoutGroup`, it places them and we only check.
 
 **Layout self-check** (coroutine on `gui`, once per `(container width, container height, player inventory rows)`
@@ -348,35 +366,39 @@ combination per session):
    nothing, store nothing, try again at the next opening. (1e-3 and not a larger threshold: the overlap tests do not
    depend on scale, and a small GUI scale must still be checked.)
 4. `CheckLayout`: `Canvas.ForceUpdateCanvases()`, try row A; a **problem** is an overlap between our two buttons, or
-   with Take all, Place stacks, the container name, the container weight, the container grid or its scrollbar, or a
-   button outside the panel (the panel rect grown to hold the vanilla buttons). A has no problem → keep A. Else try B;
-   B has none → keep B and log once at Info `No room for the Sort buttons next to Place stacks on a <w>x<h> container
-   (<problem>): they go in a second row.` Neither → back to A and one Warning `Sort buttons <problem> on a <w>x<h>
-   container with <rows> inventory rows; another UI mod may have moved the panel.` The choice is remembered for the
-   combination and re-applied at every opening.
+   with Take all, Place stacks, the container name, the container weight, the container grid or its scrollbar. A
+   button outside the panel rect is **not** a problem (0.1.0 had that rule; on the game's own layout row A is always
+   right of the panel, so it warned `stick out of the container panel` at the first opening of every container size:
+   removed in 0.1.1, decision 15). A has no problem → keep A. Else try B; B has none → keep B and log once at Info
+   `No room for the Sort buttons next to Place stacks on a <w>x<h> container (<problem>): they go in a second row.`
+   Neither → back to A and one Warning `Sort buttons <problem> on a <w>x<h> container with <rows> inventory rows;
+   another UI mod may have moved the panel.` The choice is remembered for the combination and re-applied at every
+   opening. On the game's own layout none of these overlaps happens, so a Warning here means something moved or
+   resized the game's panel parts. The check only knows the game's own panel parts: it cannot see an element another
+   mod adds (another sort mod's button at the same place overlaps unnoticed, a known limitation).
 5. Wait until the panel stops moving/scaling (2 stable frames, at most 60), then the screen check (overlay canvas
    only: world units = pixels): a button off screen → the same Warning with `are off screen`. Then the Debug layout
    dump (3.12).
 
 The check never runs per frame for long and never touches the vanilla buttons.
 
-Sketch (row A, expected):
+Sketch (row A on the game's own panel, from the rectangles measured in the 2026-10-08 run: the game's row is at the
+top of the panel):
 
 ```
-+------------------------------------------------------------------+
-| Chest                                                  [w] 42    |
-| [][][][][]                                                       |
-| [][][][][]                                                       |
-| [Take all] [Place stacks] [Sort] [By type]                       |
-+------------------------------------------------------------------+
++----------------------------------------------+
+| [Take all]       Chest        [Place stacks] | [Sort] [By type]
+| [][][][][]                                   |
+| [][][][][]                                   |
++----------------------------------------------+
 ```
 
 **Visibility**: `OnShow` sets both GameObjects active iff `m_currentContainer != null` (Unity null) `&&
 IsEligible(c)` (3.6). Because they are children of the container panel they are hidden with it (no container,
 walked away, ownership lost: `UpdateContainer` hides `m_container`).
 
-**Input focus**: no text field, so nothing to block. Mouse: normal `Button`. Gamepad: see the map above. Keyboard:
-none (non-goal).
+**Input focus**: no text field, so nothing to block. Mouse: normal `Button` (the only way to change the criterion).
+Gamepad: Sort only, see the map above. Keyboard: none (non-goal).
 
 **Feedback**: when the sort wrote something, `gui.m_moveItemEffects.Create(player position)` once (the sound Place
 stacks makes). No message. Nothing at all when already sorted. When the local copy is out of date (3.4), a center
@@ -419,8 +441,14 @@ message: "This container changed elsewhere. Close it and open it again to sort."
    Type, Sub, Name, Prefab, Slot, ListIndex }` with `Name = Localization.instance.Localize(m_shared.m_name)`,
    `Biome` only for the Biome criterion, `Slot = y * w + x` of the current position. `Array.Sort` with the comparator.
 5. For `i` in order: `pos = (i % w, i / w)`; if `m_gridPos != pos` → written, moved++; assign.
-6. Reorder the live list to the sorted order, so the saved data is in slot order too. List order alone is invisible
-   and does not count as written.
+6. Only if something was written (a merge or a move): reorder the live list to the sorted order, so the saved data is
+   in slot order too. List order alone is invisible and does not count as written, so when nothing was written the
+   list is left exactly as it is. `Inventory.Save` writes the items in list order and `LocalCopyCurrent` compares
+   those bytes: a list reordered without a save no longer matches the ZDO, and the next click is refused as out of
+   date. That was the 0.1.0 bug fixed in 0.1.1 (T20): after a stack is dragged out of the chest and back into its
+   slot, the game appends it at the end of the list (`Inventory.MoveItemToThis` → private `AddItem`) and saves that
+   order; a Sort click then moved nothing but reordered the list, and every later click showed "This container
+   changed elsewhere" until the chest was reopened. Rule: the mod never changes the list order without a save.
 
 **Comparator** (first non-zero wins; a total order, so sorting again moves nothing):
 
@@ -462,8 +490,13 @@ crafting mod's sort menu stays one block in the chest, so an item lands in the s
 `ItemKinds` rules in short: item type first (ammo, shield, armour slots, utility, trinket, tool, torch, consumable →
 Food if it restores health, stamina or eitr else Potion, material, fish, trophy, misc); a weapon-type item with a
 `Torch`/`LeftTorch` animation is a Torch, with a `FishingRod`/`Scythe` animation or a `Pickaxes`/`WoodCutting`/
-`Fishing`/`Farming` skill a SkillTool, with the `Feaster` animation (tankards) Misc, else a Weapon. The prefab values
-of the vanilla tools, torch and tankards are **unverified**; the T14 Debug dump prints them.
+`Fishing`/`Farming` skill a SkillTool, else a Weapon; **tankards are Misc** (decision 16). The tankards need their
+own rule: in game 1.0.17 the `Tankard` is a one-handed weapon item with the Swords skill and the `Torch` animation
+(seen in the 2026-10-08 runs; the first classifier expected a `Feaster` animation), so the torch rule alone put it in
+Tools and light, between the pickaxes and the torches. The shared classifier (`src/Shared/ItemKinds.cs`, not part of
+this mod) is fixed to return Misc for the tankards of 1.0.17 (`Tankard`, `TankardAnniversary`, `TankardOdin`,
+`Tankard_dvergr`) while real torches stay Torch; this mod only maps Misc to rank 10.0. The prefab values of the other
+vanilla tools and of the torch are **unverified**; the T14 Debug dump prints them.
 
 ### 3.5 Merge partial stacks (`MergeStacks`, option, default on)
 
@@ -676,13 +709,15 @@ values: never rename them.
 - **Crafting Search and Sort**: its row and menu stay inside `m_crafting`, ours inside the container panel. Its menu
   closes on an outside click without a blocker, so a click on our buttons closes it and still reaches our button. It
   binds no gamepad key and blocks every `UIGamePad` while its search field has the keyboard, so typing never fires our
-  keys; we have no keyboard key. The type groups are built on the same `ItemKinds.Classify` (C03).
+  key (nor the game's Take all / Place stacks keys); we have no keyboard key. The type groups are built on the same
+  `ItemKinds.Classify` (C03).
 - **Loot Pickup Filter**: its mode button sits above the player panel; its badges are recomputed in an
   `InventoryGrid.UpdateGui` postfix from the live items' `m_gridPos` at every repaint (every frame while the panel
   shows), so they follow sorted items; middle-click marking reads the item in the hovered slot at the moment of the
   click. Its per-item marks live in the character (`Player.m_customData`, by prefab name), not on the items, so sorting
-  and merging never touch them. Controller: its gestures only in the player grid, ours only in the container grid
-  (gamepad map, 3.3) (C02).
+  and merging never touch them. Controller: its gestures only in the player grid; ours is View/Select only, in the
+  container grid (gamepad map, 3.3). With a container open the right stick click is also the game's own Place stacks
+  (1.2): this mod neither uses nor changes that (C02).
 - **Crossbow Stays Loaded**: per-item custom data on crossbows (`MC.Combat.Crossbow.StaysLoaded.*`); sorting never
   touches item data, and merging never merges items whose custom data differ (C01).
 - **One Click Repair All, Batch Station Feeding, Harpoon Hooks Tames, Creature Kill and Tame Counts**: unrelated (no
@@ -695,7 +730,8 @@ values: never rename them.
 | Scenario | Vanilla | Mod |
 |---|---|---|
 | Chest with gaps and mixed items | Items where players left them | Packed from top left, row by row, in criterion order; empty slots at bottom right |
-| Already sorted chest, click Sort | — | Nothing moves, no `Changed()`, no ZDO write, no sound |
+| Already sorted chest, click Sort | — | Nothing moves, no `Changed()`, no ZDO write, no sound; the item list keeps its order |
+| Stack dragged out of a sorted chest and back into its slot, then Sort twice, then another sort order | The stack is now last in the chest's item list (saved in that order); slots unchanged | First and second click: nothing moves, no message; the click with the other sort order sorts (T20) |
 | Empty chest | — | Nothing happens |
 | 3 Wood stacks 20 + 30 + 15 (MergeStacks on) | Stay 3 stacks | One 50 + one 15, adjacent; total 65 |
 | Same, MergeStacks off | — | 3 stacks adjacent, 30, 20, 15 |
@@ -718,18 +754,21 @@ values: never rename them.
 | Container panel not owned (MultiUserChest) | — | Sort does nothing |
 | Ship chest opened from the dock while others are aboard | `Ship.UpdateOwner` moves the ship ZDO to a player aboard within 2 s; the panel hides; the dock player's `m_inUse` stays stuck, so their copy stops reloading | Buttons hide with the panel; the click-time `IsOwner()` check makes Sort do nothing (M05). Later, owning and reopening with the old copy: Sort refuses with "This container changed elsewhere. Close it and open it again to sort.", nothing written (M06) |
 | Chest opened within about 1 s of another player's change | Local copy may miss that change until the chest is closed (`Load` skipped while in use) | Sort refuses with the same message; reopening fixes it |
-| Panel appears many frames after the open (server, other player owned the area) | Panel shows when ownership arrives | Self-check waits up to 2 s; pads get the chest grid group as soon as the panel is up (M07) |
+| Panel appears many frames after the open (server, other player owned the area) | Panel shows when ownership arrives | Self-check waits up to 2 s; Sort's pad gets the chest grid group as soon as the panel is up (M07) |
 | Open animation still near zero scale | — | Layout not judged until the scale is real; re-tried next opening if it stays collapsed |
-| Extra inventory rows (bought, or `inventorysize`) | `m_player` grows (`SetInventorySize`) | Buttons stay in the container panel; layout re-checked for the new combination; warning once if they overlap or leave the screen (T13) |
-| No room next to Place stacks | — | Second row, away from the grid (Info line) |
+| Extra inventory rows (bought, or `inventorysize`) | `m_player` grows (`SetInventorySize`) | Buttons stay in the container panel's row; layout re-checked for the new combination; warning once if they overlap a panel part or leave the screen (T13) |
+| Game's own panel: Place stacks at the panel's right end | — | Row A stands right of the panel, past its edge: the intended place, no warning at any container size (decision 15, T13, T17) |
+| Row A overlaps a panel part (a UI mod moved or resized the game's buttons, name, weight or grid) | — | Second row, away from the grid (Info line); a Warning only if the second row overlaps too |
 | UI mod removed `m_stackAllButton` (Auga) | — | No buttons, one warning; mod otherwise inert |
 | Another sort mod's button at the same place | — | May overlap (known limitation, README) |
-| Vanilla button already on View/Select or L3 | — | That Sort button is mouse only, one warning |
+| Vanilla button already on View/Select (another game version, a UI mod) | — | Sort is mouse only, one warning |
+| Vanilla Take all on L3 and Place stacks on R3 (game 1.0.17) | Their own keys | Nothing of ours is on them, nothing is logged (0.1.0 warned at every button creation, because the criterion button asked for L3) |
 | Feature turned off while the panel is open | — | Buttons destroyed immediately |
 | Feature turned on while the panel is open | — | Buttons appear immediately (`OnActivated` → `Create` + `OnShow`) (T15) |
-| Gamepad: container grid not the active group | — | View/Select and left stick click do nothing for our buttons |
-| Gamepad: right stick click on a chest slot | Nothing | Nothing (Loot Pickup Filter reads R3 only in the player grid; Sort never binds `JoyRStick`) (C02) |
-| Gamepad: left stick clicked by accident while moving in the chest grid | Grid selection moves | The criterion label changes (no sort, nothing moves); two more presses bring it back |
+| Gamepad: container grid not the active group | — | View/Select does nothing for Sort; no glyph on Sort |
+| Gamepad: right stick click with a container open | The game's Place stacks runs | Nothing of ours: no sort, criterion unchanged (Sort never binds `JoyRStick`) (T12, C02) |
+| Gamepad: left stick click with a container open | The game's Take all runs (the container's content goes to the player) | Nothing of ours: no sort, criterion unchanged (the criterion button has no key) (T12) |
+| Gamepad: changing the criterion | — | Mouse only, by design: the criterion button has no controller key and no glyph (decision 9) |
 | Typing in Crafting Search and Sort's field with a chest open | — | Our buttons and keys never fire (C03) |
 | Language changed | Vanilla labels relocalize | Our English labels stay English (decision 8) |
 
@@ -762,10 +801,12 @@ sees and have a simple alternative.
    dragged item never left its slot.
 8. **English-only labels in 0.1.0** (to confirm with the user): vanilla has no "Sort"/"Type" token; translations can
    come later.
-9. **Gamepad keys** (to confirm with the user): **View/Select (`JoyBack`) = Sort**, **left stick click (`JoyLStick`) =
-   change criterion**, only while the container grid is focused. The right stick click stays free (no MC mod reads it
-   in the container grid; Loot Pickup Filter reads it only in the player grid). If the game's Take all or Place stacks already uses one of
-   these keys, that Sort button is mouse only (warning).
+9. **Gamepad keys** (decided by the user on 2026-10-08): **View/Select (`JoyBack`) = Sort**, only while the container
+   grid is focused. **The criterion button is mouse only: no controller key and no glyph, by design.** The left stick
+   click is the game's own Take all and the right stick click the game's own Place stacks; the mod takes neither, and
+   logs nothing about these vanilla bindings. (0.1.0 put the criterion on the left stick click; the game's Take all
+   already used it, so the button was mouse only anyway and a Warning was logged at every button creation.) If the
+   game's Take all or Place stacks ever uses View/Select, Sort is mouse only (warning).
 10. **Only when something was written**: no save, no sound when already sorted.
 11. **A client-side mod that writes a shared container** (to confirm with the user): sorting writes the open chest
     through the vanilla owner path, exactly like moving items by hand, only while the local player has it open, owns
@@ -775,26 +816,40 @@ sees and have a simple alternative.
 13. **Refuse a sort on a stale copy** (added by the review): owning the ZDO is not enough (1.3); Sort compares the
     local copy with the saved bytes and refuses with a center message when they differ. A vanilla item move in that
     state is not guarded (vanilla behaviour).
+14. **The sort order is changed with the mouse only** (user decision, 2026-10-08): see decision 9.
+15. **The buttons stay right of the container panel** (user decision, 2026-10-08): the two buttons continue the
+    game's row Take all → name → Place stacks to the right, past the panel's right edge. The user looked at it in
+    game and keeps it. The mod no longer treats "outside the panel" as a layout problem, so it logs no `Sort buttons
+    stick out of the container panel` warning there, at any container size. Still detected: an overlap between the
+    two buttons or with one of the game's own panel parts (second row, or a Warning when that overlaps too), and a
+    button off screen (Warning). An element added by another mod is not seen by the check.
+16. **Tankards belong to Other** (user decision, 2026-10-08): rank 10.0, last in the "By type" order, whatever item
+    type and animation the game gives them (3.4). The fix is in the shared classifier, so Crafting Search and Sort's
+    menu lists them under Other too.
 
 ### Added beyond the request
 
-`MergeStacks` (default on), the remembered criterion (config), gamepad support, the vanilla move sound after a sort,
-the stale-copy guard.
+`MergeStacks` (default on), the remembered criterion (config), gamepad support for Sort (View/Select), the vanilla move
+sound after a sort, the stale-copy guard.
 
 ### Differences from the pre-implementation design
 
 - **Layout**: instead of one hard-coded candidate chosen from a manual runtime dump, row A is the default and the
   self-check picks A or B per size combination at runtime (B only when A overlaps something), with a warning when
-  neither fits. The runtime dump is built in (Debug level).
+  neither fits. The runtime dump is built in (Debug level). 0.1.1: row A was expected inside the panel; in game it
+  stands right of it, which the user keeps, and the "outside the panel" rule (and its warning) is gone (decision 15).
 - **Self-check timing**: waits up to 2 s (unscaled) for the panel instead of 5 frames, fixes the pad groups as soon as
   the panel is up, and never judges a collapsed (open-animation) panel.
 - **Clones**: built under an inactive holder; extra child `UIGamePad`s, `UIInputHint` glyph switchers and `Localize`
   components are removed; a tooltip prefab falls back to the inventory slot tooltip.
-- **Gamepad**: our pads are moved to the container grid's `UIGroupHandler` (`FixPadGroups`), plus a click-time check
+- **Gamepad**: Sort's pad is moved to the container grid's `UIGroupHandler` (`FixPadGroups`), plus a click-time check
   that ignores a pad press while the container grid is not focused. A vanilla button already on our key makes ours
-  mouse only instead of "stop and choose again".
+  mouse only instead of "stop and choose again". 0.1.1: the criterion button has no pad and no key at all (decision
+  9); 0.1.0 asked for the left stick click, which is the game's Take all key.
 - **Type groups**: Misc and Other are one group ("Other", sub ranks 0 and 1) to match the crafting menu.
 - **Stale-copy guard** (`LocalCopyCurrent`) added after the review.
+- **List order** (0.1.1): the live list is reordered only together with a save; 0.1.0 also reordered it when nothing
+  was written, which made the stale-copy guard refuse the following clicks (3.4 step 6, T20).
 - **Tie-breaks**: old slot, then old list index.
 - **Biome index**: scan looks at components on children too; one stage failing does not stop the others; a Debug line
   lists table names that are not items of this game; the Debug item line also carries the type classification.
@@ -811,11 +866,12 @@ the stale-copy guard.
 
 - Container sizes (Chest 5x2, Reinforced 6x4, Black metal 8x4, Personal 3x2, Barrel 6x2, Cart 6x3, Karve 2x2, Longship
   6x3, Drakkar 8x4: wiki only); which prefabs set `m_rootObjectOverride`.
-- Which gamepad keys the vanilla Take all / Place stacks use, their `m_blockingElements`, and whether the inventory
-  canvas is screen-space overlay (the Debug layout dump shows them).
-- The placement of the buttons (row A expected; confirmed only in game, T09, T13).
-- The prefab values (`m_itemType`, `m_skillType`, `m_animationState`, food values) of tools, the torch, tankards and
-  meads, hence their type group (T14, C03).
+- The `m_blockingElements` of the vanilla Take all / Place stacks pads (the Debug layout dump shows them). Their keys
+  (left stick click / right stick click), the screen-space overlay canvas and the placement of the buttons (row A,
+  right of the panel) were seen in the automated runs of 2026-10-08 on game 1.0.17; another game version may differ.
+- The prefab values (`m_itemType`, `m_skillType`, `m_animationState`, food values) of tools, the torch and meads,
+  hence their type group (T14, C03). The `Tankard` was seen in the same runs: one-handed weapon, Swords skill, `Torch`
+  animation.
 - The recipes and station costs behind the derived biomes (T14): e.g. `BoarJerky` at the cauldron, the fermenter's
   Bronze, the forge's Copper.
 - The biome entries marked **U** in 3.8. The English names used in T01-T03 exist in the 1.0.16 English text
@@ -831,6 +887,9 @@ The in-game checklist lives next to the code: `src/UX/Container.Sort/TESTING.md`
 would also match Crafting Search and Sort). It covers every goal
 item: T01-T03 (goals 2-3, the three criteria, top left to bottom right), T04 (goal 2, criterion button and memory),
 T09-T11 (goal 1, container kinds, tombstone excluded), T15-T16 and T18 (goal 4); T05-T08 merge, already sorted and
-drag, T12 gamepad, T13 layout, T14 index log, T17 clean log. M01-M07 multiplayer (M01-M02 hand-off to players without
-the mod, M05-M06 ship storage and stale copy, M07 late panel), C01-C03 cross-mod (Crossbow Stays Loaded, Loot Pickup
-Filter, Crafting Search and Sort), C04 other sort mods (optional).
+drag, T12 gamepad (View/Select sorts; the criterion button is mouse only; the stick clicks stay the game's), T13
+layout (buttons right of the panel, no warning), T14 index log (tankards in Other), T17 clean log, T20 Sort again
+after a Sort that moved nothing. M01-M07
+multiplayer (M01-M02 hand-off to players without the mod, M05-M06 ship storage and stale copy, M07 late panel),
+C01-C03 cross-mod (Crossbow Stays Loaded, Loot Pickup Filter, Crafting Search and Sort), C04 other sort mods
+(optional).

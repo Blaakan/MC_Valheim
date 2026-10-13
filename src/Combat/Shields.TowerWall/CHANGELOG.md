@@ -6,6 +6,10 @@
   every default tower shield. It was logged at the main menu with some other item mods installed (seen with
   Jotunn-based mods) and when you left a server that does not have the mod or has it turned off. A real typo in the
   Towers setting is still reported.
+- Fixed a punch or a weapon swing that started by itself: a press of the attack button that was waiting for the bash
+  cooldown stayed active for up to half a second after the tower shield left your hands (put away, another weapon
+  equipped) or after the mod was turned off. Easy to run into with a long `BashCooldown`. The waiting press now ends
+  with the tower shield; a press made in the last half second still counts, as in the normal game.
 
 ## 0.1.0
 

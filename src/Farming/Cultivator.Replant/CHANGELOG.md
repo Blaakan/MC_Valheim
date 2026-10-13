@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed: while the mod is turned off (Enabled = false, or on a server without the mod), young transplants kept the
+  grow time of the last rules that were in force: a server's, or your own setting as it was before. They now grow on
+  your own GrowTimeMultiplier setting, as the README says, and a change of that setting while the mod is off reaches
+  them at once, also the ones already in the ground.
+- Fixed, with PlantEasily installed: its own placement check turned the ghost green where the game refuses a
+  transplant, so a Yggdrasil shoot transplant could be planted away from any Ancient Root (where it never grows) and
+  any transplant inside a no-build zone. The transplant you aim at now stays red there and nothing is planted.
+  Nothing changes without PlantEasily.
+
 ## 0.1.0
 
 - Initial version. Replant: with the cultivator in hand, aim at a wild plant and press E (gamepad X) to dig it up as

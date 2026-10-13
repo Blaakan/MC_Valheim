@@ -17,9 +17,10 @@ surface, with an under-water tint and the water surface seen from below.
 - **Let go to stay at your depth.** With neither key held you stay where you are (the server can make divers float up
   slowly instead, see IdleRiseSpeed). Holding both keys also keeps you in place under water; at the surface it leaves
   you floating on the waves as usual.
-- **Only up or down under water.** Once you are half a metre below your normal swimming height, the movement keys do
-  nothing: no forward, back or sideways swimming, and your character keeps facing the same way. Only Crouch and Jump
-  move you. In that first half metre, while you are still going down, you can still swim normally.
+- **Only up or down under water.** Once Crouch has taken you half a metre below your normal swimming height, the
+  movement keys do nothing: no forward, back or sideways swimming, and your character keeps facing the same way. Only
+  Crouch and Jump move you. In that first half metre, while you are still going down, you can still swim normally. A
+  wave that washes over you at the surface is not a dive: you stay a normal swimmer.
 - **The sea floor stops you.** You stop just above the floor (or at the bottom of the water, wherever the game's water
   ends) and hover there; Jump takes you back up.
 - **Jump does not jump under water.** Touching a rock, the floor or a hull while diving does not turn the Jump key into
@@ -33,7 +34,7 @@ surface, with an under-water tint and the water surface seen from below.
   sets UnderwaterStaminaMultiplier to 0).
 - **At the surface nothing changes.** Floating still at the surface costs nothing, as in the normal game, also while
   you hold Crouch where the water is too shallow to go down, or hold Crouch and Jump together: you then float and ride
-  the waves like a normal swimmer.
+  the waves like a normal swimmer, in a storm too.
 - **Out of breath.** When your stamina runs out under water, "Out of breath" shows at the top left and you float up
   whatever you press. As when swimming with no stamina in the normal game, you take drowning damage every second, and
   stamina only comes back once you stand on the ground or reach the shore: surface with some stamina left.

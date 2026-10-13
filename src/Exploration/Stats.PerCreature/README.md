@@ -32,7 +32,9 @@ Shows how many of each creature you have killed, and how, plus how many you have
     the player standing next to it), unless that game sees another player closer to the creature. Then nobody gets
     it: a missed tame is better than a tame given to the wrong player. That game only sees the players in the area
     it has loaded around it.
-  - In single player you always get your own tames.
+  - In single player you always get your own tames. That includes a creature that finishes taming while you have no
+    character in the world (waiting to respawn after a death, or the world still loading): it is counted when your
+    character appears.
 - **Not counted as tames**: offspring born from your tames, hatched chicks, young animals that grow up, summoned
   creatures (they start tame without being tamed), and tames made while the mod is off or not installed.
 - The vanilla "Creature Tamed" line further down the page can differ from the per-creature tames: the game gives that
@@ -68,6 +70,11 @@ whoever runs the taming, so this works with friends and servers without the mod.
 goes to the player whose game ran the taming (that player needs the mod), unless that game sees another player closer
 to the creature; then nobody gets it. A game only sees the players in the area it has loaded around it. A tame is
 never given to two players.
+
+If your game runs a taming while you have no character in the world (waiting to respawn after a death, or the world
+still loading) and sees no other player at that moment, the tame is counted when your character appears. If it sees
+another player, the rules above apply without you: a player within 30 m gets the tame, otherwise nobody does. A tame
+waiting for your character is lost if you log out, or turn the mod off, before the character is back.
 
 Each player's numbers stay on their own character. The mod sends nothing to other players and stores nothing on
 creatures: a creature tamed with the mod is an ordinary tame for everyone, including friends without the mod.

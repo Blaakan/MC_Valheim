@@ -21,8 +21,8 @@ namespace MC.Exploration.ViewSpyglassMod;
 //                          aim slowed by the zoom; body turns to the aim [T05]
 //   spyglass.wheel         wheel steps x1.25 up to the cap and down to x1.5, view and aim follow, pick kept after
 //                          lower and raise, wheel under a lower cap = new pick, vanilla camera distance kept [T06]
-//   spyglass.zoom-pick     a lower zoom cap limits the view [T25]
-//   spyglass.bug.zoom-pick-lost   (fail today) the cap gone again, the zoom the player had is back [T25]
+//   spyglass.zoom-pick     a lower zoom cap limits the view and never replaces the zoom the player had: cap gone
+//                          again (after lower and raise, and while looking), that zoom is back [T25]
 //   spyglass.hold          HoldToLook: held = up, released = down, Block lowers, a tap never gets up [T08]
 //   spyglass.lowers        lowers by itself: a hit (not burning), inventory, map, pause menu (game paused), R, a
 //                          hotbar weapon [T09 T22]
@@ -38,7 +38,6 @@ internal static partial class SelfTests
     private const string FeetTest = "spyglass.feet";
     private const string WheelTest = "spyglass.wheel";
     private const string ZoomPickTest = "spyglass.zoom-pick";
-    private const string ZoomPickBugTest = "spyglass.bug.zoom-pick-lost";
     private const string HoldTest = "spyglass.hold";
     private const string LowersTest = "spyglass.lowers";
     private const string ChatTest = "spyglass.lowers-chat";
@@ -808,17 +807,8 @@ internal static partial class SelfTests
 
     // ---------- spyglass.zoom-pick ----------
 
-    // Start zoom 4, wheel never used, cap 3: raised (and left up, some frames in).
-    private static IEnumerator UnderLowCap(Checks c, Player player)
-    {
-        Scope.TestStartMagnification = 4f;
-        Scope.TestRawMagnification = -1f;
-        ServerRules.TestRules = new SpyglassRules { MaxMagnification = 3f };
-        yield return RaiseUp(c, player, "cap x3");
-        yield return Frames(10);
-    }
-
-    // First half of T25: a lower cap limit the view. (What become of the pick afterwards: test below.)
+    // T25: a lower cap only limit the view, the zoom the player had come back with the cap. Wheel never used here
+    // (wheel used under a lower cap = new pick: spyglass.wheel).
     private static IEnumerator RunZoomPick()
     {
         var c = new Checks(ZoomPickTest);
@@ -843,44 +833,17 @@ internal static partial class SelfTests
             rig.Look(OpenYaw(player, out _), -1f);
             yield return new WaitForSeconds(0.3f);
             var vanillaFov = cam.m_camera.fieldOfView;
-            // StartMagnification 4, wheel never used, cap 3.
-            yield return UnderLowCap(c, player);
+            // StartMagnification 4, wheel never used (zoom not picked yet), cap 3: raised, some frames in.
+            Scope.TestRawMagnification = -1f;
+            ServerRules.TestRules = new SpyglassRules { MaxMagnification = 3f };
+            yield return RaiseUp(c, player, "cap x3");
+            yield return Frames(10);
             yield return new WaitForEndOfFrame();
-            c.Check(Near(ScopeCamera.CurrentMagnification, 3f, 0.01f) && Near(cam.m_camera.fieldOfView, ScopeCamera.ZoomedFov(vanillaFov, 3f), 0.05f),
-                $"under the cap the view shows x3 (x{F(ScopeCamera.CurrentMagnification)}, fov {F(cam.m_camera.fieldOfView)})");
-            yield return LowerDown();
-            c.Check(Scope.State == ScopeState.Idle, "lowered at the end");
-            c.Report();
-        }
-        finally
-        {
-            rig.Restore();
-        }
-    }
-
-    // ---------- spyglass.bug.zoom-pick-lost ----------
-
-    // Known to fail today, alone here so spyglass.zoom-pick pass: Scope.UpdateZoom write the capped zoom back into
-    // the pick every frame the spyglass is up, also with no wheel input, so one raise under a lower cap replace the
-    // zoom the player had (README: the zoom you pick is kept until you quit the game).
-    private static IEnumerator RunZoomPickBug()
-    {
-        var c = new Checks(ZoomPickBugTest);
-        if (!Ready(ZoomPickBugTest, out var player, out _))
-        {
-            yield break;
-        }
-        var rig = new SpyRig(player, ZoomPickBugTest);
-        try
-        {
-            var spy = Hold(rig, c);
-            if (spy == null)
-            {
-                c.Report();
-                yield break;
-            }
-            yield return UnderLowCap(c, player);
             var under = ScopeCamera.CurrentMagnification;
+            c.Check(Near(under, 3f, 0.01f) && Near(cam.m_camera.fieldOfView, ScopeCamera.ZoomedFov(vanillaFov, 3f), 0.05f),
+                $"under the cap the view shows x3 (x{F(under)}, fov {F(cam.m_camera.fieldOfView)})");
+
+            // Lowered, cap back to x8, raised again: the zoom the player had, not the cap it was held under.
             yield return LowerDown();
             ServerRules.TestRules = new SpyglassRules();
             yield return Frames(2);
@@ -889,7 +852,17 @@ internal static partial class SelfTests
             yield return Frames(10);
             c.Check(Near(down, 4f, 0.001f) && Near(ScopeCamera.CurrentMagnification, 4f, 0.01f),
                 $"cap back to x8, wheel never used: x4 again (x{F(under)} under the cap, x{F(down)} once the cap is gone, raised again at x{F(ScopeCamera.CurrentMagnification)})");
+
+            // Same with the spyglass left up: cap down and up again under the eye.
+            ServerRules.TestRules = new SpyglassRules { MaxMagnification = 3f };
+            yield return Frames(3);
+            var capped = ScopeCamera.CurrentMagnification;
+            ServerRules.TestRules = new SpyglassRules();
+            yield return Frames(3);
+            c.Check(Near(capped, 3f, 0.01f) && Near(ScopeCamera.CurrentMagnification, 4f, 0.01f),
+                $"cap lowered to x3 and put back while looking: x3, then x4 again (x{F(capped)}, then x{F(ScopeCamera.CurrentMagnification)})");
             yield return LowerDown();
+            c.Check(Scope.State == ScopeState.Idle, "lowered at the end");
             c.Report();
         }
         finally

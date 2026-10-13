@@ -147,6 +147,13 @@ ship helm or saddle / riding / swimming / build mode / debug fly / free camera =
 stagger, knockback, radial, piece selection = animated lower; a real hit (`Player.OnDamaged`, not fire, frost, poison,
 smoke or drowning) = lower. Rules pending = no raise, with a message at most every 3 s.
 
+Zoom pick (E1): `Scope` keeps one zoom for the session, first read from `StartMagnification`. The limit of the rules in
+force (`MaxMagnification`) is applied each time the pick is read (`Scope.Magnification`) and is never stored: the pick
+is written only on a frame where the wheel or the gamepad zoom buttons moved it, starting from the zoom on screen. So a
+lower limit only limits the view and the pick comes back with the limit, while a zoom change made under a lower limit
+is the new pick. (Fixed in 0.1.1: `UpdateZoom` wrote the limited value back on every frame the spyglass was up, so
+one look under a lower limit replaced the pick until the wheel was used again; test T25.)
+
 ### 2.3 Camera and view (G3, G4, G5)
 
 `GameCamera.UpdateCamera` postfix (`Priority.Last`, after first-person mods and Swim Dive), from p:

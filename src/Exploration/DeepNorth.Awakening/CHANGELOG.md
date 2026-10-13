@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed: after Kall, lowering ClearKillsMin or ClearKillsMax to or below the Jotun kills an area already had left the
+  area uncleared until one more Jotun died there, and `deepnorth_stones` showed more kills than the area needed
+  ("9 of 8 Jotun defeated"). The server now clears such an area by itself, like after a last kill ("The Jotun Retreat"
+  for the players in it): about two seconds after the settings stop changing, or when the world loads if they were
+  changed while the game was closed.
+- An area cleared this way stays cleared when the numbers are raised again. That is why the server waits for the
+  settings to rest: a value that only passes by (a slider being dragged, a number being typed) clears nothing.
+- Until the server has cleared such an area, `deepnorth_stones` shows at most the number the area needs ("8 of 8").
+- README and the JotunDensity description: an area can hold one group more than the listed numbers. The game's spawner
+  aims at 3 Krigen, 2 dual-axe Krigen, 2 Hexen and 6 Elaking, and when it fills a place in one go its last group can
+  take that to 4 Krigen and 8 Elaking. Nothing changed in how the areas spawn; the text now says what happens.
+
 ## 0.1.0
 
 - Initial version. The Deep North stays like the normal game until the first Malicious Ice of a Mörkhalla is broken.

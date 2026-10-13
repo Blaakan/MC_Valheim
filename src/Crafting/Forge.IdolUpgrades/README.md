@@ -64,7 +64,8 @@ longer climb forever on cheap idols.
   (or leave the idols you want to keep in a chest).
 - With OnFailure = LoseLevels, no more "need free slots" at the Forge: vanilla keeps inventory room for the materials
   a broken item returns, and items never break then. With Destroy, the vanilla rule stays.
-- Turn it off in the **MC Mods** panel at any time: the Forge behaves as in vanilla again, no restart needed.
+- Turn it off in the **MC Mods** panel at any time: the Forge behaves as in vanilla again, no restart needed. Turn it
+  back on and the Idols tab, the odds and the stars are back at once, also while the Forge window is open.
 
 ## Configuration
 
@@ -92,7 +93,7 @@ ConfigurationManager, or by editing the file (the game picks up the change while
 | Upgrade costs | Level1Material, Level1Trophies | `5`, `5` | Metal and common trophies to go from plain to 1 star. |
 | Upgrade costs | Level2Material, Level2Trophies | `10`, `3` | Metal and elite trophies to go from 1 to 2 stars. |
 | Upgrade costs | Level3Material, Level3Trophies | `15`, `1` | Metal and boss trophies to go from 2 to 3 stars. |
-| Tier 0 - Wooden idols ... Tier 7 - Bloodgold idols | Material | see the table above | Item used as metal for that tier (prefab name, as used by the spawn command). |
+| Tier 0 - Wooden idols ... Tier 7 - Bloodgold idols | Material | see the table above | Item used as metal for that tier (prefab name, as used by the spawn command). If it is empty or not an item of the game, idols of that tier cannot be upgraded: the Idols tab says so in red, and the log lists the unknown name (or the empty setting). |
 | (same) | CommonTrophies, EliteTrophies, BossTrophies | see the table above | Comma-separated prefab names of the trophies (or other items) for each step. A name the game does not know is ignored and listed in the log. |
 
 ## Multiplayer

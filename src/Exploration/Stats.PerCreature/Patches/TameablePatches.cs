@@ -11,6 +11,9 @@ namespace MC.Exploration.StatsPerCreatureMod.Patches;
 // follow active area, not the pen) = nobody get it: missed tame better than tame given to wrong player. Known hole:
 // creature at edge of my active area, friend closer but past my loaded zones = me no see friend, me still take it.
 // Same 30 m test as vanilla, same frame = never both paths for one tame.
+// No character at all (game destroyed dead one and new one not spawned yet, or world still loading: local player null,
+// out of player list too) and no other player loaded: tame still mine, but no place to write. CounterStore keep the
+// name, Player.OnSpawned patch count it when character is back.
 // Observe only: me never change what Tame do. Framework only patch this while feature Active.
 [HarmonyPatch]
 internal static class TameablePatches
@@ -51,8 +54,7 @@ internal static class TameablePatches
         try
         {
             // Really tamed? (Other mod prefix may skip vanilla.) MakeTame set it right away on owner.
-            var local = Player.m_localPlayer;
-            if (local == null || !__instance.IsTamed() || __instance.m_character == null)
+            if (!__instance.IsTamed() || __instance.m_character == null)
             {
                 return;
             }
@@ -63,7 +65,19 @@ internal static class TameablePatches
                 return;
             }
             // Closest among loaded players only, same list vanilla use for its 30 m message.
-            if (Player.GetClosestPlayer(pos, float.MaxValue) != local)
+            var closest = Player.GetClosestPlayer(pos, float.MaxValue);
+            var local = Player.m_localPlayer;
+            if (local == null)
+            {
+                // Me have no character right now (respawn wait, world still loading), but my game tamed it. No
+                // player loaded at all = tame is mine: keep it, spawn patch count it. Other player loaded = nobody.
+                if (closest == null)
+                {
+                    CounterStore.HoldTame(__instance.m_character.m_name);
+                }
+                return;
+            }
+            if (closest != local)
             {
                 return;
             }

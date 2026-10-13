@@ -29,9 +29,7 @@ internal static partial class SelfTests
     private const string CommandName = "dn.command";
     private const string RequestName = "dn.request";
     private const string MapDetailName = "dn.mapdetail";
-    // Real bugs, each alone in its own test (they fail until the mod is fixed; nothing else waits on them).
-    private const string KillTargetName = "dn.bug.killtarget";
-    private const string CapsName = "dn.bug.caps";
+    private const string KillTargetName = "dn.killtarget";
     private const string KillCountName = "dn.x.kills";
     private const string DormantName = "dn.dormant";
     private const string Stage1Name = "dn.stage1";
@@ -48,6 +46,7 @@ internal static partial class SelfTests
     private const string MpStoneName = "dn.mp.stone";
     private const string MpCommandName = "dn.mp.command";
     private const string MpKallName = "dn.mp.kall";
+    private const string MpKillTargetName = "dn.mp.killtarget";
     private const string MpClearedName = "dn.mp.cleared";
 
     // Server halves (run on the dedicated server by the server probe).
@@ -90,13 +89,13 @@ internal static partial class SelfTests
         SelfTest.Register(KallRestartName, RunKallRestart);
         SelfTest.Register(OldWorldName, RunOldWorld);
         SelfTest.Register(ToggleName, RunToggle);
-        SelfTest.Register(CapsName, RunCaps);
         SelfTest.Register(CleanLogName, RunCleanLog);
 
         SelfTest.RegisterMultiplayer(MpRulesName, SelfTest.Modded, RunMpRules);
         SelfTest.RegisterMultiplayer(MpStoneName, SelfTest.Modded, RunMpStone);
         SelfTest.RegisterMultiplayer(MpCommandName, SelfTest.Modded, RunMpCommand);
         SelfTest.RegisterMultiplayer(MpKallName, SelfTest.Modded, RunMpKall);
+        SelfTest.RegisterMultiplayer(MpKillTargetName, SelfTest.Modded, RunMpKillTarget);
         SelfTest.RegisterMultiplayer(MpClearedName, SelfTest.Modded, RunMpCleared);
         SelfTest.RegisterServerStep(StepState, ServerState);
         SelfTest.RegisterServerStep(StepSet, ServerSet);
@@ -109,12 +108,12 @@ internal static partial class SelfTests
                  {
                      BreaksName, StarsName, CommandName, RequestName, MapDetailName, KillTargetName, KillCountName,
                      DormantName, Stage1Name, StormName, BandsName, KallFightName, KallReturnName, KallRestartName,
-                     OldWorldName, ToggleName, CapsName, CleanLogName,
+                     OldWorldName, ToggleName, CleanLogName,
                  })
         {
             SelfTest.Unregister(name);
         }
-        foreach (var name in new[] { MpRulesName, MpStoneName, MpCommandName, MpKallName, MpClearedName })
+        foreach (var name in new[] { MpRulesName, MpStoneName, MpCommandName, MpKallName, MpKillTargetName, MpClearedName })
         {
             SelfTest.UnregisterMultiplayer(name);
         }
@@ -695,30 +694,25 @@ internal static partial class SelfTests
         return string.Join(", ", parts.ToArray());
     }
 
-    // Every area cap respected by the tagged Jotun of a list (design 2.3: 3 Krigen, 2 dual-axe Krigen, 2 Hexen,
-    // 6 Elaking at density 100). Only dn.bug.caps ask this: one pass of the game can go over (see OneSet).
-    private static bool UnderCaps(List<Character> tagged)
+    // Most of one kind one spawn pass of the game can leave in a place, at density 100 (design 2.3 table, "Most after
+    // one pass"): 4 Krigen, 2 dual-axe Krigen, 2 Hexen, 8 Elaking. The cap (3, 2, 2, 6) is only what the spawner aim at.
+    // Vanilla UpdateSpawnList stop a pass when count from before the pass + made in the pass reach the cap (so at most
+    // cap - 1 stand before the last group), but size each group against the count from before the pass only:
+    // min(group roll, cap - that count). Place with none of the kind: cap - 1 + min(biggest group, cap). Seen in the
+    // runs: "Spawned JotunWarrior x 2" twice in one pass, and "x 1, x 1, x 2", with cap 3.
+    private static int FillMost(string prefab)
     {
-        foreach (var name in Hostility.Army)
-        {
-            if (CountPrefab(tagged, name) > AreaSpawns.TestBaseCap(name))
-            {
-                return false;
-            }
-        }
-        return true;
+        var cap = AreaSpawns.TestBaseCap(prefab);
+        return cap - 1 + Mathf.Min(AreaSpawns.TestGroupMax(prefab), cap);
     }
 
-    // One set of an area, never two: each kind at most its cap plus what the game's own spawn pass can add. Vanilla
-    // UpdateSpawnList stop a pass at the cap, but size its last group against the count from before the pass
-    // (m_maxSpawned - count, not minus what the pass already made): cap + biggest group - 1 = 4 Krigen, 2 dual-axe
-    // Krigen, 2 Hexen, 8 Elaking. Seen in the run: "Spawned JotunWarrior x 1, x 1, x 2" with cap 3. A second set would
-    // show on the kinds that come one by one (more than 2 dual-axe Krigen or Hexen).
+    // One set of an area, never two: each kind at most what one pass of the game can leave (FillMost). A second set
+    // would show on the kinds that come one by one (more than 2 dual-axe Krigen or Hexen).
     private static bool OneSet(List<Character> tagged)
     {
         foreach (var name in Hostility.Army)
         {
-            if (CountPrefab(tagged, name) > AreaSpawns.TestBaseCap(name) + AreaSpawns.TestGroupMax(name) - 1)
+            if (CountPrefab(tagged, name) > FillMost(name))
             {
                 return false;
             }
@@ -732,7 +726,7 @@ internal static partial class SelfTests
         var n = 0;
         foreach (var name in Hostility.Army)
         {
-            n += AreaSpawns.TestBaseCap(name) + AreaSpawns.TestGroupMax(name) - 1;
+            n += FillMost(name);
         }
         return n;
     }

@@ -109,7 +109,9 @@ cultivator's build menu and the cultivator goes back to vanilla: the Upgrade tab
 Potential lists it again. Your transplant items stay in your inventory, transplants already in the ground keep growing
 (Yggdrasil shoots without taking sap while the mod is off), and a level 4-7 cultivator keeps its level and durability
 but shows its level number instead of the gem, and no tier lines, until you turn the mod on again. A level 3
-cultivator you take out of a chest later is not offered a level 4 upgrade either.
+cultivator you take out of a chest later is not offered a level 4 upgrade either. While the mod is off, young
+transplants grow on your own GrowTimeMultiplier setting (also on a server), and a change of that setting still reaches
+them at once.
 
 ## Configuration
 
@@ -241,8 +243,12 @@ Built for Valheim 1.0.16. It adds eleven transplant items (`MC_Transplant_<plant
   be dug up with Replant. The transplants keep their own rules (no cultivated soil needed, a misplaced one waits).
   It also has its own Yggdrasil sapling (paid with Sap, no root needed); both can be used.
 - **PlantEasily**: recognises the cultivator at every level and plants transplants in a grid (each copy costs a
-  transplant). Its grid does not check the Ancient Root rule: Yggdrasil copies placed away from a root wait ("Needs an
-  Ancient Root within 6 m"), and Replant gives them back. Its replant-on-harvest does not use transplants.
+  transplant). PlantEasily decides with its own check where a plant can be placed, and that check knows nothing of
+  Ancient Roots or no-build zones. This mod puts those two refusals back on the transplant you aim at: away from an
+  Ancient Root (Yggdrasil shoots) or inside a no-build zone its ghost stays red and nothing is planted, the grid
+  included. The copies of the grid around it are not checked: Yggdrasil copies planted farther than 6 m from a root
+  wait ("Needs an Ancient Root within 6 m"), and Replant gives them back. Its replant-on-harvest does not use
+  transplants.
 - **Groundwork, EarthWright**: they have their own ways to remove wild plants with the cultivator; both work side by
   side with Replant. A plant grown from a transplant counts as wild for them.
 - **Recipe changing mods** (WackysDatabase, RecipeCustomization and the like): a cultivator recipe they change

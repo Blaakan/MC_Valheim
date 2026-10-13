@@ -4,20 +4,29 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
-test (`./tools/Test-Smoke.ps1`) passed 2026-10-01 (loads, patches cleanly, JitCheck clean). In-world self-tests
-(`./tools/Test-InWorld.ps1 -Mod DeepNorth.Awakening -Only dn.`) passed 2026-10-01 on the final code: `dn.logic`,
-`dn.network`, `dn.vanilla`, `dn.hostility` (a Krigen and a Gammeltroll target each other), `dn.stones` (stones 1-4,
-held-back requests), `dn.detect`, `dn.kall` (server engagement kept near a player and released far; kill count with
-deaths made without creatures: half = weakening news, target = cleared and written, nature and outside kills not
-counted, progress and cleared read back), `dn.area` (stage 3 in the Deep North: 10-12 tagged area Jotun with stars,
-blizzard, meteors, a nature band; then Kall killed there: no refill; entered again: one burst, no refill past the local
-hold, its own Krigen back despite 3 other Krigen near; kills there counted; a band after Kall; the target reached:
-cleared, "The Jotun Retreat" shown, no storm, no new Jotun, gone from the map), `dn.map` (map scanned; awake area purple, sleeping one not; own colours back with ShowAreas off, at stage 0 and
-while waiting for the server's rules) and `dn.morkhalla`. No hands-on in-game test yet.
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+fixes the lowered kill target (after Kall, an area that already has the kills a lower ClearKillsMin / ClearKillsMax
+asks for is now cleared by the server without another kill, about two seconds after the settings stop changing or when
+the world loads): T24 was reset to `[ ]` and T26 is new. In the same version the README, the JotunDensity description
+and T25 give the real numbers of an area (the game's spawner aims at 3 Krigen, 2 dual-axe Krigen, 2 Hexen and 6
+Elaking and can end one group over: at most 4 Krigen and 8 Elaking); the mod spawns as before, T25 was reworded and
+reset to `[ ]`, and its check is now part of the self-test `dn.stage1` (`dn.bug.caps` is gone). The smoke test and the
+self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): all of
+this mod's tests passed, `dn.kallreturn` on a second run alone (see the automated checks below); everything below is
+the record of 0.1.0. Smoke test (`./tools/Test-Smoke.ps1`) passed 2026-10-01 (loads, patches cleanly, JitCheck clean).
+In-world self-tests (`./tools/Test-InWorld.ps1 -Mod DeepNorth.Awakening -Only dn.`) passed 2026-10-01 on the final
+code: `dn.logic`, `dn.network`, `dn.vanilla`, `dn.hostility` (a Krigen and a Gammeltroll target each other),
+`dn.stones` (stones 1-4, held-back requests), `dn.detect`, `dn.kall` (server engagement kept near a player and
+released far; kill count with deaths made without creatures: half = weakening news, target = cleared and written,
+nature and outside kills not counted, progress and cleared read back), `dn.area` (stage 3 in the Deep North: 10-12
+tagged area Jotun with stars, blizzard, meteors, a nature band; then Kall killed there: no refill; entered again: one
+burst, no refill past the local hold, its own Krigen back despite 3 other Krigen near; kills there counted; a band
+after Kall; the target reached: cleared, "The Jotun Retreat" shown, no storm, no new Jotun, gone from the map),
+`dn.map` (map scanned; awake area purple, sleeping one not; own colours back with ShowAreas off, at stage 0 and while
+waiting for the server's rules) and `dn.morkhalla`. No hands-on in-game test yet.
 
-**Automated checks (2026-10-08):** 28 of 30 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 30 of 30 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -129,20 +138,29 @@ changed one back afterwards. Use a new world for T01-T05 (or `deepnorth_stones 0
   them there. Expected: `deepnorth_stones` in the neighbouring area counts them (kills count where they happen), the
   first area's count does not move.
   *Automated: `dn.kallfight`.*
-- [!] **T24 Kill target lowered (G10):** after Kall, set ClearKillsMin = ClearKillsMax = 12 and kill 9 Jotun in an
+- [ ] **T24 Kill target lowered (G10):** after Kall, set ClearKillsMin = ClearKillsMax = 12 and kill 9 Jotun in an
   invaded area (`deepnorth_stones` shows "9 of 12 Jotun defeated"). Then set ClearKillsMin = ClearKillsMax = 8.
   Expected: within a couple of seconds, without another kill, the area is cleared for good like in T12
   (`deepnorth_stones` there says the area is cleared), and `deepnorth_stones` never shows more kills than the area
   needs (no "9 of 8"). The same when the lower values are set while the game is closed: after loading the world the
   area is cleared at once.
-  **FAILED:** automated test: Lowering ClearKillsMin/Max to or below an area's kill count does not clear the area
-  (shows '9 of 8 Jotun defeated') (self-test `dn.bug.killtarget`)
-- [!] **T25 Area numbers (G2):** at stage 1 or more, walk into several invaded places you have not visited and count
-  the Jotun that appear around you each time (JotunDensity = 100). Expected: never more than 3 Krigen, 2 dual-axe
-  Krigen, 2 Hexen and 6 Elaking at once, the numbers the README gives. The same after Kall when you walk into an area
-  that is not cleared.
-  **FAILED:** automated test: An area can hold more Jotun than the README and design say: 4 Krigen instead of 3, up to
-  8 Elaking instead of 6 (self-test `dn.bug.caps`)
+  *Partly automated (`dn.killtarget`, `dn.mp.killtarget`); by hand: Set the lower values while the game is closed
+  (config file), then load the world: the area is cleared at once (the test makes the server read the world again with
+  the lower values in force instead of restarting the game).*
+- [x] **T26 Kill target passing by a lower value (G10):** same start as T24 (after Kall, ClearKillsMin = ClearKillsMax
+  = 12, 9 Jotun killed in an invaded area, `deepnorth_stones` shows "9 of 12 Jotun defeated"). Lower ClearKillsMin and
+  ClearKillsMax and put both back to 12 within about a second (in ConfigurationManager: drag each slider down and
+  straight back up without stopping on the way). Expected: a few seconds later the area is still not cleared and
+  `deepnorth_stones` still shows "9 of 12 Jotun defeated": a value that only passes by clears nothing (a lower value
+  left standing for about two seconds does clear the area, for good: T24).
+  *Automated: `dn.killtarget`.*
+- [x] **T25 Area numbers (G2):** at stage 1 or more, walk into several invaded places you have not visited and count
+  the Jotun that appear around you each time (JotunDensity = 100). Expected: never more than 4 Krigen, 2 dual-axe
+  Krigen, 2 Hexen and 8 Elaking at once, the most the README gives. The game's spawner aims at 3 Krigen, 2 dual-axe
+  Krigen, 2 Hexen and 6 Elaking; when it fills a place in one go, its last group can take it one group over (one
+  Krigen, one or two Elaking), so some places hold 4 Krigen or 7 to 8 Elaking: that is expected. The same after Kall
+  when you walk into an area that is not cleared.
+  *Automated: `dn.stage1`, `dn.kallrestart`, `dn.kallreturn`.*
 - [x] **T13 Old world (G11):** a world (copy) where Malicious Ice were broken before installing the mod. Expected: log
   "Counted the broken Malicious Ice of this world: N explored Morkhalla, K with its Malicious Ice already broken. Deep
   North stage S."; no centre message, no new invasion; `deepnorth_stones` shows K.
@@ -229,6 +247,15 @@ changed one back afterwards. Use a new world for T01-T05 (or `deepnorth_stones 0
   where they explored, the same areas for both players.
   *Partly automated (`dn.mp.rules`); by hand: With two players: both maps show the same purple areas where each
   explored.*
+- [ ] **M10 Kill target lowered on the server:** dedicated server after Kall with ClearKillsMin = ClearKillsMax = 6
+  and StormShare = 100. A player kills 3 Jotun in an invaded area (`deepnorth_stones` there shows "3 of 6 Jotun
+  defeated") and stays in it. On the server, set ClearKillsMin = ClearKillsMax = 3 (its config file, or
+  ConfigurationManager on a host). Expected: a couple of seconds later, without another kill, the server log says
+  "3 Jotun defeated in Deep North area ..., where 3 are enough now: the area is cleared for good."; the player sees
+  "The Jotun Retreat", `deepnorth_stones` says the area is cleared, the blizzard stops there and its purple leaves the
+  map.
+  *Partly automated (`dn.mp.killtarget`); by hand: Stand in the area when the server's setting goes down: "The Jotun
+  Retreat" shows, the blizzard stops and the purple leaves the map (the test's player stays at the spawn).*
 
 ## 0.1.0 — cross-mod
 

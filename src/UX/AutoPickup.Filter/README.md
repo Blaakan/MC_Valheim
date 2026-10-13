@@ -93,7 +93,7 @@ by editing the file (the game picks up the change while it runs).
 |---|---|---|---|
 | General | Enabled | `true` | Turn the feature on or off. Takes effect immediately. |
 | General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
-| Filter | ExemptHarvest | `true` | Items that drop when you harvest or collect by hand (the use key on berry bushes, mushrooms, crops, pickable stones, a fermenter, a cooking station or stone oven, a beehive, a sap collector, an item or armor stand, an archery target, the empty switch of a production station, or a scythe swing) are picked up whatever the filter mode, like picking them up by hand. Turn this off to filter them like any other item. Mining, chopping and fighting drops are filtered, except a drop that lands within 4 m of something you harvested in the last 3 seconds. |
+| Filter | ExemptHarvest | `true` | Items that drop when you harvest or collect by hand (the use key on berry bushes, mushrooms, crops, pickable stones, a fermenter, a cooking station or stone oven, a beehive, a sap collector, an item or armor stand, an archery target, the empty switch of a production station, or a scythe swing) are picked up whatever the filter mode, like picking them up by hand. Turn this off to filter them like any other item. Mining, chopping and fighting drops are filtered, except a drop that appears within 4 m of something you harvested in the last 3 seconds (at any height above it). |
 | Controls | MarkKey | `Mouse2` | Key or mouse button that adds the item under the mouse pointer to the list of the current filter mode, or removes it, in your inventory or an open chest. Default: middle mouse button (Mouse2). Avoid Mouse0 and Mouse1: the inventory already uses the left and right buttons. Set to None to turn marking off. Mouse5, Mouse6 and some keys (F13-F15, some symbol keys such as # or @) cannot be read by the game; if you pick one, marking is turned off and the log says so. |
 | Controls | GamepadControls | `true` | Controller, with your inventory grid selected: click the right stick to add or remove the selected item; hold LT and click the right stick to change the filter mode; hold RT and click the right stick to show both lists. Chest slots can only be marked with the mouse. Turn this off if another mod uses the right stick in the inventory. |
 | Display | ShowMarkers | `true` | Show a small mark on items of the active list in your inventory and in chests (red: ignored, green: selected). |
@@ -137,8 +137,10 @@ to 3 seconds for them, so they are still collected as a hand harvest.
 - **A thrown weapon that lands as an item** (a spear, for example) follows the filter like any item: in Only
   selected mode, pick it up with E or select it.
 - **Harvest drops, in detail**: drops that appear within 4 m of what you just harvested or collected by hand, up to
-  3 seconds after it, are picked up whatever the mode, even if you walk over them much later. As a side effect, the
-  drops of a creature you kill (or a rock you mine) right next to a bush you just picked also get through. Opening
+  3 seconds after it, are picked up whatever the mode, even if you walk over them much later. Height above the spot
+  does not count: a plant that gives many items in one pick (for example with the Resources world modifier at 3x)
+  pops them out in a tall column, and all of them are collected. As a side effect, the drops of a creature you kill
+  (or a rock you mine) right next to a bush you just picked, or above it, also get through. Opening
   doors, chests, beds, portals, crafting stations and the like does not count, so drops next to them stay filtered;
   neither does feeding a smelter or kiln (its output is filtered when it comes out by itself), nor using an object
   added by another mod.

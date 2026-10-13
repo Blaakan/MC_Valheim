@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed: reeling a fighting fish with the rod on the right side came in stop-and-go and stopped for good about a metre
+  from the catch, while the stamina cost went on. Turning the rod away from the fish no longer holds the reel back: the
+  line keeps coming in, down to the catch if the fight lasts that long.
+- Fixed: a fish out of the water no longer fights. While the hooked fish hangs on a short line above the water or lies
+  on the shore, no fight starts and the catch bar stays; a fight in progress ends as soon as the fish leaves the water,
+  and the next one waits until the fish is back in the water. Before, such a fish "fought" without moving: the bar went
+  away, line ran out, and reeling toward it cost the wrong-side price.
+
 ## 0.1.0
 
 - Initial version. Once a fish is hooked, a catch bar shows next to the crosshair: hold Block to raise the zone, let

@@ -75,7 +75,8 @@ The user's expected behaviours, numbered. Each one is in scope and gets at least
   sneak-attack (backstab) bonus from you (vanilla's own rule for the Passive Mobs world setting; one that is running
   from you is alerted, which vanilla already treats the same way), and crawling next to afraid creatures earns the slow
   Sneak rate, not the full one. Without this, every afraid creature would be a free triple-damage hit and a free Sneak
-  trainer. One that cannot see you (behind it, in smoke) still takes the sneak attack.
+  trainer. One that cannot see you (behind it, in smoke) still takes the sneak attack, and so does one that sleeps: a
+  sleeper watches nobody (0.1.1).
 - **E4 More packs by default.** The user wrote "for example", so the default pack list also covers the other
   leader-and-followers groups of the game: Fulings (Berserker, Shaman), Draugr (Draugr Elite), Cultists, Seekers
   (Seeker Soldier), Charred (Warlock) and the Deep North frozen greydwarfs. All of it is one setting.
@@ -265,7 +266,13 @@ dump unless marked otherwise.
 - Sneak attack (`Character.RPC_Damage`, victim owner, `Character.cs:2336`): the hit is multiplied by
   `hit.m_backstabBonus` when the victim's AI is **not alerted**, the bonus is above 1, 300 s passed since the last one
   on this victim, and — only with Passive Mobs — the victim **cannot see** the attacker. `HitData` is a fresh object
-  per call, so a prefix may change `m_backstabBonus` for that hit only.
+  per call, so a prefix may change `m_backstabBonus` for that hit only. The sight test (`BaseAI.CanSeeTarget`,
+  `BaseAI.cs:775-821`: range, stealth factor, view angle unless alerted, line of sight, mist) does not look at sleep: a
+  sleeper that lies facing the attacker "sees" them, so with Passive Mobs vanilla itself gives no sneak attack on it.
+  Sleep is `MonsterAI.IsSleeping` (`m_sleeping`: set by the owner, sent to the other games by RPC). The sneak-attack
+  test comes before the damage reaches the AI (`MonsterAI.OnDamaged` wakes the creature and alerts it), and a
+  projectile deals its damage before it makes its hit noise (`Projectile.OnHit`), so an arrow on an unalerted creature
+  is a sneak attack.
 - Sneak XP: `Player.OnSneaking` (`Player.cs:6920-6942`), once per second while sneaking, raises Sneak by 1 when
   `BaseAI.InStealthRange(player)` (`BaseAI.cs:1582-1602`: some enemy creature within its view range or 10 m, and none
   of those alerted; sleeping ones count), else by 0.1. Deer are `ForestMonsters` (dump), enemies of players, so they
@@ -503,7 +510,10 @@ credit, and a center message replaces the text at once and fades in 4 s: shown a
 every ladder boss has one, dump); else, for each listed or
 ranked token whose bonus went up, a top-left message "<localized creature name>: <n> kills. They will be afraid of you
 sooner." (for example "Greydwarf: 100 kills. …"). Personal setting `ShowProgressMessages`. The log line "Standing:
-boss rank N, kill bonuses …" is written at Info on every change.
+boss rank N, kill bonuses …" is written at Info on every change. The center message belongs to the kill that raises
+the boss rank and to nothing else: another kill of a boss already killed never shows it, also when a rules change in
+between (a lower `BossesAhead`) has made creatures afraid of that rank, and neither does the rules change itself
+(kept as designed by the decision of 2026-10-08 on T04, section 10; tests T04 and T37).
 
 **Reading.** `StandingCache.Get(Player)`: per player object, at most once per second, reads the byte array and
 compares it byte by byte with the cached copy (the array object changes on every sync, 1.9); decodes only when the
@@ -787,10 +797,16 @@ attacking) still applies earlier if it happens.
 
 **Sneak attacks (E3), re-checked with the fear.** In the `Character.RPC_Damage` prefix, **before** the provocation
 above (so it uses the attitude before this hit): when the victim is a `MonsterAI` creature, the attacker a `Player`,
-`hit.m_backstabBonus > 1`, the victim not alerted, `Decide` says Afraid, and the victim `CanSeeTarget(attacker)` →
-`hit.m_backstabBonus = 1` for this hit. This is exactly the vanilla Passive Mobs rule (`Character.cs:2336`): an afraid
-creature that watches you walk up is aware of you and not surprised; one that cannot see you (behind it, in smoke, far
-away while you sneak) still takes the sneak attack. A creature running from you is alerted, and vanilla never gives a
+`hit.m_backstabBonus > 1`, the victim not alerted, **not asleep**, `Decide` says Afraid, and the victim
+`CanSeeTarget(attacker)` → `hit.m_backstabBonus = 1` for this hit. This is the vanilla Passive Mobs rule
+(`Character.cs:2336`) for a creature that is awake: an afraid creature that watches you walk up is aware of you and not
+surprised; one that cannot see you (behind it, in smoke, far away while you sneak) still takes the sneak attack. **A
+sleeping creature watches nobody** (0.1.1): the game's sight test does not look at sleep (1.5), so without the sleep
+test a sleeper that happened to lie facing the player lost the sneak attack the normal game gives on every sleeper.
+The rule now skips it (`MonsterAI.IsSleeping`, read on the owner, where the prefix runs and the sleep state is
+first-hand, before the hit wakes the creature); once it is awake the rule applies again. In a Passive Mobs world
+vanilla's own sight rule still denies the sneak attack on a sleeper that faces the attacker; the mod leaves vanilla's
+rule as it is there. A creature running from you is alerted, and vanilla never gives a
 sneak attack on an alerted creature, so a frightened creature that has seen you is never a sneak-attack target, whether
 it is still running or turned around (the fear keeps it alerted until it calms, 2.5 piece 2). The hit then provokes it
 as usual. **Known limit, smaller than before:** walking up behind an afraid creature without sneaking now makes it run
@@ -1391,8 +1407,8 @@ turns the fear off for a test step).
     that has not sensed you never corners it. Our hunter fallback (2.5 piece 5) picks a hostile-toward player without a
     sense check, like vanilla's.
   - Sneak attacks: our `Character.RPC_Damage` prefix lowers `hit.m_backstabBonus` to 1 only for an afraid creature
-    that **can see** the attacker and is not alerted, through `CanSeeTarget`, so smoke or Sneak Ambush's
-    standing-still stealth (a lower stealth factor shrinks sight) make the sneak attack possible again. A creature
+    that **can see** the attacker and is not alerted (and not asleep, 2.6), through `CanSeeTarget`, so smoke or Sneak
+    Ambush's standing-still stealth (a lower stealth factor shrinks sight) make the sneak attack possible again. A creature
     running from the player is alerted, and vanilla gives no sneak attack on an alerted creature. Sneak Ambush detects a
     sneak attack by comparing the victim's `m_backstabTime` before and after `RPC_Damage`; when we suppress the bonus,
     vanilla does not touch `m_backstabTime`, so it pays no sneak-attack XP. Order of the two prefixes does not matter.
@@ -1535,7 +1551,7 @@ transpiler. Unity null checks with `== null`, never `?.`/`??` on Unity objects.
 | `MonsterAI.RPC_OnNearProjectileHit(long, Vector3, float, ZDOID)` | prefix | provoke within `NearMissRange`; an afraid creature farther away ignores the impact (2.6) | per projectile impact per creature in range, owner only |
 | `BaseAI.OnDeath()` | postfix | leader death → rout (2.7) | per creature death on its owner |
 | `BaseAI.InStealthRange(Character)` (static) | postfix | afraid creatures do not count (2.6, E3) | once per second while the local player sneaks; loops `BaseAIInstances` only when vanilla said true |
-| `Character.RPC_Damage(long, HitData)` | prefix | no sneak-attack bonus from an afraid creature that sees the attacker (E3), then provoke (2.6) | per hit on the owner; exits at attacker not a `Player`, victim not a non-exempt `MonsterAI` |
+| `Character.RPC_Damage(long, HitData)` | prefix | no sneak-attack bonus from an awake afraid creature that sees the attacker (E3), then provoke (2.6) | per hit on the owner; exits at attacker not a `Player`, victim not a non-exempt `MonsterAI` |
 | `Game.RPC_RegisterKill(long, string, int, int, int, bool)` | postfix | republish the standing (after vanilla updated the table); progress messages | per credited kill |
 | `Player.OnSpawned(bool)` | postfix | publish the standing on the new player ZDO (local player only) | per spawn |
 | `ZNet.Awake()` | postfix | register `Rout` on the new `ZRoutedRpc` | per world start |
@@ -1680,7 +1696,9 @@ its review M07 and M14 set up again and T34 new); IDs are kept, new items come a
 - **T02 (G1)** Rank 2: vanilla (contrast).
 - **T03 (G1)** Rank 4 with 3 Greydwarfs 10 m away: they run but never attack; Rested, bed, no combat music.
 - **T04 (G2, E5)** Fresh character: Eikthyr kill → rank 1, no rank-up message (nothing afraid yet), boars attack;
-  with `BossesAhead = 0` a second Eikthyr kill → the message 4-5 s later, boars afraid.
+  with `BossesAhead = 0` boars are afraid, and a second Eikthyr kill → still no message (the rank stays 1; the message
+  comes with the kill that raises the rank). Optional: The Elder (`gd_king`) killed next → rank 2, the message 4-5 s
+  later.
 - **T05 (G2, E5)** Kill steps at rank 2: Greyling step reached → corner message, Greylings afraid one boss early,
   Boars still attack.
 - **T06 (G2)** Kill-step limit at rank 2: two Greydwarf steps → no message, still attacked; rank 3 → afraid.
@@ -2301,3 +2319,47 @@ smoke test and the in-world self-tests were not run.
   calm as before through `Fear.Update`.
 - **Documents:** 2.5 piece 2 End, 2.7 End, decision 36, 5.1 (the name plate note sat in the middle of the table), 7.3,
   8 (T25, T34, M07, M14); `TESTING.md` (build line, Setup, T24, T25, M07, M14, new T34; every item `[ ]`).
+
+**0.1.1 (2026-10-08, a bug found by the in-world self-tests), done in code; not run in the game yet.** The mod's Debug
+and Release builds are clean; the self-tests were not run on it.
+
+- **A sleeping afraid creature that faced the player lost the sneak attack (E3, 2.6).** `Provocation.OnHit` took the
+  bonus away from an unalerted afraid creature whenever `CanSeeTarget(attacker)` was true, and that test does not look
+  at sleep (1.5): a `Draugr_sleeping` lying toward the player "saw" them, so a hit on it dealt normal damage where the
+  normal game gives the sneak attack (self-test `morale.bug.sleeper-sneak`, T35). The condition now also needs the
+  creature awake (`!ai.IsSleeping()`, tested before the attitude and the sight raycast, so a hit on a sleeper costs
+  less than before). Nothing else changes: an awake afraid creature that sees the attacker still gives no bonus, and a
+  sleeper is provoked, woken and alerted by the hit as before. No RPC, ZDO key or rule changed (`ModNetworkVersion`
+  stays 2). Sneak Ambush reads `m_backstabTime`, so it pays its sneak-attack XP for such a hit again, as for any
+  sleeper in the normal game (6.1).
+- **Left as it is:** in a Passive Mobs world vanilla's own sight rule denies the sneak attack on a sleeper that faces
+  the attacker; that is the game's rule there, not the mod's. The Sneak XP rule (crawling near afraid creatures pays
+  the slow rate) still counts a sleeping afraid creature as afraid (`morale.stealth` asserts it).
+- **Self-tests:** the check of `morale.bug.sleeper-sneak` moved into `morale.sleeper` (the hit on the sleeper sets
+  `m_backstabTime`), and the bug test is gone. `morale.sleeper` also has a contrast: a second sleeping Draugr in the
+  same scene, woken with the game's own `Wakeup` in the frame of the hit (same place and facing, not alerted), takes no
+  sneak attack.
+- **Documents:** E3, 1.5, 2.6, 6.1, 7.2; `README.md` ("No free sneak attacks"), `CHANGELOG.md` (0.1.1), `TESTING.md`
+  (build line; T35 back to `[ ]`).
+
+**T04 decision (2026-10-08): the test text changes, the mod does not.** No mod code changed, the version stays 0.1.1;
+the mod's Debug and Release builds are clean; the self-tests were not run on it.
+
+- **What was wrong.** `TESTING.md` T04 expected "Weaker creatures now keep out of your way" after a second Eikthyr
+  kill once `BossesAhead` was set to 0. The mod schedules that message only when a credited kill raises the boss rank
+  (2.2, E5; `Standing.ShowProgress`): the second kill of the same boss leaves the rank at 1, so the item could never
+  pass (self-test `morale.bug.rank-message`). Decision: the mod is right; the message goes with the kill that raises
+  the rank, and a second kill of the same boss shows nothing.
+- **`TESTING.md`.** T04's second half reworded: with `BossesAhead = 0` the boars and necks are afraid, the second
+  Eikthyr kill shows only Eikthyr's own death message, and (optional step) The Elder (`gd_king`, dump 1.7) killed next
+  raises the rank to 2 and brings the message 4-5 s later. T04 back to `[ ]`. T37 keeps its steps (its reference to
+  T04 reworded).
+- **Self-tests.** `morale.bug.rank-message` is gone. Its check sits in `morale.kills` with the decided result (after
+  `BossesAhead = 0`, a second kill at rank 1 leaves no message due and none shown), followed by new checks for the
+  kill that raises the rank on the same character (rank 1 → 2, The Elder, through `Standing.TestKill`): the message is
+  due 4-4.5 s later, the log shows "Standing: boss rank 2 (The Elder), ...", The Elder's own `m_deathMessage` shown the
+  way `BaseAI.OnDeath` does holds the center text first, and the rank-up message replaces it once. The T37 checks are
+  unchanged.
+- **Documents:** 2.2 (one sentence on what never shows the message), 8 (T04). `README.md` already describes the rule
+  ("when a boss kill raises your boss rank far enough to make more creatures afraid of you") and is unchanged, so
+  `CHANGELOG.md` has no new line.

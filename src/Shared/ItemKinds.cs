@@ -2,7 +2,8 @@ namespace MC.Shared;
 
 // Me = what kind of thing an item is, for sort and filter UIs. Shared so every MC mod put same item in same group
 // (Crafting Search and Sort menu, Sort Chest type order). Each mod make own groups and labels on top of kinds.
-// Pure enum compares: no state, no Harmony, no allocation. First rule that match win (see Classify).
+// Pure compares (enums, one animation name): no state, no Harmony, no allocation. First rule that match win (see
+// Classify).
 internal enum ItemKind
 {
     Other = 0,     // None, Customization, unknown modded types
@@ -86,11 +87,14 @@ internal static class ItemKinds
             return ItemKind.Other;
         }
 
-        // Weapon slot, but maybe not for fight. Torch prefab is one-handed weapon with torch animation.
+        // Weapon slot, but maybe not for fight. Torch pose on a weapon type = creature torches (GoblinTorch) and, in
+        // 1.0.17, the tankards (the player's torch and the lanterns are item type Torch, handled above). Tankard =
+        // drink thing, not light: its "attack" is the drink emote (item dump 2026-10-08: Tankard, Tankard_dvergr,
+        // TankardAnniversary, TankardOdin; nothing else has it).
         var anim = s.m_animationState;
         if (anim == ItemDrop.ItemData.AnimationState.Torch || anim == ItemDrop.ItemData.AnimationState.LeftTorch)
         {
-            return ItemKind.Torch;
+            return s.m_attack != null && s.m_attack.m_attackAnimation == DrinkAnimation ? ItemKind.Misc : ItemKind.Torch;
         }
         if (anim == ItemDrop.ItemData.AnimationState.FishingRod || anim == ItemDrop.ItemData.AnimationState.Scythe)
         {
@@ -104,9 +108,12 @@ internal static class ItemKinds
             case Skills.SkillType.Farming:
                 return ItemKind.SkillTool;
         }
-        // Tankards (feaster animation) = drink thing, not weapon.
+        // Feaster pose on a weapon type (tankards of older game versions) = drink thing too, not weapon.
         return anim == ItemDrop.ItemData.AnimationState.Feaster ? ItemKind.Misc : ItemKind.Weapon;
     }
+
+    // Attack animation of every tankard: the drink emote.
+    private const string DrinkAnimation = "emote_drink";
 
     // Item type that sit in weapon hands (vanilla IsWeapon without torch).
     internal static bool IsWeaponType(ItemDrop.ItemData.ItemType t)

@@ -6,8 +6,10 @@ namespace MC.Exploration.SwimmingDiveMod;
 // Me = the dive physics of the local player (design 2.1-2.5). Velocity override, never m_swimDepth: every vanilla
 // read of m_swimDepth (swim threshold, jump, falling, sinking platform) stay as it is.
 //   Tick  (Character.UpdateMotion prefix, every physics tick of the local player, before swim/walk code): state.
-//         Surface -> Diving when Crouch held, swimming in water, stamina left. Deep once feet EnterMargin under the
-//         vanilla rest height (liquid level - m_swimDepth), until ExitMargin (hysteresis). Diving end: not deep and
+//         Surface -> Diving when Crouch held, swimming in water, stamina left. Deep once own way down took the feet
+//         EnterMargin under the vanilla rest height (liquid level - m_swimDepth), until ExitMargin (hysteresis). Own
+//         way down = own speed below 0: storm wave rise faster than vanilla buoyancy lift, so depth alone would count
+//         a swimmer who never dived as deep (DiveLogic.DivedUnder). Diving end: not deep and
 //         no Crouch (vanilla buoyancy finish the rise), or anything that stop swimming (land, tar, dead, attached,
 //         teleport, debug fly, rules pending, feature off).
 //   Sideways (UpdateSwimming prefix): Deep = m_moveDir zero, auto-run off (G2). Except blocked above (ship hull, dock,
@@ -59,7 +61,10 @@ internal static class DiveController
         var restY = player.GetLiquidLevel() - player.m_swimDepth;
         var feet = player.transform.position.y;
         var hasStamina = player.HaveStamina();
-        var deep = DiveLogic.Deep(DiveState.Diving, DiveState.Deep, feet, restY);
+        // Depth alone is no dive (fast wave over a swimmer): deep start only on own way down. Vy = own speed after
+        // last tick: 0 while vanilla had the vertical, still the body's (up) when the dive began on a rising wave.
+        var deep = DiveLogic.Deep(DiveState.Diving, DiveState.Deep, feet, restY)
+                   && DiveLogic.DivedUnder(DiveState.Deep, DiveState.Vy);
         if (!DiveLogic.Diving(DiveState.Diving, deep, down, hasStamina))
         {
             if (DiveState.Diving)

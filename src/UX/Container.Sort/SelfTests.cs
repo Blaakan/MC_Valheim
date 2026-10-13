@@ -25,35 +25,37 @@ namespace MC.UX.ContainerSortMod;
 // -Mod Container.Sort) and, for the sortchest.mp.* ones, by tools/Test-Multiplayer.ps1 (scenario modded: the dedicated
 // server never load this mod, it is a Client mod).
 //   sortchest.name         by name: order, empty slots last, one move sound, saved, same after reopen; second click
-//                          change nothing, save nothing, no sound
-//   sortchest.type         by type: weapons (axe before club), food, materials, trophy; tools, food, mead, other
-//   sortchest.biome        by biome: 12 items Meadows..Deep North; biome index built once, its log lines, its time
+//                          change nothing, save nothing, no sound; after a Sort that moved nothing (item dragged out
+//                          and back first) Sort still work: no "changed elsewhere", By type sort
+//   sortchest.type         by type: weapons (axe before club), food, materials, trophy; tools, food, mead, material,
+//                          tankard last (Other, rank 10.0)
+//   sortchest.biome        by biome: 12 items Meadows..Deep North; biome index built once, its log lines (tankard
+//                          line say Other), its time
 //   sortchest.criterion    sort order button: cycle, label and tooltip follow, never sort, never touch the chest
 //   sortchest.merge        partial stacks merge (weight same) or not (setting off); different items never merge
 //   sortchest.drag         Sort cancel a drag from the chest and from the player inventory, nothing lost
-//   sortchest.kinds        reinforced / personal chest, barrel, cart, karve, longship: buttons shown, no overlap, sort
+//   sortchest.kinds        reinforced / personal chest, barrel, cart, karve, longship: buttons shown, no overlap, mod's
+//                          own layout check fine, no "Sort buttons" warning, sort
 //   sortchest.tombstone    tombstone panel: no buttons, sort refused; next chest: buttons back
 //   sortchest.obliterator  sort inside, then the lever still destroy the items
 //   sortchest.gamepad      View/Select sort only with the chest grid focused, Sort glyph, left stick moves never
-//                          sort, game's own pad buttons still fire
-//   sortchest.layout       tooltips; chest, karve, black metal chest, drakkar and 2 more inventory rows: no overlap
+//                          sort; sort order button mouse only (no controller part, no glyph, also with own inventory
+//                          focused); left stick click = game's Take all, right stick click = game's Place stacks:
+//                          they still fire, mod do nothing on them; no "already uses the controller key" warning
+//   sortchest.layout       tooltips; chest, karve, black metal chest, drakkar and 2 more inventory rows: no overlap,
+//                          mod's own layout check fine, no "Sort buttons" warning (buttons right of the panel = wanted)
 //   sortchest.toggle       feature off with a chest open: buttons gone, chest untouched; on: back, sort work
 //   sortchest.owner        chest in use for others; chest no longer ours: click refused; after close others get it
 //   sortchest.owner-panel  chest no longer ours: panel and buttons hide (game rule); panel kept open by MultiUserChest: Sort do nothing
 //   sortchest.stale        old local copy: Sort refused with the center message, saved data safe; reopen fix it
-//   sortchest.pad-late     panel come late (owner change): controller parts still on the chest grid group
+//   sortchest.pad-late     panel come late (owner change): Sort's controller part still on the chest grid group, sort
+//                          order button still without controller part and glyph
 //   sortchest.pad-late-slow  same with a very late panel (longer than the mod wait)
 //   sortchest.crossbow     loaded-crossbow stamp of Crossbow Stays Loaded survive the sort, on the same item
 //   sortchest.split        split dialog open: Sort do nothing; after cancel it work
 //   sortchest.pointer      a real mouse ray on each button land on it; click through the ray work
 //   sortchest.search-field Crafting Search and Sort field has the keyboard: our controller keys do nothing
-//   sortchest.log          no error line that name this mod since game start
-// Known wrong today, each alone so the tests above stay green (they fail until the mod or its TESTING.md is fixed):
-//   sortchest.bug.noop-stale      Sort after a Sort that moved nothing is refused as "changed elsewhere"
-//   sortchest.bug.tankard-group   Tankard sort with Tools and light (torch animation), not last in Other
-//   sortchest.bug.pad-order-key   left stick click is the game's Take all key: sort order button has no controller key
-//   sortchest.bug.pad-right-stick right stick click is the game's Place stacks key: it does something to the chest
-//   sortchest.bug.layout-warning  buttons sit right of the panel: mod's own check warn "Sort buttons stick out"
+//   sortchest.log          no error line that name this mod and no "Sort buttons" warning since game start
 //   sortchest.mp.server-copy  dedicated server keep and give back the sorted, merged content
 //   sortchest.mp.settings  sort order button write the real config file; file edit and setting change move the label
 //   sortchest.mp.toggle    Enabled off / on through the config file with a chest open, and with inventory closed
@@ -116,11 +118,6 @@ internal static class SelfTests
     private const string PointerTest = "sortchest.pointer";
     private const string SearchFieldTest = "sortchest.search-field";
     private const string LogTest = "sortchest.log";
-    private const string NoopStaleTest = "sortchest.bug.noop-stale";
-    private const string BugTankardTest = "sortchest.bug.tankard-group";
-    private const string BugPadOrderKeyTest = "sortchest.bug.pad-order-key";
-    private const string BugPadRightStickTest = "sortchest.bug.pad-right-stick";
-    private const string BugLayoutTest = "sortchest.bug.layout-warning";
     private const string MpServerCopyTest = "sortchest.mp.server-copy";
     private const string MpSettingsTest = "sortchest.mp.settings";
     private const string MpToggleTest = "sortchest.mp.toggle";
@@ -164,12 +161,7 @@ internal static class SelfTests
         Test(SplitTest, RunSplit),
         Test(PointerTest, RunPointer),
         Test(SearchFieldTest, RunSearchField),
-        Test(NoopStaleTest, RunNoopStale),
-        Test(BugTankardTest, RunBugTankard),
-        Test(BugPadOrderKeyTest, RunBugPadOrderKey),
-        Test(BugPadRightStickTest, RunBugPadRightStick),
-        Test(BugLayoutTest, RunBugLayoutWarning), // after every other opening: it count the warnings since game start
-        Test(LogTest, RunLog),
+        Test(LogTest, RunLog), // after every other opening: it count the errors and layout warnings since game start
     };
 
     private static List<KeyValuePair<string, Func<IEnumerator>>> Multiplayer() => new List<KeyValuePair<string, Func<IEnumerator>>>
@@ -966,6 +958,48 @@ internal static class SelfTests
 
     private static UIGamePad PadOf(Button button) => button != null ? button.GetComponent<UIGamePad>() : null;
 
+    // The game's own controller keys on the container panel (prefab data, seen in the 1.0.17 runs): left stick click
+    // = Take all, right stick click = Place stacks. The mod leaves both to the game (user decision).
+    private const string TakeAllKey = "JoyLStick";
+    private const string PlaceStacksKey = "JoyRStick";
+
+    // Controller parts on one of our buttons, as words. Null = none at all (mouse only: no key can press it).
+    private static string PadsOn(SortChestUi.TestView view)
+    {
+        var pads = view.Go.GetComponentsInChildren<UIGamePad>(true);
+        return pads.Length == 0
+            ? null
+            : string.Join(", ", pads.Select(p => $"'{p.name}' key '{(string.IsNullOrEmpty(p.m_zinputKey) ? "none" : p.m_zinputKey)}' keyboard {p.m_keyCode}").ToArray());
+    }
+
+    // Glyph shown on this button right now: its own glyph object, or a shown object named like the glyph object of
+    // Sort (both buttons are clones of the same game button). Null = no glyph shown.
+    private static string GlyphShownOn(SortChestUi.TestView view, SortChestUi.TestView sort)
+    {
+        if (view.Hint != null && view.Hint.activeInHierarchy)
+        {
+            return $"its glyph object '{view.Hint.name}'";
+        }
+        var like = sort != null && sort.Hint != null ? sort.Hint.name : null;
+        if (like == null)
+        {
+            return null;
+        }
+        foreach (var t in view.Go.GetComponentsInChildren<Transform>(true))
+        {
+            if (t == view.Go.transform || !t.gameObject.activeInHierarchy || t.name != like)
+            {
+                continue;
+            }
+            if (view.LabelGo != null && view.LabelGo.transform.IsChildOf(t))
+            {
+                continue; // the label or its holder, not a glyph
+            }
+            return $"an object '{t.name}', named like the glyph object of Sort";
+        }
+        return null;
+    }
+
     // Game buttons of the container panel that listen to this controller key right now: a press would run them
     // (left stick click = the game's Take all: it put the whole chest in the test character). Me never press then.
     private static List<string> GameButtonsOn(InventoryGui gui, string key)
@@ -1045,7 +1079,7 @@ internal static class SelfTests
     private static List<string> PanelUpdatePatchers() =>
         PatchOwners(AccessTools.Method(typeof(InventoryGui), nameof(InventoryGui.UpdateContainer)));
 
-    // ---------------------------------------------------------------- who moved the container panel (bug.layout-warning notes)
+    // ---------------------------------------------------------------- who moved the container panel (sortchest.layout notes)
 
     private static string V(Vector2 v) => $"({v.x:0.#},{v.y:0.#})";
 
@@ -1224,8 +1258,8 @@ internal static class SelfTests
             {
                 c.Note(changed.Count == 0
                     ? "so in this run no installed mod moved or resized the container panel, Take all, the name or Place stacks: they sit where the game's "
-                      + $"own prefab puts them (game {game}), and the two buttons {ModInfo.Name} puts after Place stacks land outside "
-                      + "the panel on the game's own layout"
+                      + $"own prefab puts them (game {game}), and the two buttons {ModInfo.Name} puts after Place stacks sit right of "
+                      + "the panel on the game's own layout (the wanted place: no layout warning is expected for it)"
                       + (added.Count > 0 ? " (objects that something else added next to Place stacks are listed above)" : "")
                       + ". A run cannot show whether an older game version placed Take all and Place stacks differently."
                     : "so in this run the container panel is NOT as the game's prefab has it (see 'changed' above): a mod, or game code at run time, moved "
@@ -1361,10 +1395,12 @@ internal static class SelfTests
         return new string(chars);
     }
 
-    // One container kind: panel opens, buttons shown, nothing overlaps (own measure), pointer reach each button; with
-    // sortToo three items with gaps end in the first three slots. The mod's own layout verdict and its "Sort buttons"
-    // warning are only noted here: sortchest.bug.layout-warning checks them (buttons sit right of the panel today).
-    private static IEnumerator CheckContainer(Rig rig, Checks c, Container container, string label, string test, bool sortToo)
+    // One container kind: panel opens, buttons shown, nothing overlaps (own measure), pointer reach each button, the
+    // mod's own layout check finds nothing wrong and logs no "Sort buttons" warning for this opening, buttons go on
+    // the game's row to the right of Place stacks (on the game's panel = right of the panel: the wanted place, user
+    // decision); with sortToo three items with gaps end in the first three slots.
+    // facts = also NOTE lines for the user: where everything sits, and whether something moved the panel.
+    private static IEnumerator CheckContainer(Rig rig, Checks c, Container container, string label, string test, bool sortToo, bool facts = false)
     {
         var gui = rig.Gui;
         var inventory = container.GetInventory();
@@ -1380,6 +1416,7 @@ internal static class SelfTests
             }
             Fill(c, container, (cap - 1, "Wood", 3), (cap / 2, "Stone", 2), (1, "Resin", 1));
         }
+        var logMark = _watch != null ? _watch.MineCount : 0;
         ForgetLayout(rig, container);
         var box = new Box();
         yield return Open(rig, container, box);
@@ -1389,6 +1426,9 @@ internal static class SelfTests
         }
         yield return WaitLayout(rig, container, 2, box);
         c.Check(box.Ok, $"{label}: the mod's layout check of this opening finished ({box.Detail})");
+        // T13 / T17: the mod's own check ran for this size (forgotten above) and warned about nothing.
+        var warnings = Warnings(logMark, "Sort buttons");
+        c.Check(warnings.Count == 0, $"{label}: no 'Sort buttons' warning for this opening (log: {(warnings.Count > 0 ? warnings[0] : "")})");
         var sort = SortChestUi.TestSort;
         var criterion = SortChestUi.TestCriterion;
         var shown = sort != null && criterion != null && sort.Go.activeInHierarchy && criterion.Go.activeInHierarchy;
@@ -1407,11 +1447,30 @@ internal static class SelfTests
                 $"{label}: a pointer on the middle of the sort order button reaches it first (reached '{(overCriterion != null ? overCriterion.name : "nothing")}')");
             var root = container.transform.root;
             var own = SortChestUi.TestLayoutProblem(gui);
+            c.Check(own == null, $"{label}: the mod's own layout check finds nothing wrong (it says the buttons {own}; Sort {Fmt(WorldRect(sort.Rect))}, "
+                                 + $"sort order {Fmt(WorldRect(criterion.Rect))}, container panel {Fmt(WorldRect(gui.m_container))})");
+            // The decided place (user looked at it, keeps it): the game's row, continued to the right of Place stacks.
+            var stackRt = gui.m_stackAllButton != null ? gui.m_stackAllButton.transform as RectTransform : null;
+            if (stackRt != null && stackRt.gameObject.activeInHierarchy && !SortChestUi.TestParentHasLayoutGroup)
+            {
+                var p = WorldRect(stackRt);
+                var s = WorldRect(sort.Rect);
+                var k = WorldRect(criterion.Rect);
+                var slack = 0.05f * Mathf.Max(1f, p.height);
+                var sameRow = Mathf.Abs(s.center.y - p.center.y) <= slack && Mathf.Abs(k.center.y - p.center.y) <= slack;
+                c.Check(!SortChestUi.TestSecondRow(width, height, rows) && sameRow && s.xMin >= p.xMax - slack && k.xMin >= s.xMax - slack,
+                    $"{label}: Sort and the sort order button continue the game's row to the right of Place stacks (Place stacks {Fmt(p)}, "
+                    + $"Sort {Fmt(s)}, sort order {Fmt(k)})");
+            }
             c.Note($"{label} ({Utils.GetPrefabName(root.gameObject)}) is {width}x{height} with {rows} inventory rows: buttons "
                    + $"{(SortChestUi.TestSecondRow(width, height, rows) ? "in a second row" : "next to Place stacks")}, Sort "
                    + $"{Fmt(WorldRect(sort.Rect))}, sort order {Fmt(WorldRect(criterion.Rect))}, container panel {Fmt(WorldRect(gui.m_container))}, "
                    + $"screen {Screen.width}x{Screen.height}; the mod's own layout check says: {(own == null ? "fine" : "the buttons " + own)}; "
                    + $"its storage {(ReferenceEquals(container.m_nview, root.GetComponent<ZNetView>()) ? "shares the network object of the whole thing" : "has its own network object")}");
+            if (facts)
+            {
+                NoteLayoutFacts(c, gui, sort, criterion, label);
+            }
         }
         SelfTest.Screenshot(test, Safe(label) + "-" + rows + "rows");
         yield return null;
@@ -1428,7 +1487,7 @@ internal static class SelfTests
         yield return Close(rig);
     }
 
-    // ================================================================ sortchest.name (T01, T07)
+    // ================================================================ sortchest.name (T01, T07, T20)
 
     private static IEnumerator RunName()
     {
@@ -1535,6 +1594,51 @@ internal static class SelfTests
             yield return Open(rig, chest, box);
             c.Check(box.Ok && Same(Slots(chest.GetInventory()), want),
                 $"after closing and reopening: same layout ({box.Detail}) {Show(Slots(chest.GetInventory()))}");
+
+            // T20: Sort again after a Sort that moved nothing. What the game leaves after the stack of the first slot
+            // was dragged to the player inventory and back into the same slot: same slots, but the item is now last in
+            // the chest's list, and that is saved.
+            inv = chest.GetInventory();
+            var list = inv.GetAllItems();
+            var moved = box.Ok ? inv.GetItemAt(0, 0) : null;
+            if (!c.Check(moved != null && list.Count == BasicItems.Length && !ReferenceEquals(list[list.Count - 1], moved),
+                    "setup: the reopened chest holds an item in its first slot, and that item is not the last one in the chest's list"))
+            {
+                c.Report();
+                yield break;
+            }
+            list.Remove(moved);
+            list.Add(moved);
+            inv.Changed();
+            c.Check(Same(Slots(inv), want) && SameBytes(Bytes(inv), StoredBytes(chest)),
+                "setup: same layout, the item of the first slot is now last in the list, and that is saved");
+            var center = MessageHud.instance != null ? MessageHud.instance.m_messageCenterText : null;
+            if (center != null)
+            {
+                center.text = "";
+            }
+
+            var noop = ClickSort(rig, chest);
+            c.Check(noop.Sent && noop.Outcome == ContainerSorter.SortOutcome.Done && !noop.Written && Same(Slots(inv), want),
+                $"first Sort click on the already sorted chest: nothing moves ({noop})");
+            // The cause of the old refusal: that click reordered the list without saving it.
+            c.Check(!noop.Saved && SameBytes(Bytes(inv), StoredBytes(chest)),
+                "a Sort that moved nothing saves nothing and leaves our copy the same as the saved data, byte for byte");
+            var second = ClickSort(rig, chest);
+            c.Check(second.Sent && second.Outcome == ContainerSorter.SortOutcome.Done && !second.Written && !second.Saved,
+                $"second Sort click: again 'already sorted', not refused ({second})");
+            c.Check(center == null || center.text != ContainerSorter.StaleMessage, "no 'This container changed elsewhere' message after the second click");
+            SetSortBy(SortCriterion.Type);
+            var typeOrder = new List<string> { "AxeFlint", "Club", "Raspberry" };
+            typeOrder.AddRange(ByName("Flint", "Resin", "Stone", "Wood"));
+            typeOrder.Add("TrophyBoar");
+            var byType = Expect(inv, typeOrder.Select(p => Cell(p, stacks[p])));
+            var third = ClickSort(rig, chest);
+            c.Check(third.Sent && third.Sorted && Same(Slots(inv), byType),
+                $"Sort after switching to By type sorts by type: {Show(Slots(inv))}, expected {Show(byType)} ({third})");
+            c.Check(center == null || center.text != ContainerSorter.StaleMessage, "no 'This container changed elsewhere' message after the By type click");
+            c.Check(third.Saved && SameBytes(Bytes(inv), StoredBytes(chest)) && Totals(inv) == totals,
+                $"the By type layout is saved, nothing lost or duplicated ({Totals(inv)}, was {totals})");
             c.Report();
         }
         finally
@@ -1543,7 +1647,7 @@ internal static class SelfTests
         }
     }
 
-    // ================================================================ sortchest.type (T02, C03 type groups)
+    // ================================================================ sortchest.type (T02, C03 type groups, T14 tankard rank)
 
     private static IEnumerator RunType()
     {
@@ -1597,24 +1701,37 @@ internal static class SelfTests
             yield return null;
             yield return null;
 
-            // C03: tools and light together, then food, then mead, then material. The tankard of C03 is not in this
-            // chest: the game's Tankard has the torch animation, so today it lands between pickaxe and torch
-            // (sortchest.bug.tankard-group holds that check alone).
+            // C03: tools and light together, then food, then mead, then material, and the tankard last (Other). The
+            // game's tankards are one-handed "weapons" with the torch animation: they still belong to Other (user
+            // decision), real torches stay with Tools and light.
             yield return Close(rig);
-            var second = new[] { "Wood", "MeadHealthMinor", "Torch", "Raspberry", "PickaxeAntler" };
+            c.Note(TankardFacts());
+            var second = new[] { "Wood", "Tankard", "MeadHealthMinor", "Torch", "Raspberry", "PickaxeAntler" };
             Fill(c, chest, Scatter(cap, second.Select(p => (p, 1)).ToArray()));
             SetSortBy(SortCriterion.Type);
             yield return Open(rig, chest, box);
             if (c.Check(box.Ok, $"the Chest panel opens again ({box.Detail})"))
             {
-                var want2 = Expect(inv, new[] { "PickaxeAntler", "Torch", "Raspberry", "MeadHealthMinor", "Wood" });
+                var want2 = Expect(inv, new[] { "PickaxeAntler", "Torch", "Raspberry", "MeadHealthMinor", "Wood", "Tankard" });
                 click = ClickSort(rig, chest);
                 c.Check(click.Sent && click.Sorted && Same(Slots(inv), want2),
-                    $"pickaxe and torch together, food, mead, material: {Show(Slots(inv))}, expected {Show(want2)} ({click})");
+                    $"C03: pickaxe and torch next to each other, food, mead, material, tankard last: {Show(Slots(inv))}, expected {Show(want2)} ({click})");
                 c.Check(TypeRank("PickaxeAntler") == "5.1" && TypeRank("Torch") == "5.2" && TypeRank("MeadHealthMinor") == "6.1",
                     $"type ranks pickaxe 5.1, torch 5.2, mead 6.1: {TypeRank("PickaxeAntler")}, {TypeRank("Torch")}, {TypeRank("MeadHealthMinor")}");
                 c.Check(ItemKinds.Classify(Shared("MeadHealthMinor")) == ItemKind.Potion,
                     $"the mead's kind is Potion, the 'Meads and potions' of Crafting Search and Sort ({ItemKinds.Classify(Shared("MeadHealthMinor"))})");
+            }
+            // Same rank the T14 Debug line prints ("-> 10.0 Other"): first inside the last group of the By type order.
+            c.Check(TypeRank("Tankard") == "10.0", $"T14: the Tankard is in the group Other with rank 10.0 (got {TypeRank("Tankard")})");
+            // The game's other tankards (prefab names of the 1.0.17 item list; one this game lacks is only noted).
+            foreach (var tankard in new[] { "TankardAnniversary", "TankardOdin", "Tankard_dvergr" })
+            {
+                if (Shared(tankard) == null)
+                {
+                    c.Note($"this game has no item '{tankard}': its type group is not checked");
+                    continue;
+                }
+                c.Check(TypeRank(tankard) == "10.0", $"{tankard} is in the group Other with rank 10.0, like the Tankard (got {TypeRank(tankard)})");
             }
             c.Report();
         }
@@ -1726,13 +1843,9 @@ internal static class SelfTests
                 ("FishingRod", new[] { "-> 5.1 Tools and light" }),
                 ("Scythe", new[] { "-> 5.1 Tools and light" }),
                 ("Torch", new[] { "-> 5.2 Tools and light" }),
+                ("Tankard", new[] { "-> 10.0 Other" }),
                 ("SwordBronze", new[] { "-> 0.0 Weapons" }),
             };
-            // Tankard line of T14 ("-> 10.0 Other") not here: wrong today, sortchest.bug.tankard-group hold it alone.
-            if (perItem.TryGetValue("Tankard", out var tankardLine))
-            {
-                c.Note(tankardLine);
-            }
             foreach (var e in expected)
             {
                 var has = perItem.TryGetValue(e.Prefab, out var text);
@@ -2314,7 +2427,7 @@ internal static class SelfTests
             yield return WaitLayout(rig, chest, 1, box);
             c.Check(box.Ok, $"the mod's layout check of this opening ran ({box.Detail})");
 
-            // The controller part of Sort. (The sort order button's key: sortchest.bug.pad-order-key.)
+            // The controller part of Sort.
             var sort = SortChestUi.TestSort;
             var group = SortChestUi.TestContainerGroup(gui);
             if (!c.Check(sort != null && sort.Pad != null && group != null, "Sort has a controller part and the chest grid has a focus group"))
@@ -2326,11 +2439,29 @@ internal static class SelfTests
                 $"Sort listens to View/Select only (key '{sort.Pad.m_zinputKey}', keyboard {sort.Pad.m_keyCode})");
             c.Check(ReferenceEquals(sort.Pad.m_group, group),
                 $"Sort's controller part belongs to the chest grid group ('{(sort.Pad.m_group != null ? sort.Pad.m_group.name : "none")}', chest grid '{group.name}')");
+
+            // The sort order button is mouse only (user decision): no controller part on it, so no key can press it
+            // and it has no glyph. The left stick click stays the game's Take all, the right stick click the game's
+            // Place stacks; the mod takes neither and logs nothing about them.
             var order = SortChestUi.TestCriterion;
-            c.Note($"the game's controller keys: {GameKeys(gui)}; the sort order button's key: "
-                   + $"'{(order != null && order.Pad != null ? order.Pad.m_zinputKey ?? "none" : "no controller part")}'");
+            c.Note($"the game's controller keys: {GameKeys(gui)}; controller parts on the sort order button: "
+                   + $"{(order != null ? PadsOn(order) ?? "none" : "button missing")}");
+            if (c.Check(order != null, "the sort order button exists"))
+            {
+                var pads = PadsOn(order);
+                c.Check(order.Pad == null && pads == null,
+                    $"the sort order button is mouse only: it has no controller part, so no controller key (found: {pads ?? "none"})");
+                c.Check(order.Hint == null, $"the sort order button has no glyph object (found '{(order.Hint != null ? order.Hint.name : "")}')");
+            }
             var takePad = PadOf(gui.m_takeAllButton);
             var stackPad = PadOf(gui.m_stackAllButton);
+            c.Check(takePad != null && takePad.m_zinputKey == TakeAllKey && stackPad != null && stackPad.m_zinputKey == PlaceStacksKey,
+                $"the left stick click is the game's own Take all key and the right stick click the game's own Place stacks key ({GameKeys(gui)})");
+            c.Check(sort.Pad.m_zinputKey != TakeAllKey && sort.Pad.m_zinputKey != PlaceStacksKey,
+                $"Sort does not listen to the left or the right stick click (key '{sort.Pad.m_zinputKey}')");
+            var keyWarnings = Warnings(0, "already uses the controller key");
+            c.Check(keyWarnings.Count == 0,
+                $"no 'already uses the controller key' warning since game start ({keyWarnings.Count}): {(keyWarnings.Count > 0 ? keyWarnings[0] : "")}");
             // Game button on View/Select: a press here would run it too. No key is pressed then.
             if (!c.Check((takePad == null || takePad.m_zinputKey != SortChestUi.SortKey) && (stackPad == null || stackPad.m_zinputKey != SortChestUi.SortKey),
                     "the game's Take all and Place stacks do not use View/Select (no key pressed in this test otherwise)"))
@@ -2412,10 +2543,27 @@ internal static class SelfTests
                     yield return Focus(rig, group);
                     c.Check(sort.Hint.activeInHierarchy, "chest grid focused again: the Sort glyph is back");
                 }
+                // The sort order button never shows a glyph (mouse only), whichever grid is focused.
+                order = SortChestUi.TestCriterion;
+                if (c.Check(order != null && order.Go.activeInHierarchy, "the sort order button is shown with a controller as input device"))
+                {
+                    yield return Focus(rig, group);
+                    var glyphOnOrder = GlyphShownOn(order, sort);
+                    c.Check(glyphOnOrder == null, $"chest grid focused: no glyph on the sort order button (shown: {glyphOnOrder})");
+                    if (gui.m_playerGrid != null && gui.m_playerGrid.m_uiGroup != null)
+                    {
+                        yield return Focus(rig, gui.m_playerGrid.m_uiGroup);
+                        glyphOnOrder = GlyphShownOn(order, sort);
+                        c.Check(glyphOnOrder == null, $"own inventory focused: no glyph on the sort order button (shown: {glyphOnOrder})");
+                    }
+                    c.Check(PadsOn(order) == null, $"still no controller part on the sort order button after reopening ({PadsOn(order)})");
+                }
             }
 
-            // The game's own controller buttons still fire, and only they. Chest emptied first and their work swapped
-            // for a counter: Take all would put the items in the test character's inventory.
+            // The game's own controller buttons still fire, and only they: the left stick click runs the game's Take
+            // all, the right stick click the game's Place stacks, and the mod does nothing on either (no sort, same
+            // sort order). Chest emptied first and their work swapped for a counter: Take all would put the items in
+            // the test character's inventory.
             yield return Close(rig);
             inv.GetAllItems().Clear();
             inv.Changed();
@@ -2449,8 +2597,24 @@ internal static class SelfTests
                     c.Check(press.Sent && v.Fired[0] - before == 1 && v.Other[0] == otherBefore && press.Ran == 0 && Plugin.TestSortBy == SortCriterion.Name,
                         $"the game's {v.What} controller button ({key}) still fires, and only it ({v.Fired[0] - before} time(s), the other game button "
                         + $"{v.Other[0] - otherBefore} time(s), Sort ran {press.Ran} time(s), sort order {Plugin.TestSortBy})");
+                    var orderAfter = SortChestUi.TestCriterion;
+                    c.Check(orderAfter != null && orderAfter.Label == "By name",
+                        $"the sort order button still says 'By name' after the {v.What} key ({key}) (label '{(orderAfter != null ? orderAfter.Label : null)}')");
                 }
                 c.Check(pressed > 0, "at least one of the game's two controller buttons could be pressed in this test");
+                // Own inventory focused: only noted. No key is pressed there: the game buttons may listen there too, and
+                // Loot Pickup Filter reads the right stick click in the own inventory.
+                if (gui.m_playerGrid != null && gui.m_playerGrid.m_uiGroup != null)
+                {
+                    yield return Focus(rig, gui.m_playerGrid.m_uiGroup);
+                    foreach (var k in new[] { ("left", TakeAllKey), ("right", PlaceStacksKey) })
+                    {
+                        var busy = GameButtonsOn(gui, k.Item2);
+                        c.Note(busy.Count > 0
+                            ? $"own inventory focused: the {k.Item1} stick click is also the game's key for {string.Join(" and ", busy.ToArray())} there (with a chest open)"
+                            : $"own inventory focused: no game button of the container panel listens to the {k.Item1} stick click");
+                    }
+                }
             }
             c.Report();
         }
@@ -2549,8 +2713,9 @@ internal static class SelfTests
             }
             yield return Close(rig);
 
-            // Chest, Karve, Black metal chest, Drakkar with the usual inventory rows.
-            yield return CheckContainer(rig, c, chest, "Chest", N, false);
+            // Chest, Karve, Black metal chest, Drakkar with the usual inventory rows. First opening also writes the
+            // facts for the user (rectangles, who changed the panel).
+            yield return CheckContainer(rig, c, chest, "Chest", N, false, true);
             var blackmetal = rig.Spawn("piece_chest_blackmetal");
             if (c.Check(blackmetal != null && blackmetal.GetInventory() != null, "Black metal chest: prefab 'piece_chest_blackmetal' exists and has a container"))
             {
@@ -2988,24 +3153,28 @@ internal static class SelfTests
             var sort = SortChestUi.TestSort;
             var criterion = SortChestUi.TestCriterion;
             var group = SortChestUi.TestContainerGroup(gui);
-            if (!c.Check(sort != null && criterion != null && sort.Pad != null && criterion.Pad != null && group != null,
-                    "both buttons have a controller part and the chest grid has a focus group"))
+            if (!c.Check(sort != null && criterion != null && sort.Pad != null && group != null,
+                    "both buttons exist, Sort has a controller part and the chest grid has a focus group"))
             {
                 c.Report();
                 yield break;
             }
             var natural = sort.Pad.GetComponentInParent<UIGroupHandler>();
-            c.Note($"controller parts: Sort in group '{(sort.Pad.m_group != null ? sort.Pad.m_group.name : "none")}', sort order in "
-                   + $"'{(criterion.Pad.m_group != null ? criterion.Pad.m_group.name : "none")}', chest grid group '{group.name}', group the game "
+            var orderPads = PadsOn(criterion);
+            c.Note($"controller parts: Sort in group '{(sort.Pad.m_group != null ? sort.Pad.m_group.name : "none")}', sort order button: "
+                   + $"{orderPads ?? "none"}, chest grid group '{group.name}', group the game "
                    + $"gives them by itself '{(natural != null ? natural.name : "none")}'; the game's controller keys: {GameKeys(gui)}");
+            // Mouse only by design (user decision), also on fresh buttons and a late panel.
+            c.Check(criterion.Pad == null && orderPads == null && criterion.Hint == null,
+                $"the sort order button has no controller part and no glyph object from this first opening (found: {orderPads ?? "no controller part"}"
+                + $"{(criterion.Hint != null ? ", glyph object '" + criterion.Hint.name + "'" : "")})");
             if (expectGroup)
             {
-                c.Check(ReferenceEquals(sort.Pad.m_group, group) && ReferenceEquals(criterion.Pad.m_group, group),
-                    "both controller parts belong to the chest grid group from this first opening");
+                c.Check(ReferenceEquals(sort.Pad.m_group, group), "Sort's controller part belongs to the chest grid group from this first opening");
             }
 
-            // View/Select acts only with the chest grid focused. (Left stick click: sortchest.bug.pad-order-key; never
-            // pressed here, it is the game's Take all key.)
+            // View/Select acts only with the chest grid focused. (The left stick click is never pressed here: it is the
+            // game's Take all key; sortchest.gamepad presses it with Take all's work swapped for a counter.)
             var press = new Clicked();
             if (c.Check(GameButtonsOn(gui, SortChestUi.SortKey).Count == 0, "no game button of the panel listens to View/Select (no key pressed otherwise)"))
             {
@@ -3020,7 +3189,8 @@ internal static class SelfTests
                 c.Check(press.Sent && press.Ran == 1 && press.Sorted && Same(Slots(inv), want), $"chest grid focused: View/Select sorts ({press}) {Show(Slots(inv))}");
             }
 
-            // Sort glyph only with the chest grid focused (controller as input device).
+            // Sort glyph only with the chest grid focused (controller as input device); never a glyph on the sort order
+            // button.
             rig.ForceGamepad();
             yield return null;
             yield return null;
@@ -3029,10 +3199,14 @@ internal static class SelfTests
             {
                 yield return Focus(rig, group);
                 c.Check(sort.Hint.activeInHierarchy, "chest grid focused: the Sort glyph is shown");
+                var glyphOnOrder = GlyphShownOn(criterion, sort);
+                c.Check(glyphOnOrder == null, $"chest grid focused: no glyph on the sort order button (shown: {glyphOnOrder})");
                 if (gui.m_playerGrid != null && gui.m_playerGrid.m_uiGroup != null)
                 {
                     yield return Focus(rig, gui.m_playerGrid.m_uiGroup);
                     c.Check(!sort.Hint.activeInHierarchy, "own inventory focused: no glyph on Sort");
+                    glyphOnOrder = GlyphShownOn(criterion, sort);
+                    c.Check(glyphOnOrder == null, $"own inventory focused: no glyph on the sort order button (shown: {glyphOnOrder})");
                 }
             }
             c.Report();
@@ -3394,433 +3568,6 @@ internal static class SelfTests
         }
     }
 
-    // ================================================================ sortchest.noop-stale (T20, known wrong today)
-
-    private static IEnumerator RunNoopStale()
-    {
-        const string N = NoopStaleTest;
-        if (!Ready(N))
-        {
-            yield break;
-        }
-        var c = new Checks(N);
-        Rig rig = null;
-        try
-        {
-            rig = new Rig();
-            var chest = rig.Spawn(Chest);
-            if (!c.Check(chest != null && chest.GetInventory() != null && Cap(chest.GetInventory()) >= 6, $"setup: {Chest} with at least 6 slots"))
-            {
-                c.Report();
-                yield break;
-            }
-            var inv = chest.GetInventory();
-            var prefabs = new[] { "Wood", "AxeFlint", "Raspberry", "TrophyBoar" };
-            Fill(c, chest, Scatter(Cap(inv), prefabs.Select(p => (p, 1)).ToArray()));
-            SetSortBy(SortCriterion.Name);
-            var box = new Box();
-            yield return Open(rig, chest, box);
-            if (!c.Check(box.Ok, $"the Chest panel opens ({box.Detail})"))
-            {
-                c.Report();
-                yield break;
-            }
-            var first = ClickSort(rig, chest);
-            var byName = Expect(inv, ByName(prefabs));
-            if (!c.Check(first.Sent && first.Sorted && Same(Slots(inv), byName), $"setup: sorted by name ({first})"))
-            {
-                c.Report();
-                yield break;
-            }
-            // What the game leaves after the stack of the first slot was dragged to the player inventory and back into
-            // the same slot: same slots, but the item is now last in the chest's list, and that is saved.
-            var list = inv.GetAllItems();
-            var moved = inv.GetItemAt(0, 0);
-            list.Remove(moved);
-            list.Add(moved);
-            inv.Changed();
-            var center = MessageHud.instance != null ? MessageHud.instance.m_messageCenterText : null;
-            if (center != null)
-            {
-                center.text = "";
-            }
-
-            var noop = ClickSort(rig, chest);
-            c.Check(noop.Sent && noop.Outcome == ContainerSorter.SortOutcome.Done && !noop.Written && Same(Slots(inv), byName),
-                $"first Sort click on the already sorted chest: nothing moves ({noop})");
-            var second = ClickSort(rig, chest);
-            c.Check(second.Sent && second.Outcome == ContainerSorter.SortOutcome.Done && !second.Written && !second.Saved,
-                $"second Sort click: again 'already sorted', not refused ({second})");
-            c.Check(center == null || center.text != ContainerSorter.StaleMessage, "no 'This container changed elsewhere' message after the second click");
-            SetSortBy(SortCriterion.Type);
-            var byType = Expect(inv, new[] { "AxeFlint", "Raspberry", "Wood", "TrophyBoar" });
-            var third = ClickSort(rig, chest);
-            c.Check(third.Sent && third.Sorted && Same(Slots(inv), byType),
-                $"Sort after switching to By type sorts by type: {Show(Slots(inv))}, expected {Show(byType)} ({third})");
-            c.Check(center == null || center.text != ContainerSorter.StaleMessage, "no 'This container changed elsewhere' message after the By type click");
-            c.Report();
-        }
-        finally
-        {
-            rig?.Done();
-        }
-    }
-
-    // ================================================================ sortchest.bug.tankard-group (T14 Tankard line, C03 "tankard last")
-
-    // Known wrong today: the game's Tankard is a one-handed weapon with the torch animation, so the shared item kinds
-    // call it a torch (Tools and light 5.2), not Misc / Other 10.0 as T14 and C03 expect.
-    private static IEnumerator RunBugTankard()
-    {
-        const string N = BugTankardTest;
-        if (!Ready(N))
-        {
-            yield break;
-        }
-        var c = new Checks(N);
-        Rig rig = null;
-        try
-        {
-            rig = new Rig();
-            var chest = rig.Spawn(Chest);
-            if (!c.Check(chest != null && chest.GetInventory() != null && Cap(chest.GetInventory()) >= 8 && Shared("Tankard") != null,
-                    $"setup: {Chest} with at least 8 slots, and the item 'Tankard'"))
-            {
-                c.Report();
-                yield break;
-            }
-            c.Note(TankardFacts());
-            // Same rank the T14 Debug line prints ("-> 10.0 Other").
-            c.Check(TypeRank("Tankard") == "10.0", $"T14: the Tankard is in the group Other with rank 10.0 (got {TypeRank("Tankard")})");
-            var inv = chest.GetInventory();
-            var items = new[] { "Wood", "Tankard", "MeadHealthMinor", "Torch", "Raspberry", "PickaxeAntler" };
-            Fill(c, chest, Scatter(Cap(inv), items.Select(p => (p, 1)).ToArray()));
-            SetSortBy(SortCriterion.Type);
-            var box = new Box();
-            yield return Open(rig, chest, box);
-            if (c.Check(box.Ok, $"the Chest panel opens ({box.Detail})"))
-            {
-                var want = Expect(inv, new[] { "PickaxeAntler", "Torch", "Raspberry", "MeadHealthMinor", "Wood", "Tankard" });
-                var click = ClickSort(rig, chest);
-                c.Check(click.Sent && click.Sorted && Same(Slots(inv), want),
-                    $"C03: pickaxe and torch next to each other, food, mead, material, tankard last: {Show(Slots(inv))}, expected {Show(want)} ({click})");
-            }
-            c.Report();
-        }
-        finally
-        {
-            rig?.Done();
-        }
-    }
-
-    // ================================================================ sortchest.bug.pad-order-key (T12, M07, C02: left stick click)
-
-    // Known wrong today: the game's Take all already listens to the left stick click (JoyLStick), also with the own
-    // inventory focused. The mod then gives its key up: sort order button = mouse only, one Warning per button
-    // creation, no glyph. A left stick click empties the chest into the inventory (Take all) instead of changing the
-    // sort order. Me never press the key while a game button listens to it.
-    private static IEnumerator RunBugPadOrderKey()
-    {
-        const string N = BugPadOrderKeyTest;
-        if (!Ready(N))
-        {
-            yield break;
-        }
-        var c = new Checks(N);
-        Rig rig = null;
-        try
-        {
-            rig = new Rig();
-            var gui = rig.Gui;
-            var chest = rig.Spawn(Chest);
-            if (!c.Check(chest != null && chest.GetInventory() != null && Cap(chest.GetInventory()) >= 6, $"setup: {Chest} with at least 6 slots"))
-            {
-                c.Report();
-                yield break;
-            }
-            var inv = chest.GetInventory();
-            var stacks = new Dictionary<string, int> { { "Wood", 4 }, { "Stone", 3 }, { "Resin", 2 }, { "Flint", 1 } };
-            Fill(c, chest, Scatter(Cap(inv), stacks.Select(kv => (kv.Key, kv.Value)).ToArray()));
-            var mixed = Slots(inv);
-            SetSortBy(SortCriterion.Name);
-            ForgetLayout(rig, chest);
-            var box = new Box();
-            yield return Open(rig, chest, box);
-            if (!c.Check(box.Ok, $"the Chest panel opens ({box.Detail})"))
-            {
-                c.Report();
-                yield break;
-            }
-            yield return WaitLayout(rig, chest, 1, box);
-            var criterion = SortChestUi.TestCriterion;
-            var group = SortChestUi.TestContainerGroup(gui);
-            if (!c.Check(criterion != null && criterion.Pad != null && group != null, "the sort order button has a controller part and the chest grid a focus group"))
-            {
-                c.Report();
-                yield break;
-            }
-            const string key = SortChestUi.CriterionKey;
-            var takePad = PadOf(gui.m_takeAllButton);
-            var stackPad = PadOf(gui.m_stackAllButton);
-            c.Note($"the game's controller keys: {GameKeys(gui)}");
-            var bound = criterion.Pad.m_zinputKey == key && criterion.Pad.m_keyCode == KeyCode.None;
-            c.Check(bound, $"the sort order button listens to the left stick click (key '{criterion.Pad.m_zinputKey ?? "none"}', keyboard {criterion.Pad.m_keyCode})");
-            var keyWarnings = Warnings(0, "already uses the controller key");
-            c.Check(keyWarnings.Count == 0,
-                $"no 'already uses the controller key' warning since game start ({keyWarnings.Count}): {(keyWarnings.Count > 0 ? keyWarnings[0] : "")}");
-            c.Check((takePad == null || (takePad.m_zinputKey != key && takePad.m_zinputKey != SortChestUi.SortKey))
-                    && (stackPad == null || (stackPad.m_zinputKey != key && stackPad.m_zinputKey != SortChestUi.SortKey)),
-                "the game's Take all and Place stacks use other controller keys than the mod's two");
-
-            // Chest grid focused: the left stick click changes the sort order only.
-            yield return Focus(rig, group);
-            var press = new Clicked();
-            var busy = GameButtonsOn(gui, key);
-            if (bound && busy.Count == 0)
-            {
-                yield return PressKey(rig, chest, key, press);
-                c.Check(press.Sent && Plugin.TestSortBy == SortCriterion.Type && press.Ran == 0 && !press.Saved && Same(Slots(inv), mixed),
-                    $"chest grid focused: the left stick click changes the sort order only (order {Plugin.TestSortBy}, Sort ran {press.Ran} time(s))");
-                var after = SortChestUi.TestCriterion;
-                c.Check(after != null && after.Label == "By type", "and the label follows");
-                SetSortBy(SortCriterion.Name);
-            }
-            else
-            {
-                c.Check(false, "chest grid focused: the left stick click changes the sort order only (key not pressed: "
-                               + (busy.Count > 0 ? $"it is the game's own key for {string.Join(" and ", busy.ToArray())} there, a press would run it" : "the mod does not listen to it")
-                               + ")");
-            }
-
-            // Own inventory or crafting panel focused: the left stick click does nothing to the chest.
-            var others = new List<(string What, UIGroupHandler Group)> { ("your own inventory", gui.m_playerGrid != null ? gui.m_playerGrid.m_uiGroup : null) };
-            if (gui.m_uiGroups != null && gui.m_uiGroups.Length > 3)
-            {
-                others.Add(("the crafting panel", gui.m_uiGroups[3]));
-            }
-            foreach (var other in others)
-            {
-                if (other.Group == null || ReferenceEquals(other.Group, group))
-                {
-                    continue;
-                }
-                yield return Focus(rig, other.Group);
-                busy = GameButtonsOn(gui, key);
-                if (busy.Count > 0)
-                {
-                    c.Check(false, $"{other.What} focused: the left stick click does nothing to the chest (key not pressed: it is the game's own key for "
-                                   + $"{string.Join(" and ", busy.ToArray())} there too, a press would run it)");
-                    continue;
-                }
-                yield return PressKey(rig, chest, key, press);
-                c.Check(press.Sent && Plugin.TestSortBy == SortCriterion.Name && press.Ran == 0 && !press.Saved && Same(Slots(inv), mixed),
-                    $"{other.What} focused: the left stick click does nothing to the chest (order {Plugin.TestSortBy}, Sort ran {press.Ran} time(s)) {Show(Slots(inv))}");
-            }
-
-            // Glyph of the sort order button: only with a controller as input device and the chest grid focused.
-            rig.ForceGamepad();
-            yield return Close(rig);
-            yield return Open(rig, chest, box);
-            criterion = SortChestUi.TestCriterion;
-            if (c.Check(box.Ok && criterion != null && ZInput.IsGamepadActive(),
-                    $"setup: Chest open with a controller as input device ({box.Detail}; controller enabled in the game settings: {ZInput.IsGamepadEnabled()})"))
-            {
-                if (c.Check(criterion.Hint != null, "the sort order button has a glyph object (left stick)"))
-                {
-                    yield return Focus(rig, group);
-                    var glyph = Localization.instance.Localize("$KEY_" + key);
-                    c.Check(criterion.Hint.activeInHierarchy && !string.IsNullOrEmpty(criterion.Glyph) && criterion.Glyph == glyph,
-                        $"chest grid focused: the left stick glyph is shown ('{criterion.Glyph}' / '{glyph}')");
-                    if (gui.m_playerGrid != null && gui.m_playerGrid.m_uiGroup != null)
-                    {
-                        yield return Focus(rig, gui.m_playerGrid.m_uiGroup);
-                        c.Check(!criterion.Hint.activeInHierarchy, "own inventory focused: no glyph on the sort order button");
-                    }
-                }
-            }
-            c.Check(Same(Slots(chest.GetInventory()), mixed), $"setup: the Chest still holds its items, unmoved ({Show(Slots(chest.GetInventory()))})");
-            c.Report();
-        }
-        finally
-        {
-            rig?.Done();
-        }
-    }
-
-    // ================================================================ sortchest.bug.pad-right-stick (T12, C02: right stick click)
-
-    // Known wrong today (the game, not the mod): Place stacks listens to the right stick click (JoyRStick), so with a
-    // chest open that key does something to the chest, where T12 and C02 say it does nothing. Never pressed then.
-    private static IEnumerator RunBugPadRightStick()
-    {
-        const string N = BugPadRightStickTest;
-        const string key = "JoyRStick";
-        if (!Ready(N))
-        {
-            yield break;
-        }
-        var c = new Checks(N);
-        Rig rig = null;
-        try
-        {
-            rig = new Rig();
-            var gui = rig.Gui;
-            var chest = rig.Spawn(Chest);
-            if (!c.Check(chest != null && chest.GetInventory() != null && Cap(chest.GetInventory()) >= 6, $"setup: {Chest} with at least 6 slots"))
-            {
-                c.Report();
-                yield break;
-            }
-            var inv = chest.GetInventory();
-            var stacks = new Dictionary<string, int> { { "Wood", 4 }, { "Stone", 3 }, { "Resin", 2 }, { "Flint", 1 } };
-            Fill(c, chest, Scatter(Cap(inv), stacks.Select(kv => (kv.Key, kv.Value)).ToArray()));
-            var mixed = Slots(inv);
-            SetSortBy(SortCriterion.Name);
-            ForgetLayout(rig, chest);
-            var box = new Box();
-            yield return Open(rig, chest, box);
-            var group = SortChestUi.TestContainerGroup(gui);
-            if (!c.Check(box.Ok && group != null, $"the Chest panel opens ({box.Detail})"))
-            {
-                c.Report();
-                yield break;
-            }
-            yield return WaitLayout(rig, chest, 1, box);
-            c.Note($"the game's controller keys: {GameKeys(gui)}");
-            var sort = SortChestUi.TestSort;
-            var criterion = SortChestUi.TestCriterion;
-            c.Check(sort != null && criterion != null && (sort.Pad == null || sort.Pad.m_zinputKey != key) && (criterion.Pad == null || criterion.Pad.m_zinputKey != key),
-                "the mod's buttons do not listen to the right stick click");
-            yield return Focus(rig, group);
-            var busy = GameButtonsOn(gui, key);
-            if (busy.Count > 0)
-            {
-                c.Check(false, "chest grid focused: the right stick click does nothing to the chest (key not pressed: it is the game's own key for "
-                               + $"{string.Join(" and ", busy.ToArray())} there, a press would run it)");
-            }
-            else
-            {
-                var press = new Clicked();
-                yield return PressKey(rig, chest, key, press);
-                c.Check(press.Sent && Plugin.TestSortBy == SortCriterion.Name && press.Ran == 0 && !press.Saved && Same(Slots(inv), mixed),
-                    $"chest grid focused: the right stick click does nothing to the chest (order {Plugin.TestSortBy}, Sort ran {press.Ran} time(s)) {Show(Slots(inv))}");
-            }
-            // C02: Loot Pickup Filter uses the right stick click with the own inventory focused. Only noted here.
-            if (gui.m_playerGrid != null && gui.m_playerGrid.m_uiGroup != null)
-            {
-                yield return Focus(rig, gui.m_playerGrid.m_uiGroup);
-                busy = GameButtonsOn(gui, key);
-                c.Note(busy.Count > 0
-                    ? $"own inventory focused: the right stick click is also the game's key for {string.Join(" and ", busy.ToArray())} there (with a chest open)"
-                    : "own inventory focused: no game button of the container panel listens to the right stick click");
-            }
-            c.Report();
-        }
-        finally
-        {
-            rig?.Done();
-        }
-    }
-
-    // ================================================================ sortchest.bug.layout-warning (T13, T17: "Sort buttons" warning)
-
-    // Known wrong today: the game's Take all sits at the left end and Place stacks at the right end of the container
-    // panel, so the two buttons the mod puts after Place stacks sit right of the panel. The mod's own layout check
-    // then says "stick out of the container panel" and logs a "Sort buttons ..." Warning for every new size, which T13
-    // and T17 say must not be there. (Own measures of overlap and screen: sortchest.kinds, sortchest.layout.)
-    private static IEnumerator RunBugLayoutWarning()
-    {
-        const string N = BugLayoutTest;
-        if (!Ready(N))
-        {
-            yield break;
-        }
-        var c = new Checks(N);
-        Rig rig = null;
-        try
-        {
-            rig = new Rig();
-            SetSortBy(SortCriterion.Name);
-            // The containers of T13.
-            var kinds = new (string Prefab, string Label, Place Place)[]
-            {
-                (Chest, "Chest", Place.Near), ("piece_chest_blackmetal", "Black metal chest", Place.Near),
-                ("Karve", "Karve", Place.Vehicle), ("VikingShip_Ashlands", "Drakkar", Place.Vehicle),
-            };
-            var kept = new List<(Container Container, string Label)>();
-            var factsNoted = false;
-            foreach (var kind in kinds)
-            {
-                var container = rig.Spawn(kind.Prefab, kind.Place);
-                if (!c.Check(container != null && container.GetInventory() != null, $"{kind.Label}: prefab '{kind.Prefab}' exists and has a container"))
-                {
-                    continue;
-                }
-                // First opening also writes the facts for the user (rectangles, who changed the panel).
-                yield return CheckVerdict(rig, c, container, kind.Label, !factsNoted);
-                factsNoted = true;
-                if (kind.Place == Place.Vehicle)
-                {
-                    rig.Destroy(container);
-                    yield return null;
-                }
-                else
-                {
-                    kept.Add((container, kind.Label));
-                }
-            }
-            // Two extra inventory rows (console: inventorysize 6).
-            var rows = rig.P.GetInventory().GetHeight();
-            var more = rows == 4 ? 6 : Mathf.Min(rows + 2, 9);
-            rig.SetRows(more);
-            yield return null;
-            foreach (var k in kept)
-            {
-                yield return CheckVerdict(rig, c, k.Container, $"{k.Label} with {more} inventory rows", false);
-            }
-            // T17: none in the whole run (this test runs after every other opening of the single-player run).
-            var since = _watch != null ? _watch.LayoutWarnings() : new List<string>();
-            c.Check(_watch != null && since.Count == 0,
-                $"no 'Sort buttons' warning since game start ({since.Count}{(since.Count > 0 ? ", first: " + since[0] : "")})");
-            c.Report();
-        }
-        finally
-        {
-            rig?.Done();
-        }
-    }
-
-    // One opening: what the mod's own layout check says, and its warning in the log.
-    private static IEnumerator CheckVerdict(Rig rig, Checks c, Container container, string label, bool facts)
-    {
-        var gui = rig.Gui;
-        var logMark = _watch != null ? _watch.MineCount : 0;
-        ForgetLayout(rig, container);
-        var box = new Box();
-        yield return Open(rig, container, box);
-        if (!c.Check(box.Ok, $"{label}: the container panel opens ({box.Detail})"))
-        {
-            yield break;
-        }
-        yield return WaitLayout(rig, container, 2, box);
-        c.Check(box.Ok, $"{label}: the mod's layout check of this opening finished ({box.Detail})");
-        var sort = SortChestUi.TestSort;
-        var criterion = SortChestUi.TestCriterion;
-        if (c.Check(sort != null && criterion != null && sort.Go.activeInHierarchy && criterion.Go.activeInHierarchy, $"{label}: Sort and sort order buttons are shown"))
-        {
-            var own = SortChestUi.TestLayoutProblem(gui);
-            c.Check(own == null, $"{label}: the mod's own layout check finds nothing wrong (it says the buttons {own}; Sort {Fmt(WorldRect(sort.Rect))}, "
-                                 + $"sort order {Fmt(WorldRect(criterion.Rect))}, container panel {Fmt(WorldRect(gui.m_container))})");
-            if (facts)
-            {
-                NoteLayoutFacts(c, gui, sort, criterion, label);
-            }
-        }
-        var warnings = Warnings(logMark, "Sort buttons");
-        c.Check(warnings.Count == 0, $"{label}: no 'Sort buttons' warning for this opening (log: {(warnings.Count > 0 ? warnings[0] : "")})");
-        yield return Close(rig);
-    }
-
     // ================================================================ sortchest.pointer (mouse reach)
 
     private static GameObject Hit(SortChestUi.TestView view, out Vector2 at)
@@ -3997,11 +3744,12 @@ internal static class SelfTests
             c.Report();
             yield break;
         }
-        // Error half of T17. Its "Sort buttons" warning half is wrong today: sortchest.bug.layout-warning holds it alone.
+        // Both halves of T17: no error line, and no "Sort buttons" layout warning in the whole run (this test runs after
+        // every other opening of the single-player run; the buttons right of the panel are the wanted place).
         var errors = _watch.Errors();
         var layout = _watch.LayoutWarnings();
         c.Note($"{_watch.MineCount} log lines of {ModInfo.Name} since game start: {errors.Count} error line(s) that come from it or name it or MC.UX, "
-               + $"{layout.Count} 'Sort buttons' warning(s) (see {BugLayoutTest})");
+               + $"{layout.Count} 'Sort buttons' warning(s)");
         foreach (var p in errors.Take(8))
         {
             c.Note("log: " + p);
@@ -4009,6 +3757,8 @@ internal static class SelfTests
         c.Check(_watch.MineCount > 0, "setup: lines of this mod were seen since game start (the watch works)");
         c.Check(errors.Count == 0,
             $"no error line that comes from {ModInfo.Name} or names it or MC.UX since game start ({errors.Count}, first: {(errors.Count > 0 ? errors[0] : "")})");
+        c.Check(layout.Count == 0,
+            $"no 'Sort buttons' warning since game start ({layout.Count}{(layout.Count > 0 ? ", first: " + layout[0] : "")})");
         c.Report();
     }
 
@@ -4050,7 +3800,8 @@ internal static class SelfTests
                 yield break;
             }
             rig = new Rig();
-            // Facts for the sortchest.bug.* tests, seen in a run with MC mods only (no third-party mod can have changed them).
+            // Facts behind the tankard and controller key checks of sortchest.type / sortchest.gamepad, seen in a run
+            // with MC mods only (no third-party mod can have changed them).
             c.Note("this run has MC mods only: " + TankardFacts());
             c.Note($"this run has MC mods only: the game's controller keys: {GameKeys(rig.Gui)}");
             // This mod is made for the game client only: the dedicated server program never loads it.

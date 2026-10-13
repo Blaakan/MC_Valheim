@@ -4,25 +4,31 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, reworked on 2026-09-30 after the first in-game test (build `3cda33b+dirty`): creatures are
-afraid of a player two bosses past their biome's boss, judged by the biome they spawned in, and run from that player
-instead of ignoring them. Build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). The Debug and
-Release builds are clean; the smoke test (`./tools/Test-Smoke.ps1`) and the in-world self-tests
-(`./tools/Test-InWorld.ps1 -Mod Creatures.Morale`: `morale.rules`, `morale.publish`, `morale.calm`, `morale.provoke`,
-`morale.stealth`, `morale.rout`) have **not run on the reworked build yet** (the first build passed both on
-2026-09-30, 71 of 71 self-tests). Their NOTE lines in the log record the values the design lists as unverified. No
-hands-on in-game test of the reworked build yet. Changed later on 2026-09-30 (user feedback, not run in the game yet):
-no more "afraid" / "routed" line under the health bar and no `ShowOnNameplates` setting; a creature that runs from a
-player, or a routed pack, shows the game's own alert icon and loses it when it calms down. Changed again after the
-review of that change (not run in the game yet): a run (fear or rout) that ends next to a player the creature will
-fight keeps its alert for that fight (T34), and a creature that goes for a building after its run no longer keeps the
-run's alert. **The game folder may still hold an older build** (these changes were built without deploying): close
-the game and run `dotnet build ValheimMods.slnx` before testing. The right build shows this change's build id in the
-MC Mods panel, and ConfigurationManager's `Display` section has no `ShowOnNameplates` setting (an older build still
-has it).
+**Build under test:** 0.1.1. Build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+(2026-10-08) fixes the sneak attack on a sleeping afraid creature that faces you, which the mod took away (T35, reset
+to `[ ]`). Also on 2026-10-08, a change of this list only (no mod code): T04's second half now says what the mod does
+(a second kill of the same boss shows no rank-up message; the message comes with the kill that raises the boss rank),
+T04 was reset to `[ ]`, and the self-test that failed on the old text is gone (`morale.kills` checks the new text).
+The Debug and Release builds are clean, and the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with
+a dedicated server, every MC mod loaded): all of this mod's tests passed (see the automated checks below). History of
+0.1.0, which 0.1.1 builds on: reworked on 2026-09-30 after the first in-game test (build `3cda33b+dirty`): creatures
+are afraid of a player two bosses past their biome's boss, judged by the biome they spawned in, and run from that
+player instead of ignoring them. The Debug and Release builds are clean; the smoke test (`./tools/Test-Smoke.ps1`) and
+the in-world self-tests (`./tools/Test-InWorld.ps1 -Mod Creatures.Morale`: `morale.rules`, `morale.publish`,
+`morale.calm`, `morale.provoke`, `morale.stealth`, `morale.rout`) have **not run on the reworked build yet** (the
+first build passed both on 2026-09-30, 71 of 71 self-tests). Their NOTE lines in the log record the values the design
+lists as unverified. No hands-on in-game test of the reworked build yet. Changed later on 2026-09-30 (user feedback,
+not run in the game yet): no more "afraid" / "routed" line under the health bar and no `ShowOnNameplates` setting; a
+creature that runs from a player, or a routed pack, shows the game's own alert icon and loses it when it calms down.
+Changed again after the review of that change (not run in the game yet): a run (fear or rout) that ends next to a
+player the creature will fight keeps its alert for that fight (T34), and a creature that goes for a building after its
+run no longer keeps the run's alert. **The game folder may still hold an older build** (these changes were built
+without deploying): close the game and run `dotnet build ValheimMods.slnx` before testing. The right build shows this
+change's build id in the MC Mods panel, and ConfigurationManager's `Display` section has no `ShowOnNameplates` setting
+(an older build still has it).
 
-**Automated checks (2026-10-08):** 33 of 35 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 33 of 33 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -55,11 +61,11 @@ Names checked in the 1.0.16 game data: creatures `Boar`, `Neck`, `Hen`, `Greylin
 `Greydwarf_Elite` (Greydwarf Brute), `Troll`, `Skeleton`, `Skeleton_Swamps`, `Skeleton_Mountains`, `Draugr`,
 `Draugr_sleeping`, `Draugr_Elite`, `Wolf`, `Ulv`, `Lox`, `Goblin` (Fuling), `GoblinArcher`, `GoblinBrute` (Fuling
 Berserker), `GoblinShaman`, `Fenring`, `Fenring_Cultist`, `Seeker`, `SeekerBrood`, `SeekerBrute` (Seeker Soldier),
-`Charred_Melee`, `Charred_Mage`, `Greydwarf_Frozen`, `Greydwarf_Shaman_Frozen`, `Eikthyr`, `Deer`, `Dverger`,
-`piece_TrainingDummy` (or build a training dummy with the hammer); items `Bow`, `SpearFlint`, `KnifeFlint`, `Club`,
-`BombOoze` (Ooze bomb), `SpearChitin` (Abyssal Harpoon), `ShieldWoodTower`; world key `defeated_goblinking` (Fuling
-night hunters). Not in the checked data **(unverified)**: the arrows `ArrowWood`, the food `Mushroom` and `RawMeat`, the
-raid `army_eikthyr`, the English creature names in messages.
+`Charred_Melee`, `Charred_Mage`, `Greydwarf_Frozen`, `Greydwarf_Shaman_Frozen`, `Eikthyr`, `gd_king` (The Elder),
+`Deer`, `Dverger`, `piece_TrainingDummy` (or build a training dummy with the hammer); items `Bow`, `SpearFlint`,
+`KnifeFlint`, `Club`, `BombOoze` (Ooze bomb), `SpearChitin` (Abyssal Harpoon), `ShieldWoodTower`; world key
+`defeated_goblinking` (Fuling night hunters). Not in the checked data **(unverified)**: the arrows `ArrowWood`, the
+food `Mushroom` and `RawMeat`, the raid `army_eikthyr`, the English creature names in messages.
 
 ## 0.1.0 — single player
 
@@ -79,14 +85,18 @@ raid `army_eikthyr`, the English creature names in messages.
   *Partly automated (`morale.rest`); by hand: Lie down in a real roofed bed at night next to afraid Greydwarfs and
   sleep through the night (the test only runs the bed's enemy check, it does not sleep), and listen that no combat
   music plays.*
-- [!] **T04 Boss kill raises the rank:** a character that has killed no boss, `ForceBossRank = -1`: `spawn Eikthyr`,
+- [ ] **T04 Boss kill raises the rank:** a character that has killed no boss, `ForceBossRank = -1`: `spawn Eikthyr`,
   kill it. Expected: Eikthyr's own death message, **no** "Weaker creatures now keep out of your way" (nothing is afraid
   of a rank 1 player with the default settings); the log shows "Standing: boss rank 1 (Eikthyr), ..."; boars still
-  attack you. Then set `BossesAhead = 0`, `spawn Eikthyr` again and kill it. Expected: about 4-5 s after the kill, once
-  Eikthyr's death message has faded, "Weaker creatures now keep out of your way" in the middle of the screen; boars
-  and necks are now afraid of you. Put `BossesAhead` back to 2.
-  **FAILED:** automated test: TESTING.md T04, second half, cannot pass as written: a second Eikthyr kill never shows
-  the rank-up message (self-test `morale.bug.rank-message`)
+  attack you. Then set `BossesAhead = 0` (boars and necks are now afraid of you), `spawn Eikthyr` again and kill it.
+  Expected: only Eikthyr's own death message again, still **no** "Weaker creatures now keep out of your way": a second
+  kill of the same boss leaves your boss rank at 1, and the message comes only with the kill that raises your rank
+  (T37 shows that kill with Eikthyr on a fresh character). Optional, the same on this character: `spawn gd_king` (The
+  Elder, the next boss) and kill it. Expected: about 4-5 s after the kill, once The Elder's death message has faded,
+  "Weaker creatures now keep out of your way" in the middle of the screen; the log shows "Standing: boss rank 2 (The
+  Elder), ...". Put `BossesAhead` back to 2.
+  *Partly automated (`morale.kills`, `morale.publish`); by hand: The same with real boss kills on a fresh character (a
+  self-test must not kill a boss): Eikthyr's own death message at both kills, the necks, and the optional Elder kill.*
 - [x] **T05 Kill step:** rank 2, in the Meadows; note your Greyling kill count N. Set `KillSteps` = N+3 (the number), then kill 3
   Greylings (`spawn Greyling`). Expected: after the third, a corner message "Greyling: N+3 kills. They will be afraid
   of you sooner."; the Standing log line shows "Greyling +1"; other Greylings are now afraid of you (one boss early),
@@ -242,19 +252,18 @@ raid `army_eikthyr`, the English creature names in messages.
   Expected: it turns and fights you, and its alert icon stays on all along (no second alert sound, the icon never
   switches to the yellow "aware" one in between). Put `ShakenSeconds` back to 60.
   *Automated: `morale.rout-hit`, `morale.rout-end`, `morale.rout`.*
-- [!] **T35 Sneak attack on a sleeping afraid creature:** rank 5: `spawn Draugr_sleeping`, then walk 12-15 m away
+- [x] **T35 Sneak attack on a sleeping afraid creature:** rank 5: `spawn Draugr_sleeping`, then walk 12-15 m away
   (outside its 10 m wake range) to a spot it faces, with nothing between you and it. Standing, shoot it with the `Bow`
   from there. Expected: a normal sneak attack (the sneak-attack effect and bonus damage), as in the normal game: a
   sleeping creature watches nobody, so the "no free sneak attacks" rule of T14 does not apply to it. It wakes up and
   fights you.
-  **FAILED:** automated test: A sleeping afraid creature that faces the player loses vanilla's sneak attack (self-test
-  `morale.bug.sleeper-sneak`)
+  *Automated: `morale.sleeper`.*
 - [x] **T36 The player it runs from dies or turns ghost:** rank 4: let an afraid Greydwarf run from you (alert icon),
   then run `ghost` in the console (the same happens when the player it runs from dies). Expected: it stops running
   from you at once; within about 2 s its alert icon goes away, and it does not come for you. Run `ghost` again and
   stay within 12 m: it runs from you again within a couple of seconds.
   *Automated: `morale.senses`.*
-- [ ] **T37 The rank-up message needs a kill that raises the rank:** (the checkable version of T04's second half) a
+- [ ] **T37 The rank-up message needs a kill that raises the rank:** (T04's second half, plus the kill that shows it) a
   character that has killed no boss, `ForceBossRank = -1`, default settings: `spawn Eikthyr` and kill it. Expected: no
   "Weaker creatures now keep out of your way"; boars still attack you. Set `BossesAhead = 0`. Expected: no message;
   about a second later boars and necks are afraid of you. `spawn Eikthyr` and kill it again. Expected: still no

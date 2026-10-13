@@ -37,8 +37,7 @@ namespace MC.UX.CraftingSearchSortMod;
 //   csearch.upgrade    T20  upgrade tab at the forge
 //   csearch.potential  T32  Forge of Potential
 //   csearch.food       T21  food stations (notes for the eyes)
-//   csearch.tools      T22  tools and torch, row dump lines
-//   csearch.bug.tankard T22 REAL BUG, alone: tankard land under Tools and light, README and T22 say Other
+//   csearch.tools      T22  tools and torch, tankard under Other, row dump lines
 //   csearch.craft     T23 M02  craft with filter, x5, type during craft, crafted item is plain
 //   csearch.nocost     T24  nocost list
 //   csearch.console    T25  filtercraft / sortcraft with us
@@ -78,7 +77,6 @@ internal static class SelfTests
     private const string PotentialName = "csearch.potential";
     private const string FoodName = "csearch.food";
     private const string ToolsName = "csearch.tools";
-    private const string BugTankardName = "csearch.bug.tankard";
     private const string CraftName = "csearch.craft";
     private const string NoCostName = "csearch.nocost";
     private const string ConsoleName = "csearch.console";
@@ -167,7 +165,6 @@ internal static class SelfTests
             new KeyValuePair<string, Func<IEnumerator>>(PotentialName, RunPotential),
             new KeyValuePair<string, Func<IEnumerator>>(FoodName, RunFood),
             new KeyValuePair<string, Func<IEnumerator>>(ToolsName, RunTools),
-            new KeyValuePair<string, Func<IEnumerator>>(BugTankardName, RunBugTankard),
             new KeyValuePair<string, Func<IEnumerator>>(CraftName, RunCraft),
             new KeyValuePair<string, Func<IEnumerator>>(NoCostName, RunNoCost),
             new KeyValuePair<string, Func<IEnumerator>>(ConsoleName, RunConsole),
@@ -3533,8 +3530,9 @@ internal static class SelfTests
             rig.ClearCraftFilter();
             var gui = rig.Gui;
 
-            // The table itself: tools and torch under Tools and light only; tankard not under Weapons or a weapon type.
-            // ("Tankard under Other" is not met by the mod: that check live alone in csearch.bug.tankard.)
+            // The table itself: tools and torch under Tools and light only; tankard under Other (a drink thing: no
+            // weapon, no light. Game 1.0.17 make it a one-handed weapon in the torch pose; until 0.1.1 the shared
+            // ItemKinds took that pose for a torch and the row landed under Tools and light).
             foreach (var pair in new[]
                      {
                          new KeyValuePair<string, ItemKind>("Hammer", ItemKind.Tool), new KeyValuePair<string, ItemKind>("Hoe", ItemKind.Tool),
@@ -3561,9 +3559,10 @@ internal static class SelfTests
             if (c.Check(tankard != null, "no item prefab 'Tankard'"))
             {
                 var shared = tankard.m_itemData.m_shared;
-                RecipeCategory.Of(ItemKinds.Classify(shared), shared.m_skillType, out var first, out var second);
-                c.Check(first != RecipeCategory.Weapons && second == -1,
-                    $"Tankard ({shared.m_itemType}, {shared.m_skillType}, {shared.m_animationState}) -> {RecipeCategory.Id(first)}{(second >= 0 ? " + " + RecipeCategory.Id(second) : "")}: counts under Weapons or a weapon type");
+                var kind = ItemKinds.Classify(shared);
+                RecipeCategory.Of(kind, shared.m_skillType, out var first, out var second);
+                c.Check(first == RecipeCategory.Other && second == -1,
+                    $"Tankard ({shared.m_itemType}, {shared.m_skillType}, {shared.m_animationState}) counts as {kind} -> {RecipeCategory.Id(first)}{(second >= 0 ? " + " + RecipeCategory.Id(second) : "")}, expected other only");
                 var recipe = ObjectDB.instance.GetRecipe(tankard.m_itemData);
                 c.Note($"Tankard is made at: {(recipe == null ? "no recipe" : recipe.m_craftingStation != null ? recipe.m_craftingStation.m_name : "no station (by hand)")}");
             }
@@ -3626,9 +3625,20 @@ internal static class SelfTests
                 if (tankardRow >= 0)
                 {
                     OptionsOf(rows[tankardRow], out var first, out var second);
-                    c.Check(first != RecipeCategory.Weapons && second == -1,
-                        $"{label}: Tankard listed under {RecipeCategory.Id(first)}{(second >= 0 ? " + " + RecipeCategory.Id(second) : "")} (Weapons or a weapon type)");
+                    c.Check(first == RecipeCategory.Other && second == -1,
+                        $"{label}: Tankard listed under {RecipeCategory.Id(first)}{(second >= 0 ? " + " + RecipeCategory.Id(second) : "")}, expected Other only");
                     c.Note($"{label}: the Tankard is listed here, under {RecipeCategory.Label(first)}");
+                    c.Check(tankardRow >= tools.Count, $"{label}: on the sort Tools and light the Tankard is at row {tankardRow}, among the {tools.Count} tool rows on top");
+                    // Sort Other must put the Tankard row in the top block.
+                    var others = all.Count(r => InOption(r, RecipeCategory.Other));
+                    yield return Choose(rig, RecipeCategory.Other, ok);
+                    var at = IndexOf(Rows(gui), "Tankard");
+                    c.Check(ok.Value && at >= 0 && at < others,
+                        $"{label}: sort Other does not put the Tankard on top (menu has an Other entry: {ok.Value}, Other rows: {others}, Tankard at row {at} on sort '{SortLabel()}')");
+                }
+                else if (place != null)
+                {
+                    c.Note($"{label} does not list the Tankard: only the category table was checked");
                 }
                 // Debug row lines (first build of this list after a clear).
                 c.Check(dump.Length > 0, $"{label}: no 'Crafting list at station' debug lines logged");
@@ -3647,73 +3657,6 @@ internal static class SelfTests
                 }
                 yield return Close(rig);
             }
-            c.Complete();
-        }
-        finally
-        {
-            c.Report();
-            if (rig != null)
-            {
-                rig.Done();
-            }
-        }
-    }
-
-    // ---------- csearch.bug.tankard (T22, real bug) ----------
-
-    // REAL BUG, alone here so csearch.tools stay green for the rest of T22. README ("Tankards go under Other") and
-    // T22 want the Tankard under Other. Game 1.0.17: Tankard = OneHandedWeapon, skill Swords, animation Torch (not
-    // Feaster), so shared ItemKinds.Classify say Torch and the row land under Tools and light. Fail until mod fixed.
-    private static IEnumerator RunBugTankard()
-    {
-        const string T = BugTankardName;
-        if (!Ready(T))
-        {
-            yield break;
-        }
-        var c = new Checks(T);
-        Rig rig = null;
-        try
-        {
-            rig = new Rig(T);
-            yield return rig.UnlockAllRecipes(c);
-            rig.ForgetSorts();
-            rig.ClearCraftFilter();
-            var gui = rig.Gui;
-            var prefab = ObjectDB.instance.GetItemPrefab("Tankard");
-            var tankard = prefab != null ? prefab.GetComponent<ItemDrop>() : null;
-            if (!c.Check(tankard != null, "no item prefab 'Tankard'"))
-            {
-                yield break;
-            }
-            var shared = tankard.m_itemData.m_shared;
-            var kind = ItemKinds.Classify(shared);
-            RecipeCategory.Of(kind, shared.m_skillType, out var first, out var second);
-            c.Check(first == RecipeCategory.Other && second == -1,
-                $"Tankard ({shared.m_itemType}, {shared.m_skillType}, {shared.m_animationState}) counts as {kind} -> {RecipeCategory.Id(first)}, expected other");
-
-            // At the workbench (where the game make it): sort Other must put the Tankard row in the top block.
-            var bench = new Box<CraftingStation>();
-            yield return Open(rig, "piece_workbench", bench);
-            if (c.Check(bench.Value != null && SortButton() != null, "setup: workbench or Sort button missing"))
-            {
-                var all = Rows(gui);
-                if (IndexOf(all, "Tankard") < 0)
-                {
-                    c.Note("the workbench does not list the Tankard: only the category table was checked");
-                }
-                else
-                {
-                    var others = all.Count(r => InOption(r, RecipeCategory.Other));
-                    var ok = new Box<bool>();
-                    yield return Choose(rig, RecipeCategory.Other, ok);
-                    var at = IndexOf(Rows(gui), "Tankard");
-                    OptionsOf(all[IndexOf(all, "Tankard")], out var rowFirst, out _);
-                    c.Check(ok.Value && at >= 0 && at < others,
-                        $"workbench: Tankard listed under {RecipeCategory.Label(rowFirst)}, expected Other (menu has an Other entry: {ok.Value}, Other rows: {others}, Tankard at row {at} on sort '{SortLabel()}')");
-                }
-            }
-            yield return Close(rig);
             c.Complete();
         }
         finally

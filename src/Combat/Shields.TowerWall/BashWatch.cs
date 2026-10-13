@@ -12,6 +12,9 @@ namespace MC.Combat.ShieldsTowerWallMod;
 //       input buffer keep a press only 0.5 s: KeepPress hold a press made once the swing is over until the time is up,
 //       else a press 1.1-1.5 s after the start (swing over, guard up) would vanish. A press during the swing keep the
 //       vanilla 0.5 s. A start that never reached its attack state (watchdog A) do not count.
+//       Kept press is for the tower's next bash only: ReleasePress (every tick, before vanilla read the press) give it
+//       back its vanilla 0.5 s the moment the tower is no more in the left hand as a tower, Reset do so when the mod
+//       go off. Else vanilla swing the fists or the next weapon with it up to 0.5 s later (TESTING T37).
 //   Swing speed (BashAnimationSpeed, decision 32): BashSpeed, begun here at each start, told when the attack state is
 //       reached, ended with the bash.
 //   (A) No attack state: from the first bash start that did not reach an attack-tagged state (a held button start a
@@ -59,8 +62,16 @@ internal static class BashWatch
     private static Player _startedBy;
     private static float _startedAt = float.MinValue;
 
+    // Press me keep for the cooldown (KeepPress): whose (null = none), and the Time.time vanilla alone would have
+    // dropped it (0.5 s after the button went down).
+    private static Player _pressFor;
+    private static float _pressEnds;
+
     // Clone of the running bash (null = none). OnAttackTrigger prefix compare against it.
     internal static Attack Running => _running;
+
+    // True = me keep a press right now (PlayerAttackInput prefix: one reference compare when not).
+    internal static bool KeepsPress => !ReferenceEquals(_pressFor, null);
 
     // Hit events of the running bash so far (self tests).
     internal static int Hits => _hits;
@@ -105,10 +116,54 @@ internal static class BashWatch
         {
             return;
         }
+        // Press new to me (first tick me refuse it, or button pressed again this tick): timer still vanilla's own
+        // count, so me know when vanilla alone would drop it (ReleasePress need that).
+        if (!ReferenceEquals(_pressFor, player) || player.m_attack)
+        {
+            _pressFor = player;
+            _pressEnds = Time.time + queued;
+        }
         var keep = Mathf.Min(QueuedPress, CooldownLeft(player) + 2f * Time.fixedDeltaTime);
         if (queued < keep)
         {
             player.m_queuedAttackTimer = keep;
+        }
+    }
+
+    // Player.PlayerAttackInput prefix: every tick, before vanilla read the press, and right after the action queue of
+    // the same tick (where a queued equip or unequip happen). Kept press is for the tower's next bash only. Tower no
+    // more in the left hand as a tower (unequipped, other item equipped, put on the back, off the Towers list) = the
+    // press get back the time vanilla alone would have left it: none when the button went down more than 0.5 s ago,
+    // so fists or new weapon never swing by themselves (TESTING T37); a younger press still count, like vanilla.
+    // Press over (its bash started, or it ran out) = forgotten. Caller checked KeepsPress.
+    internal static void ReleasePress(Player player)
+    {
+        if (!ReferenceEquals(_pressFor, player))
+        {
+            _pressFor = null; // old player object: nothing to give back
+            return;
+        }
+        if (player.m_queuedAttackTimer > 0f && TowerCatalog.Held(player) != null && player.m_rightItem == null)
+        {
+            return; // tower still wait for its bash
+        }
+        GiveBackPress();
+    }
+
+    // Kept press back to vanilla's own count (this tick's step not taken yet), then forgotten. Never raise the timer.
+    // Player object gone = only forgotten.
+    private static void GiveBackPress()
+    {
+        var player = _pressFor;
+        _pressFor = null;
+        if (player == null)
+        {
+            return;
+        }
+        var own = Mathf.Max(0f, _pressEnds - Time.time + Time.fixedDeltaTime);
+        if (player.m_queuedAttackTimer > own)
+        {
+            player.m_queuedAttackTimer = own;
         }
     }
 
@@ -143,6 +198,7 @@ internal static class BashWatch
         _speed = rules != null ? rules.BashAnimationSpeed : 1f;
         _startedBy = player;
         _startedAt = Time.time;
+        _pressFor = null; // the bash a kept press waited for: press used
 #if DEBUG
         DebugStarts.Add(Time.time);
 #endif
@@ -243,11 +299,13 @@ internal static class BashWatch
         Cancel(player, all: true);
     }
 
-    // Deactivation state step: forget everything, cooldown too.
+    // Deactivation state step: forget everything, cooldown too. Kept press given back first: patches go off after
+    // this, the tower is a plain shield, and vanilla would punch with the press me kept.
     internal static void Reset()
     {
         BashSpeed.Reset();
         Forget();
+        GiveBackPress();
         _player = null;
         _startedBy = null;
         _startedAt = float.MinValue;

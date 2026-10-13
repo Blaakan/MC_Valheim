@@ -6,7 +6,8 @@ using UnityEngine;
 namespace MC.Farming.CultivatorReplantMod.Patches;
 
 // Me = transplant sapling growth (design 2.2, 2.6, RootGate). Framework patch me only while feature Active: feature
-// off = saplings grow like vanilla, no sap drained.
+// off = saplings grow like vanilla, no sap drained, on this player's own grow time setting (TransplantContent.Rebuild
+// write it on them when the feature go off).
 //   Grow          prefix (Low): client still wait for server rules = none of our saplings grow (own config grow time
 //                 may sit on them until Rebuild write the server's). Our Yggdrasil sapling grow only when an Ancient
 //                 Root near give its sap. Vanilla call Grow every SlowUpdater pass once a plant is due: every other

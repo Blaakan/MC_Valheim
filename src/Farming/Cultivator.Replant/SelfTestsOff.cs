@@ -14,24 +14,18 @@ namespace MC.Farming.CultivatorReplantMod;
 // Debug build only. Self tests with the mod really turned off and on again (Plugin.TestTurnOff / TestTurnOn: the two
 // steps of the framework toggle, OnDeactivated + feature patches away, then back; no config write), the log watch, and
 // the checks next to other MC mods:
-//   replant.toggle      T30, T34, T36 (off part), T31 (same session part)
-//   replant.bug.offgrow T39: mod off = transplant saplings on the player's own grow time (README promise). Real bug
-//                       of the mod (it keeps the last rules in force): fails until the mod is fixed
+//   replant.toggle      T30, T34, T36 (off part), T31 (same session part), T39 and T40 (mod off = young transplants on
+//                       the player's own grow time, never the last rules in force; own setting changed while off)
 //   replant.log         T32: no warning or error of this mod in the whole run but the cost warnings tests ask for
 //   replant.x.idol      X01: with Forge Idol Upgrades loaded
 //   replant.x.spyglass  X05: with Spyglass loaded
-//   replant.bug.planteasily  E04: PlantEasily (other mod on the tester's PC) left on: the Yggdrasil ghost away from a
-//                       root must still be refused. Fails while PlantEasily turns that ghost green (every other test
-//                       lifts PlantEasily's placement patches, SelfTestsHelpers.LiftPlantEasily)
 // RegisterMore / UnregisterMore: every newer test of the mod (SelfTests.Register calls them).
 internal static partial class SelfTests
 {
     private const string ToggleName = "replant.toggle";
-    private const string OffGrowName = "replant.bug.offgrow";
     private const string LogName = "replant.log";
     private const string IdolName = "replant.x.idol";
     private const string SpyglassName = "replant.x.spyglass";
-    private const string PlantEasilyName = "replant.bug.planteasily";
 
     private const string IdolGuid = "MC.Crafting.Forge.IdolUpgrades";
     private const string SpyglassItem = "MC_Spyglass";
@@ -66,10 +60,8 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(SlotsName, RunSlots),
         new KeyValuePair<string, Func<IEnumerator>>(GemsName, RunGems),
         new KeyValuePair<string, Func<IEnumerator>>(ToggleName, RunToggle),
-        new KeyValuePair<string, Func<IEnumerator>>(OffGrowName, RunOffGrow),
         new KeyValuePair<string, Func<IEnumerator>>(IdolName, RunIdol),
         new KeyValuePair<string, Func<IEnumerator>>(SpyglassName, RunSpyglass),
-        new KeyValuePair<string, Func<IEnumerator>>(PlantEasilyName, RunPlantEasily),
         new KeyValuePair<string, Func<IEnumerator>>(WrongBiomeName, RunWrongBiome),
         new KeyValuePair<string, Func<IEnumerator>>(ScytheName, RunScythe),
         new KeyValuePair<string, Func<IEnumerator>>(MountainName, RunMountain),
@@ -103,7 +95,7 @@ internal static partial class SelfTests
         return HasPatch(Harmony.GetPatchInfo(method)?.Prefixes, typeof(PlayerPatchClass), ModInfo.Guid);
     }
 
-    // ---------- replant.toggle (T30, T34, T36 off part, T31 same-session part) ----------
+    // ---------- replant.toggle (T30, T34, T36 off part, T31 same-session part, T39, T40) ----------
 
     private static IEnumerator RunToggle()
     {
@@ -180,10 +172,33 @@ internal static partial class SelfTests
                 yield break;
             }
 
+            // T39, T40: the rules in force before the off use another grow time than this player's own setting (a
+            // server's rules, or the setting as it was with the mod on). Own setting read from the config, never written.
+            var own = CultivatorRules.Own().GrowTimeMultiplier;
+            var other = Near(own, 0.1f, 0.01f) ? 0.5f : 0.1f;
+            bool HasTimes(Plant pl, float multiplier)
+            {
+                TransplantContent.GrowTimes(rasp, multiplier, out var low, out var high);
+                return pl != null && Near(pl.m_growTime, low, 0.5f) && Near(pl.m_growTimeMax, high, 0.5f);
+            }
+            string Times(Plant pl) => pl != null ? $"{F(pl.m_growTime)}-{F(pl.m_growTimeMax)} s" : "none";
+            string TimesOf(float multiplier)
+            {
+                TransplantContent.GrowTimes(rasp, multiplier, out var low, out var high);
+                return $"x{F(multiplier)} = {F(low)}-{F(high)} s";
+            }
+            var planted = raspSapling.GetComponent<Plant>();
+            ServerRules.TestRules = new CultivatorRules { GrowTimeMultiplier = other };
+            TransplantContent.Rebuild();
+            c.Check(HasTimes(planted, other), $"mod on, rules with grow time {TimesOf(other)}: the planted transplant carries it ({Times(planted)})");
+
             // ----- off -----
             Plugin.TestTurnOff();
             yield return Frames(3);
             c.Check(!Plugin.FeatureActive && !FeaturePatched() && !CultivatorTiers.InForce, "turned off: feature patches gone, tiers not in force");
+            // T40: the transplant planted before is on this player's own grow time from the moment the mod is off.
+            c.Check(HasTimes(planted, own),
+                $"off: the transplant planted before is on this player's own grow time ({TimesOf(own)}), not on the rules in force before the off (x{F(other)}); it has {Times(planted)}");
             yield return rig.AimAt(bush.AimAt);
             yield return Frames(4);
             c.Check(HintText().Length == 0 && !CrosshairYellow() && !Replant.Target.IsFresh, $"off: no hint over the bush ('{OneLine(HintText())}')");
@@ -246,6 +261,38 @@ internal static partial class SelfTests
             yield return OpenStation(rig, potential, true);
             c.Check(AnyCultivatorRow(), "off: the Forge of Potential lists the cultivator again");
             yield return CloseStation(rig);
+
+            // T39 (the check of the former replant.bug.offgrow): a young transplant that loads while the mod is off
+            // carries this player's own grow time, not the last rules in force before it was turned off.
+            GameObject freshGo = null;
+            if (c.Check(FindPlantSpot(rig, taken, 1.4f, out var freshSpot), "free spot for a transplant that loads while the mod is off"))
+            {
+                freshGo = rig.Spawn(rasp.SaplingName, freshSpot, Quaternion.identity);
+                yield return Settle();
+            }
+            var fresh = freshGo != null ? freshGo.GetComponent<Plant>() : null;
+            if (c.Check(fresh != null && !Plugin.FeatureActive, "mod off, young raspberry transplant planted"))
+            {
+                c.Check(HasTimes(fresh, own),
+                    $"mod off: a young transplant grows on this player's own grow time ({TimesOf(own)}), not on the last rules in force before it was turned off (x{F(other)}); it has {Times(fresh)}");
+            }
+            // T39, T40: the own setting changed while the mod is off (in memory, ServerRules.TestOwn: never the config
+            // file) reaches the planted transplant, the one loaded while off and the young-plant prefab (what a
+            // transplant loading later copies) at once: nobody runs the rebuild delay while the feature patches are off.
+            var saplingPrefab = TransplantContent.SaplingPrefab(rasp);
+            var prefabPlant = saplingPrefab != null ? saplingPrefab.GetComponent<Plant>() : null;
+            var changed = Near(own, 0.5f, 0.01f) ? 2f : 0.5f;
+            ServerRules.TestOwn = new CultivatorRules { GrowTimeMultiplier = changed };
+            c.Check(!TransplantContent.RebuildPending && HasTimes(planted, changed) && HasTimes(fresh, changed) && HasTimes(prefabPlant, changed),
+                $"off: own GrowTimeMultiplier changed to {TimesOf(changed)}: at once on the planted transplant ({Times(planted)}), the one loaded while off ({Times(fresh)}) "
+                + $"and the young-plant prefab ({Times(prefabPlant)})");
+            // Own setting = the default 1 from here (whatever the tester's config says): the growth below runs on it.
+            ServerRules.TestOwn = new CultivatorRules();
+            var due = Alive(raspView) ? planted.GetGrowTime() : 0f;
+            c.Check(HasTimes(planted, 1f) && HasTimes(fresh, 1f) && HasTimes(prefabPlant, 1f) && due > 2000f && due < 20000f,
+                $"off: own GrowTimeMultiplier back to 1: all three on {TimesOf(1f)} again; the planted transplant is due {F(due)} s after planting "
+                + "(young 2000 s after, due 20000 s after)");
+            rig.Destroy(freshGo);
 
             // Young transplants keep growing while off, like vanilla saplings (the Yggdrasil one with no root, no sap).
             Age(raspView, 20000.0);
@@ -316,55 +363,6 @@ internal static partial class SelfTests
             {
                 InventoryGui.instance.Hide();
             }
-            rig.Restore();
-        }
-    }
-
-    // ---------- replant.bug.offgrow (T39: real bug, seen in the run of 2026-10-07) ----------
-
-    private static IEnumerator RunOffGrow()
-    {
-        if (!WorldReady(OffGrowName))
-        {
-            yield break;
-        }
-        var c = new Checks(OffGrowName);
-        var player = Player.m_localPlayer;
-        var rig = new Rig(player, OffGrowName);
-        var taken = new List<Vector3>();
-        try
-        {
-            rig.TakeControls();
-            rig.Undo(Plugin.TestTurnOn);
-            var rasp = PlantCatalog.ByKey("RaspberryBush");
-            var own = CultivatorRules.Own().GrowTimeMultiplier;
-            // Rules of a server played on earlier this session: another grow time than this player's own setting.
-            var other = Near(own, 0.1f, 0.01f) ? 0.5f : 0.1f;
-            ServerRules.TestRules = new CultivatorRules { GrowTimeMultiplier = other };
-            TransplantContent.Rebuild();
-            if (!c.Check(FindPlantSpot(rig, taken, 1.4f, out var spot), "free spot"))
-            {
-                c.Report();
-                yield break;
-            }
-            Plugin.TestTurnOff();
-            yield return Frames(2);
-            var sapling = rig.Spawn(rasp.SaplingName, spot, Quaternion.identity);
-            yield return Settle();
-            var plant = sapling != null ? sapling.GetComponent<Plant>() : null;
-            if (c.Check(plant != null && !Plugin.FeatureActive, "mod off, young raspberry transplant planted"))
-            {
-                TransplantContent.GrowTimes(rasp, own, out var lo, out var hi);
-                TransplantContent.GrowTimes(rasp, 1f, out var lo1, out _);
-                var factor = lo1 > 0f ? plant.m_growTime / lo1 : 0f;
-                c.Check(Near(plant.m_growTime, lo, 0.5f) && Near(plant.m_growTimeMax, hi, 0.5f),
-                    $"mod off: a young transplant grows on this player's own grow time x{F(own)} ({F(lo)}-{F(hi)} s); it has {F(plant.m_growTime)}-{F(plant.m_growTimeMax)} s "
-                    + $"= x{F(factor)}, the last rules in force before it was turned off (x{F(other)})");
-            }
-            c.Report();
-        }
-        finally
-        {
             rig.Restore();
         }
     }
@@ -504,60 +502,6 @@ internal static partial class SelfTests
             yield return Tap(UseAndSnap);
             yield return WaitGone(bush.View, 1.5f);
             c.Check(!Alive(bush.View) && CountByName(rig.Inv, rasp.ItemDisplayName) == count + 1, "and E digs the bush up");
-            c.Report();
-        }
-        finally
-        {
-            rig.Restore();
-        }
-    }
-
-    // ---------- replant.bug.planteasily (E04) ----------
-
-    // PlantEasily's patches left on (the only test that does): the Yggdrasil transplant ghost away from any Ancient
-    // Root must still be refused, as T13 says. Run of 2026-10-07: PlantEasily's UpdatePlacementGhost postfix set the
-    // status Valid and the transplant was planted there. One transplant only, never placed: no grid copies left behind.
-    private static IEnumerator RunPlantEasily()
-    {
-        if (!WorldReady(PlantEasilyName))
-        {
-            yield break;
-        }
-        var c = new Checks(PlantEasilyName);
-        if (!PlantEasilyLoaded)
-        {
-            SelfTest.Fail(PlantEasilyName, "PlantEasily is not loaded: nothing checked");
-            yield break;
-        }
-        var player = Player.m_localPlayer;
-        var rig = new Rig(player, PlantEasilyName);
-        var taken = new List<Vector3>();
-        try
-        {
-            PrepareInput(rig, true, false);
-            var ygg = PlantCatalog.ByKey("YggaShoot");
-            var piece = SaplingPiece(ygg);
-            var origin = rig.Origin;
-            var tool = rig.Give(PlantCatalog.CultivatorPrefab, 1, 5);
-            rig.Give(ygg.ItemName, 1);
-            if (!c.Check(tool != null && piece != null, "level 5 cultivator and one Yggdrasil transplant given")
-                || !SpawnRoot(rig, c, taken, out _, out var root, out var rootSpot, p => Buildable(p, 8f)))
-            {
-                c.Report();
-                yield break;
-            }
-            yield return Settle();
-            yield return Hold(rig, tool);
-            if (!c.Check(FindSpot(rootSpot, origin - rootSpot, new[] { 12f, 14f, 16f, 18f, 20f, 22f }, 2.3f, taken, out var far,
-                    p => RootGate.FindRoot(p, 7.5f) == null && StandOk(origin, p) && Buildable(p)), "ground spot away from the root"))
-            {
-                c.Report();
-                yield break;
-            }
-            var placing = new Placing();
-            yield return AimGhost(rig, piece, far, placing);
-            c.Check(placing.Status == Player.PlacementStatus.Invalid,
-                $"with PlantEasily on, the Yggdrasil transplant ghost away from an Ancient Root is still refused (status {placing.Status})");
             c.Report();
         }
         finally

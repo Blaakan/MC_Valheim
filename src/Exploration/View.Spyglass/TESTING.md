@@ -29,8 +29,15 @@ multiplayer scenarios all passed (`spyglass.mp.rules` and `spyglass.mp.server` o
 Music Instruments tests the Forge's craft list was empty); the log has no Spyglass line at the main menu, and none
 after "ZNet OnDestroy" in the client log of the server-without-mods scenario (four before).
 
-**Automated checks (2026-10-08):** 37 of 38 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
+**0.1.1, zoom fix (2026-10-08, after the run above):** a lower zoom limit no longer replaces the zoom you picked. The
+pick is now changed only by the mouse wheel or the gamepad zoom buttons, and the limit applies to the view alone (T25,
+reset to `[ ]`). The check of the removed self-test `spyglass.bug.zoom-pick-lost` (one of the two that failed in the
+run above) is back in `spyglass.zoom-pick`, which now also lowers the limit and puts it back while looking. Both
+builds compile; the self-tests ran on this change on 2026-10-13 (game 1.0.17, every MC mod loaded): all of this mod's
+tests passed apart from the open `spyglass.bug.blur-off-capture`.
+
+**Automated checks (2026-10-13):** 37 of 37 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -166,12 +173,11 @@ changed one back afterwards.
   click. Expected: the click lets go of the helm, as in the normal game, and the spyglass does not go up (this is the
   right result for the helm, where T10 says "nothing happens").
   *Automated: `spyglass.helm`.*
-- [!] **T25 Zoom kept after a lower limit:** StartMagnification 4, do not touch the wheel. Set MaxMagnification = 3,
+- [x] **T25 Zoom kept after a lower limit:** StartMagnification 4, do not touch the wheel. Set MaxMagnification = 3,
   raise (the view shows x3), lower. Set MaxMagnification back to 8 and raise again. Expected: x4 again: a lower limit
   only limits the view, it does not change the zoom you picked. If you used the wheel while the limit was 3, the zoom
   it reached is kept instead.
-  **FAILED:** automated test: A lower zoom limit overwrites the zoom the player picked (self-test
-  `spyglass.bug.zoom-pick-lost`)
+  *Automated: `spyglass.zoom-pick`, `spyglass.wheel`.*
 - [ ] **T26 Death while looking:** `god` off, low health; stand in a fire, raise the spyglass while burning and die
   from the burning without lowering it. Expected: at death the normal view comes back at once (no round view, blur,
   dark ring, cleared fog or missing body on the death camera) and the log has no error; after you respawn the view is

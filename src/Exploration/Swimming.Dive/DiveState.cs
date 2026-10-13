@@ -5,8 +5,10 @@ namespace MC.Exploration.SwimmingDiveMod;
 // camera patches. Owner = the Player it belong to: new local player (logout, respawn copy) = state reset.
 //   Surface (Diving false) = vanilla swimming.
 //   Diving  = me drive the vertical speed. Deep = feet far enough under the vanilla rest height: under-water rules on
-//             (no sideways swimming, stamina drain while still). Not deep and nothing to do up or down (Crouch + Jump,
-//             floor stop the Crouch) = HandedBack: vanilla buoyancy keep the vertical, diver ride the waves.
+//             (no sideways swimming, stamina drain while still). Deep start only on own way down (Vy below 0,
+//             DiveLogic.DivedUnder): wave that rise over a swimmer is no dive. Not deep and nothing to do up or down
+//             (Crouch + Jump, floor stop the Crouch) = HandedBack: vanilla buoyancy keep the vertical, diver ride the
+//             waves.
 internal static class DiveState
 {
     internal static Player Owner;
@@ -115,6 +117,15 @@ internal static class DiveLogic
         return feetY < restY - (wasDeep ? ExitMargin : EnterMargin);
     }
 
+    // Deep may START only on own way down: vy = own vertical speed (DiveState.Vy), below 0 = me taking the diver down.
+    // Once deep, depth alone decide (Deep above). Why: vanilla buoyancy pull a swimmer up at 5 m/s per metre under the
+    // rest height, so water that rise faster than 2.5 m/s (storm wave) leave ANY swimmer more than EnterMargin under
+    // it (plain swimmer at wind 1: about 1 m, in-world run). That swimmer did not dive. Vertical handed back (Crouch +
+    // Jump, floor stop the Crouch) = own speed 0. Dive that start on such a wave (Crouch a moment before Jump, Crouch
+    // tap) = own speed still the body's, upward, for about 0.3 s. Depth alone counted him deep: me held his height
+    // while the wave rose over him (no sideways swimming, drain while still) until a trough came down to him.
+    internal static bool DivedUnder(bool wasDeep, float vy) => wasDeep || vy < 0f;
+
     // Diving next tick. Start: Crouch held with stamina left. Keep: deep, or Crouch still held with stamina. So near
     // the surface (not deep) without Crouch the diver go back to vanilla, whose buoyancy finish the rise.
     internal static bool Diving(bool wasDiving, bool deep, bool down, bool hasStamina)
@@ -150,8 +161,9 @@ internal static class DiveLogic
 
     // Vertical left to vanilla this tick: not deep, stamina left, target 0 (Crouch + Jump, or floor / water bottom
     // stop the Crouch). Vanilla buoyancy and gravity then keep the diver on the waves like any swimmer, so a wave never
-    // rise over a diver held at one height and make him deep (drain while still, no sideways swimming). Deep = me hold
-    // the depth (G2); no stamina = forced ascent, never handed back.
+    // rise over a diver held at one height and make him deep (drain while still, no sideways swimming). Wave too fast
+    // for vanilla buoyancy still get over him: DivedUnder keep that from counting as deep. Deep = me hold the depth
+    // (G2); no stamina = forced ascent, never handed back.
     internal static bool VanillaVertical(bool deep, bool hasStamina, float target) =>
         !deep && hasStamina && target == 0f;
 }

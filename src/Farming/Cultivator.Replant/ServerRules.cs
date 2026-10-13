@@ -44,6 +44,22 @@ internal static class ServerRules
 #if DEBUG
     private static CultivatorRules _testRules;
     private static bool _testPending;
+    private static CultivatorRules _testOwn;
+
+    // Self test force this game's own settings (never the config file): what OwnRules give. Null = normal. Set = like
+    // the player changed a rule setting (Changed raised).
+    internal static CultivatorRules TestOwn
+    {
+        get => _testOwn;
+        set
+        {
+            if (!ReferenceEquals(_testOwn, value))
+            {
+                _testOwn = value;
+                NotifyChanged();
+            }
+        }
+    }
 
     // Self test force rules (never the config file). Null = normal.
     internal static CultivatorRules TestRules
@@ -105,7 +121,21 @@ internal static class ServerRules
         }
     }
 
-    private static CultivatorRules OwnRules => _own ??= CultivatorRules.Own();
+    // This game's own settings (config snapshot, new one after OwnChanged). Rules in force when not a client, and what
+    // transplant saplings grow on while the feature is off (TransplantContent.Rebuild). Never null.
+    internal static CultivatorRules OwnRules
+    {
+        get
+        {
+#if DEBUG
+            if (_testOwn != null)
+            {
+                return _testOwn;
+            }
+#endif
+            return _own ??= CultivatorRules.Own();
+        }
+    }
 
     // Pure (self test hammer it). Not client (single player, host, dedicated server, menu) = own. Client = server's
     // rules of this session, else pending.

@@ -36,10 +36,10 @@ namespace MC.UX.AutoPickupFilterMod;
 //   SelfTests.Harvest.cs  lootfilter.harvest (T24), lootfilter.stations (T24 optional part, T37),
 //                         lootfilter.filtered (T25), lootfilter.door (T32), lootfilter.kiln (T33),
 //                         lootfilter.scythe (T30, T31), lootfilter.scythe-swing (real swing, T30),
-//                         lootfilter.compat-batch (C02)
+//                         lootfilter.pick-column (T38), lootfilter.compat-batch (C02)
 //   lootfilter.bug.*      one check each that the mod does not meet today (red until the mod is fixed), kept alone so
 //                         the other checks of its item stay green: lootfilter.bug.badge-hotbar-number (T13, Ui),
-//                         lootfilter.bug.lists-panel-over-grid (T18, Ui), lootfilter.bug.pick-column (T38, Harvest)
+//                         lootfilter.bug.lists-panel-over-grid (T18, Ui)
 //   SelfTests.Mp.cs       lootfilter.mp.filter (M01, M04), lootfilter.mp.handoff (M02), lootfilter.mp.remote-harvest
 //                         (M05). Mod is client only: it never load on the dedicated server, so no server step.
 // Me never write config: settings forced in memory with TestHooks (then the entry's real change handlers are run with
@@ -113,7 +113,7 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(KilnName, RunKiln),
         new KeyValuePair<string, Func<IEnumerator>>(ScytheName, RunScythe),
         new KeyValuePair<string, Func<IEnumerator>>(ScytheSwingName, RunScytheSwing),
-        new KeyValuePair<string, Func<IEnumerator>>(BugPickColumnName, RunBugPickColumn),
+        new KeyValuePair<string, Func<IEnumerator>>(PickColumnName, RunPickColumn),
         new KeyValuePair<string, Func<IEnumerator>>(HandoffName, RunHandoff),
         new KeyValuePair<string, Func<IEnumerator>>(ForeignPatchName, RunForeignPatch),
         new KeyValuePair<string, Func<IEnumerator>>(CompatSearchName, RunCompatSearch),

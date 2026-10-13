@@ -14,8 +14,8 @@ namespace MC.Exploration.SwimmingDiveMod;
 // -Mod Swimming.Dive). Design 7.5:
 //   dive.network  rules on the wire (round trip, wild values clamped, unknown layout and cut-off refused), which rules
 //                 apply (own / server / pending), push debounce, join check verdicts (pure)
-//   dive.logic    dive state rules (deep hysteresis, start/keep/end, target speed, near-surface hand-back to vanilla
-//                 buoyancy, blockers), camera clamp maths, fog
+//   dive.logic    dive state rules (deep hysteresis, deep start only on own way down, start/keep/end, target speed,
+//                 near-surface hand-back to vanilla buoyancy, blockers), camera clamp maths, fog
 //                 maths, fog override on RenderSettings and the _SunFogColor global (no compounding, base taken again
 //                 after SetEnv, put back only when still ours, linear start/end kept through SetEnv; NOTE how Unity
 //                 store a global colour in this colour space), surface flip round trip on a live
@@ -36,8 +36,7 @@ namespace MC.Exploration.SwimmingDiveMod;
 // and everything a test hand it with Undo.
 // More live tests (each travel to water and back, one TESTING.md group each) live in the other SelfTests.*.cs files:
 //   SelfTests.Live.cs   shared helpers (log tap, water finders, key and dive helpers) and dive.motion, dive.stamina,
-//                       dive.rules, dive.multiplier, dive.waves, dive.bug.storm-waves, dive.keys, dive.menus,
-//                       dive.moveset
+//                       dive.rules, dive.multiplier, dive.waves, dive.keys, dive.menus, dive.moveset
 //   SelfTests.World.cs  dive.view, dive.exits, dive.floor, dive.ceiling, dive.shallow, dive.ashlands, dive.bottom,
 //                       dive.serpent
 //   SelfTests.Mp.cs     multiplayer (tools/Test-Multiplayer.ps1): dive.mp.rules, dive.mp.diver, dive.mp.server-off and
@@ -91,7 +90,6 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(RulesName, RunRules),
         new KeyValuePair<string, Func<IEnumerator>>(MultiplierName, RunMultiplier),
         new KeyValuePair<string, Func<IEnumerator>>(WavesName, RunWaves),
-        new KeyValuePair<string, Func<IEnumerator>>(BugStormWavesName, RunBugStormWaves),
         new KeyValuePair<string, Func<IEnumerator>>(KeysName, RunKeys),
         new KeyValuePair<string, Func<IEnumerator>>(MenusName, RunMenus),
         new KeyValuePair<string, Func<IEnumerator>>(MovesetName, RunMoveset),
@@ -324,6 +322,19 @@ internal static partial class SelfTests
             "deep starts 0.5 m under the rest height");
         c.Check(DiveLogic.Deep(true, true, rest - 0.3f, rest) && !DiveLogic.Deep(true, true, rest - 0.1f, rest),
             "deep stays until 0.2 m under the rest height (hysteresis)");
+        // Deep starts only on the dive's own way down (own vertical speed below 0); once deep the depth alone decides.
+        c.Check(DiveLogic.DivedUnder(false, -0.01f) && DiveLogic.DivedUnder(false, -2f),
+            "going down by the dive (own speed below 0): may turn deep");
+        c.Check(!DiveLogic.DivedUnder(false, 0f),
+            "own speed 0 (vertical left to the normal game: Crouch and Jump, floor stops the Crouch): never turns deep");
+        c.Check(!DiveLogic.DivedUnder(false, 0.01f) && !DiveLogic.DivedUnder(false, 2.5f),
+            "own speed still upward (dive started while a wave lifts the swimmer): does not turn deep");
+        c.Check(DiveLogic.DivedUnder(true, 0f) && DiveLogic.DivedUnder(true, 2f) && DiveLogic.DivedUnder(true, -2f),
+            "already deep: stays deep holding still, rising or going down (the depth alone decides)");
+        // Both rules together, as the dive uses them each physics tick: 1 m under the rest height.
+        var depthSaysDeep = DiveLogic.Deep(true, false, rest - 1f, rest);
+        c.Check(depthSaysDeep && !DiveLogic.DivedUnder(false, 0f) && !DiveLogic.DivedUnder(false, 3f) && DiveLogic.DivedUnder(false, -1f),
+            "water 1 m over a swimmer who did not go down (a storm wave): not deep; 1 m down by the dive: deep");
 
         // Diving: start needs Crouch and stamina; keep while deep or Crouch held with stamina.
         c.Check(DiveLogic.Diving(false, false, true, true), "Crouch with stamina starts a dive");
@@ -1122,9 +1133,10 @@ internal static partial class SelfTests
                 $"still at the surface: no drain ({F(s2)} -> {F(s3)} in 2 s)");
 
             // ---- Crouch + Jump held at the surface = a dive with nothing to do: no drain (G4) ----
-            // Not deep + target 0 = vertical left to vanilla buoyancy and gravity: diver ride the waves, so a wave never
-            // make him deep. Deep and vanilla hand-back sampled every physics tick of the window (each tick can change
-            // them). Deep anyway (a storm wave faster than vanilla buoyancy) = drain on purpose: NOTE, check skipped.
+            // Not deep + target 0 = vertical left to vanilla buoyancy and gravity: diver ride the waves. Wave faster than
+            // vanilla buoyancy (storm, weather here is the world's own) get over him anyway: still never deep, deep
+            // start only on own way down. Deep and vanilla hand-back sampled every physics tick of the window (each
+            // tick can change them).
             DiveInput.TestDown = true;
             DiveInput.TestUp = true;
             yield return new WaitForSeconds(1f);
@@ -1163,19 +1175,12 @@ internal static partial class SelfTests
             var ride = $"deep {deepTicks} of {ticks} ticks, vertical left to vanilla {vanillaTicks} of {ticks}, feet at most "
                        + $"{F(maxUnder)} m under the rest height, own vertical speed at most {F(maxSpeed)}";
             c.Note("Crouch and Jump held at the surface: " + ride);
-            if (deepTicks > 0)
-            {
-                c.Note($"Crouch and Jump held at the surface: a wave still took the diver under, no-drain check skipped "
-                       + $"({F(s4)} -> {F(s5)})");
-            }
-            else
-            {
-                c.Check(heldDiving && ticks > 0 && vanillaTicks == ticks,
-                    $"Crouch and Jump held at the surface: vertical left to vanilla buoyancy every tick (diving "
-                    + $"{heldDiving}, {ride})");
-                c.Check(heldDiving && Mathf.Abs(s5 - s4) < 0.2f,
-                    $"Crouch and Jump held at the surface: no drain ({F(s4)} -> {F(s5)} in 2 s, diving {heldDiving}, {ride})");
-            }
+            c.Check(deepTicks == 0, $"Crouch and Jump held at the surface: a wave never counts the swimmer as deep ({ride})");
+            c.Check(heldDiving && ticks > 0 && vanillaTicks == ticks,
+                $"Crouch and Jump held at the surface: vertical left to vanilla buoyancy every tick (diving "
+                + $"{heldDiving}, {ride})");
+            c.Check(heldDiving && Mathf.Abs(s5 - s4) < 0.2f,
+                $"Crouch and Jump held at the surface: no drain ({F(s4)} -> {F(s5)} in 2 s, diving {heldDiving}, {ride})");
             yield return new WaitForSeconds(1f);
             c.Check(!DiveState.Diving, "keys released at the surface: back to normal swimming");
             rig.GiveStaminaRateBack();

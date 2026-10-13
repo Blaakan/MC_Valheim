@@ -138,6 +138,7 @@ internal static partial class ContainerSorter
 
     // Local items = what ZDO hold? First exact bytes (true right after any own save). Else read ZDO bytes back through
     // vanilla Load + Save once (old item format, durability round trip, stack clamp): same content never refused.
+    // Bytes follow list order: me must never change list order without a save (Sort keep that rule).
     // Scratch inventory: nobody listen to its m_onChanged, not player inventory: its Load never save, never show
     // cheated message. Only make and destroy item prefabs, like vanilla Container.Load. Click only, never per frame.
     private static bool LocalCopyCurrent(Container container)
@@ -182,7 +183,8 @@ internal static partial class ContainerSorter
         return true;
     }
 
-    // Top left to bottom right, row by row, no gap. Live list reordered too (saved data in slot order).
+    // Top left to bottom right, row by row, no gap. When something written, live list reordered too (saved data in
+    // slot order). Nothing written = list stay as it is: LocalCopyCurrent compare bytes in list order.
     private static void Sort(Inventory inventory, SortCriterion criterion, bool merge, Run run)
     {
         var items = inventory.GetAllItems();
@@ -247,7 +249,13 @@ internal static partial class ContainerSorter
             }
         }
 
-        // List order alone invisible: no save for it.
+        // List order alone invisible: no save for it, so no reorder for it either. Item dragged out and back sit last
+        // in list and game saved it so. Me reordered list without save once: next click saw local bytes differ from
+        // saved bytes and refused ("changed elsewhere") until chest closed.
+        if (!run.Written)
+        {
+            return;
+        }
         items.Clear();
         for (var i = 0; i < count; i++)
         {

@@ -10,6 +10,7 @@ namespace MC.Exploration.StatsPerCreatureMod;
 // unknown keys when mod gone):
 //   Tames          "1\n3\t$enemy_boar\n2\t$enemy_wolf"   (version line, then count TAB name per line)
 //   CountingSince  "2026-09-28"                          (day tame counting started, written once, never moved)
+// Tame done while game has no character (respawn wait, world loading): name kept in memory, counted at next spawn.
 // Kills: me never store, never write. Vanilla profile already have them (CreatureCounts read there).
 // Parse cache keyed on raw string reference: many reads per page build = one dictionary lookup each.
 internal static class CounterStore
@@ -26,6 +27,12 @@ internal static class CounterStore
     private static Dictionary<string, int> _cachedTames = Empty;
     private static bool _cachedWritable = true;
     private static bool _newerFormatWarned;
+
+    // Tames that finished while game had no character at all (respawn wait, world still loading): names wait here
+    // for the next spawn. Memory only, never saved. Game object = the play session (one world, one character) they
+    // belong to: a later session never get them.
+    private static readonly List<string> _held = new List<string>();
+    private static Game _heldGame;
 
     // Message look like tame message? Give creature name. Cheap: no allocation unless it match.
     internal static bool TryParseTameMessage(string msg, out string name)
@@ -77,6 +84,52 @@ internal static class CounterStore
         Log.Debug($"Tame counted: {name} ({via}). Stored {CreatureCounts.TamesDataKey} = {Escape(newRaw)}");
     }
 
+    // My game tamed it, but nobody to give it to yet: no local character, no player loaded. Keep the name for the
+    // character that spawn next in this play session. Nothing written: no character = no place to write.
+    internal static void HoldTame(string name)
+    {
+        var game = Game.instance;
+        if (string.IsNullOrEmpty(name) || game == null)
+        {
+            return;
+        }
+        if (_heldGame != game)
+        {
+            // Left over from an older play session: not this character's.
+            _held.Clear();
+            _heldGame = game;
+        }
+        _held.Add(name);
+        Log.Debug($"Tame kept until your character is back: {name}.");
+    }
+
+    // Local character spawned (custom data loaded): give it the kept tames, once. Only in the play session that kept
+    // them: logout in between = other Game object = drop them (next character may be somebody else).
+    internal static void CreditHeldTames()
+    {
+        if (_held.Count == 0)
+        {
+            return;
+        }
+        var names = _heldGame != null && _heldGame == Game.instance ? _held.ToArray() : null;
+        ClearHeld();
+        if (names == null)
+        {
+            return;
+        }
+        foreach (var name in names)
+        {
+            AddTame(name, "owner");
+        }
+    }
+
+    // Kept tames given, or feature off (tame not written while mod on = gone, like tames made while off).
+    internal static void ClearHeld()
+    {
+        _held.Clear();
+        _heldGame = null;
+    }
+
     internal static int GetTames(Player player, string name)
     {
         Parse(player, out _, out var tames, out _);
@@ -125,6 +178,10 @@ internal static class CounterStore
 #if DEBUG
     // Self test only (Debug build): "newer format" warning may come once more, so test can count it.
     internal static void TestResetWarnings() => _newerFormatWarned = false;
+
+    // Self test only (Debug build): as if the play session that kept the tames is over (its Game object destroyed at
+    // logout read as null, same as this).
+    internal static void TestEndHeldSession() => _heldGame = null;
 #endif
 
     // Read stored tames of this player. Same raw string object as last time = cached result.

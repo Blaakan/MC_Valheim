@@ -165,8 +165,8 @@ internal sealed partial class Plugin : ModPlugin
             + "stones, a fermenter, a cooking station or stone oven, a beehive, a sap collector, an item or armor stand, an "
             + "archery target, the empty switch of a production station, or a scythe swing) are picked up whatever the filter "
             + "mode, like picking them up by hand. Turn this off to filter them like any other item. Mining, chopping and "
-            + "fighting drops are filtered, except a drop that lands within 4 m of something you harvested in the last "
-            + "3 seconds.",
+            + "fighting drops are filtered, except a drop that appears within 4 m of something you harvested in the last "
+            + "3 seconds (at any height above it).",
             null, new ConfigurationManagerAttributes { Order = 100 }));
 
         MarkKey = Config.Bind("Controls", "MarkKey", new KeyboardShortcut(KeyCode.Mouse2), new ConfigDescription(

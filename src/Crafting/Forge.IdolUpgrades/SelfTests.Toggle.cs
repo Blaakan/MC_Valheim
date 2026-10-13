@@ -18,8 +18,7 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 //                      back at the Forge: everything there again
 //   forge.off.upgrade  turned off during idol upgrade timer: timer stop, vanilla rows, nothing used
 //   forge.off.refine   turned off during refinement timer: timer stop, no vanilla roll, nothing used
-//   forge.on.at-forge  turned on with Forge window open: odds, text and starred idol back at once
-//   forge.bug.tab-after-on  (real bug, fail until mod fixed) same moment: IDOLS tab back at once too
+//   forge.on.at-forge  turned on with Forge window open: odds, text, starred idol and IDOLS tab back at once
 //   forge.popup.off    starred idol picked up, mod turned off at once: popups still show starred icon
 internal static partial class SelfTests
 {
@@ -27,7 +26,6 @@ internal static partial class SelfTests
     private const string OffUpgradeName = "forge.off.upgrade";
     private const string OffRefineName = "forge.off.refine";
     private const string OnAtForgeName = "forge.on.at-forge";
-    private const string BugTabAfterOnName = "forge.bug.tab-after-on";
     private const string PopupOffName = "forge.popup.off";
 
     private static Sprite HotbarIcon(int x)
@@ -346,25 +344,12 @@ internal static partial class SelfTests
 
     // ---------- forge.on.at-forge (T28) ----------
 
+    // Forge open, mod off, mod on, window never closed. 0.1.1: IDOLS tab back at once too. Tab is made only by a
+    // crafting panel refresh (IdolsTab.AfterPanelUpdate); Plugin.OnActivated now ask for one (IdolsTab.AfterOn), before
+    // it came back only when window was opened again or the list rebuilt.
     private static IEnumerator RunOnAtForge()
     {
-        yield return OnAtForge(OnAtForgeName, false);
-    }
-
-    // ---------- forge.bug.tab-after-on (T28: real bug, fail until mod fixed) ----------
-
-    // Run 2026-10-07: 5 frames after mod turned on with Forge window open, odds and text were back but there was no
-    // MC_IdolsTab button. Tab is made only by the crafting panel refresh (IdolsTab.AfterPanelUpdate) and
-    // Plugin.OnActivated ask for none, so it come back only when window is opened again or the list rebuilt.
-    private static IEnumerator RunBugTabAfterOn()
-    {
-        yield return OnAtForge(BugTabAfterOnName, true);
-    }
-
-    // Same play for both: Forge open, mod off, mod on, window never closed. tabOnly = only the IDOLS tab check.
-    private static IEnumerator OnAtForge(string name, bool tabOnly)
-    {
-        var rig = new Rig(name);
+        var rig = new Rig(OnAtForgeName);
         var c = rig.C;
         try
         {
@@ -389,17 +374,14 @@ internal static partial class SelfTests
 
             c.Check(SetModOff(false) && Plugin.TestActive, $"mod turned on again, the window still open ({Plugin.TestStatus})");
             yield return Frames(5);
-            if (!tabOnly)
-            {
-                c.Check(InventoryGui.IsVisible() && rig.ButtonLabel.EndsWith("(75%)", StringComparison.Ordinal) && rig.CraftText.StartsWith("75% chance", StringComparison.Ordinal),
-                    $"on: the odds and the text are back at once ('{rig.ButtonLabel}' / '{rig.CraftText}')");
-                c.Check(StarIcons.IsStarSprite(rig.SlotIcon(0)), $"on: the idol under the requirements shows its stars again: {Describe(rig.SlotIcon(0))}");
-            }
-            else
-            {
-                var tab = rig.IdolsTabButton();
-                c.Check(InventoryGui.IsVisible() && tab != null && tab.gameObject.activeSelf, "on: the IDOLS tab is back at once, without closing the Forge window");
-            }
+            c.Check(InventoryGui.IsVisible() && rig.ButtonLabel.EndsWith("(75%)", StringComparison.Ordinal) && rig.CraftText.StartsWith("75% chance", StringComparison.Ordinal),
+                $"on: the odds and the text are back at once ('{rig.ButtonLabel}' / '{rig.CraftText}')");
+            c.Check(StarIcons.IsStarSprite(rig.SlotIcon(0)), $"on: the idol under the requirements shows its stars again: {Describe(rig.SlotIcon(0))}");
+            var tab = rig.IdolsTabButton();
+            c.Check(InventoryGui.IsVisible() && tab != null && tab.gameObject.activeSelf, "on: the IDOLS tab is back at once, without closing the Forge window");
+            c.Check(tab != null && tab.interactable && !gui.m_tabUpgrade.interactable && !IdolsTab.Mode && RowOf(gui, axe) >= 0
+                    && ReferenceEquals(gui.m_selectedRecipe.ItemData, axe),
+                "on: the Forge stays on the UPGRADE tab (UPGRADE selected, IDOLS clickable) with the same item selected");
             c.Report();
         }
         finally

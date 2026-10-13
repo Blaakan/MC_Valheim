@@ -14,9 +14,9 @@ namespace MC.Combat.CreaturesMoraleMod;
 //   morale.ranks     stars (T07), ranks across biomes at rank 6 (T08), elites one boss later (T32)
 //   morale.rest      afraid Greydwarfs near a campfire and a bed: Resting then Rested, Bed.CheckEnemies, no combat
 //                    music; hostile ones stop all of it (T03, X04)
-//   morale.kills     rank from a boss kill and its log line (T04), rank-up message only on a kill that raises the rank
-//                    (T37), real credited kills: kill step message, kill bonus, at most one boss early, messages off
-//                    (T05, T06, T25, X03)
+//   morale.kills     rank from a boss kill and its log line, no rank-up message for a second kill of the same boss,
+//                    the message with the kill that raises the rank (T04, T37), real credited kills: kill step
+//                    message, kill bonus, at most one boss early, messages off (T05, T06, T25, X03)
 //   morale.missiles  real arrow, thrown spear, Ooze bomb and harpoon projectiles (T11, T12, X06)
 // The others are in SelfTestsWorld2.cs. Me never write config.
 internal static partial class SelfTests
@@ -591,6 +591,7 @@ internal static partial class SelfTests
             };
             var mark = Watch.Mark();
             Standing.TestKill(new Standing.Override(1));
+            var firstKillMessage = Standing.MessagePending;
             c.Check(!Standing.MessagePending, "T04: the kill that raises the boss rank to 1 (Eikthyr) schedules no rank-up message with the default settings");
             c.Check(Watch.Count("Standing: boss rank 1 (Eikthyr)", mark, BepInEx.Logging.LogLevel.Info) == 1,
                 $"T04: the log shows \"Standing: boss rank 1 (Eikthyr), ...\" once (last Standing line: \"{Watch.Last("Standing:", mark)}\")");
@@ -610,6 +611,12 @@ internal static partial class SelfTests
             Standing.TestKill(new Standing.Override(1));
             c.Check(!Standing.MessagePending && Standing.RankMessageAt < 0f,
                 "T37: a second kill of the same boss (the rank stays 1) schedules no rank-up message");
+            // T04, second half. Old item said this second kill bring the message; user decided the mod is right (design
+            // E5) and the item now say so. Same facts as the old lone check, decided result: nothing due, nothing shown.
+            c.Check(!firstKillMessage && !Standing.MessagePending && Shown(Standing.RankUpText) == rankUps,
+                "T04: after BossesAhead = 0, a second Eikthyr kill (the boss rank stays 1) is followed by no \"Weaker creatures now keep out of your way\" "
+                + $"(message due after the first kill with the defaults: {firstKillMessage}; message due after the second kill: {Standing.MessagePending}; "
+                + $"shown since BossesAhead = 0: {Shown(Standing.RankUpText) - rankUps} time(s))");
             s.Destroy(boar);
             // A character with no boss kill that has BossesAhead = 0 before its first Eikthyr kill: the message comes.
             Standing.TestOverride = new Standing.Override(0);
@@ -622,6 +629,33 @@ internal static partial class SelfTests
             c.Check(w.Met && Shown(Standing.RankUpText) == rankUps + 1 && hud.m_messageCenterText.text == Standing.RankUpText,
                 $"T37: about 4.5 s later the center message reads \"{Standing.RankUpText}\" (now \"{hud.m_messageCenterText.text}\", "
                 + $"shown {Shown(Standing.RankUpText) - rankUps} time(s))");
+
+            // ----- T04 (second half, end): the kill that raises the rank brings the message -----
+            // Back to the character of T04: boss rank 1 after its two Eikthyr kills, BossesAhead still 0. Next boss (The
+            // Elder) raise the rank to 2 = Black Forest kinds afraid now = message. Me show the boss's own death line
+            // like vanilla do right after the kill credit (BaseAI.OnDeath): ours must come once that one faded.
+            Standing.TestOverride = new Standing.Override(1);
+            mark = Watch.Mark();
+            Standing.TestKill(new Standing.Override(2));
+            var elderDue = Standing.RankMessageAt - Time.time;
+            c.Check(Standing.MessagePending && elderDue >= 4f && elderDue <= Standing.RankMessageDelay + 0.01f,
+                "T04: with BossesAhead = 0 the kill that raises the boss rank from 1 to 2 (The Elder) schedules the rank-up message 4 to 4.5 s later "
+                + $"(message due: {Standing.MessagePending}, in {F(elderDue)} s)");
+            c.Check(Watch.Count("Standing: boss rank 2 (The Elder)", mark, BepInEx.Logging.LogLevel.Info) == 1,
+                $"T04: the log shows \"Standing: boss rank 2 (The Elder), ...\" once (last Standing line: \"{Watch.Last("Standing:", mark)}\")");
+            var elder = ZNetScene.instance.GetPrefab("gd_king");
+            var elderAi = elder != null ? elder.GetComponent<BaseAI>() : null;
+            var elderLine = elderAi != null && !string.IsNullOrEmpty(elderAi.m_deathMessage) ? elderAi.m_deathMessage : "$enemy_gdking_deathmessage";
+            // Me count from the death line on: the HUD log drop old lines, a count from its start could lose one here.
+            var elderText = Localization.instance.Localize(elderLine);
+            hud.ShowMessage(MessageHud.MessageType.Center, elderLine);
+            c.Check(ShownAfter(Standing.RankUpText, elderText) == 0 && hud.m_messageCenterText.text != Standing.RankUpText,
+                $"T04: the rank-up message is not shown at once: the boss's own death line ({elderLine}) holds the middle of the screen first "
+                + $"(now \"{hud.m_messageCenterText.text}\")");
+            yield return Until(() => !Standing.MessagePending, Standing.RankMessageDelay + 1f, null, w);
+            c.Check(w.Met && ShownAfter(Standing.RankUpText, elderText) == 1 && hud.m_messageCenterText.text == Standing.RankUpText,
+                $"T04: about 4.5 s after that kill the center message reads \"{Standing.RankUpText}\" (now \"{hud.m_messageCenterText.text}\", "
+                + $"shown {ShownAfter(Standing.RankUpText, elderText)} time(s) after the death line, waited {F(w.Took)} s)");
 
             // ----- T25: personal settings -----
             var display = new List<string>();

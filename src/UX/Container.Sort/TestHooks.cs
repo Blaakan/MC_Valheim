@@ -59,6 +59,7 @@ internal static partial class SortChestUi
         internal RectTransform Rect;
         internal Button Button;
         internal string Label;
+        internal GameObject LabelGo;
         internal UITooltip Tip;
         internal UIGamePad Pad;
         internal GameObject Hint;
@@ -90,6 +91,7 @@ internal static partial class SortChestUi
             Rect = widget.Rect,
             Button = widget.Go.GetComponent<Button>(),
             Label = widget.Label != null ? widget.Label.text : null,
+            LabelGo = widget.Label != null ? widget.Label.gameObject : null,
             Tip = widget.Tip,
             Pad = widget.Pad,
             Hint = widget.Pad != null ? widget.Pad.m_hint : null,

@@ -21,7 +21,9 @@ namespace MC.Farming.CultivatorReplantMod;
 //                        grows; rules asked and received again = all back
 //   replant.mp.owngrow   M11: the client's own grow time setting is never used on a server
 //   replant.mp.allowed   M10: server lets players in who cannot play by its rules; the client turns the mod off, stays
-//                        connected, still knows transplants, and a Yggdrasil transplant grows on it with no root
+//                        connected, still knows transplants, and a Yggdrasil transplant grows on it with no root.
+//                        M14: with the mod off that transplant is on the client's own grow time setting, not the
+//                        server's rules, also when the setting changes after the off
 // Config files of a multiplayer run are throwaway (the script gives server and client fresh ones): the server step
 // writes real settings, so the config -> rules -> push path is the real one. Each client test first asks the server
 // for its default rules again, so a test cut short never spoils the next.
@@ -747,10 +749,30 @@ internal static partial class SelfTests
             var spawnedAt = Time.time;
             c.Check(RootGate.FindRoot(yggSpot, 30f) == null && dropGo != null && dropGo.GetComponent<ItemDrop>() != null, "Yggdrasil transplant with no root near, transplant item on the ground");
 
+            // M14: this player's own setting (this run's own config file) is twice as fast as the server's rules. Not
+            // used while the mod is on (M11): the transplant keeps the server's grow time.
+            var shootPlant = shoot.GetComponent<Plant>();
+            TransplantContent.GrowTimes(ygg, 1f, out var shootLo1, out _);
+            TransplantContent.GrowTimes(ygg, 0.5f, out var shootLo05, out _);
+            TransplantContent.GrowTimes(ygg, 0.2f, out var shootLo02, out _);
+            Plugin.GrowTimeMultiplier.Value = 0.5f;
+            c.Check(ServerRules.UsingServer && Near(shootPlant.m_growTime, shootLo1, 0.5f),
+                $"mod on, own GrowTimeMultiplier 0.5: the transplant is on the server's grow time ({F(shootPlant.m_growTime)} s, x1 = {F(shootLo1)} s)");
+
             // Mod off on this game while connected.
             enabled.Value = false;
             yield return WaitFor(() => !Plugin.FeatureActive, 3f);
             c.Check(!Plugin.FeatureActive, "mod turned off on this game");
+            // M14: off = this player's own grow time on the transplants this game runs, not the server's rules that
+            // were in force until then; the own setting really changed after that (config entry) reaches them at once.
+            c.Check(Near(shootPlant.m_growTime, shootLo05, 0.5f),
+                $"mod off: the transplant is on this player's own grow time ({F(shootPlant.m_growTime)} s, x0.5 = {F(shootLo05)} s), not the server's x1");
+            Plugin.GrowTimeMultiplier.Value = 0.2f;
+            c.Check(Near(shootPlant.m_growTime, shootLo02, 0.5f),
+                $"mod off: own GrowTimeMultiplier set to 0.2: at once on that transplant ({F(shootPlant.m_growTime)} s, x0.2 = {F(shootLo02)} s)");
+            Reset(Plugin.GrowTimeMultiplier);
+            c.Check(Near(shootPlant.m_growTime, shootLo1, 0.5f),
+                $"mod off: own GrowTimeMultiplier back to 1: at once too ({F(shootPlant.m_growTime)} s)");
             // Refusal would come after 1 s grace and cut 4 s later.
             yield return new WaitForSecondsRealtime(7f);
             c.Check(ZNet.GetConnectionStatus() == ZNet.ConnectionStatus.Connected && ZNet.instance != null && ZNet.instance.GetServerPeer() != null && Player.m_localPlayer != null,
@@ -802,6 +824,7 @@ internal static partial class SelfTests
         }
         finally
         {
+            Reset(Plugin.GrowTimeMultiplier);
             if (enabled != null && !enabled.Value)
             {
                 enabled.Value = true;

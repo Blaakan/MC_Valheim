@@ -21,15 +21,15 @@ namespace MC.Farming.FishingFightMod;
 //                     tick, world end, hooked fish picked up, and the hooked flag left behind with no float
 //   fishing.swim      full bag catch (fish stay in the world), then deep water: swimming put the rod away (Swim Dive on)
 //   fishing.toggle    feature off and on through the framework (Plugin.TestBlocked): calm and mid-fight
-//   fishing.input     bar settings at once, Toggle block, inventory, game menu pause, hidden HUD (dry land)
+//   fishing.input     bar settings at once, Toggle block, inventory, game menu pause, hidden HUD; then a Perch lying
+//                     out of the water with its own phase timer: no fight start and the calm clock stand still, with
+//                     the water level given by the test the fight start after the calm time left, water gone = the
+//                     fight end at once (dry land; T26, T28)
 //   fishing.dual      rod from a pair of axes, plain cast, Block + Jump = normal dodge (dry land, Dual Wielding and
 //                     Weapon Moveset on)
 //   fishing.harpoon   tame boar on a harpoon line (the game's effect, put on by the test), then a rod cast lets it go
 //                     and a fight works after (dry land, Harpoon Hooks Tames on)
-//   fishing.bug.struggle-reel  right-side reel in a fight down to the catch, no stall, no break (T25; failed in the
-//                     in-world run: line stood still at 0.9 m), with counts of why no line came in
-//   fishing.bug.stranded  fish out of the water: no fight may start, or it take no line and has no wrong side (dry
-//                     land; T26; failed in the in-world run: fight start, 1.08 m of line a second, wrong side x4)
+// Also here: the last part of fishing.fight (StruggleReelToCatch: right-side reel in a fight down to the catch, T25).
 // Me read log lines of this mod with a BepInEx listener (LogTap, every level), fake held keys with a Harmony postfix
 // on ZInput.GetButton under my own id (HeldKeys, only while a test hold one).
 internal static partial class SelfTests
@@ -42,10 +42,6 @@ internal static partial class SelfTests
     private const string InputName = "fishing.input";
     private const string DualName = "fishing.dual";
     private const string HarpoonName = "fishing.harpoon";
-    // Own small tests for what the in-world run showed the mod does not do (TESTING.md T25, T26): they fail until the
-    // mod is fixed, the other tests stay green.
-    private const string BugReelName = "fishing.bug.struggle-reel";
-    private const string StrandedName = "fishing.bug.stranded";
 
     private const string SwimDiveGuid = "MC.Exploration.Swimming.Dive";
     private const string DualWieldGuid = "MC.Combat.Weapons.DualWield";
@@ -66,8 +62,6 @@ internal static partial class SelfTests
         SelfTest.Register(InputName, RunInput);
         SelfTest.Register(DualName, RunDual);
         SelfTest.Register(HarpoonName, RunHarpoon);
-        SelfTest.Register(BugReelName, RunBugReel);
-        SelfTest.Register(StrandedName, RunStranded);
     }
 
     private static void UnregisterLive()
@@ -80,8 +74,6 @@ internal static partial class SelfTests
         SelfTest.Unregister(InputName);
         SelfTest.Unregister(DualName);
         SelfTest.Unregister(HarpoonName);
-        SelfTest.Unregister(BugReelName);
-        SelfTest.Unregister(StrandedName);
     }
 
     // ---------- small readers ----------
@@ -1322,19 +1314,25 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------- fishing.bug.struggle-reel ----------
-
-    private static IEnumerator RunBugReel() => RunLive(BugReelName, true, BugReelBody);
+    // ---------- fishing.fight, last part: reel in a fight to the catch ----------
 
     // Right-side reel in a fight down to the catch (T25): first a quick calm reel to about 6 m, then the fight with
-    // the default reel speed, rod kept on the right side. Own test: in the in-world run of 2026-10-07 the line came
-    // in at a third of the reel speed and stood still at 0.9 m for the last 10 s (no catch). Me count why no line
-    // came in on each tick (rod judged on the wrong side, or float dragged past the line: the two things that stop
-    // the reel in Fight.Step), so the next run say which. Then the rod held still 2 s (player who stop turning).
-    private static IEnumerator BugReelBody(Checks c, FishRig rig, Stage st, LogTap tap)
+    // the default reel speed, rod kept on the right side. In the in-world runs of 0.1.0 the line came in stop-and-go
+    // and stood still about 1 m from the catch: the drag was measured from the rod top, which the turned rod hold
+    // 2 m and more off the float (0.1.1: measured as if the rod pointed at the float). Me count why no line came in
+    // on each tick (rod judged on the wrong side, float out of the pointed rod's reach, or the line already too far
+    // ahead of the float: the three things that stop the reel in Fight.Step), so a run say which. Then the rod held
+    // still 2 s (player who stop turning). Start like a new rig: facing the water, Fishing 0, no Block.
+    private static IEnumerator StruggleReelToCatch(Checks c, FishRig rig, Stage st, LogTap tap)
     {
         var p = rig.P;
         var turn = FightRules.Default.RodAngle + 15f;
+        rig.Reel(false);
+        rig.Face(st.WaterDir);
+        rig.SetFishing(0f);
+        rig.Fill(p.GetMaxStamina());
+        Fight.TestSwitchRate = null;
+        FightHud.TestArrow = null;
         FightHud.TestDisplay = DefaultDisplay;
         var hook = new Hooked();
         ServerRules.TestRules = new FightRules { ReelSpeed = FightRules.ReelSpeedMax };
@@ -1375,8 +1373,11 @@ internal static partial class SelfTests
         var inTicks = 0;
         var wrongTicks = 0;
         var draggedTicks = 0;
+        var aheadTicks = 0;
         var otherTicks = 0;
         var worstPast = 0f;
+        var worstPointed = 0f;
+        var ahead = Mathf.Max(FightLogic.StruggleDrag, ff.m_breakDistance * FightLogic.BreakGuard);
         var turned = 0f;
         var at4 = -1f;
         var at2 = -1f;
@@ -1407,7 +1408,9 @@ internal static partial class SelfTests
             ticks++;
             var line = ff.m_lineLength;
             var past = PastLine(st, ff);
+            var pointed = PastPointed(p, st, ff);
             worstPast = Mathf.Max(worstPast, past);
+            worstPointed = Mathf.Max(worstPointed, pointed);
             if (line < last - 0.0001f)
             {
                 inTicks++;
@@ -1416,9 +1419,13 @@ internal static partial class SelfTests
             {
                 wrongTicks++;
             }
-            else if (past >= FightLogic.StruggleDrag)
+            else if (pointed >= FightLogic.StruggleDrag)
             {
                 draggedTicks++;
+            }
+            else if (past >= ahead)
+            {
+                aheadTicks++;
             }
             else
             {
@@ -1458,8 +1465,16 @@ internal static partial class SelfTests
         c.Note($"reel in a fight: line {F(from)} -> {F(best)} m in {F(reelTime)} s (4 m after {Seconds(at4)}, 2 m after "
                + $"{Seconds(at2)}, 1 m after {Seconds(at1)}); of {ticks} ticks the line came in on {inTicks}; no line on "
                + $"{wrongTicks} ticks with the rod judged on the wrong side, on {draggedTicks} with the float about "
-               + $"{F(FightLogic.StruggleDrag)} m or more past the line (farthest {F(worstPast)} m), on {otherTicks} for "
-               + $"neither; the fisher turned {F(turned)} deg in all");
+               + $"{F(FightLogic.StruggleDrag)} m or more past the line as the reel judges it (rod pointed at the float; "
+               + $"farthest {F(worstPointed)} m), on {aheadTicks} with the line about {F(ahead)} m or more ahead of the "
+               + $"float from the turned rod top (farthest {F(worstPast)} m), on {otherTicks} for none of these; the "
+               + $"fisher turned {F(turned)} deg in all");
+        if (st.RodTop != null)
+        {
+            // The length the fix leans on (worked out as about 3.2 m and 1.45 m from the 0.1.0 runs, never measured).
+            c.Note($"the rod top is {F(Flat(st.RodTop.position - p.transform.position).magnitude)} m in front of the fisher "
+                   + $"and {F(st.RodTop.position.y - p.transform.position.y)} m above the feet while reeling");
+        }
         if (ff != null)
         {
             var top = st.RodTop;
@@ -1491,7 +1506,7 @@ internal static partial class SelfTests
                 {
                     holdWrong++;
                 }
-                else if (PastLine(st, ff) >= FightLogic.StruggleDrag)
+                else if (PastPointed(p, st, ff) >= FightLogic.StruggleDrag)
                 {
                     holdDragged++;
                 }
@@ -1511,12 +1526,22 @@ internal static partial class SelfTests
         c.Check(!broke, "the line does not break");
     }
 
-    // How far the float is past the line's end (m): rod top to float, minus the line. Fight.Step reels only while
-    // this is under FightLogic.StruggleDrag in a fight.
+    // How far the float is past the line's end (m): rod top to float, minus the line. In a fight Fight.Step stops the
+    // reel when this reaches half the rod's break distance (the line never runs that far ahead of the float).
     private static float PastLine(Stage st, FishingFloat ff)
     {
         var top = st.RodTop;
         return top != null && ff != null ? Vector3.Distance(top.position, ff.transform.position) - ff.m_lineLength : 0f;
+    }
+
+    // The same as the reel of a fight judges it: as if the rod pointed at the float (FightLogic.PointedDistance).
+    // Fight.Step reels only while this is under FightLogic.StruggleDrag.
+    private static float PastPointed(Player p, Stage st, FishingFloat ff)
+    {
+        var top = st.RodTop;
+        return top != null && ff != null && p != null
+            ? FightLogic.PointedDistance(p.transform.position, top.position, ff.transform.position) - ff.m_lineLength
+            : 0f;
     }
 
     private static string Seconds(float t) => t < 0f ? "never" : F(t) + " s";
@@ -2302,6 +2327,12 @@ internal static partial class SelfTests
             $"HUD hidden (what Ctrl+F3 does): the bar goes away with the HUD (bar moved {F(barShift)}, the HUD {F(rootShift)})");
         c.Check(hud.IsVisible() && FightHud.BarShown && Mathf.Abs(FightHud.TestBarWorld.x - barX) <= Mathf.Abs(rootShift) * 0.01f + 0.01f,
             "HUD shown again: the bar is back in place");
+
+        // --- Fish out of the water (T26, T28): a new Perch on the same dry ground, the fight's own phase timer.
+        Remove(hook);
+        yield return null;
+        Fight.TestPhase = null;
+        yield return OutOfWater(c, rig, st, tap);
     }
 
     // ---------- fishing.dual ----------
@@ -2520,13 +2551,13 @@ internal static partial class SelfTests
             "after the harpoon: catch bar, fight and calm again work as usual");
     }
 
-    // ---------- fishing.bug.stranded ----------
+    // ---------- fishing.input, last part: fish out of the water ----------
 
-    private static IEnumerator RunStranded() => RunLive(StrandedName, false, StrandedBody);
-
-    // Fish lying out of the water (dry land) with its own phase timer. Right behaviour, either of: no fight starts
-    // while it is out of the water (the calm bar goes on), or a fight there takes no line and has no wrong side.
-    private static IEnumerator StrandedBody(Checks c, FishRig rig, Stage st, LogTap tap)
+    // Fish lying out of the water (dry land) with its own phase timer (T26; nothing pinned: the caller clear the
+    // phase pin). Right behaviour, either of: no fight starts while it is out of the water (the calm bar goes on;
+    // what the mod does since 0.1.1), or a fight there takes no line and has no wrong side. In the in-world runs of
+    // 0.1.0 a fight started after 2 to 3 s, took 1.08 m of line a second and charged the wrong side x4.
+    private static IEnumerator OutOfWater(Checks c, FishRig rig, Stage st, LogTap tap)
     {
         var p = rig.P;
         var quick = new FightRules
@@ -2546,6 +2577,7 @@ internal static partial class SelfTests
         var ff = hook.Float;
         var fish = hook.Fish;
         var calmHigh = quick.CalmSeconds * 1.4f * Mathf.Lerp(1.2f, 0.8f, fight.Profile.D01);
+        var calmLeft = fight.PhaseLeft;
         var dry = fish.IsOutOfWater();
         var start = Time.time;
         while (ReferenceEquals(Fight.Current, fight) && fight.Phase == FightPhase.Calm && Time.time - start < calmHigh + 2f)
@@ -2565,6 +2597,7 @@ internal static partial class SelfTests
             yield return null;
             c.Check(FightHud.BarShown,
                 $"fish out of the water: no fight starts, the catch bar goes on ({F(waited)} s waited, the calm time is at most {F(calmHigh)} s)");
+            yield return WaterComesAndGoes(c, hook, quick, calmLeft, waited, tap);
             yield break;
         }
         c.Note($"a fight started {F(waited)} s after the hook although the fish lies out of the water (it cannot run there)");
@@ -2601,6 +2634,68 @@ internal static partial class SelfTests
         rig.Reel(false);
         c.Check(rate <= normalCost * 1.5f + 0.5f,
             $"reeling toward a fish that lies out of the water must not cost the wrong-side price ({F(rate)} stamina/s, the normal cost of a fighting fish is {F(normalCost)}/s, wrong side x{F(rules.WrongSideStamina)})");
+    }
+
+    // New with 0.1.1 (T28), after the wait of OutOfWater (fight calm, fish still out of the water): the calm clock
+    // stood still, it runs again once the fish is in the water and the fight starts when it is over, and a fight in
+    // progress ends at once when the fish leaves the water. No water on this rig: the "in the water" part is the
+    // mod's own in-memory answer (Fight.TestOutOfWater = false), the "out of the water" parts are the game's own
+    // (Fish.IsOutOfWater of a Perch lying on dry land). A real fish lifted out of real water by the line stays a
+    // by-hand part.
+    private static IEnumerator WaterComesAndGoes(Checks c, Hooked hook, FightRules quick, float calmLeft, float waited,
+        LogTap tap)
+    {
+        var fight = hook.Fight;
+        var fish = hook.Fish;
+        var ff = hook.Float;
+        if (fish == null || ff == null || !ReferenceEquals(Fight.Current, fight) || fight.Phase != FightPhase.Calm)
+        {
+            yield break;
+        }
+        var d01 = fight.Profile.D01;
+        var left = fight.PhaseLeft;
+        c.Check(Near(left, calmLeft, 0.001f) && left > 0f,
+            $"out of the water the calm time does not run ({F(calmLeft)} s left at the hook, {F(left)} s left after {F(waited)} s)");
+
+        // In the water (the mod is told so): the calm time runs, the fight starts when it is over.
+        var mark = tap.Mark();
+        yield return new WaitForFixedUpdate();
+        var wetStart = Time.time;
+        Fight.TestOutOfWater = false;
+        while (fish != null && ff != null && ReferenceEquals(Fight.Current, fight) && fight.Phase == FightPhase.Calm
+               && Time.time - wetStart < left + 1.5f)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        var inWater = Time.time - wetStart;
+        var fought = fish != null && ff != null && ReferenceEquals(Fight.Current, fight) && fight.Phase == FightPhase.Struggle;
+        c.Check(fought && Mathf.Abs(inWater - left) <= 0.1f,
+            $"back in the water the calm time runs on and the fight starts when it is over ({F(inWater)} s in the water, {F(left)} s were left)");
+        if (!fought)
+        {
+            Fight.TestOutOfWater = null;
+            yield break;
+        }
+
+        // Out of the water again (the game's own answer for this fish): the fight ends at once, long before its time.
+        var zdo = fish.m_nview.GetZDO();
+        var splashOn = zdo.GetFloat(ZDOVars.s_escape) > 0f;
+        var fightLow = quick.StruggleSeconds * 0.67f * Mathf.Lerp(0.8f, 1.2f, d01);
+        Fight.TestOutOfWater = null;
+        var ticks = 0;
+        while (ticks < 10 && fish != null && ReferenceEquals(Fight.Current, fight) && fight.Phase == FightPhase.Struggle)
+        {
+            yield return new WaitForFixedUpdate();
+            ticks++;
+        }
+        yield return null;
+        yield return null;
+        c.Check(fish != null && fish.IsOutOfWater() && ReferenceEquals(Fight.Current, fight)
+                && fight.Phase == FightPhase.Calm && ticks <= 2,
+            $"the fish leaves the water during a fight: the fight ends at once ({ticks} ticks; by its own time it would have lasted {F(fightLow)} s or more)");
+        c.Check(splashOn && FightHud.BarShown && fish != null && Near(zdo.GetFloat(ZDOVars.s_escape), 0f)
+                && tap.Has("Fight: calm for ", mark),
+            "fight ended by leaving the water: the catch bar is back, the splash key is off, Debug line \"Fight: calm for ... s.\"");
     }
 }
 #endif

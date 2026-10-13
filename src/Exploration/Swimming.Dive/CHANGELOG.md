@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed: in a storm, holding Crouch and Jump together at the surface could get you held under a rising wave, unable to
+  swim sideways and losing stamina fast. A wave that washes over you is no longer taken for a dive: you only count as
+  under water once Crouch has taken you down, so at the surface you keep riding the waves and keep your stamina, also
+  when you press Crouch a moment before Jump.
+
 ## 0.1.0
 
 - Initial version. While swimming, hold Crouch to dive straight down and hold Jump to rise, at your swimming speed;

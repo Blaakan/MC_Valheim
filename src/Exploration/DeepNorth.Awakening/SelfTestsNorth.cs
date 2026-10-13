@@ -12,9 +12,10 @@ namespace MC.Exploration.DeepNorthAwakeningMod;
 //   dn.dormant      stage 0 in a place that is invaded later: nothing from the mod (no area Jotun, no band, no blizzard,
 //                   no meteor) with storms and bands forced to 100 %; the console says 0 broken, stage 0; then stage 1
 //                   in that same place (not one of the first areas): still quiet
-//   dn.stage1       an area invaded at stage 1: both Krigen, Hexen and Elaking around the player under the caps, by day
-//                   and at night, none hunting; no circle, pin or event for the area, no Malicious Ice in it, awake
-//                   whatever the world time
+//   dn.stage1       an area invaded at stage 1: both Krigen, Hexen and Elaking around the player, by day and at night,
+//                   none hunting; fresh fills never past what one pass of the game can leave (cap, or one last group
+//                   over: 4 Krigen, 2 dual-axe Krigen, 2 Hexen, 8 Elaking); no circle, pin or event for the area, no
+//                   Malicious Ice in it, awake whatever the world time
 //   dn.storm        blizzard within seconds, meteors never near the player, StormShare 0 = none, Meteors off =
 //                   blizzard only, the default schedule of this area over a day, no blizzard past the Deep North line
 //   dn.bands        a nature band through the area's own check (timer, chance): size, place, together, no second one,
@@ -30,8 +31,6 @@ namespace MC.Exploration.DeepNorthAwakeningMod;
 //                   (no banner, no invasion); key removed mid-game = counted again within a second; next break goes on
 //   dn.toggle       mod turned off in the area (framework switch, never the Enabled setting): weather, spawns, fights,
 //                   stones, map and command like the normal game; on again: all back, count goes on
-//   dn.bug.caps     real bug, own small test: a fresh fill of an area can go over the numbers the README gives (one
-//                   Krigen or two Elaking more: the game's last group of a pass)
 internal static partial class SelfTests
 {
     private static string CurrentEnv()
@@ -362,7 +361,8 @@ internal static partial class SelfTests
                 c.Check(CountPrefab(first, Hostility.Krigen) > 0 && CountPrefab(first, Hostility.KrigenDual) > 0
                         && CountPrefab(first, Hostility.Hexen) > 0 && CountPrefab(first, Hostility.Elaking) > 0,
                     $"both kinds of Krigen, Hexen and Elaking are there ({Kinds(first)})");
-                // The exact numbers of the README are dn.bug.caps' own check: one pass of the game can go a group over.
+                // One pass of the game can go a group over the cap, never more (FillMost; the fills further down ask
+                // the same of many passes).
                 c.Check(OneSet(first) && first.Count <= SetMost(),
                     $"about a dozen, one set of the area: 3 Krigen, 2 dual-axe Krigen, 2 Hexen, 6 Elaking, at most one last group more ({Kinds(first)})");
                 c.Check(asleep == 0, $"every one came from an area invaded at stage 1 ({asleep} did not)");
@@ -375,6 +375,21 @@ internal static partial class SelfTests
                                  && Mathf.Approximately(e.m_overrideLevelupChance, rules.StarChance(1));
                 }
                 c.Check(entriesOk, "the four Jotun entries spawn by day and at night, never as hunters, with the stage 1 star chance (10 %)");
+                // The two rows of numbers the README and design 2.3 give, from the built entries themselves: what the
+                // spawner aim at (cap), and the most one pass can leave (cap - 1 before the last group + that group,
+                // sized min(biggest group, cap) in a place with none: vanilla UpdateSpawnList).
+                var aims = new[] { 3, 2, 2, 6 };
+                var tops = new[] { 4, 2, 2, 8 };
+                var numbersOk = true;
+                for (var i = 0; i < Hostility.Army.Length; i++)
+                {
+                    var e = AreaSpawns.TestEntry(Hostility.Army[i]);
+                    numbersOk &= e != null && e.m_maxSpawned == aims[i]
+                                 && e.m_maxSpawned - 1 + Mathf.Min(e.m_groupSizeMax, e.m_maxSpawned) == tops[i]
+                                 && FillMost(Hostility.Army[i]) == tops[i];
+                }
+                c.Check(numbersOk,
+                    "the four Jotun entries aim at 3 Krigen, 2 dual-axe Krigen, 2 Hexen and 6 Elaking; with their group sizes one pass of the game leaves at most 4, 2, 2 and 8");
 
                 // The other half of the day (the game's own debug clock, put back in finally): they come too.
                 var wasDay = EnvMan.IsDay();
@@ -395,6 +410,44 @@ internal static partial class SelfTests
                 env.m_debugTimeOfDay = savedDebug;
                 env.m_debugTime = savedDebugTime;
                 envSaved = false;
+
+                // Area numbers (T25): many fresh fills of this place (timers back to "never ran", like a place nobody
+                // visited; none of its Jotun left). Vanilla UpdateSpawnList count the creatures once, before the pass:
+                // it stop the pass at the cap, but its last group is sized against that first count, so a fill can end
+                // a group over the cap and never more (FillMost). A fill go one Krigen over the cap about 3 times in 8
+                // (two groups of 2, or 1 + 1 + 2), so in 10 fills some stand over the cap; all must stay at the most.
+                const int wanted = 10;
+                var fills = 0;
+                var most = new int[Hostility.Army.Length];
+                var over = "";
+                for (var k = 0; k < wanted && over.Length == 0 && clock.Room(5f); k++)
+                {
+                    DestroyAll(TaggedNear(pos, 400f));
+                    yield return Frames(3);
+                    AreaSpawns.TestResetTimers(spawner.Value, true, false);
+                    // The four entries run in one pass of the zone (once a second).
+                    yield return Until(() => TaggedNear(pos, 400f).Count > 0, clock.Cap(4f));
+                    yield return Frames(2);
+                    var got = TaggedNear(pos, 400f);
+                    if (got.Count == 0)
+                    {
+                        continue;
+                    }
+                    fills++;
+                    for (var i = 0; i < most.Length; i++)
+                    {
+                        most[i] = Mathf.Max(most[i], CountPrefab(got, Hostility.Army[i]));
+                    }
+                    if (!OneSet(got))
+                    {
+                        over = Kinds(got);
+                    }
+                }
+                c.Check(fills >= 3 && over.Length == 0,
+                    $"{fills} more fresh fill(s) of the area: never more than {FillMost(Hostility.Krigen)} Krigen, {FillMost(Hostility.KrigenDual)} dual-axe Krigen, "
+                    + $"{FillMost(Hostility.Hexen)} Hexen and {FillMost(Hostility.Elaking)} Elaking at once, the cap or one last group over "
+                    + $"(most seen: {most[0]} Krigen, {most[1]} dual-axe Krigen, {most[2]} Hexen, {most[3]} Elaking"
+                    + (over.Length > 0 ? $"; one fill gave {over}" : "") + ")");
 
                 // Hidden (T07): nothing marks the area but the tint; no Malicious Ice in it; it does not end with time.
                 yield return new WaitForSeconds(1.2f);
@@ -1572,94 +1625,6 @@ internal static partial class SelfTests
             yield return GoHome(c, player, home);
         }
         c.Note("the two test invasions left their ice and Fimbul locations far from the area (events removed)");
-        c.Report();
-    }
-
-    // ---------- dn.bug.caps ----------
-
-    // Real bug, alone here (README and design 2.3: "up to 3 Krigen, 2 dual-axe Krigen, 2 Hexen and 6 Elaking"). The mod
-    // let vanilla UpdateSpawnList count: a pass stop at the cap, but its last group is sized against the count from
-    // before the pass, so a fresh fill can end one Krigen or two Elaking over. Me fill one area fresh several times
-    // (timers back to "never ran", like a place nobody visited) and stop at the first fill over a number. Expected to
-    // fail until the mod (or the README) is fixed; the other tests only ask for one set (OneSet).
-    private static IEnumerator RunCaps()
-    {
-        var c = new Checks(CapsName);
-        var player = Player.m_localPlayer;
-        _home ??= player.transform.position;
-        var home = _home.Value;
-        var clock = new Clock();
-        var travelled = false;
-        try
-        {
-            ServerRules.TestRules = Rules(r =>
-            {
-                r.StormShare = 0;
-                r.NatureBandChance = 0;
-            });
-            WorldState.TestStones = 3;
-            WorldState.Refresh();
-            AreaSpawns.TestInvalidate();
-            if (!c.Check(LandSlot(SlotOther, out var point, out var cell), "a dry invaded Deep North area exists"))
-            {
-                c.Report();
-                yield break;
-            }
-            var box = new Box();
-            travelled = true;
-            yield return TeleportAndWait(player, point, TravelTimeout, box);
-            var spawner = new Found<SpawnSystem>();
-            if (c.Check(box.Ok, $"travelled to the invaded area {cell} at {F(point)}"))
-            {
-                yield return WaitSpawner(player.transform.position, 12f, spawner);
-            }
-            if (box.Ok && c.Check(spawner.Value != null, "this game owns the zone control in the area"))
-            {
-                var pos = player.transform.position;
-                // A fill go one Krigen over about 3 times in 8 (two groups of 2, or 1 + 1 + 2): 10 fills miss it 1 run in 100.
-                const int wanted = 10;
-                var fills = 0;
-                var most = new int[Hostility.Army.Length];
-                var over = "";
-                for (var k = 0; k < wanted && over.Length == 0 && clock.Room(5f); k++)
-                {
-                    DestroyAll(TaggedNear(pos, 400f));
-                    yield return Frames(3);
-                    AreaSpawns.TestResetTimers(spawner.Value, true, false);
-                    // The four entries run in one pass of the zone (once a second; the first up to 10 s after the zone
-                    // came).
-                    yield return Until(() => TaggedNear(pos, 400f).Count > 0, clock.Cap(k == 0 ? 14f : 4f));
-                    yield return Frames(2);
-                    var got = TaggedNear(pos, 400f);
-                    if (got.Count == 0)
-                    {
-                        continue;
-                    }
-                    fills++;
-                    for (var i = 0; i < most.Length; i++)
-                    {
-                        most[i] = Mathf.Max(most[i], CountPrefab(got, Hostility.Army[i]));
-                    }
-                    if (!UnderCaps(got))
-                    {
-                        over = Kinds(got);
-                    }
-                }
-                c.Check(fills >= 3 && over.Length == 0,
-                    $"{fills} fresh fill(s) of one invaded area: never more than 3 Krigen, 2 dual-axe Krigen, 2 Hexen and 6 Elaking at once "
-                    + $"(most seen: {most[0]} Krigen, {most[1]} dual-axe Krigen, {most[2]} Hexen, {most[3]} Elaking"
-                    + (over.Length > 0 ? $"; one fill gave {over}" : "") + ")");
-            }
-        }
-        finally
-        {
-            ClearOverrides();
-            SweepArea(player);
-        }
-        if (travelled)
-        {
-            yield return GoHome(c, player, home);
-        }
         c.Report();
     }
 }

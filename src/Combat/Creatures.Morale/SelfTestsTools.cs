@@ -191,6 +191,32 @@ internal static partial class SelfTests
         return count;
     }
 
+    // Same, but only lines shown after the last `after` line (-1 = `after` not in the log). The log drop its oldest
+    // line at 50: a count from a line shown a moment ago never lose one, a count from the start can.
+    private static int ShownAfter(string text, string after)
+    {
+        var hud = MessageHud.instance;
+        if (hud == null)
+        {
+            return -1;
+        }
+        var log = hud.GetLog();
+        var from = log.LastIndexOf(after);
+        if (from < 0)
+        {
+            return -1;
+        }
+        var count = 0;
+        for (var i = from + 1; i < log.Count; i++)
+        {
+            if (log[i] == text)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
     // Corner message (top left), not a center one: it waits in the corner queue or is the corner line on screen now
     // (MessageHud.ShowMessage put only TopLeft messages there; a center message goes straight to the center text).
     private static bool InCorner(string text)

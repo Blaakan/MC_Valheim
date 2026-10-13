@@ -5,6 +5,12 @@
 - Fixed a false warning, "Unknown item name(s) in the idol settings, ignored: ...", that listed every default item. It
   was logged at game start with some other item mods installed (seen with Jotunn-based mods) and at every return to
   the main menu. The idol settings were read correctly all along; a real typo is still reported once a world loads.
+- Fixed: a tier whose Material setting is empty or is not an item of the game blocked the idol upgrades of that tier
+  without saying why. The Idols tab now says it in red ("No valid metal is set for this tier in the settings."), and
+  the cost shown in the tab and in the idol's tooltip still counts that metal ("5 metal of this tier") instead of
+  leaving it out. The log warning names an empty Material setting instead of listing an empty name.
+- Fixed: turning the mod on while the Forge window is open brings the IDOLS tab back at once. Before, only the odds
+  and the text came back and the tab was missing until the window was closed and opened again.
 
 ## 0.1.0
 

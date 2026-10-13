@@ -12,6 +12,11 @@ namespace MC.Farming.CultivatorReplantMod.Patches;
 //   UpdateHover      postfix: remember the frame the player held a ship helm or lox saddle (doodad controller).
 //                    UpdateHover run before the Use block that let go of it, so release frame count too. Replant
 //                    then set no target that frame: no hint, press stay with the game.
+//   UpdatePlacementGhost  postfix, Last priority and after PlantEasily's (other author's mod): its postfix write Valid
+//                    over the game's verdict when its own plant checks pass. Me put the Ancient Root rule and the
+//                    no-build zone refusal back on a transplant ghost of ours (GhostVerdict). The game call this
+//                    method every frame (LateUpdate) and once more inside TryPlacePiece, right before it read the
+//                    status: ghost red and place button refused. PlantEasily not installed = nothing done.
 [HarmonyPatch(typeof(Player))]
 internal static class PlayerPatches
 {
@@ -48,6 +53,26 @@ internal static class PlayerPatches
         catch (Exception e)
         {
             PatchGuard.Report("Player.UpdateHover postfix", e);
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPriority(Priority.Last)]
+    [HarmonyAfter(GhostVerdict.PlantEasilyId)]
+    [HarmonyPatch(nameof(Player.UpdatePlacementGhost))]
+    private static void UpdatePlacementGhost_Postfix(Player __instance)
+    {
+        if (!ReferenceEquals(__instance, Player.m_localPlayer))
+        {
+            return;
+        }
+        try
+        {
+            GhostVerdict.AfterGhostUpdate(__instance);
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("Player.UpdatePlacementGhost postfix", e);
         }
     }
 }

@@ -4,12 +4,18 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
-MC Mods panel. Smoke test passed 2026-09-29 (loads, patches cleanly, the activation check of `Player.AutoPickup`
-passed, JitCheck clean: 310 methods, 0 failures). No in-game test yet.
+**Build under test:** 0.1.1, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+MC Mods panel. Smoke test passed 2026-09-29 on 0.1.0 (loads, patches cleanly, the activation check of
+`Player.AutoPickup` passed, JitCheck clean: 310 methods, 0 failures). No in-game test yet. 0.1.1 fixes the harvest
+exemption for one pick that gives 8 items or more (the items that pop out highest are now collected too) and resets
+T38 to `[ ]`; the smoke test and the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, every MC mod loaded):
+`lootfilter.pick-column` and the others passed, apart from the two open `lootfilter.bug.*` tests (T13, T18). Twelve of
+them needed a second run without the other mods' tests before them (a Torch left in the first inventory slot), and
+`lootfilter.stations` passes about one run in two (the two sap drops of its sap collector are sometimes not picked up
+within its 2 seconds).
 
-**Automated checks (2026-10-08):** 37 of 40 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 38 of 40 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -256,15 +262,14 @@ logs:
   the bread is done and take it out with E. Expected: the bread is picked up at once, like cooked meat from a cooking
   station (T24).
   *Automated: `lootfilter.stations`.*
-- [!] **T38 Many items from one pick (user behaviour 3):** in a world with the Resources world modifier at its
+- [x] **T38 Many items from one pick (user behaviour 3):** in a world with the Resources world modifier at its
   highest setting (3x), mode Only selected with only Coins selected, auto pickup on. Press E on a ripe plant that
   gives several items per pick, or scythe it (unverified amounts: seed carrots, seed turnips and seed onions give 3
   seeds, so 9 at 3x). Expected: every item of the pick is picked up, also the ones that pop out highest above the
-  plant; none stays on the ground showing "Auto pickup skips this (not selected)". Suspected bug in 0.1.0: from the
-  8th item of one pick on, the items get no harvest exemption and stay on the ground (self test
-  `lootfilter.bug.pick-column`, which also lists in a NOTE the plants that give 8 items or more at 3x).
-  **FAILED:** automated test: One pick that gives 8 or more items: the top items get no harvest exemption and stay on
-  the ground (self-test `lootfilter.bug.pick-column`)
+  plant; none stays on the ground showing "Auto pickup skips this (not selected)". Bug in 0.1.0, fixed in 0.1.1: from
+  the 8th item of one pick on, the items got no harvest exemption and stayed on the ground (the self test
+  `lootfilter.pick-column` also lists in a NOTE the plants that give 8 items or more at 3x).
+  *Automated: `lootfilter.pick-column`.*
 - [x] **T39 Item of a mod that is no longer installed:** set `Defaults.IgnoredItems = stone,SomeUnknownItem` and run
   `lootfilter defaults` (or use a character whose lists hold an item from a mod you removed). Expected: the unknown
   name is kept as typed; `lootfilter` and the button tooltip list it by that name; `/lootfilter_ignore

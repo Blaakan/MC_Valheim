@@ -23,9 +23,12 @@ internal static class IdolTooltip
             Text.Append("\n<color=#A0A0A0>Upgrade at a Forge of Potential, Idols tab: ");
             var material = ServerRules.Current.Material[target];
             var trophies = ServerRules.Current.Trophies[target];
-            if (material > 0 && tier != null && tier.Material != null)
+            if (material > 0 && tier != null)
             {
-                Text.Append(material).Append(' ').Append(tier.Material.m_itemData.m_shared.m_name).Append(", ");
+                // Tier metal no item of this game (typo or empty in settings): cost still hold it (upgrade blocked,
+                // Idols tab say why in red). No name to show.
+                Text.Append(material).Append(' ')
+                    .Append(tier.Material != null ? tier.Material.m_itemData.m_shared.m_name : "metal of its biome").Append(", ");
             }
             if (trophies > 0)
             {

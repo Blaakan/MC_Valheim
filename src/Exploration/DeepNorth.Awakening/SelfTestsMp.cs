@@ -22,6 +22,8 @@ namespace MC.Exploration.DeepNorthAwakeningMod;
 //   dn.mp.kall     after Kall: rules and area lists as a joining player gets them; an area not cleared spawns its Jotun
 //                  on arrival with its blizzard; the player's kills count on the server; weakening and "The Jotun
 //                  Retreat" reach the player; cleared = no blizzard
+//   dn.mp.killtarget  after Kall: the server's ClearKillsMin / Max lowered (its own config) to the kills an area
+//                  already has: the server clears it without another death, the player's game hears of it
 //   dn.mp.cleared  after Kall: a cleared area (cleared on the server) gets no Jotun and no blizzard for a player who
 //                  asks like at join; the mod turned off and on again there: still no blizzard
 // Server halves (run by the server probe on the dedicated server):
@@ -842,6 +844,85 @@ internal static partial class SelfTests
         if (travelled)
         {
             yield return GoHomeMp(c, player, home);
+        }
+        if (changed)
+        {
+            yield return PutServerBack(c, s, stones0, cell);
+        }
+        c.Report();
+    }
+
+    // ---------- dn.mp.killtarget ----------
+
+    // The real road of a lowered kill target: the dedicated server's own settings change (its config entries, like an
+    // owner editing them), the server clears the area that already has the kills, the player's game hears of it. Deaths
+    // made on the server without creatures; the player stays at the spawn.
+    private static IEnumerator RunMpKillTarget()
+    {
+        var c = new Checks(MpKillTargetName);
+        var s = new Server();
+        var stones0 = 0;
+        var changed = false;
+        var cell = HeldCells.NoTag;
+        try
+        {
+            if (!AsPlayer(c))
+            {
+                c.Report();
+                yield break;
+            }
+            yield return Ask(s, StepState, "");
+            if (!c.Check(s.Ok, "the server answers (" + s.Reply + ")")
+                || !c.Check(LandSlot(SlotKillTarget, out _, out _), "a dry invaded Deep North area exists"))
+            {
+                c.Report();
+                yield break;
+            }
+            LandSlot(SlotKillTarget, out var point, out cell);
+            stones0 = s.Num("stones");
+            changed = true;
+            // Stage 3, 6 kills clear an area, no storms, no bands.
+            yield return Ask(s, StepSet, "defaults=1;kall=0;rescan=1;stones=3;StormShare=0;NatureBandChance=0;ClearKillsMin=6;ClearKillsMax=6");
+            yield return Until(() => StonesAre(3) && ServerRules.UsingServer && ServerRules.Current.ClearKillsMin == 6
+                                     && ServerRules.Current.ClearKillsMax == 6, 8f);
+            c.Check(s.Ok && StonesAre(3) && ServerRules.Current.ClearKillsMin == 6 && ServerRules.Current.ClearKillsMax == 6,
+                "the server's stage 3 and its rules (6 kills clear an area) are on the player");
+            yield return Ask(s, StepSet, "kall=1");
+            yield return Until(() => WorldState.KallDefeated && HeldCells.TestKnown, 8f);
+            c.Check(s.Ok && WorldState.KallDefeated && HeldCells.TestKnown, "Kall defeated on the server: the player knows, the area lists came");
+
+            // 3 Jotun deaths in the area, as the server sees them: 3 of 6.
+            yield return Ask(s, StepKill, string.Format(CultureInfo.InvariantCulture, "{0}|{1:R}|{2:R}|3", Hostility.Krigen, point.x, point.z));
+            var logged = s.Num("log.cleared");
+            s.Cell(cell, out var kills, out _, out var cleared, out _);
+            c.Check(s.Ok && kills == 3 && !cleared, $"3 Jotun deaths in the area on the server: 3 of 6 counted, not cleared ({kills} counted, cleared {cleared})");
+            yield return Until(() => HeldCells.KillsIn(cell) == 3, 4f);
+            var text = HeldCells.DescribeArea(point, ServerRules.Current);
+            c.Check(!HeldCells.IsCleared(cell) && ReadOf(text, JotunDefeated, out var shownKills, out var shownTarget)
+                    && shownKills == 3 && shownTarget == 6,
+                $"the player's game shows 3 of 6 Jotun defeated there ('{text}')");
+
+            // The server's own settings go down to 3 and stay there: no further death.
+            HeldCells.TestResetNews();
+            yield return Ask(s, StepSet, "ClearKillsMin=3;ClearKillsMax=3");
+            c.Check(s.Ok, "ClearKillsMin and ClearKillsMax set to 3 on the server (" + (s.Ok ? "done" : s.Reply.ToString()) + ")");
+            yield return WaitServerCell(s, cell, 0, true, 6f);
+            s.Cell(cell, out kills, out _, out cleared, out var marked);
+            var lines = s.Num("log.cleared") - logged;
+            c.Check(s.Ok && cleared && marked && kills == 0 && lines == 1,
+                $"a few seconds later the server cleared the area by itself: cleared {cleared}, kept in the world {marked}, "
+                + $"{lines} new log line(s) \"... the area is cleared for good\"");
+            yield return Until(() => HeldCells.IsCleared(cell), 4f);
+            HeldCells.TestLastNews(out var kind, out var newsCell, out _);
+            text = HeldCells.DescribeArea(point, ServerRules.Current);
+            c.Check(HeldCells.IsCleared(cell) && !HeldCells.MayBurst(cell) && text.Contains("is cleared"),
+                $"the player's game hears of it: the area is cleared there too ('{text}')");
+            c.Check(kind == HeldCells.NewsCleared && newsCell == cell,
+                $"and it gets the news \"The Jotun Retreat\" for that area, shown to players standing in it (news {kind})");
+        }
+        finally
+        {
+            ClearOverrides();
         }
         if (changed)
         {

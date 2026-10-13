@@ -7,6 +7,10 @@
   the message was wrong.
 - Fixed four false recipe warnings in the log ("... is not an item in this game", "... is not a crafting station ...")
   when you left a server that does not have the mod or has it turned off.
+- Fixed the zoom you picked being lost after a lower zoom limit. When MaxMagnification (the server's in multiplayer)
+  was lowered for a while and raised again, the spyglass stayed at the lower zoom until you used the mouse wheel. A
+  lower limit now only limits the view, and your zoom comes back with the limit. If you change the zoom while the
+  lower limit applies, that new zoom is kept.
 
 ## 0.1.0
 

@@ -4,17 +4,24 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0 with the review fixes of 2026-10-03, build id = the commit in the `[MC:ready]` log line
-(also in the MC Mods panel). Smoke test (`./tools/Test-Smoke.ps1 -Mod Cultivator.Replant`): passed 2026-10-03.
-In-world self-tests (`./tools/Test-InWorld.ps1 -Mod Cultivator.Replant -Only replant.`): all 7 `replant.*` tests
-passed 2026-10-03 (`replant.network`, `content`, `tiers`, `action`, `grow`, `root`, `icons`; they confirm the prefab
-values at runtime). Both runs were made with the third-party mods of the test machine installed (Jotunn, Warfare,
-PlantEasily and others); the in-world script still reports two false "missing from the item database" errors from
-Spyglass and Sneak Ambush caused by Warfare's item manager (a separate fix) and one PlantEasily exception when a test
-removes the last transplant while it is selected (see E02). No hands-on in-game test yet.
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+fixed the grow time of young transplants while the mod is off (T39: they kept the grow time of the last rules in force
+instead of the player's own GrowTimeMultiplier, and a change of that setting while the mod was off never reached
+them): T39 is reset to `[ ]`, T40 and M14 are new. 0.1.1 also keeps a transplant refused away from an Ancient Root and
+inside a no-build zone when PlantEasily is installed (PlantEasily's own placement check turned the aimed ghost green
+there): E04 is reworded and reset to `[ ]`, E02 (b) is reworded. The self-tests ran on 0.1.1 on 2026-10-13 (game
+1.0.17, in-world with PlantEasily 2.2.2 installed and with a dedicated server, every MC mod loaded): all of this mod's
+tests passed, `replant.rootplace` on a second run alone (see the automated checks below). History, on 0.1.0 with the
+review fixes of 2026-10-03: smoke test (`./tools/Test-Smoke.ps1 -Mod Cultivator.Replant`) passed 2026-10-03. In-world
+self-tests (`./tools/Test-InWorld.ps1 -Mod Cultivator.Replant -Only replant.`): all 7 `replant.*` tests passed
+2026-10-03 (`replant.network`, `content`, `tiers`, `action`, `grow`, `root`, `icons`; they confirm the prefab values
+at runtime). Both runs were made with the third-party mods of the test machine installed (Jotunn, Warfare, PlantEasily
+and others); the in-world script still reports two false "missing from the item database" errors from Spyglass and
+Sneak Ambush caused by Warfare's item manager (a separate fix) and one PlantEasily exception when a test removes the
+last transplant while it is selected (see E02). No hands-on in-game test yet.
 
-**Automated checks (2026-10-08):** 50 of 52 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 50 of 50 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -261,14 +268,20 @@ changed one back afterwards.
   Root within 6 m" at once (the root it had found is out of reach now). After `skiptime 8000` it is still a young
   plant, and the root has lost no sap. Replant gives the transplant back.
   *Automated: `replant.range`.*
-- [!] **T39 Own grow time while the mod is off:** set GrowTimeMultiplier = 0.1 and wait a second with the mod on (or
+- [ ] **T39 Own grow time while the mod is off:** set GrowTimeMultiplier = 0.1 and wait a second with the mod on (or
   play on a server whose rules use another grow time than yours), then untick Cultivator Replant in the MC Mods panel
   and only then set GrowTimeMultiplier back to 1. `spawn MC_Sapling_RaspberryBush`, wait 15 s, then `skiptime 2000`.
   Expected: it stays a young plant (with the mod off a transplant grows on your own GrowTimeMultiplier, as the README
   says: 1 = 5 h for a bush); after `skiptime 20000` it grows. The same after a restart with Enabled = false and
   GrowTimeMultiplier = 0.5: a transplant then needs 2.5 h (`skiptime 10000`), not 5 h.
-  **FAILED:** automated test: (known, unchanged) With the mod off, young transplants grow on the last rules in force,
-  not on the player's own GrowTimeMultiplier (self-test `replant.bug.offgrow`)
+  *Partly automated (`replant.toggle`, `replant.mp.allowed`); by hand: The restart with Enabled = false and
+  GrowTimeMultiplier = 0.5 (a transplant then needs 2.5 h), and the setting really changed in the config window after
+  unticking the mod in single player (the single-player test changes it in memory).*
+- [x] **T40 Transplant planted before the mod is turned off:** with the mod on set GrowTimeMultiplier = 0.1, wait a
+  second, plant a raspberry transplant and stay near it. Untick Cultivator Replant in the MC Mods panel, then set
+  GrowTimeMultiplier = 1, wait 15 s and `skiptime 2000`. Expected: it stays a young plant (the setting changed while
+  the mod is off reaches the transplant already in the ground at once); after `skiptime 20000` it grows.
+  *Automated: `replant.toggle`, `replant.mp.allowed`.*
 - [ ] **T32 Clean log:** after every other single-player item, the log has no error or warning from Cultivator
   Replant (`./tools/Watch-Log.ps1 -Mine`), apart from the warnings T26 asked for.
   *Partly automated (`replant.log`); by hand: The log of a hands-on play session (the test only sees what the
@@ -304,12 +317,12 @@ changed one back afterwards.
   raspberry transplant still goes on uncultivated ground and grows; one in the Mountains waits (not destroyed);
   (e) no error in the log.
 - [ ] **E02 PlantEasily:** with PlantEasily installed. Expected: (a) a grid of raspberry transplants costs one
-  transplant per plant and they all grow; (b) a Yggdrasil grid next to a root: copies farther than 6 m say "Needs an
-  Ancient Root within 6 m" and wait; Replant gives them back; (c) with its ReplantOnHarvest on, picking a wild
-  raspberry bush while carrying a raspberry transplant plants nothing; (d) with the grid on, plant your last
-  transplant of a kind while it is selected: note whether PlantEasily logs "ArgumentOutOfRangeException ...
-  GhostGrid.GetGhostObject" (seen in the in-world tests when a test removed the last transplant while it was
-  selected; a PlantEasily error, not ours); (e) no other error in the log.
+  transplant per plant and they all grow; (b) a Yggdrasil grid aimed within 6 m of a root (E04 for an aim farther
+  away): copies farther than 6 m say "Needs an Ancient Root within 6 m" and wait; Replant gives them back; (c) with
+  its ReplantOnHarvest on, picking a wild raspberry bush while carrying a raspberry transplant plants nothing;
+  (d) with the grid on, plant your last transplant of a kind while it is selected: note whether PlantEasily logs
+  "ArgumentOutOfRangeException ... GhostGrid.GetGhostObject" (seen in the in-world tests when a test removed the last
+  transplant while it was selected; a PlantEasily error, not ours); (e) no other error in the log.
 - [ ] **E03 Recipe changing mod (optional):** with WackysDatabase or RecipeCustomization changing the Cultivator
   recipe (for example 3 Wood for level 1, 1 Wood per level). Expected: levels 1 to 3 cost what that mod says; the
   upgrade from level 3 to 4 still asks only for 5 Black metal and 10 Linen thread (no Wood), also after that mod
@@ -317,15 +330,22 @@ changed one back afterwards.
   mod adds a second Cultivator recipe, the Upgrade tab offers no second "Upgrade to 4" row.
   *Partly automated (`replant.tiers`); by hand: The real WackysDatabase or RecipeCustomization, including its reload
   while playing.*
-- [!] **E04 PlantEasily and refused spots:** with PlantEasily installed and turned on (its grid at any size), select
-  the Yggdrasil shoot transplant and aim at ground away from any Ancient Root. Expected: the ghost is red, the hint
-  says "Plant 2 to 6 m from an Ancient Root" and nothing can be planted, as in T13. Seen in the in-world tests of
-  2026-10-07 with PlantEasily 2.2.2 (grid 7 x 7): the hint shows, but PlantEasily's own placement check turns the
-  aimed ghost green and the transplant is planted; it then waits with "Needs an Ancient Root within 6 m". PlantEasily
-  does the same inside a no-build zone (T24), also for vanilla seeds. The automated tests of T03, T13 and T24 run with
-  PlantEasily's placement patches lifted; `replant.bug.planteasily` checks this item with them on.
-  **FAILED:** automated test: (known, unchanged) With PlantEasily on, the Yggdrasil transplant ghost is green away
-  from any Ancient Root (self-test `replant.bug.planteasily`)
+- [ ] **E04 PlantEasily and refused spots:** with PlantEasily installed and turned on (its grid at any size).
+  (a) Select the Yggdrasil shoot transplant and aim at ground away from any Ancient Root. Expected: the aimed ghost is
+  red (the grid copies around it may stay green), the hint says "Plant 2 to 6 m from an Ancient Root", and the place
+  button plants nothing, no grid copy either, and uses no transplant, as in T13. (b) Aim 3 to 5 m from a root.
+  Expected: the aimed ghost is green and the transplant is planted (grid copies farther than 6 m from the root wait,
+  E02 b). (c) Select any transplant and aim at ground inside a no-build zone: a place where the hammer refuses every
+  piece because of the place itself (a dungeon as in T24; which outdoor places are no-build zones is unverified).
+  Expected: the aimed ghost is red (inside a dungeon PlantEasily may put the ghost out of sight) and the place button
+  plants nothing and uses no transplant. Until 0.1.1 PlantEasily's own placement check turned the aimed ghost green
+  in (a) and (c) and the transplant was planted (in-world tests of 2026-10-07, PlantEasily 2.2.2, grid 7 x 7). Known,
+  not changed by this mod: PlantEasily still lets vanilla seeds and saplings be planted inside a no-build zone; and
+  its placement check does not look at wards either, so inside another player's ward it may let a plant or a
+  transplant be planted (read from its code, not seen in game).
+  *Partly automated (`replant.rootplace`, `replant.nobuild`); by hand: That the aimed ghost really looks red among
+  PlantEasily's grid copies, (b) the green ghost and the planting 3 to 5 m from a root with PlantEasily on, and (c) at
+  a real dungeon.*
 
 ## 0.1.0 — multiplayer
 
@@ -407,3 +427,12 @@ changed one back afterwards.
   (as the README warns).
   *Partly automated (`probe.mp.baseline`); by hand: No Replant and no transplants in the build menu on that server,
   and the host without the mod deleting a dropped transplant ("Destroyed invalid prefab ZDO").*
+- [ ] **M14 Own grow time of a player with the mod turned off:** AllowPlayersWithoutMod = true on the host, whose
+  GrowTimeMultiplier stays 1. A friend with the mod sets their own GrowTimeMultiplier = 0.1, joins and unticks
+  Cultivator Replant in the MC Mods panel. Plant a raspberry transplant next to the friend and walk far away so only
+  the friend is near it, then `skiptime 2000` on the host. Expected: it grows on the friend's game within about 10 s
+  (their own setting: 0.1 = 30 min for a bush; the server's 1 would need 5 h), as the README says for players with the
+  mod turned off.
+  *Partly automated (`replant.mp.allowed`); by hand: A real friend with the mod turned off whose game runs the area:
+  the transplant really growing there after `skiptime 2000` on the host (the test reads the grow time that game holds:
+  its own setting, not the server's).*

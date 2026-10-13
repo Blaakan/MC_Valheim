@@ -21,7 +21,7 @@ internal static partial class SelfTests
     private const string KilnName = "lootfilter.kiln";
     private const string ScytheName = "lootfilter.scythe";
     private const string ScytheSwingName = "lootfilter.scythe-swing";
-    private const string BugPickColumnName = "lootfilter.bug.pick-column";
+    private const string PickColumnName = "lootfilter.pick-column";
     private const string CompatBatchName = "lootfilter.compat-batch";
 
     // Mode Only selected with only Coins selected: every other item is skipped by the lists.
@@ -746,19 +746,19 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------------------------------------------------------------- lootfilter.bug.pick-column (T38)
+    // ---------------------------------------------------------------- lootfilter.pick-column (T38)
 
     // One pick that gives many items: Pickable.Drop stacks them 0.5 m apart upwards. Every one of them is that
-    // harvest. REAL BUG of 0.1.0 (round 1: 7 of 9 seeds tagged, 2 left on the ground): FAIL until the mod covers the
-    // whole drop column (today: 4 m around the plant only, HarvestGrace.RadiusSqr).
-    private static IEnumerator RunBugPickColumn()
+    // harvest. (0.1.0 only counted 4 m around the plant: round 1 had 7 of 9 seeds tagged, 2 left on the ground.
+    // Since 0.1.1 the height above a harvest spot does not count, HarvestGrace.CoversSpawn.)
+    private static IEnumerator RunPickColumn()
     {
-        if (!Ready(BugPickColumnName, out var player, out _))
+        if (!Ready(PickColumnName, out var player, out _))
         {
             yield break;
         }
-        var c = new Checks(BugPickColumnName);
-        var rig = new Rig(player, BugPickColumnName);
+        var c = new Checks(PickColumnName);
+        var rig = new Rig(player, PickColumnName);
         try
         {
             NoteRoom(c, rig);
@@ -837,6 +837,12 @@ internal static partial class SelfTests
             HarvestGrace.Record(root);
             c.Check(HarvestGrace.CoversSpawn(root + Vector3.up * 5f, Time.time), "an item born 5 m straight above a plant just harvested counts as that harvest");
             c.Check(!HarvestGrace.CoversSpawn(root + rig.Forward * 6f, Time.time), "an item born 6 m to the side does not");
+            // The column has no height limit (a pick of 50 items puts its last one 25 m up), but it is no wider than
+            // the 4 m around the plant, it only goes up, and it lasts no longer than the 3 s after the harvest.
+            c.Check(HarvestGrace.CoversSpawn(root + Vector3.up * 25f, Time.time), "an item born 25 m straight above it (as high as the 50th item of one pick) counts too");
+            c.Check(!HarvestGrace.CoversSpawn(root + Vector3.up * 5f + rig.Forward * 6f, Time.time), "an item born 5 m above it and 6 m to the side does not");
+            c.Check(!HarvestGrace.CoversSpawn(root - Vector3.up * 5f, Time.time), "an item born 5 m straight below it does not");
+            c.Check(!HarvestGrace.CoversSpawn(root + Vector3.up * 5f, Time.time + 3.5f), "an item born 5 m above it 3.5 s after the harvest does not");
             c.Report();
         }
         finally

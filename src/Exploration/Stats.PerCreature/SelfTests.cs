@@ -38,8 +38,8 @@ namespace MC.Exploration.StatsPerCreatureMod;
 //   percreature.toggle       feature off live (Debug block hook, Enabled untouched): vanilla page byte for byte, no
 //                            tame count, kills still read; on again: section back
 //   percreature.compat       other mod move Compendium entries / drop the stats entry: section follow, no error
-//   percreature.bug.respawn-gap  REAL BUG, fail until mod fixed: tame while game has no character at all (respawn
-//                            wait) must be credited after. Alone in own test: no other item wait on it
+//   percreature.respawn-gap  tame while game has no character at all (respawn wait, world loading): kept, counted
+//                            once at next spawn; other player loaded, play session over or feature off = not counted
 //   percreature.log          no error line of this mod since it went on
 //   percreature.mp.session   client on dedicated server (server never load this Client mod): kill, tame near, far,
 //                            tame message RPC
@@ -66,7 +66,7 @@ internal static partial class SelfTests
     private const string FormatName = "percreature.format";
     private const string ToggleName = "percreature.toggle";
     private const string CompatName = "percreature.compat";
-    private const string GapName = "percreature.bug.respawn-gap";
+    private const string GapName = "percreature.respawn-gap";
     private const string LogName = "percreature.log";
     private const string MpSessionName = "percreature.mp.session";
     private const string MpConfigName = "percreature.mp.config";
@@ -369,6 +369,11 @@ internal static partial class SelfTests
     // Exact Debug line CounterStore.AddTame write for this count.
     private static string TameLine(string name, string via, string storedRaw) =>
         $"Tame counted: {name} ({via}). Stored {CreatureCounts.TamesDataKey} = {storedRaw.Replace("\n", "\\n").Replace("\t", "\\t")}";
+
+    private static List<string> KeptLines(int mark) => _watch.Since(mark, LogLevel.Debug, "Tame kept until your character is back: ");
+
+    // Exact Debug line CounterStore.HoldTame write for a tame it keep for the next spawn.
+    private static string KeptLine(string name) => $"Tame kept until your character is back: {name}.";
 
     // ---------- kill numbers ----------
 

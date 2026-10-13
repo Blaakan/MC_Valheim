@@ -102,8 +102,9 @@ internal sealed partial class Plugin : ModPlugin
             new AcceptableValueRange<float>(0f, AwakeningRules.PercentMax),
             new ConfigurationManagerAttributes { Order = 93 }));
         JotunDensity = Config.Bind(AwakeningSection, "JotunDensity", d.JotunDensity, new ConfigDescription(
-            "How many Jotun an invaded area holds around each player, in percent of the normal amount (100: up to 3 "
-            + "Krigen, 2 dual-axe Krigen, 2 Hexen and 6 Elaking within about 160 m, like a Jotun invasion)."
+            "How many Jotun an invaded area holds around each player, in percent of the normal amount (100: the game "
+            + "aims at 3 Krigen, 2 dual-axe Krigen, 2 Hexen and 6 Elaking within about 160 m, like a Jotun invasion; "
+            + "its last group can take that to 4 Krigen and 8 Elaking)."
             + ServerWins,
             new AcceptableValueRange<int>(AwakeningRules.DensityMin, AwakeningRules.DensityMax),
             new ConfigurationManagerAttributes { Order = 90 }));
@@ -122,7 +123,9 @@ internal sealed partial class Plugin : ModPlugin
         ClearKillsMin = Config.Bind(AwakeningSection, "ClearKillsMin", d.ClearKillsMin, new ConfigDescription(
             "After Kall Fimbulbringer is defeated, an invaded area is cleared for good once enough Jotun (Krigen, "
             + "Hexen, Elaking, from any area) have been killed inside it: each area needs its own fixed number "
-            + "between ClearKillsMin and ClearKillsMax. Half way, players there see \"The Jotun army is weakening\"."
+            + "between ClearKillsMin and ClearKillsMax. Half way, players there see \"The Jotun army is weakening\". "
+            + "Lowering ClearKillsMin or ClearKillsMax clears, about two seconds later, every area that already has "
+            + "enough kills for its new number; it stays cleared if you raise them again."
             + ServerWins,
             new AcceptableValueRange<int>(AwakeningRules.KillsMin, AwakeningRules.KillsMax),
             new ConfigurationManagerAttributes { Order = 80, ShowRangeAsPercent = false }));

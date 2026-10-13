@@ -116,8 +116,31 @@ internal static class FightLogic
 
     // How far (m) the float may be dragged past the line while the line still come in: vanilla 0.2 when calm; a
     // running fish hold the float about that far out, so a struggle allow 1 m (vanilla break at m_breakDistance, 4).
+    // Calm: from the rod top, as vanilla. Struggle: from where the rod top would be with the rod pointed at the float
+    // (PointedDistance), and never while the float is BreakGuard of the break distance past the line.
     internal const float CalmDrag = 0.2f;
     internal const float StruggleDrag = 1f;
+    internal const float BreakGuard = 0.5f;
+
+    // Rod top to float (m) as if the rod pointed straight at the float. In a fight the fisher turn the rod away from
+    // the fish on purpose: the rod top (some 3 m in front of the fisher: worked out from in-world run numbers, not
+    // measured) then swing metres off the float, and a float on a short line hang from that very rod top, so it
+    // follow every turn and never catch up. Measured from the real rod top, the drag rule stopped the reel for a
+    // second after each turn and for good on the last metre (no catch on the good side, ever).
+    // hand = the fisher at rod top height; result = hand to float, minus hand to rod top. Same for every way the
+    // fisher face, never more than the real rod top to float distance, below 0 when the float is nearer than the rod
+    // is long (fish at the feet: nothing hold the line out).
+    internal static float PointedDistance(Vector3 fisher, Vector3 rodTop, Vector3 floatPos)
+    {
+        var hand = new Vector3(fisher.x, rodTop.y, fisher.z);
+        return Vector3.Distance(hand, floatPos) - Vector3.Distance(hand, rodTop);
+    }
+
+    // Good side reel in a fight: may the line come in this tick? pointed = PointedDistance, real = rod top to float.
+    // Second part = my reel never run the line so far ahead of the float that the rod's own break rule
+    // (float breakDistance past the line) could cut it; never tighter than the drag itself.
+    internal static bool StruggleReelOpen(float line, float pointed, float real, float breakDistance) =>
+        line > pointed - StruggleDrag && real - line < Mathf.Max(StruggleDrag, breakDistance * BreakGuard);
 
     // Line taken by a fighting fish when not reeled (m/s): rule for a middle fish, slower easy fish, faster hard ones.
     internal static float LineRunSpeed(FightRules rules, float d01) =>

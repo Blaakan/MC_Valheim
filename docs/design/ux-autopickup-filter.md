@@ -7,7 +7,7 @@
 | Category / scope | UX / QoL |
 | Side | Client (only the player who wants it installs it) |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/`; item, creature and piece prefab names checked in the installed game data (`StreamingAssets/SoftRef/manifest_extended`) |
-| Status | Implemented (0.1.0), smoke test passed, in-game testing pending |
+| Status | Implemented (0.1.1: harvest grace covers the whole drop column of one pick, 3.2), smoke test passed on 0.1.0, in-game testing pending |
 
 ## Goal
 
@@ -112,7 +112,7 @@ leaves it there:
 
 | Interaction | Code (spawn) |
 |---|---|
-| E on a `Pickable` (berries, mushrooms, pickable flint/stone/branches, thistle, crops...) | `Pickable.Interact` → `RPC_Pick` (on the ZDO owner) → `Drop` → `Instantiate` with an upward push |
+| E on a `Pickable` (berries, mushrooms, pickable flint/stone/branches, thistle, crops...) | `Pickable.Interact` → `RPC_Pick` (on the ZDO owner) → `Drop` → `Instantiate` with an upward push. One pick spawns one drop per item (scaled amount + skill bonus), then one per extra drop: the first at the plant + `m_spawnOffset` (0.5 m by default), each next one 0.5 m higher, up to 0.2 m sideways, with no limit: the 9th drop of a pick is born 4.5 m above the plant |
 | Scythe | `Attack` (harvest attack, local player only) calls `Pickable.Interact(Player.m_localPlayer, ...)` **directly** for every harvestable pickable in its radius, not through `Player.Interact` |
 | E on a `PickableItem` | `PickableItem.Interact` → `RPC_Pick` → `Drop` |
 | Fermenter tap | `Fermenter.Interact` → `RPC_Tap` → `Instantiate(m_to)` |
@@ -270,7 +270,10 @@ harvest interactions and exempts the drops they produce (`HarvestGrace`):
     newest entry when it is in the **same frame** within 8 m of its box (every plant of one scythe swing, the two
     records of one E press), or within 0.5 m and 0.5 s (holding E). One scythe swing = one entry.
 - **Tag, once, when the drop is born**: an `ItemDrop.Awake` postfix calls `CoversSpawn(position, Time.time)`: some
-  entry with `Start - 0.05 s <= now <= Last + 3 s` and the spawn position within 4 m of its box. A match puts the
+  entry with `Start - 0.05 s <= now <= Last + 3 s` and the spawn position within 4 m of its box. **Above the box
+  only the horizontal distance counts, at any height** (since 0.1.1): one pick stacks its drops upwards without limit
+  (1.6), and the plain 4 m distance of 0.1.0 left out the drops from the 8th of one pick on (T38: 7 of 9 seeds at
+  Resources 3x). Beside and below the box the distance stays the plain 4 m. A match puts the
   drop's instance id in a set; an `ItemDrop.OnDestroy` postfix removes it. Owned harvests spawn inside the
   `Interact` call; drops of a bush another client owns arrive within the 3 s window.
 - **Verdict**: `Blocks = ListBlocks(drop) && (!ExemptHarvest || !IsTagged(drop))`. A tagged drop stays exempt until it
@@ -278,7 +281,11 @@ harvest interactions and exempts the drops they produce (`HarvestGrace`):
   (drops walked over much later, drops being pulled towards you). A reloaded drop is a new instance: an ordinary drop.
   Recording and tagging run in every mode and whatever `ExemptHarvest` says, so switching either one later works.
 - **Accepted side effect**: a filtered drop that spawns within 3 s and 4 m of your own harvest (a creature killed next
-  to the bush) is also exempt. Attacks never record.
+  to the bush), or higher above it within 4 m sideways, is also exempt. Attacks never record.
+- The column is not sized from the pick's own item count (which the `Pickable.Interact` prefix could estimate): the
+  count is only final inside `RPC_Pick` (the extra drops are rolled there, on the ZDO owner, which can be another
+  client, and other mods can change the amounts), and a fixed height cap would bring the same bug back for bigger
+  yields.
 - Deciding at spawn replaced a pre-implementation "match position and spawn time when auto pickup looks at the drop",
   which lost scythe drops once the ring had overflowed.
 
@@ -555,7 +562,8 @@ builds only), `Patches/` (`PlayerPatches`, `PickablePatches`, `ItemDropPatches`,
 | E on the stone oven's food switch (take the bread out) | Drops auto-picked | Same (harvest grace): a `Switch` that is a `CookingStation.m_addFoodSwitch` is recorded (T37) |
 | Scythe over a big field, drops collected much later; mode or list changed meanwhile | Auto-picked | Still collected (tag at spawn, never expires while the drop exists) |
 | Same with V off | Drops stay | Same |
-| Kill or mining next to a bush just harvested (3 s, 4 m) | Auto-picked | Also exempt (accepted side effect) |
+| One pick that gives 8 items or more (seed crops at Resources 3x give 9) | All auto-picked | Same: the whole drop column is exempt, at any height above the plant (T38; 0.1.0 left the items from the 8th on on the ground) |
+| Kill or mining next to a bush just harvested (3 s, 4 m, any height above it) | Auto-picked | Also exempt (accepted side effect) |
 | Door, chest, bed, portal or crafting station used, kill next to it | Auto-picked | Filtered (these kinds record nothing) |
 | Feeding a smelter or kiln; its output popping out on its own | Auto-picked | Filtered |
 | Use on another mod's interactable that drops items | Auto-picked | Filtered (no harvest grace for unknown kinds) |
@@ -610,7 +618,8 @@ sees and have a simple alternative.
 5. **"Manual pickup" includes fishing, the console spawn pickup and hand harvesting** (to confirm with the user):
    hand-harvest drops are exempt through the harvest grace (3.2, `ExemptHarvest`, default on), decided once when the
    drop spawns, only for the local player's own Use on kinds that drop items (and the scythe). Side effect: a filtered
-   drop that appears within 3 s and 4 m of such a harvest is exempt too. With V off harvest drops stay on the ground.
+   drop that appears within 3 s and 4 m of such a harvest (or above it) is exempt too. With V off harvest drops stay
+   on the ground.
 6. **Thrown weapons that fall back as items are ordinary items** (vanilla-consistent, to confirm with the user): in
    Only selected mode a thrown spear stays on the ground unless selected.
 7. **Storage per character in `Player.m_customData`**, config only for defaults (to confirm with the user; reasons in
@@ -714,7 +723,7 @@ harvest grace is not an extra: it is how goal 4 holds for hand harvesting.
 The in-game checklist lives next to the code: `src/UX/AutoPickup.Filter/TESTING.md` (run
 `./tools/Get-TestTodo.ps1 -Mod AutoPickup`; smoke test `./tools/Test-Smoke.ps1 -Mod AutoPickup`). It covers every goal
 item: T01-T03, T06-T09 and T12 (goals 1-2 / user behaviour 1), T10 and T28 (goal 3 / user behaviour 2), T04, T11,
-T24-T25, T30-T33, T36 and T37 (goal 4 / user behaviour 3), M01-M03 and M05 (goal 5), T15-T16 and M04 (goal 6), T21-T22
+T24-T25, T30-T33 and T36-T38 (goal 4 / user behaviour 3), M01-M03 and M05 (goal 5), T15-T16 and M04 (goal 6), T21-T22
 (goal 7); T13, T17-T20, T23, T26-T27, T29, T34-T35 the rest. M02 (items) and M06 (character) are the hand-off tests.
 C01-C03 cover the MC mods that share methods or screens (Crafting Search and Sort, Batch Station Feeding, One Click
 Repair All); C04-C07 third-party mods. The cross-mod test with Sort Chest goes into that mod's own `TESTING.md`.

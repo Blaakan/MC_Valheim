@@ -29,8 +29,15 @@ The normal game never runs more than 3 Jotun invasions at once; that limit stays
 ### The invaded areas
 
 - **Where the Jotun army spawns.** Krigen (sword or greataxe), Krigen with two axes, Hexen and Elaking appear around
-  you in an invaded area, day and night, about as many as in a Jotun invasion: up to 3 Krigen, 2 dual-axe Krigen,
-  2 Hexen and 6 Elaking within about 160 m. They come back over time when killed.
+  you in an invaded area, day and night, about as many as in a Jotun invasion. The game's own spawner aims at 3 Krigen,
+  2 dual-axe Krigen, 2 Hexen and 6 Elaking within about 160 m, and adds no more once it counts that many. They come
+  back over time when killed.
+- **One group more at times.** The game counts the Jotun around once, before it starts spawning, and sizes each group
+  against that first count. When it fills a place in one go (the first time you come there, when you come back after
+  a long time, or when you walk into an area after Kall), its last group can take it past the numbers above: at most
+  4 Krigen (they come by 1 or 2) and 8 Elaking (by 1 to 3). Dual-axe Krigen and Hexen come one at a time and stay at
+  2. That makes 16 Jotun at the very most where the numbers above add up to 13. A place that refills over time, one
+  group at a time, stops at the numbers above.
 - **No markers.** The areas have no map pin and no Malicious Ice at their centre, and cannot be stopped or destroyed.
   You find them by the Jotun, the storms, and the purple on your map once you have explored there (below).
 - **The same for everyone.** The areas are worked out from the world itself: the same places for every player, every
@@ -73,9 +80,9 @@ Once Kall is defeated, the invaded areas stop spawning Jotun over time, and you 
   number, the area is cleared for good: "The Jotun Retreat", no more Jotun, nature bands, storms or meteors there, and
   its purple leaves the map. Creatures still alive there stay.
 - **Walking into an area that is not cleared** makes its Jotun appear at once, up to its usual numbers (the ones still
-  around count), and then it waits to be defeated: no more Jotun until every player has gone far enough for it to
-  unload (about 750 m from its centre). Leave without clearing it and its Jotun come back the next time you walk in;
-  the kills you made there stay counted.
+  around count; the last group can go over, see "One group more at times" above), and then it waits to be defeated:
+  no more Jotun until every player has gone far enough for it to unload (about 750 m from its centre). Leave without
+  clearing it and its Jotun come back the next time you walk in; the kills you made there stay counted.
 - **The area you stand in when Kall falls** (and the areas next to you whose Jotun are around) keep the Jotun they
   have: nothing new appears there while you stay around. Areas nobody visited yet still have their Jotun the first time
   you walk into them.
@@ -123,7 +130,7 @@ AllowPlayersWithoutMod and the Invasions section are read only by the server.
 | Awakening | JotunDensity | `100` | How many Jotun an area holds, in percent of the normal amount (25 to 400). |
 | Awakening | NatureFightsBack | `true` | Gammeltroll, Barka and frost Greydwarfs fight the Jotun once the north is awake, and the areas spawn bands of them. |
 | Awakening | NatureBandChance | `10` | Chance, in percent, of a nature band (10-20 frost Greydwarfs, 1-3 Gammeltroll or Barka) each time a place in an invaded area checks (every 20 minutes per place, at once on the first visit). Never in a cleared area. 0 = no bands. |
-| Awakening | ClearKillsMin | `8` | After Kall: fewest Jotun kills inside an area that clear it. Each area needs its own fixed number between ClearKillsMin and ClearKillsMax. |
+| Awakening | ClearKillsMin | `8` | After Kall: fewest Jotun kills inside an area that clear it. Each area needs its own fixed number between ClearKillsMin and ClearKillsMax. Lowering either one clears, about two seconds later, every area that already has enough kills; it stays cleared if you raise them again. |
 | Awakening | ClearKillsMax | `13` | After Kall: most Jotun kills an area can need. |
 | Storms | StormShare | `33` | Share of the time an area storms, in percent. 0 = never. |
 | Storms | StormMinMinutes | `5` | Shortest storm, in real minutes (1 to 60). |
@@ -176,6 +183,12 @@ how many Malicious Ice were broken in the global key mc_dn_stones.
 - **Cleared areas and kill counts are remembered in the world**, on the game's own zone data, so they stay after a
   restart and are the same for every player. `deepnorth_stones` in an area shows its kills so far and the number it
   needs.
+- **Lowering ClearKillsMin or ClearKillsMax after Kall** changes the number each area needs. An area that already has
+  that many kills is cleared by the server without another kill, like after a last kill ("The Jotun Retreat" for the
+  players in it): about two seconds after the settings stop changing, or when the world loads if you changed them while
+  the game was closed. Cleared is for good: raising the numbers again does not bring an area back, so lower them with
+  care. A value that only passes by while you drag a slider or type a number clears nothing, as long as you do not
+  stop on it for more than a second.
 - **Any Jotun killed inside an area counts for that area**: one that followed you in from next door, or a normal Jotun
   patrol. Gammeltroll, Barka and Greydwarfs do not count, nor raid Jotun that leave when their raid ends. A Jotun of an area killed elsewhere counts for the area where it
   died.

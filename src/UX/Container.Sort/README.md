@@ -5,9 +5,11 @@ Adds a Sort button to chests, carts and ships. It rearranges the contents from t
 ## Features
 
 - **Sort button on every container**: chests of every kind, barrels, your personal chest, carts, ships (Karve,
-  Longship, Drakkar), the Obliterator, dungeon and loot chests. Two buttons appear next to the game's **Take all** and
-  **Place stacks** buttons: **Sort** and the **sort order** button. If there is no room next to them (for example a
-  UI mod moved them), the two buttons go in a second row, on the side away from the chest slots.
+  Longship, Drakkar), the Obliterator, dungeon and loot chests. Two buttons continue the game's row of **Take all**
+  and **Place stacks** to the right: **Sort** and the **sort order** button. Place stacks sits at the right end of the
+  container panel, so the two buttons stand just past its right edge. If they would overlap a part of the panel there
+  (for example because a UI mod moved the game's buttons), they go in a second row, on the side away from the chest
+  slots.
 - **Three sort orders**, chosen with the button next to Sort, which cycles **By name** → **By type** → **By biome**:
   - **By name**: alphabetical, using the item names of your game language (capital letters and accents ignored).
   - **By type**: weapons, ammo, shields, armour, utility and trinkets, tools and light, food and potions, materials,
@@ -33,9 +35,11 @@ Adds a Sort button to chests, carts and ships. It rearranges the contents from t
 - **Safe**: clicking Sort while you hold an item cancels that move first, as Take all does (the item goes back to its
   slot). A chest that is already sorted is not touched. Tombstones get no Sort button, so Take all still gives you
   back your own inventory layout and hotbar.
-- **Controller**: while the chest's slots are selected, the **View/Select** button sorts and a **left stick click**
-  changes the sort order. The buttons show these controller glyphs the way the game's own buttons do. They do nothing
-  while your own inventory or the crafting panel is selected. The right stick click is not used.
+- **Controller**: while the chest's slots are selected, the **View/Select** button sorts. The Sort button shows that
+  glyph the way the game's own buttons do, and View/Select does nothing to the chest while your own inventory or the
+  crafting panel is selected. The **sort order is changed with the mouse**: its button has no controller key and no
+  glyph, on purpose. The stick clicks belong to the game (left stick click: Take all, right stick click: Place
+  stacks) and Sort Chest leaves them as they are.
 - Turn it off at any time in the **MC Mods** panel (Esc menu), or with ConfigurationManager or the config file, which
   also work while a chest is open: the buttons disappear at once, no restart needed.
 
@@ -100,8 +104,9 @@ the new item order (and the combined stacks) of the chests you sort.
   does nothing.
 - **EpicLoot** and **Crossbow Stays Loaded** (MC): safe. Items with extra data from other mods keep it; items whose
   data differ are never combined.
-- **Loot Pickup Filter** (MC): works together. Its markers on chest slots follow the sorted items; its controller
-  gestures work in your own inventory, Sort Chest's in the chest.
+- **Loot Pickup Filter** (MC): works together. Its markers on chest slots follow the sorted items. Sort Chest's only
+  controller key is View/Select, and only while the chest's slots are selected. With a chest open, a right stick click
+  is the game's own Place stacks and a left stick click the game's own Take all; Sort Chest does not change that.
 - **Crafting Search and Sort** (MC): works together. Both put an item in matching type groups; typing in its search
   field never triggers Sort.
 - **One Click Repair All, Batch Station Feeding, Harpoon Hooks Tames, Creature Kill and Tame Counts** (MC): unrelated,

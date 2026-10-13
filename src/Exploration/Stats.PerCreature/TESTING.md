@@ -4,12 +4,16 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
-MC Mods panel. Smoke test passed 2026-09-29 (loads, patches, JitCheck clean: 191 methods, 0 failures). No in-game
+**Build under test:** 0.1.1, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+MC Mods panel. 0.1.1 fixes the tame that finished while there was no character in the world (respawn wait, world still
+loading) and was never counted: T21 is reset and T24 is new (both checked by the self-test `percreature.respawn-gap`);
+the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded):
+all of this mod's tests passed, `percreature.mp.config` on a second run alone (see the automated checks below).
+Earlier (0.1.0): smoke test passed 2026-09-29 (loads, patches, JitCheck clean: 191 methods, 0 failures). No in-game
 test yet.
 
-**Automated checks (2026-10-08):** 21 of 22 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 22 of 22 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -41,6 +45,8 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. With `Debug` in the BepInEx disk log le
 (`./tools/Setup.ps1 -DevBepInExConfig`):
 - each counted tame logs `Tame counted: <name> (message|owner). Stored MC.Exploration.Stats.PerCreature.Tames = <value>`
   (line breaks shown as `\n`, tabs as `\t`);
+- a tame that finishes while you have no character in the world (respawn wait, world still loading) logs
+  `Tame kept until your character is back: <name>.`, then the `Tame counted: <name> (owner)` line when you spawn;
 - the first run for a character logs `Counting started: <date> (tames are counted from this date).`;
 - each page build logs `Creatures section: <rows> rows (<n> other names).`
 
@@ -140,16 +146,18 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. With `Debug` in the BepInEx disk log le
   HUD), console `tame`, then left Ctrl + F3 again. Expected: no message was shown (vanilla hides messages with the
   HUD), but Player Statistics shows Boar +1 tamed.
   *Automated: `percreature.tames`.*
-- [!] **T21 Tame that finishes while you wait to respawn:** the `percreature.bug.respawn-gap` self-test checks the mod's
-  side of this without a real death (the game tames a boar while it has no local character; the test fails until
-  the mod counts such a tame). A real death still has to be checked by hand, in single player: base with your bed
-  as spawn point and a pen next to it; feed a wild Boar and wait until its taming is nearly done (hover text close
-  to 100%), then die next to the pen (`god` off, for example `spawn Troll`) and wait for the respawn. Expected: a
-  boar that becomes tame between the moment your body disappears (about 10 s after death) and your respawn is
-  counted once you are back: Boar +1 tamed, like the game's own "Creature Tamed" total (in single player you always
-  get your own tames). The same holds for a boar that becomes tame while the world is still loading at login.
-  **FAILED:** automated test: A tame that finishes while the game has no local character (respawn wait, world still
-  loading) is never counted (self-test `percreature.bug.respawn-gap`)
+- [ ] **T21 Tame that finishes while you wait to respawn:** the `percreature.respawn-gap` self-test checks the mod's
+  side of this without a real death (the game tames a boar while it has no local character). A real death still has
+  to be checked by hand, in single player: base with your bed as spawn point and a pen next to it; feed a wild Boar
+  and wait until its taming is nearly done (hover text close to 100%), then die next to the pen (`god` off, for
+  example `spawn Troll`) and wait for the respawn. Expected: a boar that becomes tame between the moment your body
+  disappears (about 10 s after death) and your respawn is counted once you are back: Boar +1 tamed, like the game's
+  own "Creature Tamed" total (in single player you always get your own tames). The same holds for a boar that
+  becomes tame while the world is still loading at login. Log: `Tame kept until your character is back:
+  $enemy_boar.` during the wait, then `Tame counted: $enemy_boar (owner)` when you are back.
+  *Partly automated (`percreature.respawn-gap`); by hand: A real death and respawn next to a pen with a boar whose
+  taming is about to finish (and a login with such a boar near your logout point): check the boar that becomes tame
+  while you have no character is counted once you are back.*
 - [x] **T22 Stored tame counts stay readable and safe:** covered by the `percreature.format` self-test (the stored
   value cannot be edited in game). Expected: a stored value with Windows line ends, empty lines, unreadable lines,
   signed or space-padded numbers or zero counts is read without error (unreadable lines are skipped, two lines of
@@ -166,6 +174,19 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. With `Debug` in the BepInEx disk log le
   (`[enemy_...]`); a name that is not a translation key (a player name from an old PvP kill) is listed only under
   the grey "Other names" line; after the last row come two empty lines, then the vanilla text.
   *Automated: `percreature.page`.*
+
+## 0.1.1 — tames with no character in the world
+
+- [x] **T24 Kept tames are counted once and stay with their character:** covered by the `percreature.respawn-gap`
+  self-test (these cases cannot be timed by hand; the test makes the game tame a boar while it has no local
+  character). Expected: such a tame is only kept in memory at first (nothing is stored on the character yet; log
+  `Tame kept until your character is back: <name>.`) and is counted exactly once when the character spawns (stored
+  like any other tame; log `Tame counted: <name> (owner)`), also when several creatures finish in the same wait; a
+  later spawn does not count it again. Nobody gets the tame, also after the spawn, when the game had no character
+  of its own but saw another player at that moment (the test leaves the character in the game's player list for
+  this), when the play session ended before the character was back (as after a logout during the wait: the next
+  character never gets it), or when the mod was turned off before the character was back.
+  *Automated: `percreature.respawn-gap`.*
 
 ## 0.1.0 — multiplayer (needs a second player)
 

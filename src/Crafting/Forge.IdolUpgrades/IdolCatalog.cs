@@ -196,7 +196,8 @@ internal static class IdolCatalog
             tier.Material = Item(db, material);
             if (tier.Material == null)
             {
-                unknown.Add(material);
+                // Empty setting has no name to list (warning ended with "ignored: ."): name the setting.
+                unknown.Add(material.Length > 0 ? material : $"(empty Material of Tier {t} - {tier.Title} idols)");
             }
             tier.Pools[1] = PoolOf(db, rules.TierCommon[t], unknown);
             tier.Pools[2] = PoolOf(db, rules.TierElite[t], unknown);

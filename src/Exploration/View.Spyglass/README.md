@@ -25,7 +25,9 @@ far land, trees and buildings. Aim with the mouse; you stand still while looking
   crosshair and the name of what you point at are hidden; health, hotbar and map stay on screen.
 - **Zoom:** 4 times by default. The mouse wheel zooms in and out while you look, from x1.5 up to x8 (the server's
   MaxMagnification). On a gamepad, hold the button that switches to the alternate keys and use the camera zoom buttons,
-  as for the normal camera zoom. The zoom you pick is kept until you quit the game.
+  as for the normal camera zoom. The zoom you pick is kept until you quit the game. A lower zoom limit
+  (MaxMagnification, the server's in multiplayer) only limits the view while it applies: when the limit goes back up,
+  so does your zoom, unless you changed the zoom in the meantime.
 - **Aim, but no walking.** The mouse (or right stick) turns you as usual, but slower the stronger the zoom, so the view
   moves across the screen as fast as without the spyglass (AimSensitivity changes that). While the spyglass is up you
   cannot walk, run, jump, dodge, crouch, attack or block; your body turns to face where you look.

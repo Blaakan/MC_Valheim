@@ -21,10 +21,10 @@ namespace MC.Exploration.SwimmingDiveMod;
 //   dive.rules    own settings in force for a host, speed x2, idle rise 0.5, encumbered (T25, T26, T28, M07)
 //   dive.multiplier  UnderwaterStaminaMultiplier 0 and 2, ground contact (faked) = stamina back, surface untouched by
 //                 the multiplier (T27)
-//   dive.waves    wind pinned at 0.3 (waves the hand-back handle): Crouch + Jump at the surface ride the waves with no
-//                 drain (T32)
-//   dive.bug.storm-waves  REAL BUG, alone: storm at its strongest wind, a fast wave rise over the swimmer who hold
-//                 Crouch + Jump, the dive count him as deep, hold him under and drain him (T32, storm part)
+//   dive.waves    Crouch + Jump at the surface ride the waves with no drain, never deep: wind pinned at 0.3; then water
+//                 put 1.2 m over the swimmer by hand (both keys held; Crouch 3 ticks before Jump); then storm weather
+//                 with the wind pinned at its strongest, where waves rise faster than the normal game lift a swimmer
+//                 (T32, T34)
 //   dive.keys     the real keys (ZInput buttons pressed by code, PlayerController on): Crouch tap, Jump in open water,
 //                 Jump with contact, Crouch held, Jump taps under water, gamepad buttons (T01, T02, T05, T11, T12, X03)
 //   dive.menus    real Crouch key held under water with the inventory, the large map and the chat open: depth held, keys
@@ -41,7 +41,6 @@ internal static partial class SelfTests
     private const string MovesetName = "dive.moveset";
     private const string MultiplierName = "dive.multiplier";
     private const string WavesName = "dive.waves";
-    private const string BugStormWavesName = "dive.bug.storm-waves";
 
     private const string StartedDefault =
         "Dive started (dive speed x1, no key under water: hold depth, stamina drain while diving x1).";
@@ -1257,13 +1256,26 @@ internal static partial class SelfTests
         c.Report();
     }
 
-    // ---------- dive.waves, dive.bug.storm-waves ----------
+    // ---------- dive.waves ----------
 
-    // Wind pinned for dive.waves (console "wind 0 0.3"). Vanilla buoyancy (Character.UpdateSwimming) pull a swimmer up
-    // at 5 m/s per metre under the rest height, so on water rising at w m/s a plain swimmer sit w / 5 m under it. At
-    // this wind no wave rise at 2.5 m/s, so no swimmer get DiveLogic.EnterMargin (0.5 m) under. In a storm waves do:
-    // that is dive.bug.storm-waves.
+    // Wind pinned for the first part of dive.waves (console "wind 0 0.3"). Vanilla buoyancy (Character.UpdateSwimming)
+    // pull a swimmer up at 5 m/s per metre under the rest height, so on water rising at w m/s a plain swimmer sit
+    // w / 5 m under it. At this wind no wave rise at 2.5 m/s, so no swimmer get DiveLogic.EnterMargin (0.5 m) under.
+    // In a storm waves do (plain swimmer 0.985 m under at wind 1, run of 2026-10-08): last part of the test.
     private const float WavesWind = 0.3f;
+
+    // The test put the swimmer this far under the rest height (MovePlayer): water over him all at once, more than the
+    // storm waves of the runs managed. For the dive it is what a wave is: feet far under the rest height and no dive
+    // behind it.
+    private const float PushedUnder = 1.2f;
+
+    // Feet this far under the rest height = clearly past the margin where depth alone would count a swimmer as deep
+    // (0.05 m more: a sample here is taken after the physics step, the dive look before the next one).
+    private const float PastMargin = DiveLogic.EnterMargin + 0.05f;
+
+    // The probe stop a test at 120 s (tools/Test-InWorld.ps1 -TestTimeoutSec). The storm hold end this many seconds
+    // after the test began at the latest, so the trip home (10 s in the runs) still fit.
+    private const float StormHoldEnd = 95f;
 
     // What Crouch + Jump held at the surface did, physics tick by physics tick.
     private sealed class SurfaceHold
@@ -1403,10 +1415,89 @@ internal static partial class SelfTests
         DiveInput.TestUp = false;
     }
 
-    // Waves the hand-back to the normal game handle (wind pinned at WavesWind): Crouch + Jump at the surface ride them
-    // with no drain (T32, G4). Storm waves: dive.bug.storm-waves.
+    // What the swimmer did after the test put him PushedUnder under the rest height.
+    private sealed class Pushed
+    {
+        internal bool Ready;                           // before the push: dive on and left to the normal game (keys
+                                                       // held) / no dive (Crouch first)
+        internal bool Diving;                          // dive on when both keys were down
+        internal float UnderAtStart;                   // feet under the rest height when the watch began
+        internal int CrouchTicks;                      // ticks of Crouch alone before Jump (Crouch first)
+        internal int Ticks;                            // watched ticks with both keys down
+        internal int DeepTicks;                        // of the Crouch ticks and the watched ticks
+        internal int VanillaTicks;                     // of the watched ticks
+        internal float EndUnder;
+        internal float Before;
+        internal float After;
+
+        internal string Facts() =>
+            $"feet {F(UnderAtStart)} m under the rest height when both keys were down, deep {DeepTicks} of {CrouchTicks + Ticks} "
+            + $"ticks, left to the normal game {VanillaTicks} of {Ticks} ticks with both keys, {F(EndUnder)} m under the rest "
+            + $"height {F(Ticks * Time.fixedDeltaTime)} s later, stamina {F(Before)} -> {F(After)}";
+    }
+
+    // Swimmer put PushedUnder under the rest height, then watched 2 s with Crouch + Jump down.
+    //   crouchFirst false: both keys held since 0.5 s (dive on, vertical left to the normal game), then the push.
+    //   crouchFirst true:  no key at the push. 3 ticks later (the normal game is lifting the swimmer: body speed up)
+    //                      Crouch alone for 3 ticks, then Jump too = fingers that press Crouch a moment before Jump
+    //                      while a wave lift the swimmer.
+    private static IEnumerator PushSwimmerUnder(Player player, DiveRig rig, bool crouchFirst, Pushed p)
+    {
+        const int WatchTicks = 100;
+        DiveInput.TestDown = !crouchFirst;
+        DiveInput.TestUp = !crouchFirst;
+        yield return Ticks(25);
+        p.Ready = crouchFirst ? !DiveState.Diving : DiveState.Diving && DiveState.HandedBack && !DiveState.Deep;
+        rig.Refill();
+        p.Before = player.GetStamina();
+        var at = player.transform.position;
+        MovePlayer(player, new Vector3(at.x, Rest(player) - PushedUnder, at.z));
+        if (crouchFirst)
+        {
+            yield return Ticks(3);
+            DiveInput.TestDown = true;
+            for (var i = 0; i < 3; i++)
+            {
+                yield return FixedTick;
+                p.CrouchTicks++;
+                if (DiveState.Deep)
+                {
+                    p.DeepTicks++;
+                }
+            }
+            DiveInput.TestUp = true;
+        }
+        p.Diving = DiveState.Diving;
+        p.UnderAtStart = Under(player);
+        for (var i = 0; i < WatchTicks; i++)
+        {
+            yield return FixedTick;
+            p.Ticks++;
+            if (DiveState.Deep)
+            {
+                p.DeepTicks++;
+            }
+            if (DiveState.Diving && DiveState.HandedBack && player.m_body.useGravity)
+            {
+                p.VanillaTicks++;
+            }
+        }
+        p.After = player.GetStamina();
+        p.EndUnder = Under(player);
+        DiveInput.TestDown = false;
+        DiveInput.TestUp = false;
+    }
+
+    // Crouch + Jump at the surface: the swimmer ride the waves like in the normal game, never deep, no drain (T32, T34,
+    // G4). Three parts, one trip: waves at wind WavesWind (the normal game keep a swimmer on them); water put over the
+    // swimmer by hand; storm at its strongest wind (waves rise faster than the normal game lift a swimmer: depth alone
+    // counted him as deep until 0.1.1, then the dive held him under the wave and drained him; found by the run of
+    // 2026-10-07, natural ThunderStorm, wind 0.595: deep 366 of 500 ticks, feet 4.8 m under the rest height, stamina
+    // 45.9 -> 2.6). Storm part need the fast wave too (feet PastMargin under the rest height at least once, 1 s or more
+    // before the end, and still never deep): a run where none came fail as "prove nothing", never pass by luck.
     private static IEnumerator RunWaves()
     {
+        var began = Time.realtimeSinceStartup;
         yield return Settle();
         var s = Begin(WavesName);
         if (s == null)
@@ -1436,7 +1527,7 @@ internal static partial class SelfTests
             yield return WaitWind(WavesWind);
             var wind = EnvMan.instance.GetWindIntensity();
             c.Note($"wind pinned at {F(WavesWind)}: wind now {F(wind)}");
-            // Other wind = other waves (stronger: the storm bug; weaker: nothing to ride): not this test.
+            // Other wind = other waves (stronger: the storm part below; weaker: nothing to ride): not this part.
             if (!c.Check(Mathf.Abs(wind - WavesWind) <= 0.02f, $"the wind is the pinned one (wanted {F(WavesWind)}, is {F(wind)})"))
             {
                 c.Report();
@@ -1466,47 +1557,35 @@ internal static partial class SelfTests
             // Really carried up and down by the waves (a swimmer held at one height would not move).
             c.Check(h.FeetRange >= 0.6f * h.WaterRange,
                 $"{held}: rises and falls with the waves (the swimmer {F(h.FeetRange)} m, the water under it {F(h.WaterRange)} m)");
-            rig.GiveStaminaRateBack();
-            yield return new WaitForSeconds(1f);
 
-            yield return GoHome(s);
-            CheckLog(s);
-        }
-        finally
-        {
-            rig.Restore();
-        }
-        c.Report();
-    }
+            // ---- water over the swimmer all at once (put PushedUnder under the rest height by hand), Crouch + Jump
+            // already held: no dive took the swimmer there, so not deep; the normal game lifts them back, no drain (T32,
+            // T34). Until 0.1.1 depth alone counted them as deep on the next tick ----
+            yield return new WaitForSeconds(0.5f);
+            var p = new Pushed();
+            yield return PushSwimmerUnder(player, rig, false, p);
+            var pushed = $"Crouch and Jump held at the surface, then the swimmer put {F(PushedUnder)} m under the rest height";
+            c.Note($"{pushed}: {p.Facts()}");
+            c.Check(p.Ready && p.Diving && p.UnderAtStart >= PastMargin && p.DeepTicks == 0 && p.VanillaTicks == p.Ticks
+                    && Mathf.Abs(p.EndUnder) < 0.4f,
+                $"{pushed}: not counted as deep, the normal game lifts the swimmer back to the swimming height ({p.Facts()})");
+            c.Check(Mathf.Abs(p.After - p.Before) < 0.2f, $"{pushed}: the stamina bar stays full ({p.Facts()})");
 
-    // REAL BUG, alone here (T32, storm part; found by the run of 2026-10-07, natural ThunderStorm, wind 0.595: deep 366 of
-    // 500 ticks, feet 4.8 m under the rest height, stamina 45.9 -> 2.6). Storm wave rise faster than 2.5 m/s, vanilla
-    // buoyancy then leave even a plain swimmer more than DiveLogic.EnterMargin under the rest height. With Crouch held
-    // (Crouch + Jump = stay) DiveController.Tick count that as deep: from then me hold the height (target 0, gravity
-    // off), the wave go on rising over the diver, no sideways swimming, still-diver drain, until a trough come down to
-    // him. Fail until the mod is fixed. Wind pinned at the strongest the storm weather itself give, so the fast wave
-    // come soon; held up to 40 s. A pass need the fast wave too (feet past EnterMargin under the rest height at least
-    // once, 1 s or more before the end, and still never deep): a run where none came fail as "prove nothing", never
-    // pass by luck (round 1 passed by luck: natural wind 0.438, no fast wave in its 10 s).
-    private static IEnumerator RunBugStormWaves()
-    {
-        yield return Settle();
-        var s = Begin(BugStormWavesName);
-        if (s == null)
-        {
-            yield break;
-        }
-        var c = s.C;
-        var rig = s.Rig;
-        var player = s.P;
-        try
-        {
-            ApplyDefaults();
-            if (!DeepSpot(s, out var spot))
-            {
-                c.Report();
-                yield break;
-            }
+            // ---- the same water over a plain swimmer, Crouch pressed 3 ticks before Jump while the normal game lifts
+            // them (own speed of the new dive still upward): not deep either (T34) ----
+            yield return new WaitForSeconds(0.5f);
+            p = new Pushed();
+            yield return PushSwimmerUnder(player, rig, true, p);
+            pushed = $"plain swimmer put {F(PushedUnder)} m under the rest height, Crouch pressed 3 ticks before Jump on the way up";
+            c.Note($"{pushed}: {p.Facts()}");
+            c.Check(p.Ready && p.Diving && p.CrouchTicks == 3 && p.UnderAtStart >= PastMargin && p.DeepTicks == 0
+                    && p.VanillaTicks == p.Ticks && Mathf.Abs(p.EndUnder) < 0.4f,
+                $"{pushed}: not counted as deep, left to the normal game from the tick both keys are down, lifted back to the "
+                + $"swimming height ({p.Facts()})");
+            c.Check(p.Before - p.After < 1f, $"{pushed}: costs at most the few ticks of Crouch alone ({p.Facts()})");
+
+            // ---- storm: the game's stormiest weather forced (console "env <name>"), wind pinned at its strongest. A
+            // fast wave rises over the swimmer who holds Crouch + Jump: still never deep, no drain (T32) ----
             var env = EnvMan.instance;
             var storm = StormEnv();
             EnvSetup setup = null;
@@ -1521,64 +1600,56 @@ internal static partial class SelfTests
                     }
                 }
             }
-            if (!c.Check(setup != null, "the game has a weather to force (EnvMan.m_environments)"))
+            if (c.Check(setup != null, "the game has a weather to force (EnvMan.m_environments)"))
             {
-                c.Report();
-                yield break;
-            }
-            // Storm forced (console "env <name>") and wind pinned (console "wind") before the trip: weather blend and
-            // wind change (5 s) are done on arrival.
-            var envBefore = env.m_debugEnv;
-            rig.Undo("weather", () =>
-            {
-                if (EnvMan.instance != null)
+                var envBefore = env.m_debugEnv;
+                rig.Undo("weather", () =>
                 {
-                    EnvMan.instance.m_debugEnv = envBefore;
+                    if (EnvMan.instance != null)
+                    {
+                        EnvMan.instance.m_debugEnv = envBefore;
+                    }
+                });
+                env.m_debugEnv = storm;
+                var strongest = Mathf.Clamp(setup.m_windMax, 0.05f, 1f);
+                PinWind(rig, strongest);
+                yield return WaitWind(strongest);
+                c.Note($"storm weather '{storm}' forced (its wind goes from {F(setup.m_windMin)} to {F(setup.m_windMax)}), wind pinned "
+                       + $"at its strongest: wind now {F(env.GetWindIntensity())}");
+                // Held 10 s at least, then until the hard case showed (feet clearly past the margin, and 1 s more), 40 s at
+                // most and never past StormHoldEnd.
+                var left = StormHoldEnd - (Time.realtimeSinceStartup - began);
+                var maxTicks = Mathf.Clamp(Mathf.FloorToInt(left / Time.fixedDeltaTime), 500, 2000);
+                var hs = new SurfaceHold { HardUnder = PastMargin };
+                var endedBefore = s.Tap.Count("Dive ended:");
+                yield return HoldAtSurface(player, rig, 500, maxTicks, x => x.HardSeen, hs);
+                var heldStorm = $"storm (wind {F(strongest)}), Crouch and Jump held {F(hs.Seconds)} s at the surface";
+                c.Note($"{heldStorm}: {hs.Facts()}");
+                // A tick not left to the normal game with no deep tick = the dive ended and began again in between:
+                // say how often and why ("NotSwimming" = the normal game itself stopped swimming on a falling wave).
+                c.Note($"{heldStorm}: \"Dive ended\" Debug lines during the hold: {s.Tap.Count("Dive ended:") - endedBefore} "
+                       + $"(NotSwimming {s.Tap.Count("Dive ended: NotSwimming.")} in the whole test)");
+                c.Check(hs.Diving && hs.DeepTicks == 0 && hs.VanillaTicks == hs.Ticks,
+                    $"{heldStorm}: floats at the swimming height on the waves ({hs.Facts()})");
+                c.Check(hs.Diving && Mathf.Abs(hs.After - hs.Before) < 0.2f, $"{heldStorm}: the stamina bar stays full ({hs.Facts()})");
+                c.Check(hs.FeetRange >= 0.6f * hs.WaterRange,
+                    $"{heldStorm}: rises and falls with the waves (the swimmer {F(hs.FeetRange)} m, the water under it "
+                    + $"{F(hs.WaterRange)} m)");
+                if (hs.DeepTicks == 0)
+                {
+                    c.Check(hs.HardSeen,
+                        $"{heldStorm}: a wave fast enough to tell came (the feet were at most {F(hs.MaxUnder)} m under the rest height, "
+                        + $"wanted {F(hs.HardUnder)} m or more at least 1 s before the end: {F(DiveLogic.EnterMargin)} m is where depth "
+                        + $"alone counted a held swimmer as deep; held {hs.Ticks} of at most {maxTicks} ticks). None came: this run "
+                        + "proves nothing, run it again");
                 }
-            });
-            env.m_debugEnv = storm;
-            var strongest = Mathf.Clamp(setup.m_windMax, 0.05f, 1f);
-            PinWind(rig, strongest);
-            var ok = new Box();
-            yield return EnterWater(s, spot, true, ok);
-            if (!ok.Ok)
-            {
-                c.Report();
-                yield break;
-            }
-            yield return WaitWind(strongest);
-            c.Note($"storm weather '{storm}' forced (its wind goes from {F(setup.m_windMin)} to {F(setup.m_windMax)}), wind pinned "
-                   + $"at its strongest: wind now {F(env.GetWindIntensity())}");
-
-            // The normal game alone on this sea (no key, mod not involved): the reason behind the bug.
-            var plain = new Box();
-            yield return PlainSwim(player, 300, plain);
-            c.Note($"plain swimmer for 6 s, no key: rose and fell {F(plain.Point.x)} m, feet at most {F(plain.Value)} m under the "
-                   + $"rest height (the dive counts a diver as deep from {F(DiveLogic.EnterMargin)} m)");
-
-            rig.TakeStaminaRate();
-            yield return new WaitForSeconds(0.4f);
-            // Hard case = feet clearly past the margin where the dive count a held swimmer as deep (0.05 m more: the
-            // sample here is after the physics step, the dive look before the next one).
-            var h = new SurfaceHold { HardUnder = DiveLogic.EnterMargin + 0.05f };
-            yield return HoldAtSurface(player, rig, 500, 2000, x => x.HardSeen, h);
-            var held = $"storm (wind {F(strongest)}), Crouch and Jump held {F(h.Seconds)} s at the surface";
-            c.Note($"{held}: {h.Facts()}");
-            c.Check(h.Diving && h.DeepTicks == 0 && h.VanillaTicks == h.Ticks,
-                $"{held}: floats at the swimming height on the waves ({h.Facts()})");
-            c.Check(h.Diving && Mathf.Abs(h.After - h.Before) < 0.2f, $"{held}: the stamina bar stays full ({h.Facts()})");
-            if (h.DeepTicks == 0)
-            {
-                c.Check(h.HardSeen,
-                    $"{held}: a wave fast enough to tell came (the feet were at most {F(h.MaxUnder)} m under the rest height, "
-                    + $"wanted {F(h.HardUnder)} m or more at least 1 s before the end: {F(DiveLogic.EnterMargin)} m is where a held "
-                    + "swimmer was counted as deep). None came: this run proves nothing, run it again");
+                env.m_debugEnv = envBefore;
             }
             rig.GiveStaminaRateBack();
-            env.m_debugEnv = envBefore;
             yield return new WaitForSeconds(1f);
 
             yield return GoHome(s);
+            CheckLog(s);
         }
         finally
         {

@@ -4,12 +4,18 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
-MC Mods panel. Smoke test passed 2026-09-29 (loads, patches cleanly, JitCheck clean: 278 methods, 0 failures). No
-in-game test yet.
+**Build under test:** 0.1.1, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+MC Mods panel. Smoke test passed 2026-09-29 on 0.1.0 (loads, patches cleanly, JitCheck clean: 278 methods, 0
+failures). No in-game test yet. 0.1.1 fixes the "This container changed elsewhere" refusal that followed a Sort that
+moved nothing (T20: a Sort with nothing to move no longer reorders the chest's item list without saving it); T20 was
+reset to `[ ]`. 0.1.1 also makes the sort order button mouse only (no controller key, no glyph: the left stick click
+stays the game's Take all, the right stick click the game's Place stacks), no longer warns about the buttons standing
+right of the container panel (they stay there), and sorts tankards in Other again; T12, T13, T14, T17, M07, C02 and
+C03 were reworded where needed and reset to `[ ]`. The smoke test and the self-tests ran on 0.1.1 on 2026-10-13 (game
+1.0.17, every MC mod loaded): all of this mod's tests passed, `sortchest.toggle` on a second run alone.
 
-**Automated checks (2026-10-08):** 25 of 30 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 24 of 24 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -34,10 +40,14 @@ Press F5 for the console → `devcommands` (if the console asks you to confirm c
   Cart 6x3, Karve 2x2, Longship 6x3, Drakkar 8x4; the Debug line `Opened <name> <w>x<h>` shows the real size: note
   it); which English name a prefab shows where the names differ (Timberwood for `Frostwood`, Flametal Ore for
   `FlametalOreNew`, Iron Scale Mail for `ArmorIronChest`); Wood's stack size of 50 (T05); the weapon skill of
-  `AxeFlint` (Axes, so it sorts before `Club`); the item type, skill and animation of the tools, the torch, the tankard
-  and the mead (T14 prints them); the recipes and station costs behind the derived biomes (T14); which controller keys
-  the game's Take all / Place stacks use and where the Sort buttons end up (T12, T13: the Debug layout dump shows
-  both); that a ship's storage shares the ship's network object (M05, M06).
+  `AxeFlint` (Axes, so it sorts before `Club`); the item type, skill and animation of the tools, the torch and the
+  mead (T14 prints them); the recipes and station costs behind the derived biomes (T14); that a ship's storage shares
+  the ship's network object (M05, M06).
+- Seen in the automated runs of 2026-10-08 (game 1.0.17, no longer unverified): the game's Take all listens to the
+  left stick click and Place stacks to the right stick click; on the game's own panel Take all sits at the left end,
+  the container name in the middle and Place stacks at the right end, so the two Sort buttons stand right of the panel
+  (T12, T13; the Debug layout dump shows both); the `Tankard` is a one-handed weapon item with the Swords skill and
+  the torch animation (it still belongs to Other, T14).
 
 Keep `./tools/Watch-Log.ps1 -Mine` open. For T09, T12, T13 and T14 turn on Debug logging
 (`./tools/Setup.ps1 -DevBepInExConfig`):
@@ -102,25 +112,27 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. For T09, T12, T13 and T14 turn on Debug
   *Automated: `sortchest.tombstone`.*
 - [x] **T11 Obliterator:** put items in, Sort works; obliterating afterwards works as usual.
   *Automated: `sortchest.obliterator`.*
-- [!] **T12 Gamepad:** with a controller, open a chest, move the focus to the chest grid (bumpers). Expected: glyphs
-  on both buttons (View/Select on Sort, left stick on the sort order button), shown only while the chest grid is
-  focused; View/Select sorts; a left stick click changes the sort order only (nothing moves); with your own inventory
-  or the crafting panel focused, both do nothing to the chest; moving around the chest grid with the left stick never
-  sorts; the right stick click does nothing to the chest; the game's Take all / Place stacks controller buttons still
-  work. No `already uses the controller key` warning in the log. (While the left stick is held down, the crafting
-  panel may show its x5 multi-craft preview: that is the game's own use of that button, nothing is crafted.)
-  **FAILED:** automated test: Left stick click is the game's Take all key: the sort order button has no controller key
-  and no glyph (self-test `sortchest.bug.pad-order-key`); Right stick click is the game's Place stacks key, so it does
-  something to the chest (self-test `sortchest.bug.pad-right-stick`)
+- [ ] **T12 Gamepad:** with a controller, open a chest, move the focus to the chest grid (bumpers). Expected: the
+  View/Select glyph on Sort, shown only while the chest grid is focused; **no** glyph on the sort order button (it is
+  mouse only, by design); View/Select sorts; with your own inventory or the crafting panel focused, View/Select does
+  nothing to the chest; moving around the chest grid with the left stick never sorts. The stick clicks are the game's
+  own and do what they do without the mod: a left stick click is Take all (the chest's content goes to your
+  inventory) and a right stick click is Place stacks; neither sorts, and neither changes the sort order. Change the
+  sort order with the mouse: the label changes, nothing moves. No `already uses the controller key` warning in the
+  log.
+  *Partly automated (`sortchest.gamepad`); by hand: With a real controller: the View/Select glyph looks right on Sort
+  and the sort order button shows none, View/Select sorts, and a real left / right stick click runs the game's Take
+  all / Place stacks (the test presses simulated keys with the game buttons' work swapped for a counter).*
 - [x] **T13 Layout and tooltips:** hover each button: tooltip "Sort" / "Rearrange this container from top left to
   bottom right, by ..." and "Sort order" / "Click to change how Sort orders items: ...". With Debug logging on, open a
-  Chest, the Karve, the Black metal chest and the Drakkar: in each, no overlap with Take all, Place stacks, the name,
-  the weight, the grid or its scrollbar, nothing off screen, and no `Sort buttons ... on a` warning in the log (an Info
-  line `they go in a second row` is fine if the buttons are then in a clean second row: note it). Then
-  `inventorysize 6` (2 extra rows) and open the Chest and the Black metal chest again: same checks. Put nothing in the
-  extra rows and set `inventorysize 4` afterwards (lowering the size drops the items of the removed rows).
-  *Automated test failing: Sort buttons sit outside the container panel and the mod logs 'Sort buttons stick out of
-  the container panel' at every opening (self-test `sortchest.bug.layout-warning`) (the box was ticked by hand).*
+  Chest, the Karve, the Black metal chest and the Drakkar: in each, the two buttons continue the game's row (Take all,
+  the name, Place stacks) to the right of Place stacks (on the game's own panel that is just past the panel's right
+  edge: their intended place), with no overlap with Take all, Place stacks, the name, the weight, the grid or its
+  scrollbar, nothing off screen, and no `Sort buttons ... on a` warning in the log. Then `inventorysize 6` (2 extra
+  rows) and open the Chest and the Black metal chest again: same checks. Put nothing in the extra rows and set
+  `inventorysize 4` afterwards (lowering the size drops the items of the removed rows). (Only with a UI mod that moves
+  the game's buttons: an Info line `they go in a second row` with the buttons in a clean second row is fine: note it.)
+  *Automated: `sortchest.layout`.*
 - [x] **T14 Biome and type index log (Debug level):** the first "By biome" sort after loading a world writes `Biome
   index built in … ms` (Info) and one Debug line per item. Expected: `Wood -> Meadows (Table)`, `Bronze -> BlackForest
   (Derived)`, `BoarJerky -> BlackForest (Derived)` (made at the cauldron, which needs Tin), `MeadHealthMinor ->
@@ -129,8 +141,7 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. For T09, T12, T13 and T14 turn on Debug
   `FishingRod`, `Scythe` `-> 5.1 Tools and light`, `Torch` `-> 5.2 Tools and light`, `Tankard` `-> 10.0 Other`,
   `SwordBronze` `-> 0.0 Weapons`; no exception; the time well under a second. A second "By biome" sort in the same world
   does not rebuild. (The recipes and prefab values behind these lines are unverified: if a line differs, note it.)
-  *Automated test failing: Tankard sorts with Tools and light, not last in Other (self-test
-  `sortchest.bug.tankard-group`) (the box was ticked by hand).*
+  *Automated: `sortchest.biome`, `sortchest.type`.*
 - [x] **T15 Live toggle:** with a chest open, set `Enabled = false` for Sort Chest without closing the chest: in
   ConfigurationManager (F1) if installed, or by editing `BepInEx/config/MC.UX.Container.Sort.cfg` (alt-tab; the game
   picks the change up while running). Not through Esc → MC Mods: Esc closes the inventory first (T18). Expected: both
@@ -143,8 +154,7 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. For T09, T12, T13 and T14 turn on Debug
   chest: vanilla panel, no buttons.*
 - [x] **T17 Clean log:** after a session, no errors or exceptions mentioning `Sort Chest` or `MC.UX` in
   `BepInEx/LogOutput.log`, and no `Sort buttons` warning.
-  *Automated test failing: Sort buttons sit outside the container panel and the mod logs 'Sort buttons stick out of
-  the container panel' at every opening (self-test `sortchest.bug.layout-warning`) (the box was ticked by hand).*
+  *Automated: `sortchest.log`.*
 - [x] **T18 Live toggle from the MC Mods panel:** close the inventory, Esc → MC Mods → untick Sort Chest, open a
   chest. Expected: vanilla panel, no buttons. Tick it again, open the chest: the buttons are back, sorting works, no
   restart.
@@ -156,12 +166,11 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. For T09, T12, T13 and T14 turn on Debug
   the dialog: Sort works (the Wood stacks merge). Split a stack after that: the dragged amount comes from the stack
   you picked, nothing is duplicated.
   *Automated: `sortchest.split`.*
-- [!] **T20 Sort again after a Sort that moved nothing:** sort a chest "By name". Drag the stack of the first slot into
+- [x] **T20 Sort again after a Sort that moved nothing:** sort a chest "By name". Drag the stack of the first slot into
   your inventory, then back into the same chest slot. Click Sort (nothing moves), click Sort again, then switch to
   "By type" and click Sort. Expected: the second click does nothing and shows no message; the "By type" click sorts
   by type. The center message "This container changed elsewhere. Close it and open it again to sort." never appears.
-  **FAILED:** automated test: After a Sort that moved nothing, the next Sort clicks are refused with 'This container
-  changed elsewhere' (self-test `sortchest.bug.noop-stale`)
+  *Automated: `sortchest.name`.*
 
 ## 0.1.0 — multiplayer (needs a second player)
 
@@ -196,11 +205,12 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. For T09, T12, T13 and T14 turn on Debug
   After you close and reopen the storage, you see the current content and Sort works.
   *Partly automated (`sortchest.stale`); by hand: The real two-player sequence on a Karve (friend aboard, storage
   opened from the dock).*
-- [!] **M07 Controller on a chest another player owned:** with a controller, open a chest the friend used last (so the
-  friend's game owned it). Expected: from this first opening, the glyphs on the Sort buttons show only while the chest
-  grid is focused, and View/Select / left stick click act only there.
-  **FAILED:** automated test: Left stick click is the game's Take all key: the sort order button has no controller key
-  and no glyph (self-test `sortchest.bug.pad-order-key`)
+- [ ] **M07 Controller on a chest another player owned:** with a controller, open a chest the friend used last (so the
+  friend's game owned it). Expected: from this first opening, the View/Select glyph on Sort shows only while the chest
+  grid is focused and View/Select sorts only there; the sort order button has no glyph and is changed with the mouse.
+  *Partly automated (`sortchest.pad-late`, `sortchest.pad-late-slow`); by hand: With a real controller on a chest a
+  real second player used last (the tests give the chest to a made-up other player and press simulated keys; on this
+  PC MultiUserChest keeps the panel open, so they never saw a late panel).*
 
 ## 0.1.0 — compatibility (optional, needs another mod)
 
@@ -209,20 +219,19 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. For T09, T12, T13 and T14 turn on Debug
   loaded; the other one is not.
   *Partly automated (`sortchest.crossbow`); by hand: Take the loaded crossbow out and equip it: still loaded; the
   other one is not.*
-- [x] **C02 Loot Pickup Filter (MC):** both mods on, open a chest. Expected: both UIs visible, no overlap, both work.
+- [ ] **C02 Loot Pickup Filter (MC):** both mods on, open a chest. Expected: both UIs visible, no overlap, both work.
   - Set its mode to Skip ignored and middle-click three different chest items to mark them (badges shown; its marks
     are per item type, so every stack of a marked item shows one). Sort. Expected: the badges move with the marked
     items to their new slots; no badge on a slot that is now empty or holds an unmarked item.
   - After sorting, middle-click a chest slot: that item is marked / unmarked as before.
-  - Controller: with the chest grid focused, the right stick click (alone, with LT, with RT) does nothing (no mark,
-    no mode change, no sort); View/Select sorts; the left stick click only changes the sort order. With your own
-    inventory focused, the right stick click marks the selected item, LT + right stick changes its mode, RT + right
-    stick opens its lists panel, and View/Select / the left stick click do nothing to the chest. No press ever does
-    both mods' actions.
-  *Automated test failing: Left stick click is the game's Take all key: the sort order button has no controller key
-  and no glyph (self-test `sortchest.bug.pad-order-key`); Right stick click is the game's Place stacks key, so it does
-  something to the chest (self-test `sortchest.bug.pad-right-stick`) (the box was ticked by hand).*
-- [x] **C03 Crafting Search and Sort (MC):** both mods on. Open a chest: its search row and Sort button show above the
+  - Controller: with the chest grid focused, View/Select sorts, and the sort order is changed with the mouse only
+    (no glyph on that button). With a chest open the stick clicks are the game's own: the right stick click is Place
+    stacks and the left stick click is Take all, and they do what they do in the game without the mods. Sort Chest
+    never reacts to a stick click (alone, with LT, with RT): no sort, no change of the sort order. With your own
+    inventory focused, View/Select does nothing to the chest.
+  *Partly automated (`sortchest.gamepad`); by hand: With Loot Pickup Filter on: both UIs visible without overlap, the
+  badges follow the sorted items, a middle-click marks after a sort, and the controller part with a real controller.*
+- [ ] **C03 Crafting Search and Sort (MC):** both mods on. Open a chest: its search row and Sort button show above the
   crafting list as usual, our buttons on the chest panel.
   - No overlap between its row (and its open Sort menu) and our buttons. Open its Sort menu, then click our Sort:
     its menu closes and the chest is sorted. Open its menu again, click our sort order button: its menu closes and our
@@ -236,8 +245,10 @@ Keep `./tools/Watch-Log.ps1 -Mine` open. For T09, T12, T13 and T14 turn on Debug
     `nocost` on, as in Setup, every recipe is listed, even in your plain inventory), "Tools and light" brings the
     Antler Pickaxe and the Torch to the top and "Other" brings the Tankard; the mead's T14 line says
     `6.1 Food and potions` (its kind Potion is that mod's "Meads and potions").
-  *Automated test failing: Tankard sorts with Tools and light, not last in Other (self-test
-  `sortchest.bug.tankard-group`) (the box was ticked by hand).*
+  *Partly automated (`sortchest.type`, `sortchest.biome`, `sortchest.search-field`); by hand: Its search row and its
+  open Sort menu do not overlap our buttons; a click on our buttons closes its menu and still works; typing `sort` and
+  Enter in its search field does nothing to the chest; its own menu groups "Tools and light" and "Other" list the
+  pickaxe, the torch and the tankard.*
 - [ ] **C04 Other chest sort mods (optional):** with Quick Stack Store Sort Trash Restock (or InventoryActions,
   HexQuickStackStorage), open a chest. Note whether its buttons and ours overlap; both sorts work; no errors from this
   mod.

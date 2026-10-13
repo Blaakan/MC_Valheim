@@ -75,7 +75,9 @@ push you back while your stamina lasts. The attack button bashes with the shield
     full block and lets damage through, so a player who lands one parry in three also pays about 20 stamina per
     stagger, and the bash needs no timing. Like a parry, one bash staggers one creature at most, also in a group.
   - **One bash every 2 seconds at most.** A press before the time is up (once the swing is over, or in its last half
-    second), or the attack button held down, starts the next bash as soon as the time is up.
+    second), or the attack button held down, starts the next bash as soon as the time is up. That waiting press is for
+    the bash only: when you put the tower shield away or switch to another weapon it is dropped, so nothing swings by
+    itself (a press made in the last half second still counts, as in the normal game).
   - **A slow, readable swing.** The shield punch plays at 0.6 of its normal speed, its hit included: the hit lands
     about 0.8 s after you press attack, and the swing is over after about 1.1 s. Your guard is down for the whole
     swing. Other players see the same slow swing.
@@ -91,9 +93,10 @@ push you back while your stamina lasts. The attack button bashes with the shield
   | Nord Greatshield | 32 | 320 / 560 / 740 | 12.8 / 29.6 |
 
   For scale, creatures stagger at: Greydwarf 12, Skeleton 20, Draugr 50, Draugr Elite 100, Troll 180, Lox 300. So an
-  Iron tower shield staggers a Draugr in one bash and a Troll in two to four (its stagger bar drains between two
-  bashes: two or three bashes for about four Trolls in five, four for the rest). A staggered creature takes double
-  damage from the next hits (normal game rule): the bash sets up your allies and your next weapon hit.
+  Iron tower shield staggers a Draugr in one bash and a Troll in two to four, now and then five (its stagger bar
+  drains between two bashes: two or three bashes for about four Trolls in five, four or now and then five for the
+  rest). A staggered creature takes double damage from the next hits (normal game rule): the bash sets up your allies
+  and your next weapon hit.
 - **No endless stagger lock.** After a bash staggers a creature, bashes add no heavy stagger to it for 8 seconds (for
   every player): it recovers and fights back between staggers. Other weapons are not limited. In a group, turn to
   another enemy: a bash aimed at the creature you just staggered staggers no one in those 8 seconds.

@@ -4,14 +4,18 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
-test (`./tools/Test-Smoke.ps1`) passed 2026-10-01 (loads, patches cleanly, JitCheck clean). In-world self-tests
-(`./tools/Test-InWorld.ps1`) passed 2026-10-01 on the final code: `dive.network`, `dive.logic`, `dive.pending` and
-`dive.dive` (a live dive in 12 m deep sea: descent, hold depth, no sideways movement, drain while still, free at the
-surface, camera, fog and surface from below). No hands-on in-game test yet.
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+fixed the storm-wave bug of T32 (in a storm, holding Crouch and Jump at the surface got the swimmer counted as under
+water, held under the rising wave and drained): T32 is reset to `[ ]` and T34 is new; the self-tests ran on 0.1.1 on
+2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): all of this mod's tests passed
+(see the automated checks below). History, on 0.1.0: smoke test (`./tools/Test-Smoke.ps1`) passed 2026-10-01 (loads,
+patches cleanly, JitCheck clean). In-world self-tests (`./tools/Test-InWorld.ps1`) passed 2026-10-01 on the final
+0.1.0 code: `dive.network`, `dive.logic`, `dive.pending` and `dive.dive` (a live dive in 12 m deep sea: descent, hold
+depth, no sideways movement, drain while still, free at the surface, camera, fog and surface from below). No hands-on
+in-game test yet.
 
-**Automated checks (2026-10-08):** 26 of 27 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 26 of 26 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -26,8 +30,9 @@ to go up.
 
 **Names checked:** every console command above is in the game code (`Terminal`); the ship `Karve` (`spawn Karve`; any
 ship works) and the creature `Serpent` are prefab names from the 1.0.16 runtime dump (`docs/game/exploration-player.md`,
-`docs/design/combat-creatures-morale.md`). Values measured by the in-world run (Valheim 1.0.16, `dive.dive` and
-`dive.logic` NOTE lines): swim depth 1.5 m (you swim once the water is deeper than 1.1 m), swim speed 2 m/s, swim
+`docs/design/combat-creatures-morale.md`); the weather `ThunderStorm` is the name the in-world run of 2026-10-08 forced
+(Valheim 1.0.17, `EnvMan` weather list, wind 0.8 to 1). Values measured by the in-world run (Valheim 1.0.16,
+`dive.dive` and `dive.logic` NOTE lines): swim depth 1.5 m (you swim once the water is deeper than 1.1 m), swim speed 2 m/s, swim
 stamina drain 6 per second at Swim 0 down to 3 at Swim 100, camera minimum distance above water 0.4 m, the ocean water
 zone reaches 50 m below the sea surface (it reached the floor at the 12 m test spot), fog mode Exponential. The live
 dive went down at 1.6 m/s on average over 3 m and drained 6 stamina per second while holding still.
@@ -165,14 +170,13 @@ one back afterwards. Stamina items need `god` off only where they say so.
   it stays near the surface and cannot bite you; note how deep you needed to go.
   *Partly automated (`dive.serpent`); by hand: That it "stays near the surface" and how deep you need to go: read the
   dive.serpent NOTE (how close it came, how deep it went) or repeat by hand; one Serpent, one run, 7-8 m only.*
-- [!] **T32 No drain when the dive cannot go down (G4):** `heal`, then in water about 1.6 m deep (you swim, but your
+- [x] **T32 No drain when the dive cannot go down (G4):** `heal`, then in water about 1.6 m deep (you swim, but your
   feet are near the floor: a gentle shore slope) hold Crouch for 10 s; repeat a little further out, in water about 2 m
   deep. Then in deep water at the surface, with big waves (`env` a stormy weather), hold Crouch and Jump together for
   10 s. Expected: each time you float at the normal swimming height and rise and fall with the waves as when swimming
   normally, and the stamina bar stays full. In the 2 m water you may first dip a little (a small cost while you go
   down), then float back up and stay there while you hold Crouch, with no quick bobbing up and down against the floor.
-  **FAILED:** automated test: Storm waves: holding Crouch + Jump at the surface gets the swimmer counted as deep, held
-  under the rising wave and drained (self-test `dive.bug.storm-waves`)
+  *Automated: `dive.shallow`, `dive.waves`.*
 - [x] **T33 Bottom of the water (world edge):** the water itself ends about 50 m under the surface, and only the sea at
   the edge of the world is deeper than that: go to open sea about 10,300 m from the world centre (`goto 10300 0` or
   another direction that is neither Ashlands nor Deep North), and stay inside 10,420 m: beyond that line the normal
@@ -181,6 +185,14 @@ one back afterwards. Stamina items need `god` off only where they say so.
   you hold Crouch; you keep swimming the whole time (no drop to the sea floor, no fall damage); Jump brings you back
   to the surface.
   *Automated: `dive.bottom`.*
+- [ ] **T34 A wave is not a dive (storm, 0.1.1):** in deep water with big waves (`env ThunderStorm`), stay at the
+  surface. As a wave lifts you, press Crouch and Jump and hold them for a few seconds, pressing Crouch a moment before
+  Jump; repeat on several waves. Then tap Crouch a few times (well under half a second each). Last, hold Crouch alone
+  for two seconds. Expected: the holds and the taps never leave you held under a wave: you keep riding the waves, W, A,
+  S, D still swim you, and the stamina bar stays full or nearly full (a tap of Crouch costs a little). Holding Crouch
+  alone still dives as in T01.
+  *Partly automated (`dive.waves`, `dive.logic`); by hand: Real keys in a real storm: Crouch pressed a moment before
+  Jump and short taps of Crouch never leave you held under a wave, and Crouch held alone still dives.*
 - [x] **L01 Live toggle:** 5 m down, untick Swim Dive in the MC Mods panel. Expected: the normal game lifts you to the
   surface within a second or two, the camera goes above water, tint and surface back to normal, no error. Tick it
   again: Crouch dives again.

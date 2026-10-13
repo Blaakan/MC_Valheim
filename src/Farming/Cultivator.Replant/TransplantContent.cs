@@ -16,7 +16,8 @@ namespace MC.Farming.CultivatorReplantMod;
 // error in log, other rows work. Registration always on ([AlwaysOnPatch] ObjectDB / ZNetScene postfixes): transplants
 // never vanish from inventories and planted saplings stay known while mod installed, also with feature off. Sapling
 // piece m_enabled follow feature and rules (pending = hidden from build menu); grow times (prefab and loaded saplings)
-// and root range follow rules (Rebuild). Prefab names PERMANENT after release (PlantKind.ItemName / SaplingName: saved in inventories, chests,
+// and root range follow rules (Rebuild); feature off = grow times follow this player's own setting, never the last
+// rules in force. Prefab names PERMANENT after release (PlantKind.ItemName / SaplingName: saved in inventories, chests,
 // ZDOs). Me never touch vanilla prefabs: clones only. Only vanilla thing me change = cultivator piece table, our
 // saplings added at the end (shared prefab, added once).
 internal static class TransplantContent
@@ -103,7 +104,7 @@ internal static class TransplantContent
 
     internal static bool RebuildPending => _rebuildPending;
 
-    // How many loaded transplant saplings the last enabled Rebuild gave the rules' grow time (self tests).
+    // How many loaded transplant saplings the last Rebuild that wrote grow times gave them (self tests).
     internal static int LoadedSaplingsUpdated => _loadedUpdated;
 
     // Transplant item prefab of this row. Null = not built yet, or row left out (source missing).
@@ -255,10 +256,12 @@ internal static class TransplantContent
 
     // Rules changed: rebuild once they stay still RebuildDelay s (ZNet.Update postfix call UpdatePendingRebuild).
     // Saplings switch on or off (server rules came after pending, pending again): rebuild NOW. RootGate pending hold
-    // end same moment, so no loaded sapling get one grow try on a stale grow time while me wait.
+    // end same moment, so no loaded sapling get one grow try on a stale grow time while me wait. Feature off: rebuild
+    // NOW too. ZNet.Update postfix is a feature patch (gone), nobody would run the wait, and own grow time setting
+    // changed while off would never reach our saplings.
     internal static void RequestRebuild()
     {
-        if (WantEnabled() != _builtEnabled)
+        if (!Plugin.FeatureActive || WantEnabled() != _builtEnabled)
         {
             _rebuildPending = false;
             Rebuild();
@@ -289,21 +292,37 @@ internal static class TransplantContent
         Rebuild();
     }
 
-    // Saplings and tiers from rules in force. Called at registration, on rules change (after the delay),
-    // OnActivated, OnDeactivated. Piece m_enabled = feature on + rules here (pending = hidden). Feature off = pieces
-    // hidden, nothing read (game quit run OnDeactivated while Unity already destroy prefabs: Unity null skipped).
+    // Saplings and tiers from rules in force. Called at registration, on rules change (after the delay; at once while
+    // feature off), OnActivated, OnDeactivated. Piece m_enabled = feature on + rules here (pending = hidden). Feature
+    // off = pieces hidden (game quit run OnDeactivated while Unity already destroy prefabs: Unity null skipped, no
+    // grow time written).
     // Grow times go on the prefab (saplings spawned later) AND on saplings already loaded (UpdateLoadedSaplings):
-    // joined while pending, or rules changed, no sapling keep old time. Root range = prefab only (placement ghost).
+    // joined while pending, or rules changed, no sapling keep old time. Which time: rules in force when feature on;
+    // this player's OWN setting when feature off (Grow prefix gone, vanilla grow our saplings on the time they carry:
+    // must never be the last rules in force, a server's or the setting as it was before); pending = none written
+    // (RootGate hold our saplings until the server's come). Root range = prefab only (placement ghost).
     // Local build menu refreshed when a piece came or went. Always end with CultivatorTiers.Apply (it revert itself
     // when off or pending).
     internal static void Rebuild()
     {
         CultivatorRules rules = null;
         var enable = false;
+        var writeTimes = false;
+        var multiplier = 1f;
         if (Plugin.FeatureActive)
         {
             rules = ServerRules.Current;
             enable = rules != null && !rules.IsPending;
+            if (enable)
+            {
+                writeTimes = true;
+                multiplier = rules.GrowTimeMultiplier;
+            }
+        }
+        else if (!_quitting)
+        {
+            writeTimes = true;
+            multiplier = ServerRules.OwnRules.GrowTimeMultiplier;
         }
         _builtEnabled = enable;
         var menuChanged = false;
@@ -315,22 +334,22 @@ internal static class TransplantContent
             {
                 continue;
             }
-            if (enable)
+            if (writeTimes)
             {
                 var plant = entry.Plant;
                 if (plant != null)
                 {
-                    SetGrowTime(plant, entry.Kind, rules.GrowTimeMultiplier);
+                    SetGrowTime(plant, entry.Kind, multiplier);
                 }
-                if (entry.Kind.NeedsRoot)
+            }
+            if (enable && entry.Kind.NeedsRoot)
+            {
+                var range = rules.RootRange > 0f ? rules.RootRange : CultivatorRules.Default.RootRange;
+                if (!Mathf.Approximately(piece.m_connectRadius, range))
                 {
-                    var range = rules.RootRange > 0f ? rules.RootRange : CultivatorRules.Default.RootRange;
-                    if (!Mathf.Approximately(piece.m_connectRadius, range))
-                    {
-                        // Ghost copy keep old radius: menu refresh make a new ghost.
-                        piece.m_connectRadius = range;
-                        menuChanged = true;
-                    }
+                    // Ghost copy keep old radius: menu refresh make a new ghost.
+                    piece.m_connectRadius = range;
+                    menuChanged = true;
                 }
             }
             if (piece.m_enabled != enable)
@@ -339,12 +358,12 @@ internal static class TransplantContent
                 menuChanged = true;
             }
         }
-        if (enable)
+        if (writeTimes)
         {
             // Own guard: walk blow up never stop menu and tiers after it.
             try
             {
-                _loadedUpdated = UpdateLoadedSaplings(rules.GrowTimeMultiplier);
+                _loadedUpdated = UpdateLoadedSaplings(multiplier);
             }
             catch (Exception e)
             {
@@ -358,12 +377,13 @@ internal static class TransplantContent
         CultivatorTiers.Apply();
     }
 
-    // Saplings already in the world get the grow time of the rules in force, like new ones. Instance keep the copy of
-    // the prefab made at spawn (Plant.GetGrowTime read the instance), so without me a sapling loaded while pending (own
-    // config on prefab) or before a rules change grow on the old time. None grew on it before: vanilla never grow a
-    // plant in its first 10 s, RootGate hold all of ours while pending, and pending over = Rebuild at once (no wait,
-    // RequestRebuild). Rebuild rare (debounced): walk all loaded objects, one set lookup each. Returns how many
-    // saplings got it.
+    // Saplings already in the world get the grow time of the rules in force (feature off: of this player's own
+    // setting), like new ones. Instance keep the copy of the prefab made at spawn (Plant.GetGrowTime read the
+    // instance), so without me a sapling loaded while pending (own config on prefab) or before a rules change grow on
+    // the old time. None grew on it before: vanilla never grow a plant in its first 10 s, RootGate hold all of ours
+    // while pending, and pending over = Rebuild at once (no wait, RequestRebuild). Rebuild rare (debounced; feature
+    // off = once per rules or setting change): walk all loaded objects, one set lookup each. Returns how many saplings
+    // got it.
     internal static int UpdateLoadedSaplings(float multiplier)
     {
         var scene = ZNetScene.instance;

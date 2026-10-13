@@ -89,7 +89,8 @@ corners them. And when a pack leader falls, the rest of its pack runs away.
 - **No free sneak attacks.** A creature that is afraid of you and can see you gets no sneak-attack bonus from you (the
   game's own rule for its Passive Mobs world setting): it watched you walk up. One that is running from you is alert,
   which also rules out a sneak attack. From behind it, out of its sight and quiet, or in smoke, a sneak attack works as
-  usual. Crawling around creatures that are afraid of you raises Sneak only at the slow rate, as if nobody who cared
+  usual. A sleeping creature watches nobody: a hit on it is a sneak attack as in the normal game, whichever way it
+  lies. Crawling around creatures that are afraid of you raises Sneak only at the slow rate, as if nobody who cared
   were near.
 - **No extra name plates.** The mod adds nothing to the health bars. A creature running from a player, or a pack
   running from its fallen leader, is simply alert in the game's own way: the red "!" above its name, the icon the game

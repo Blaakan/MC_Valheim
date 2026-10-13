@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Fixed: a sleeping creature that is afraid of you and happens to face you lost the sneak-attack bonus. A sleeper
+  watches nobody, so a hit on it is a sneak attack again, as in the normal game.
+
 ## 0.1.0
 
 - Initial version: weak creatures are afraid of the players who have outgrown them. A creature is afraid of a player

@@ -19,8 +19,15 @@ the open `forge.bug.*` tests), multiplayer scenarios all passed; no "Unknown ite
 and none in the client log of the each-off scenario, which goes back to the main menu 30 times (26 such warnings
 before).
 
-**Automated checks (2026-10-08):** 54 of 58 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
+**0.1.1, added after that run (2026-10-08):** an unknown or empty tier `Material` now shows on screen why the idol
+upgrade is blocked (T24, reset), and turning the mod on with the Forge window open brings the IDOLS tab back at once
+(T28, reset). The checks of the removed self-tests `forge.bug.bad-material-silent` and `forge.bug.tab-after-on` are
+back in `forge.rules.bad-material` and `forge.on.at-forge`. Debug and Release build; the self-tests ran on this code
+on 2026-10-13 (game 1.0.17, every MC mod loaded): all of this mod's tests passed apart from the two open `forge.bug.*`
+tests (T25, T22).
+
+**Automated checks (2026-10-13):** 54 of 56 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -154,13 +161,15 @@ the idol and refinement tests: it makes everything free.
   the timer open ConfigurationManager (F1) and untick `Enabled`. Expected: the timer stops, the panel shows the vanilla
   refinement text, the item keeps its level and durability and the idol is not used (no vanilla roll follows).
   *Automated: `forge.off.refine`.*
-- [!] **T24 Unknown metal name:** set `Material` of "Tier 3 - Silver idols" to a name the game does not know
-  (`Silverr`), carry a plain `Upgrader3Weapon`, 5 `Silver` and 5 `TrophyWolf`, open the Idols tab. Expected: the
-  upgrade stays blocked (it never becomes free), the panel says in red why (no metal is set for this tier), the
-  idol's tooltip does not show the cost as trophies only, and the log warning names `Silverr`. The same with an empty
-  `Material`.
-  **FAILED:** automated test: Unknown or empty tier Material blocks the idol upgrade with no visible reason (self-test
-  `forge.bug.bad-material-silent`)
+- [x] **T24 Unknown metal name:** set `Material` of "Tier 3 - Silver idols" to a name the game does not know
+  (`Silverr`), carry a plain `Upgrader3Weapon`, 5 `Silver` and 5 `TrophyWolf`, open the Idols tab and select the idol.
+  Expected: the upgrade stays blocked (it never becomes free): the button is off and its tooltip says "Missing
+  requirement". The panel says why: its cost still counts the metal, without a name ("Cost: 5 metal of this tier, 5
+  common trophies of this tier (any mix) and this idol."), and a red line under it reads "No valid metal is set for
+  this tier in the settings." The idol's tooltip does not show the cost as trophies only ("... Idols tab: 5 metal of
+  its biome, 5 common trophies of its biome"), and the log warning names `Silverr`. The same with an empty `Material`;
+  the log warning then names the setting, "(empty Material of Tier 3 - Silver idols)", not an empty name.
+  *Automated: `forge.rules.bad-material`, `forge.rules.wiring`.*
 - [!] **T25 Cost of 0 in the tooltip:** set `Level1Trophies = 0` and hover a plain idol. Expected: the cost line reads
   "Upgrade at a Forge of Potential, Idols tab: 5 Silver", with no comma after it. With `Level1Material = 0` instead:
   only the trophies. With both at 0: no "Idols tab:" line with nothing after it.
@@ -176,11 +185,11 @@ the idol and refinement tests: it makes everything free.
   Expected: nothing is upgraded or refined and nothing else is used; for the idol upgrade a message says the
   requirement is missing.
   *Automated: `forge.timer.loss`.*
-- [!] **T28 Turned on with the Forge open:** with the mod off, open the Forge window, then tick `Enabled` in
-  ConfigurationManager (F1) without closing the window. Expected: the refinement odds and text are back at once, and
-  so is the IDOLS tab (no need to close and reopen the Forge).
-  **FAILED:** automated test: Turned on while the Forge window is open: the IDOLS tab does not come back until the
-  panel is rebuilt (self-test `forge.bug.tab-after-on`)
+- [x] **T28 Turned on with the Forge open:** with the mod off, open the Forge window and select an item, then tick
+  `Enabled` in ConfigurationManager (F1) without closing the window. Expected: the refinement odds and text are back
+  at once, and so is the IDOLS tab (no need to close and reopen the Forge); the UPGRADE tab stays selected, with the
+  same item.
+  *Automated: `forge.on.at-forge`.*
 - [ ] **T29 No false "Unknown item name(s)" warning:** with the default settings, start the game while
   `./tools/Watch-Log.ps1 -Mine` runs, load a world, then log out to the main menu. Expected: the log never shows an
   "Unknown item name(s) in the idol settings, ignored: ..." warning that lists items the game has (`Upgrader0Weapon`,

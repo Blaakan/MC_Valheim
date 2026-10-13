@@ -70,9 +70,11 @@ internal static class Provocation
 
         // E3: afraid creature that watch you walk up is aware of you, not surprised (vanilla Passive Mobs rule,
         // Character.RPC_Damage). One running from you is alerted: vanilla already give no sneak attack. One that cannot
-        // see you (behind it, smoke, far while you sneak) still take the sneak attack.
-        if (hit.m_backstabBonus > 1f && !ai.IsAlerted() && Attitudes.Judge(ai, player) == Attitude.Afraid
-            && ai.CanSeeTarget(player))
+        // see you (behind it, smoke, far while you sneak) still take the sneak attack. Sleeper watch nobody: game sight
+        // test not know sleep (it say sleeper that face you see you), so me ask sleep first and leave vanilla's sneak
+        // attack alone.
+        if (hit.m_backstabBonus > 1f && !ai.IsAlerted() && !ai.IsSleeping()
+            && Attitudes.Judge(ai, player) == Attitude.Afraid && ai.CanSeeTarget(player))
         {
             hit.m_backstabBonus = 1f;
         }

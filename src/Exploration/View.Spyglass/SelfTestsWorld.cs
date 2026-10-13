@@ -60,7 +60,6 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(FeetTest, RunFeet),
         new KeyValuePair<string, Func<IEnumerator>>(WheelTest, RunWheel),
         new KeyValuePair<string, Func<IEnumerator>>(ZoomPickTest, RunZoomPick),
-        new KeyValuePair<string, Func<IEnumerator>>(ZoomPickBugTest, RunZoomPickBug),
         new KeyValuePair<string, Func<IEnumerator>>(HoldTest, RunHold),
         new KeyValuePair<string, Func<IEnumerator>>(LowersTest, RunLowers),
         new KeyValuePair<string, Func<IEnumerator>>(ChatTest, RunChat),

@@ -4,17 +4,21 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
-test (`./tools/Test-Smoke.ps1`) passed 2026-10-01 (loads, patches cleanly). In-world self-tests
-(`./tools/Test-InWorld.ps1 -Only fishing.`) passed 2026-10-01 on the final code (build f37c457+dirty):
-`fishing.network` 19 checks, `fishing.logic` 50, `fishing.pending` 4 and `fishing.fight` 36 (a live fight with a
-Perch on a sea shore: catch bar in and out of the zone, a struggle to the right with the fish swimming right and taking
-line, wrong and right side reel, side switch, catch, loss at 0 stamina). An earlier run failed one check (the right
-side reel stalled while the fish dragged the float, fixed by allowing 1 m of drag in a fight). The full suite of every
-MC mod passed apart from that check. No hands-on in-game test yet.
+**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+fixed two things found by the self-tests on 0.1.0: reeling on the right side in a fight came in stop-and-go and
+stalled about a metre from the catch (T25), and a fish out of the water still fought (T26). T25 and T26 were reset and
+T28 is new; the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod
+loaded): all of this mod's tests passed (see the automated checks below). History of 0.1.0: smoke test
+(`./tools/Test-Smoke.ps1`) passed 2026-10-01 (loads, patches cleanly). In-world self-tests (`./tools/Test-InWorld.ps1
+-Only fishing.`) passed 2026-10-01 on the final code (build f37c457+dirty): `fishing.network` 19 checks,
+`fishing.logic` 50, `fishing.pending` 4 and `fishing.fight` 36 (a live fight with a Perch on a sea shore: catch bar in
+and out of the zone, a struggle to the right with the fish swimming right and taking line, wrong and right side reel,
+side switch, catch, loss at 0 stamina). An earlier run failed one check (the right side reel stalled while the fish
+dragged the float, fixed by allowing 1 m of drag in a fight). The full suite of every MC mod passed apart from that
+check. No hands-on in-game test yet.
 
-**Automated checks (2026-10-08):** 21 of 23 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 21 of 21 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -149,22 +153,29 @@ one back afterwards. Stamina items need `god` off only where they say so (god mo
   deeper, but the side does not swap every second (with `ShowStruggleArrow = true` the arrow stays steady).
   *Partly automated (`fishing.logic`, `fishing.phases`); by hand: Fishing from a real beach with the fish in the last
   metres of shallow water: it runs along the shore and the side (arrow) stays steady.*
-- [!] **T25 Struggle reel near the end:** in a fight, reel on the right side until the fish is close. Expected: the
+- [x] **T25 Struggle reel near the end:** in a fight, reel on the right side until the fish is close. Expected: the
   line keeps coming in while the fish pulls the float sideways (no stall), and the line does not break.
-  **FAILED:** automated test: Reeling on the right side in a fight gets slower as the line gets short and stalls about
-  0.8 m from the catch (self-test `fishing.bug.struggle-reel`)
-- [!] **T26 Fish out of the water (edge case):** from a dock or a shore 1-2 m above the water, `CalmSeconds = 2` and
+  *Automated: `fishing.fight`.*
+- [x] **T26 Fish out of the water (edge case):** from a dock or a shore 1-2 m above the water, `CalmSeconds = 2` and
   `StruggleSeconds = 10`: keep the fish in the zone until the last metres of line lift it out of the water (or drag
   it onto the beach), then wait. Expected: no fight starts while the fish hangs or lies out of the water (the catch
   bar goes on until it is back in the water); or, if one does start, the fish takes no line and holding Block toward
   it does not cost the wrong-side price. Put the settings back.
-  **FAILED:** automated test: A fight starts and takes line while the hooked fish is out of the water (self-test
-  `fishing.bug.stranded`)
+  *Automated: `fishing.input`.*
 - [x] **T27 Hooked fish picked up (edge case):** with a fish hooked and lifted out of the water near you (or lying on
   the shore), pick it up with Use. Expected: the fish is in your inventory with no "Caught" message, the bar is gone
   at once, Debug "Fight ended: its float or fish is gone." (or "Fight ended: the fish is gone."), the float stays
   where it is, empty, holding Block reels it in as in the normal game with no bait back, and there is no error.
   *Automated: `fishing.exits`.*
+- [ ] **T28 Fish pulled out of the water during a fight (added in 0.1.1):** from a dock or a shore 1-2 m above the
+  water, `CalmSeconds = 2` and `StruggleSeconds = 10`: when a fight starts with only a few metres of line left, reel
+  on the right side until the short line lifts the fish out of the water. Expected: the fight ends at once, long
+  before its 10 seconds (the catch bar is back, Debug "Fight: calm for ... s."), and no new fight starts while the
+  fish hangs there. Then walk down to the water until the fish is back in it and wait: the next fight starts after its
+  calm time (about 1.5 to 3 s in the water for a Perch). Put the settings back.
+  *Partly automated (`fishing.input`); by hand: A real fish lifted out of real water by the short line during a fight
+  (the fight ends at once, the bar is back), then lowered back in (the next fight comes after its calm time). The test
+  uses a Perch lying on dry land and tells the mod when it is in the water.*
 
 ## 0.1.0 — multiplayer
 

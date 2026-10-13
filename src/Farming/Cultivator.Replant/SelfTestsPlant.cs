@@ -16,8 +16,9 @@ namespace MC.Farming.CultivatorReplantMod;
 //                       transplant; young plant hover; refused on a wooden floor
 //   replant.cloudberry  T11: level 4 dig, plant the transplant, it grows into a ripe cloudberry bush
 //   replant.rootplace   T13: Yggdrasil ghost refused away from a root, fine a few metres from it; against the root it
-//                       can be placed but has no room; RootRange minimum
-//   replant.nobuild     T24: no-build zone: dig works, planting refused
+//                       can be placed but has no room; RootRange minimum. E04: away from the root it stays refused
+//                       with PlantEasily (other mod, when the tester has it) on again
+//   replant.nobuild     T24: no-build zone: dig works, planting refused. E04: still refused with PlantEasily on again
 //   replant.clock       T04, T35, T26 d: grows on the clock into the ripe vanilla plant, pick, regrow; a grow time
 //                       change reaches a planted sapling (waited, not forced)
 //   replant.sap         T14, T15: sap cost 40: hover, growth drains the root, second one waits, root refills, grows
@@ -276,7 +277,7 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------- replant.rootplace (T13) ----------
+    // ---------- replant.rootplace (T13, E04) ----------
 
     private static IEnumerator RunRootPlace()
     {
@@ -326,9 +327,11 @@ internal static partial class SelfTests
             var toOrigin = origin - rootSpot;
 
             // Away from the root: red ghost, hint with both limits, nothing placed.
+            var farFound = false;
             if (c.Check(FindSpot(rootSpot, toOrigin, new[] { 12f, 14f, 16f, 18f, 20f, 22f }, 2.3f, taken, out var far,
                     p => RootGate.FindRoot(p, 7.5f) == null && StandOk(origin, p) && Buildable(p)), "ground spot away from the root"))
             {
+                farFound = true;
                 // Control: the spot itself can be planted on (a raspberry transplant ghost is fine there).
                 var rasp = PlantCatalog.ByKey("RaspberryBush");
                 rig.Give(rasp.ItemName, 1);
@@ -426,6 +429,13 @@ internal static partial class SelfTests
                         $"Replant gives it back ({why})");
                 }
             }
+
+            // E04, last: PlantEasily (when the tester has it) on again. Its own placement check turn the ghost away
+            // from the root green; this mod's second look (GhostVerdict) must keep it refused, ghost and place button.
+            if (farFound)
+            {
+                yield return WithPlantEasily(rig, c, ygg, far, Player.PlacementStatus.Invalid, "away from the root", "Plant 2 to 6 m from an Ancient Root");
+            }
             c.Report();
         }
         finally
@@ -434,7 +444,7 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------- replant.nobuild (T24) ----------
+    // ---------- replant.nobuild (T24, E04) ----------
 
     private static IEnumerator RunNoBuild()
     {
@@ -509,6 +519,10 @@ internal static partial class SelfTests
             yield return PressPlace(rig, kind.SaplingHash, placing);
             c.Check(!placing.Placed && CountByName(rig.Inv, name) == 1 && CenterText() == L("$msg_nobuildzone"),
                 $"nothing planted, the game's refusal shown ('{CenterText()}')");
+
+            // E04, last: PlantEasily (when the tester has it) on again. Its own placement check turn the ghost in
+            // the no-build zone green; this mod's second look (GhostVerdict) must keep the game's refusal.
+            yield return WithPlantEasily(rig, c, kind, plantSpot, Player.PlacementStatus.NoBuildZone, "inside the no-build zone");
             c.Report();
         }
         finally

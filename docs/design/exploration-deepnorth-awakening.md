@@ -109,6 +109,16 @@ buildings; new music.
   day/night, cap (`GetNrOfZDOInstances`: every ZDO of that prefab in the 5 × 5 zones, 320 × 320 m, around the zone),
   `FindBaseSpawnPoint` (20 tries 40-80 m from a random player in the zone, each through `IsSpawnPointGood`), persistent
   event, spacing, then a group whose members each pass `IsSpawnPointGood`.
+- **The cap is not exact** (`SpawnSystem.UpdateSpawnList`, read in 1.0.17). The call gathers the zone objects once, at
+  its start (`ZDOMan.FindSectorObjects` copies them into a list), and `GetNrOfZDOInstances` counts on that list at
+  every attempt: within one call the count never sees what the call already spawned. The stop test adds the call's
+  own counter of spawned creatures to that first count, so no attempt starts at or above `m_maxSpawned`; but the group
+  is the roll (`m_groupSizeMin` to `m_groupSizeMax`) limited to `m_maxSpawned` minus the first count only. With c
+  creatures counted before the call, a call with several attempts can end at up to
+  `m_maxSpawned - 1 + min(m_groupSizeMax, m_maxSpawned - c)`: `m_maxSpawned + m_groupSizeMax - 1` in a place with none.
+  A call with one attempt (one interval after the last one) never passes `m_maxSpawned`, and no call adds anything
+  while the count is at or above it. The counter of spawned creatures is shared by all entries of the list given to
+  the call.
 - `IsSpawnPointGood` checks biome (ground data at the point), biome area, blocked, altitude (`y - 30`), tilt, distance
   from the centre, no player within 40 m (unless `m_canSpawnCloseToPlayer`), not inside a player base (unless
   `m_insidePlayerBase`), forest, lava and ocean depth.
@@ -204,15 +214,27 @@ buildings; new music.
 - The mod has its own `SpawnData` entries (not in any `SpawnSystemList`, so spawn-list editors never see or remove
   them), all `m_biome = DeepNorth`, day and night, at or above sea level, never inside a player base, not hunting:
 
-  | Entry | Prefab | Max per 320 m | Interval | Chance | Group | Levels |
-  |---|---|---|---|---|---|---|
-  | Krigen | `JotunWarrior` | 3 | 500 s | 100 % | 1-2 | 1-3 |
-  | Krigen (dual axes) | `JotunWarriorDualWield` | 2 | 500 s | 100 % | 1 | 1-3 |
-  | Hexen | `JotunWitch` | 2 | 500 s | 100 % | 1 | 1-2 |
-  | Elaking | `Elaking` | 6 | 1000 s | 100 % | 1-3 | 1-2 |
-  | Meteors (storm only) | `projectile_FimbulvinterMeteor` | no cap | 5 s | 100 % | 1-3 (radius 30, 150 m up) | — |
+  | Entry | Prefab | Cap per 320 m (`m_maxSpawned`) | Most after one pass | Interval | Chance | Group | Levels |
+  |---|---|---|---|---|---|---|---|
+  | Krigen | `JotunWarrior` | 3 | 4 | 500 s | 100 % | 1-2 | 1-3 |
+  | Krigen (dual axes) | `JotunWarriorDualWield` | 2 | 2 | 500 s | 100 % | 1 | 1-3 |
+  | Hexen | `JotunWitch` | 2 | 2 | 500 s | 100 % | 1 | 1-2 |
+  | Elaking | `Elaking` | 6 | 8 | 1000 s | 100 % | 1-3 | 1-2 |
+  | Meteors (storm only) | `projectile_FimbulvinterMeteor` | no cap | — | 5 s | 100 % | 1-3 (radius 30, 150 m up) | — |
 
   Nature comes as bands (2.5), not as entries.
+
+  **The cap is what the game's spawner aims at, not a hard limit** (1.2, `SpawnSystem.UpdateSpawnList`; decision
+  D23). The mod lets vanilla count and size the groups, and each entry runs in its own call (the call's counter holds
+  only that entry's creatures). A pass with several attempts can therefore end one group over the cap: at most
+  cap - 1 + biggest group, which is 4 Krigen, 2 dual-axe Krigen, 2 Hexen and 8 Elaking, 16 Jotun in all where the caps
+  add up to 13. Passes with several attempts: a zone's first pass (its timer never ran), a pass two intervals or more
+  after the last one, and every after-Kall burst (2.6, timers reset). A fresh fill ends one Krigen over about 3 times
+  in 8 (two groups of 2, or 1 + 1 + 2). A pass with one attempt, the refill of a zone a player stays in, stops at the
+  cap. With `JotunDensity` the cap is max(1, round(cap × density / 100)) and the most is that cap - 1 + min(biggest
+  group, that cap): never more than 1 Krigen or 2 Elaking over. The count is vanilla's: every creature of that prefab
+  in the 5 × 5 zones around the zone that spawns (in an after-Kall burst, the burst cell's own, 2.6); Jotun standing
+  farther away, or walking in afterwards, are not part of it.
 
   Jotun values copy the vanilla invasion (Krigen 4 split 3 + 2 with the dual-axe variant that vanilla only uses at the
   invasion core); `JotunDensity` scales the Jotun caps. The level ranges follow vanilla data (Hexen and Elaking stop at
@@ -269,7 +291,8 @@ buildings; new music.
   timers of the Jotun entries on that zone control and runs them once: vanilla tries up to each cap at once. During
   that pass the gate lets Jotun spawn only into that cell, and the cap count (`SpawnSystem.GetNrOfZDOInstances`
   prefix) is the cell's own Jotun of that kind in the 5 × 5 zones around (other areas' Jotun and vanilla ones do not
-  fill its caps). So a fresh area gets a full set and one with survivors around is topped up. Only the cell under a
+  fill its caps). So a fresh area gets a full set and one with survivors around is topped up (a burst is a pass with
+  several attempts, so it can end one group over a cap: 2.3). Only the cell under a
   player: the vanilla spawn ring (40-80 m from a player) could not put Jotun in a cell the player only sees from its
   edge, and such a cell would be flagged without ever getting its Jotun.
 - **Engaged ("to be defeated", server).** The game that bursts tells the server which cells got Jotun or have some
@@ -293,6 +316,14 @@ buildings; new music.
   and destroy it again). When the count reaches half the target (rounded up), players there get
   "The Jotun army is weakening" (top left); at the target the cell is **cleared** for good: no burst, no band, no storm,
   no meteors, gone from the map. Creatures still alive there stay.
+- **Kill target lowered (0.1.1).** The target is worked out from the settings, so lowering `ClearKillsMin` or
+  `ClearKillsMax` can put it at or below the kills a cell already has. Kills and target used to be compared only when
+  a Jotun died, which left such a cell uncleared ("9 of 8 Jotun defeated") until one more death. The server now
+  compares every counted cell again (same rule as a kill: the north awake, the cell awake and not cleared) right after
+  the load scan, and 1.5 s after the rules last changed (`ServerRules.Version`; every new change starts the wait
+  again). A cell that already reached its target is cleared like after a last kill: mark written, kill slot freed, log
+  line, the lists sent at once, and the "cleared" news from the cell's seed point. Until then `deepnorth_stones` shows
+  at most the target for that cell ("8 of 8"). See D22 for the wait.
 - **Remembered in the world.** The server writes each cleared cell into one of 8 int slots (`<GUID>.Cleared0..7`,
   value = cell id) and each kill count into one of 8 long slots (`<GUID>.Kills0..7`, value = cell << 32 | count) of a
   zone control that no player owns (or the server owns), so no owner's next write replaces it. At load it reads every
@@ -303,7 +334,7 @@ buildings; new music.
   change (a kill never delays a send already waiting), and to a player in answer to each rules request (join, turned
   back on). A game forgets them when it sees no Kall key, so a new Kall waits for the server's new lists.
 - **News.** Routed `<GUID>.News` (kind, cell, kill position) to everybody: each game shows it when its player stands in
-  that cell or within 100 m of the kill. Half way: top-left "The Jotun army is weakening" (user wording; no vanilla
+  that cell or within 100 m of the kill (a cell cleared by a lowered kill target sends its seed point instead). Half way: top-left "The Jotun army is weakening" (user wording; no vanilla
   text fits). Cleared: the vanilla centre message "The Jotun Retreat".
 - `deepnorth_stones` after Kall also shows, from the lists the game has, the area the player stands in: its kills and
   target, and whether it waits to be defeated, spawns when entered, or is cleared.
@@ -382,6 +413,23 @@ server's console and log).
   Jotun the area spawned" (the first build followed each tagged Jotun wherever it walked; one that ran off kept an area
   from clearing). No creature is followed any more; caps count the area's own Jotun around the burst only, so an area
   entered from a far side may get a second set (more to kill, never fewer).
+- **D22 — A lowered kill target clears by itself, after the settings rest** (0.1.1): an area that already has the
+  kills its new target asks for is cleared by the server without another kill (a status of "9 of 8" helps nobody).
+  Clearing cannot be undone, and ConfigurationManager applies every step of a slider drag at once (a typed number can
+  pass through other values too), so the server only compares once the rules have been still for 1.5 s
+  (`HeldCells.RulesSettleSeconds`): a value that passes by clears nothing. A value left standing longer does; the
+  setting's description and the README say that lowering clears for good. At world load there is nothing to wait for:
+  the comparison runs with the scan. Not handled: the half-way "weakening" news is not sent after the fact when a
+  lowered target puts the kills past its half; a cell that is asleep when the target is lowered (stage or coverage
+  lowered by an admin) is compared again at the next rules change, load or kill, not when it wakes by a stage change.
+- **D23 — The area numbers are vanilla's, one group over included** (user decision, 2026-10-08). The automated tests
+  found fills of 4 Krigen where the README said "up to 3" (2.3: vanilla sizes the last group of a pass against the
+  count taken before the pass). The mod is not changed: it keeps vanilla's own counting and group sizing. The texts
+  changed instead: the README, the JotunDensity description and TESTING.md T25 now give what the spawner aims at
+  (3 / 2 / 2 / 6) and the most one pass can leave (4 / 2 / 2 / 8), and `dn.stage1` asserts that bound over many fresh
+  fills. Not done: a
+  `SpawnSystem.GetNrOfZDOInstances` prefix that adds the creatures spawned earlier in the same pass to the count of
+  the mod's entries, which would make the cap exact.
 - **D19 — Cleared areas and kill counts are kept on zone controls** (vanilla persistent ZDOs, written by the server on ones no
   player owns), not in a global key (a key's value string is copied into every player's profile at each change) nor in a file next to the world (lost
   with cloud saves and world copies).
@@ -419,7 +467,7 @@ server's console and log).
   and the cleared cell ids; int count and the engaged cell ids; int count and, per cell, the cell id and its Jotun kills.
 - Routed `<GUID>.Engage` (a game that burst → server): int layout 2, int count, then the cell ids.
 - Routed `<GUID>.News` (server → everybody): int layout 2, int kind (1 weakening, 2 cleared), int cell, float x, float z
-  (the kill position).
+  (the kill position; the cell's seed point when a lowered kill target cleared it. Same payload, no version bump).
 - ZDO int `<GUID>.Cell` on Jotun-army creatures spawned by an area, `<GUID>.Band` (1) on nature band members,
   `<GUID>.Cleared0..7` (int cell ids) and `<GUID>.Kills0..7` (long cell << 32 | count) on zone controls; zone-control longs for the entry timers (`mcdn<i>_<prefab>1`,
   `mcdnBand_NatureBand1`).
@@ -594,6 +642,9 @@ who joins after Kall; two players entering one area after Kall get one set of Jo
   other Krigen placed 30 m away, entering again brings its own Krigen back (vanilla counting would spawn none).
 - A Krigen and a Gammeltroll target each other once the north is awake (`dn.hostility`; they must be able to sense
   each other: vanilla sight needs the target inside the view angle until alerted).
+- Area numbers (self-test runs of 2026-10-08, game 1.0.17): with a cap of 3 Krigen, one pass logged
+  `Spawned JotunWarrior x 2` twice (4 Krigen), another `x 1`, `x 1`, `x 2`, as 1.2 and 2.3 say. Most seen in one fill:
+  4 Krigen, 2 dual-axe Krigen, 2 Hexen and 6 Elaking (7 or 8 Elaking are possible, not seen yet).
 
 ### Still unverified (and how to verify)
 

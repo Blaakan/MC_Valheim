@@ -204,12 +204,18 @@ they need cultivated ground and most have Meadows, Black Forest, Plains and Ashl
   rewrite never sees them. Added once to the cultivator's piece table (the `Cultivator` prefab's `m_buildPieces`).
 - **Toggle:** `Piece.m_enabled` = feature active and server rules in force; the local player's build menu is refreshed
   (`Player.UpdateAvailablePiecesList`). Saplings already in the ground keep growing while the feature is off (vanilla
-  `Plant`), Yggdrasil ones without draining sap.
+  `Plant`), on the player's own `GrowTimeMultiplier` (see Rebuild), Yggdrasil ones without draining sap.
 - **Rebuild** (`Rebuild`, debounced 0.5 s after a rules change, Spyglass pattern): grow times, `m_connectRadius`,
   piece enablement, then `CultivatorTiers.Apply()`. When enabled it also rewrites `m_growTime` / `m_growTimeMax` of
   the saplings already loaded (walks `ZNetScene.instance.m_instances`, matches the ZDO prefab with
   `PlantCatalog.TryFind` and `isSapling`), so a rules change reaches planted transplants at once, not only saplings
-  instantiated later.
+  instantiated later. With the feature off (turned off, or turned off by the framework on a server without the mod)
+  it writes the player's own `GrowTimeMultiplier` (`ServerRules.OwnRules`) on the sapling prefabs and the loaded
+  saplings instead: the `Plant.Grow` prefix is gone then and vanilla grows them on the times they carry, which must
+  never be the last rules that were in force (a server's, or the setting as it was). A rules change while the feature
+  is off rebuilds at once, with no debounce: the `ZNet.Update` postfix that runs the wait is a feature patch, so a
+  waiting rebuild would never run and a changed own setting would not reach the saplings. While the rules are pending
+  (feature on) and at game quit no grow time is written.
 - **Pending rules:** while a client waits for the server's rules, the `Plant.Grow` prefix holds every MC sapling
   (`__result` null, return false; a hash-set check on the ZDO prefab). A sapling instantiated in that window still
   carries the prefab's own-config grow time, but it cannot grow before the rules arrive, and the Rebuild that follows
@@ -320,6 +326,22 @@ they need cultivated ground and most have Meadows, Black Forest, Plains and Ashl
   could grow). The texts give both limits ("Plant 2 to 6 m from an Ancient Root"; item text "within a few metres of
   an Ancient Root, but not right against it"). No too-close check on the ghost: the vanilla ghost stays green right
   against the root, the young plant then says "Needs more room to grow", and Replant gives it back.
+- Second look for PlantEasily (`GhostVerdict`, 0.1.1): PlantEasily's postfix on `Player.UpdatePlacementGhost` judges
+  the aimed ghost with its own plant checks (ground, biome, room, open sky) and, when they pass, writes
+  `PlacementStatus.Valid` over the game's verdict, so the root rule above and the game's no-build refusal were lost.
+  A feature postfix on the same method (`HarmonyPriority(Priority.Last)`, `HarmonyAfter("advize.PlantEasily")`) runs
+  after it and, only when PlantEasily is loaded, the status is Valid and the ghost is one of our transplant saplings,
+  checks again at the ghost's final position: no root within the ghost piece's `m_connectRadius`
+  (`RootGate.FindRoot`, only when the piece has `m_mustConnectTo`) → Invalid; `Location.IsInsideNoBuildLocation` →
+  NoBuildZone (same precedence as the game), and the ghost is made red (`Piece.SetInvalidPlacementHeightlight`).
+  `Player.TryPlacePiece` calls `UpdatePlacementGhost` itself and reads the status right after, so the place button is
+  refused with the game's own message; `Player.PlacePiece` checks nothing and is only reached through it. It never
+  turns a refusal into Valid. Cost: the game calls the method every frame (`LateUpdate`); without PlantEasily the
+  postfix is one field read, with it reference checks until a transplant ghost is Valid, then one non-allocating root
+  search (Yggdrasil ghost only) and the game's own no-build test; a ghost is identified once (one name read per new
+  ghost). Not covered: PlantEasily's grid copies (its own objects, planted by its own code: Yggdrasil copies out of
+  reach of a root wait, as before), the other refusals PlantEasily's postfix overrides the same way (wards, a player
+  in the way; read from its 2.2.2 code, not tested), and vanilla plants.
 - `Plant.Grow` prefix (feature patch), keyed by the ZDO prefab hash: while the rules are pending it holds every MC
   sapling (§2.2). Otherwise only `MC_Sapling_YggaShoot`, and only when Healthy (else vanilla runs): at most one
   attempt every 10 s per sapling (a `RootDrawer` component on the prefab keeps the next attempt time and the cached
@@ -405,9 +427,11 @@ tiers vanilla, and transplant saplings its game runs grow by vanilla rules.
 - A player who has the mod but turned it off, or another network version (only with `AllowPlayersWithoutMod`): the
   items and saplings are registered by always-on patches, so their game knows them: they see transplant saplings,
   keep transplant items, and chests they touch keep them. But the feature patches are off there: transplant saplings
-  in areas their game runs grow as plain vanilla plants, on that player's own prefab grow time (not the server's
-  `GrowTimeMultiplier`), and Yggdrasil ones grow without an Ancient Root and without taking sap (also PlantEasily
-  copies placed away from a root). Accepted and documented (README, `AllowPlayersWithoutMod` description, the
+  in areas their game runs grow as plain vanilla plants, on that player's own `GrowTimeMultiplier` (not the server's:
+  `Rebuild` writes the own setting on the sapling prefabs and the loaded saplings when the feature goes off, and
+  again when that setting changes, §2.2), and Yggdrasil ones grow without an Ancient Root and without taking sap
+  (also PlantEasily copies placed away from a root). Accepted and documented (README, `AllowPlayersWithoutMod`
+  description, the
   server's "allowed" warning picks its sentence per `NetworkGate.PeerProblem`); an always-on growth gate would break
   the framework rule that only registration stays on, and the single-player toggle behaviour of §2.2. With the
   default setting such a player is refused about a second after turning the mod off; a due sapling they run may
@@ -470,7 +494,7 @@ A tier cost with no valid material would make that level free, so the cultivator
 | Mod | Effect |
 |---|---|
 | PlantEverything | Its saplings and ours share the cultivator table. It takes the Remove button for flora; we use E / X. Our saplings are registered after its "modded plant" pass. With it, wild bushes carry a `Piece`; Replant still works (prefab hash). |
-| PlantEasily | Recognises the cultivator (same name). Its grid can place Yggdrasil transplants away from a root (they wait; Replant gives them back). |
+| PlantEasily | Recognises the cultivator (same name). Its `UpdatePlacementGhost` postfix sets the aimed ghost Valid on its own plant checks, which know nothing of the root rule or no-build zones: `GhostVerdict` runs after it and puts those two refusals back on a transplant ghost (§2.6), so the aimed transplant is red and nothing is planted there, the grid included. Its grid copies are not checked: copies of a Yggdrasil transplant out of reach of a root wait (Replant gives them back). |
 | Groundwork, EarthWright | Their own cultivator removal of wild pickables: no conflict, both remove the plant. Replanted bushes count as wild for them. |
 | Recipe-config mods (WackysDatabase, RecipeCustomization) | They may replace `Recipe_Cultivator.m_resources` after our `Apply` (on connect, on reload). The re-sync (§2.3) adopts their array as the base: their rows price levels 1-3, and the tier rows are added again on top, also when they swap it while playing. A second Cultivator recipe they add crafts new cultivators and upgrades up to level 3 only (its Upgrade rows for level 3+ are dropped while the tiers are on). |
 | EarthWright, MoreBettererUpgrades, FurtherUpgrades | Rewrite the cultivator's levels: the last writer wins. Not supported together. A different `m_maxQuality` alone does not trigger the re-sync, so there is no tug of war on every refresh. |
@@ -487,25 +511,28 @@ plugin, rules, join check, content registration and self tests; Forge Idol Upgra
 |---|---|---|
 | `Plugin.cs` | config, life cycle | `Plugin.FeatureActive`; config entries `AllowPlayersWithoutMod`, `BlackMetalLevel`, `EitrLevel`, `FlametalLevel`, `BloodgoldLevel`, `GrowTimeMultiplier`, `RootSapCost`, `RootRange`; Debug `Plugin.TestInactive`. `BindConfig` calls `IconInlineGuard.Apply()`. `OnActivated`: `ServerRules.Start()`, `PlayerCheck.Start()`, `TransplantContent.Rebuild()`, `SelfTests.Register()`. `OnDeactivated` (each step guarded): `SelfTests.Unregister()`, `Replant.Reset()`, `ReplantHint.Reset()`, `TransplantContent.Rebuild()`, `PlayerCheck.Stop()`, `ServerRules.Stop()`. Rules changed → `TransplantContent.RequestRebuild()`. |
 | `CultivatorRules.cs` | rule snapshot, wire | fields `BlackMetalLevel`, `EitrLevel`, `FlametalLevel`, `BloodgoldLevel` (string), `GrowTimeMultiplier` (float), `RootSapCost` (int), `RootRange` (float); `string CostOf(int quality)` (4-7, else ""); `IsPending`; `Default`, `Pending`, `Own()`, `Write`, `TryRead`, `Describe()`; consts for ranges. |
-| `ServerRules.cs`, `PlayerCheck.cs`, `Patches/ZNetPatches.cs` | Spyglass copies | `ServerRules.Current` (never null), `ServerRules.Changed`, `ServerRules.OwnChanged()`, Debug `TestRules` / `TestPending`; `PlayerCheck.Decide`, `ScheduleAllConnected` (the "allowed" warning picks its sentence per `NetworkGate.PeerProblem`: without the mod vs turned off or another version); `ZNet.Update` postfix calls `TransplantContent.UpdatePendingRebuild()` and `CultivatorTiers.Resync()`. |
+| `ServerRules.cs`, `PlayerCheck.cs`, `Patches/ZNetPatches.cs` | Spyglass copies | `ServerRules.Current` (never null), `ServerRules.OwnRules` (this game's own settings: the rules when not a client, and the grow time of saplings while the feature is off), `ServerRules.Changed`, `ServerRules.OwnChanged()`, Debug `TestRules` / `TestPending` / `TestOwn`; `PlayerCheck.Decide`, `ScheduleAllConnected` (the "allowed" warning picks its sentence per `NetworkGate.PeerProblem`: without the mod vs turned off or another version); `ZNet.Update` postfix calls `TransplantContent.UpdatePendingRebuild()` and `CultivatorTiers.Resync()`. |
 | `PlantCatalog.cs` | the plant table of §2.1 | `sealed class PlantKind` (fields of the table: `Key`, `DisplayName`, `Tier`, `WildPrefabs`, `GrownPrefabs`, `ProduceItem`, `SaplingTemplate`, `GrowMinutes`, `MinScale`, `MaxScale`, `GrowRadius`, `Biome`, `OnlyInBiome`, `TolerateHeat`, `TolerateCold`, `AllowedInDeepSnow`, `VegetationGroundOnly`, `NeedsRoot`; derived `ItemName`, `SaplingName`, `ItemDisplayName`, `ItemHash`, `SaplingHash`); `static IReadOnlyList<PlantKind> All`; `static bool TryFind(int prefabHash, out PlantKind kind, out bool isSapling)`; `static PlantKind ByKey(string)`; `const int FirstNewTier = 4, MaxTier = 7, VanillaMaxQuality = 3`; `static string TierName(int quality)` ("bronze", "black metal", "eitr", "flametal", "bloodgold"); `static string TierTitle(int quality)` ("Black metal cultivator"…); `static IEnumerable<PlantKind> UnlockedAt(int quality)`, `static IEnumerable<PlantKind> NewAt(int quality)`. |
-| `TransplantContent.cs` | items, saplings, table, toggle | `RegisterInObjectDB(ObjectDB)`, `RegisterInZNetScene(ZNetScene)`, `Rebuild()`, `RequestRebuild()`, `UpdatePendingRebuild()`, `RebuildPending`; `GameObject ItemPrefab(PlantKind)`, `GameObject SaplingPrefab(PlantKind)`, `bool ItemsBuilt`, `bool SaplingsBuilt`, `PieceTable CultivatorTable`, `GameObject CultivatorPrefab`; `PlantKind KindOfItem(ItemDrop.ItemData)`. The one cultivator check everywhere is `CultivatorTiers.IsCultivator` (by `m_shared.m_name`, as PlantEasily and PlantEverything do). `RegisterInObjectDB` also calls `CultivatorTiers.Capture(db)`; `Rebuild` also rewrites the grow times of loaded sapling instances (when enabled) and ends with `CultivatorTiers.Apply()`; building the saplings sets `RootGate.RootMask` from the root prefab's collider layers. |
+| `TransplantContent.cs` | items, saplings, table, toggle | `RegisterInObjectDB(ObjectDB)`, `RegisterInZNetScene(ZNetScene)`, `Rebuild()`, `RequestRebuild()`, `UpdatePendingRebuild()`, `RebuildPending`; `GameObject ItemPrefab(PlantKind)`, `GameObject SaplingPrefab(PlantKind)`, `bool ItemsBuilt`, `bool SaplingsBuilt`, `PieceTable CultivatorTable`, `GameObject CultivatorPrefab`; `PlantKind KindOfItem(ItemDrop.ItemData)`. The one cultivator check everywhere is `CultivatorTiers.IsCultivator` (by `m_shared.m_name`, as PlantEasily and PlantEverything do). `RegisterInObjectDB` also calls `CultivatorTiers.Capture(db)`; `Rebuild` also rewrites the grow times of loaded sapling instances (the rules in force when enabled, the player's own setting when the feature is off) and ends with `CultivatorTiers.Apply()`; `RequestRebuild()` rebuilds at once while the feature is off; building the saplings sets `RootGate.RootMask` from the root prefab's collider layers. |
 | `Patches/ObjectDBPatches.cs`, `Patches/ZNetScenePatches.cs` | `[AlwaysOnPatch]` postfixes | call `TransplantContent`; `ZNetScene.Awake` postfix carries `[HarmonyAfter("advize.PlantEverything")]`. |
 | `CultivatorTiers.cs` | recipe rows, max quality, amounts, Forge of Potential, tooltip | `Capture(ObjectDB)`, `Apply()`, `Resync()` (re-apply when the recipe's array was swapped while in force), `bool TryAmount(Piece.Requirement, int quality, out int amount)` (tier rows, base rows, and the idol row: 0 from quality 2 while in force), `HealLocal()`, `HealInventory(Inventory)`, `bool HideAtUpgrader(InventoryGui, Recipe)`, `string TooltipLines(int quality, bool crafting)`, `bool IsCultivator(ItemDrop.ItemData)` (by `m_shared.m_name`), `int TierOf(ItemDrop.ItemData)` (quality, at least 1). A tier whose cost has no valid material caps `m_maxQuality` below it (warning once). |
 | `Patches/PieceRequirementPatches.cs`, `Patches/InventoryGuiPatches.cs`, `Patches/InventoryGuiHealPatches.cs`, `Patches/ItemTooltipPatches.cs` | tier patches | `GetAmount` postfix; `UpdateRecipeList` prefix (re-sync, then heal) in its own `[AlwaysOnPatch]` class, so it also runs while the feature is off; `AddRecipeToList` prefix (feature patch: Cultivator hidden at an upgrader, other Cultivator recipes' Upgrade rows dropped at level 3+); static `GetTooltip` postfix (`ItemData, int, bool, float, int, bool`). |
 | `IconPainter.cs`, `TierIcons.cs`, `IconInlineGuard.cs`, `Patches/ItemIconPatches.cs`, `Patches/InventoryGridPatches.cs` | icons | `IconPainter.Compose(Sprite source, string key, Action<Color32[], int, int> paint)` → `Sprite` or null; `TierIcons.TransplantIcon(Sprite produce)` (sprout upper-right); `TierIcons.CultivatorIcon(Sprite vanilla, int quality)` → null below 4; `GetIcon` postfix; `InventoryGrid.UpdateGui` postfix (feature patch: quality number hidden for cultivators at quality ≥ 4, gem sprite set again as inline backup); Debug `TierIcons.ExportPngs(string folder)`. |
 | `Replant.cs`, `ReplantHint.cs`, `Patches/PlayerPatches.cs`, `Patches/HudPatches.cs` | the action and the hint | `Replant.OnUpdatePlacement(Player, bool takeInput)` (no target in a helm or saddle frame); `Replant.Target` (per frame: `ZNetView View`, `PlantKind Kind`, `bool IsSapling`, `bool Allowed`, `int Frame`); `bool Replant.TryReplant(Player, ItemDrop.ItemData tool, ZNetView view, PlantKind kind, bool isSapling, out string refusal)` (no input; for self tests); `Replant.Reset()`; `ReplantHint.Update(Hud, Player)`; `ReplantHint.Reset()`; `UpdateHover` postfix marks every frame with a doodad controller (helm, saddle). Gamepad key is always X. |
 | `RootGate.cs`, `RootDrawer.cs`, `Patches/PlantPatches.cs` | sapling growth gate, Yggdrasil root | `RootGate.BeforeGrow(Plant, ref GameObject result)` → bool (run original; holds every MC sapling while rules are pending); `RootGate.HoverLines(Plant)`; `ResourceRoot RootGate.FindRoot(Vector3 pos, float range)` (root collider layers only); `RootGate.RootMask`; per-peer drain ledger (effective level); `RootDrawer : MonoBehaviour` (next attempt time, cached root, last state for the hover). |
+| `GhostVerdict.cs`, `Patches/PlayerPatches.cs` | second look at the placement ghost when PlantEasily is loaded (§2.6) | `GhostVerdict.AfterGhostUpdate(Player)` from the `UpdatePlacementGhost` postfix (Last priority, after `advize.PlantEasily`); `GhostVerdict.PlantEasilyId`; Debug `GhostVerdict.TestOff`. |
 | `SelfTests.cs` | Debug in-world tests | section 8 |
 
 ### 7.2 Turning off
 
 `OnDeactivated` (patches still applied during the call, each step guarded): self tests unregistered, target and hint
-cleared, `TransplantContent.Rebuild()` with the feature off disables the sapling pieces, refreshes the build menu and
-calls `CultivatorTiers.Apply()`, which puts the recipe and `m_maxQuality` back and heals the player's inventory;
+cleared, `TransplantContent.Rebuild()` with the feature off disables the sapling pieces, writes the player's own grow
+time on the sapling prefabs and the loaded saplings (§2.2), refreshes the build menu and calls
+`CultivatorTiers.Apply()`, which puts the recipe and `m_maxQuality` back and heals the player's inventory;
 join check and rules stop. Items, saplings, table entries and the `UpdateRecipeList` heal stay on (always on), so a
 cultivator copy met later (chest, ground) is healed too. The `InventoryGrid` postfix is unpatched, so levels 4-7 show
-their number again. At game quit the revert skips work on destroyed objects (Unity null checks).
+their number again. At game quit the revert skips work on destroyed objects (Unity null checks) and writes no grow
+times.
 
 ## 8. Test plan
 
@@ -600,3 +627,23 @@ Found by the test runs (2026-10-03):
   (`Player.UpdatePlacementGhost`); a Replant press now also clears `TabRight` when it was pressed in the same frame.
 - **Self-test layout.** The Forge test looks farther for a free spot (the spawn stones fill the close ring) and places
   each extension inside its own reach (`forge_ext1` 2 m).
+
+Found by the self-test runs (2026-10-07), fixed in 0.1.1:
+
+- **Grow time while the feature is off.** `Rebuild` wrote grow times only while enabled, so with the feature off the
+  sapling prefabs and the loaded saplings kept the times of the last rules in force (a server's rules, or the own
+  setting as it was), or the default 1 after a restart with `Enabled = false`; and a rules change while off only
+  queued a rebuild that nothing ran (the `ZNet.Update` postfix is a feature patch). The README and the
+  `AllowPlayersWithoutMod` description promise the player's own grow time there. `Rebuild` now writes
+  `ServerRules.OwnRules.GrowTimeMultiplier` on the prefabs and the loaded saplings when the feature is off, and
+  `RequestRebuild` rebuilds at once while it is off (§2.2, §4.4, §7.2). No RPC, payload or ZDO change: network
+  version 1 stays. Tests: `replant.toggle` (T39, T40) and `replant.mp.allowed` (M14).
+- **PlantEasily turned refused transplant ghosts green** (user decision: work around it). With PlantEasily 2.2.2 the
+  aimed Yggdrasil transplant was green away from any Ancient Root and was planted there (it then waits for ever), and
+  any transplant could be planted inside a no-build zone: PlantEasily's `UpdatePlacementGhost` postfix writes Valid
+  over the game's verdict when its own plant checks pass. `GhostVerdict` (§2.6) now runs after it and puts the root
+  rule and the no-build refusal back on a transplant ghost; nothing is done when PlantEasily is not loaded. Client
+  side only, no network change. Tests: the last part of `replant.rootplace` and of `replant.nobuild` puts
+  PlantEasily's placement patches back (every other part of the tests runs with them lifted), first shows with the
+  second look off that PlantEasily alone turns the ghost green on that spot, then checks the refusal and a real press
+  of the place button (E04); the former `replant.bug.planteasily` is gone.

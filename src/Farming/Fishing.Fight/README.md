@@ -28,13 +28,17 @@ rod points the other way and reel, or it takes line back. Casting, bait and the 
   the float and the line. When the fight ends, the catch bar comes back.
 - **Point your rod the other way and reel.** Your rod points where your character faces (while you hold Block your
   character turns with the camera). If the fish runs to your right, turn left, at least 30 degrees off the line, and
-  hold Block: the line comes in and costs stamina like reeling a fighting fish in the normal game.
+  hold Block: the line comes in and costs stamina like reeling a fighting fish in the normal game. Turning the rod
+  away does not hold the reel back: the line keeps coming in, down to the catch if the fight lasts that long.
 - **Reeling the wrong way costs a lot.** Pointing the rod toward the side the fish runs to, or straight at it, while
   you reel costs four times as much stamina, and no line comes in.
 - **Not reeling lets the fish take line.** If you let go during a fight, nothing costs stamina, but the fish takes line
   back (about 1 to 2 metres per second, faster for harder fish). If the line gets longer than 30 metres, it breaks.
 - **The fish can change sides** in the middle of a fight, more often for harder fish: turn your rod the other way
   again. A fish that runs into shallow water turns around when the other way is deeper.
+- **A fish out of the water does not fight.** While the hooked fish hangs on a short line above the water or lies on
+  the shore, no fight starts and the catch bar stays. A fight in progress ends as soon as the fish is pulled out of
+  the water, and the next one waits until the fish is back in the water.
 - **Staying in view.** While you reel, the view turns with your rod: about 30 to 45 degrees off the line should keep
   the float at the side of the screen; you can turn further if you like.
 

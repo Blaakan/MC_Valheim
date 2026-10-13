@@ -7,6 +7,22 @@ Fixes for the problems the automated in-game tests found on 2026-10-08 (none of 
 - Sneak Ambush 0.1.1, Spyglass 0.1.1, Forge Idol Upgrades 0.1.1, Tower Shield Wall 0.1.1, Music Instruments 0.4.1: no
   more false errors and warnings in the log at the main menu (with other item mods installed) and when leaving a
   server that does not have the mod.
+- Fishing Fight 0.1.1: reeling on the right side no longer stalls short of the catch; a fish out of the water does
+  not fight.
+- Swim Dive 0.1.1: a storm wave that washes over you is no longer taken for a dive.
+- Creature Morale 0.1.1: a sleeping creature that is afraid of you keeps the sneak-attack bonus.
+- Deep North Awakening 0.1.1: lowering the kill target clears the areas that already have that many kills.
+- Loot Pickup Filter 0.1.1: a pick that gives 8 items or more is picked up whole.
+- Sort Chest 0.1.1: Sort keeps working after a Sort that had nothing to move; the sort order button is mouse only;
+  two false warnings are gone; tankards sort under Other.
+- Crafting Search and Sort 0.1.1: tankards are listed under Other.
+- Creature Kill and Tame Counts 0.1.1: a tame that finishes while you have no character in the world is counted.
+- Cultivator Replant 0.1.1: with the mod off, transplants grow on your own setting; with PlantEasily installed a
+  transplant can no longer be placed where the game refuses it.
+- Tower Shield Wall 0.1.1: an attack press that waited for the bash cooldown ends with the tower shield.
+- Spyglass 0.1.1: the zoom you picked comes back after a lower zoom limit.
+- Forge Idol Upgrades 0.1.1: a tier with a bad Material setting says why its idols cannot be upgraded; the IDOLS tab
+  comes back at once when the mod is turned on with the Forge open.
 
 ## 0.4.0
 

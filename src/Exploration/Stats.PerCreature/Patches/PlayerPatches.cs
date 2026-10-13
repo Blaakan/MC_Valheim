@@ -10,7 +10,8 @@ namespace MC.Exploration.StatsPerCreatureMod.Patches;
 //   Player.Message      -> we are owner AND closest (local call)
 //   Player.RPC_Message  -> other game tamed it, we closest (routed RPC to our own player)
 // Hook on Player, not MessageHud: MessageHud skip messages while HUD hidden (Ctrl+F3), and other mods mute there.
-// Also: spawn write start day of tame counting (custom data loaded just before OnSpawned).
+// Also: spawn write start day of tame counting (custom data loaded just before OnSpawned), and count tames kept
+// while game had no character (TameablePatches).
 // Framework only patch these while feature Active. Every body catch own errors: never throw into game.
 [HarmonyPatch]
 internal static class PlayerPatches
@@ -56,7 +57,8 @@ internal static class PlayerPatches
         }
     }
 
-    // Once per spawn. First run for this character write the day tame counting start (never moved after).
+    // Once per spawn. First run for this character write the day tame counting start (never moved after). Then
+    // tames that finished while me had no character (respawn wait, world loading) get counted.
     [HarmonyPostfix]
     [HarmonyPatch(typeof(Player), nameof(Player.OnSpawned), new[] { typeof(bool) })]
     private static void OnSpawned_Postfix(Player __instance)
@@ -66,6 +68,7 @@ internal static class PlayerPatches
             if (__instance == Player.m_localPlayer)
             {
                 CounterStore.EnsureStarted(__instance);
+                CounterStore.CreditHeldTames();
             }
         }
         catch (Exception e)

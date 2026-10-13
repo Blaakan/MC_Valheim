@@ -27,16 +27,13 @@ namespace MC.Combat.CreaturesMoraleMod;
 //   morale.toggle    mod turned off and on through the framework, also during a rout (L01, L02)
 //   morale.settings  rule changes live: name check warning, edits settle once, RoutSeconds, FearRange (T26); the
 //                    overlap warning for another creature AI mod (X09)
-//   morale.sleeper   a hit on a sleeping afraid Draugr that faces the player: it wakes, is provoked and fights (T35)
+//   morale.sleeper   a hit on a sleeping afraid Draugr that faces the player: a sneak attack as in the normal game,
+//                    it wakes, is provoked and fights (T35); a second one woken up first, still facing the player:
+//                    no sneak attack (the rule of T14 is back once it is awake)
 //   morale.spawn-biome  a Skeleton that spawned in the Mountains, then in the Plains: attacks or runs by that biome's
 //                    rank (T31, the behaviour; the Judge table on more biomes is in morale.calm)
 //   morale.handover  a creature another game owned for a moment: fear, provocation and rout go on (M03, M05, M13,
 //                    this game's side only)
-// Tests named morale.bug.* hold ONE check each that fails because the mod (or its TESTING.md) is wrong; they fail
-// until the user decides. Never "fix" them by changing the check:
-//   morale.bug.sleeper-sneak  the same hit must be a sneak attack, as in the normal game (T35): the mod takes it away
-//   morale.bug.rank-message   T04's second half as written: a second Eikthyr kill after BossesAhead = 0 brings the
-//                             rank-up message (the mod and design E5 say: only a kill that raises the rank; T37)
 internal static partial class SelfTests
 {
     private const string FightName = "morale.fight";
@@ -52,8 +49,6 @@ internal static partial class SelfTests
     private const string HandoverName = "morale.handover";
     private const string PacksOtherName = "morale.packs-other";
     private const string SpawnBiomeName = "morale.spawn-biome";
-    private const string BugSleeperSneakName = "morale.bug.sleeper-sneak";
-    private const string BugRankMessageName = "morale.bug.rank-message";
 
     private static void RegisterMore()
     {
@@ -75,8 +70,6 @@ internal static partial class SelfTests
         SelfTest.Register(HandoverName, RunHandover);
         SelfTest.Register(PacksOtherName, RunPacksOther);
         SelfTest.Register(SpawnBiomeName, RunSpawnBiome);
-        SelfTest.Register(BugSleeperSneakName, RunBugSleeperSneak);
-        SelfTest.Register(BugRankMessageName, RunBugRankMessage);
     }
 
     private static void UnregisterMore()
@@ -85,7 +78,7 @@ internal static partial class SelfTests
                  {
                      KindsName, RanksName, RestName, KillsName, MissilesName, FightName, SensesName, PacksName, RoutHitName,
                      RoutEndName, ExemptName, TameName, ToggleName, SettingsName, SleeperName, HandoverName, PacksOtherName,
-                     SpawnBiomeName, BugSleeperSneakName, BugRankMessageName,
+                     SpawnBiomeName,
                  })
         {
             SelfTest.Unregister(name);
@@ -1720,7 +1713,7 @@ internal static partial class SelfTests
         }
     }
 
-    // ================================================================ morale.sleeper, morale.bug.sleeper-sneak
+    // ================================================================ morale.sleeper
 
     private sealed class SleeperRef
     {
@@ -1768,8 +1761,9 @@ internal static partial class SelfTests
         }
     }
 
-    // T35, the part that works: the player's hit on the sleeping afraid Draugr wakes it, provokes it and it fights.
-    // (The sneak attack of that hit is checked alone in morale.bug.sleeper-sneak: the mod takes it away.)
+    // T35: the player's hit on the sleeping afraid Draugr is a sneak attack as in the normal game (a sleeper watches
+    // nobody: the E3 rule of Provocation.OnHit leaves it alone), wakes it, provokes it and it fights. Then the contrast:
+    // a second one woken up first takes no sneak attack (awake, it watches the player: the rule of T14).
     private static IEnumerator RunSleeper()
     {
         var c = new Checks(SleeperName);
@@ -1793,7 +1787,12 @@ internal static partial class SelfTests
                 yield break;
             }
             Tough(d.m_character);
+            var before = d.m_character.m_backstabTime;
             Hit(d.m_character, player, 5f, 0f, 3f);
+            // Vanilla sets this time in the same block that multiplies the damage and plays the sneak-attack effect
+            // (Character.RPC_Damage).
+            c.Check(d.m_character.m_backstabTime != before,
+                "T35: a hit with a sneak-attack bonus on a sleeping afraid Draugr that faces the player is a sneak attack, as in the normal game (a sleeper watches nobody)");
             c.Check(Provoked(d, player), "T35: the hit provokes it");
             c.Check(!d.IsSleeping() && d.IsAlerted(), $"T35: the hit wakes it up, alerted (asleep {d.IsSleeping()}, alerted {d.IsAlerted()})");
             var feared = false;
@@ -1813,93 +1812,32 @@ internal static partial class SelfTests
             c.Check(!feared && !lost && !d.IsSleeping(),
                 $"T35: for the next 2 s it keeps the player as target, alerted, and never runs (ran {feared}, lost the target or the alert {lost})");
             s.Destroy(d);
+
+            // ----- contrast: same scene, second Draugr, woken up before the hit -----
+            // Me wake it with the game's own wake-up and hit it in the same frame: same place, same eyes, same facing,
+            // not alerted, only the sleep is gone. So the sneak attack above come from the sleep, nothing else.
+            var second = new SleeperRef();
+            yield return SleeperScene(s, c, second);
+            var woken = second.Draugr;
+            if (woken == null)
+            {
+                c.Report();
+                yield break;
+            }
+            woken.Wakeup();
+            c.Check(!woken.IsSleeping() && !woken.IsAlerted() && Attitudes.Judge(woken, player) == Attitude.Afraid && woken.CanSeeTarget(player),
+                "contrast setup: a second afraid Draugr, woken up, not alerted, still faces the player and sees them "
+                + $"(asleep {woken.IsSleeping()}, alerted {woken.IsAlerted()}, Judge {Attitudes.Judge(woken, player)}, sees {woken.CanSeeTarget(player)})");
+            before = woken.m_character.m_backstabTime;
+            Hit(woken.m_character, player, 1f, 0f, 3f);
+            c.Check(woken.m_character.m_backstabTime == before,
+                "contrast (the rule of T14): the same hit on an afraid Draugr that is awake and watches the player is no sneak attack");
+            s.Destroy(woken);
             c.Report();
         }
         finally
         {
             Finish(s);
-        }
-    }
-
-    // T35, the sneak attack alone: REAL BUG of the mod, this test fails until the mod is fixed. Vanilla gives a sneak
-    // attack on a sleeping creature (not alerted). The mod removes the bonus from an afraid creature that "can see" the
-    // player (Provocation.OnHit, E3), and the game's sight test does not know about sleep: a sleeper that faces the
-    // player loses the sneak attack. README and design E3: only a creature that watches you walk up.
-    private static IEnumerator RunBugSleeperSneak()
-    {
-        var c = new Checks(BugSleeperSneakName);
-        Stage s = null;
-        var scene = new SleeperRef();
-        try
-        {
-            s = Stage.Begin(BugSleeperSneakName, c);
-            if (s == null)
-            {
-                c.Report();
-                yield break;
-            }
-            var player = s.Player;
-            yield return SleeperScene(s, c, scene);
-            var d = scene.Draugr;
-            if (d == null)
-            {
-                c.Report();
-                yield break;
-            }
-            var before = d.m_character.m_backstabTime;
-            Hit(d.m_character, player, 1f, 0f, 3f);
-            // Vanilla sets this time in the same block that multiplies the damage and plays the sneak-attack effect
-            // (Character.RPC_Damage).
-            c.Check(d.m_character.m_backstabTime != before,
-                "T35: a hit with a sneak-attack bonus on a sleeping afraid Draugr that faces the player is a sneak attack, as in the normal game (a sleeper watches nobody)");
-            s.Destroy(d);
-            c.Report();
-        }
-        finally
-        {
-            Finish(s);
-        }
-    }
-
-    // ================================================================ morale.bug.rank-message
-
-    // T04, second half as TESTING.md words it: BossesAhead = 0 set after the first Eikthyr kill, then a second Eikthyr
-    // kill brings the rank-up message. The mod shows that message only for a kill that raises the boss rank (design
-    // E5; morale.kills checks that as T37), so this fails until the user picks: the item's text or the mod. Alone here
-    // so the other checks stay green. Kills played through the Debug kill hook: no boss is killed.
-    private static IEnumerator RunBugRankMessage()
-    {
-        var c = new Checks(BugRankMessageName);
-        var w = new Waiter();
-        try
-        {
-            var hud = MessageHud.instance;
-            if (!c.Check(Player.m_localPlayer != null && hud != null && !Hud.IsUserHidden(), "no local player, or the HUD is hidden or missing: messages cannot be checked"))
-            {
-                c.Report();
-                yield break;
-            }
-            ResetHooks();
-            ServerRules.TestRules = NewRules(null);
-            Standing.TestMessages = true;
-            Standing.TestOverride = new Standing.Override(0);
-            Standing.TestKill(new Standing.Override(1));
-            var first = Standing.MessagePending;
-            ServerRules.TestRules = NewRules(r => r.BossesAhead = 0);
-            Standing.TestKill(new Standing.Override(1));
-            c.Check(!first && Standing.MessagePending,
-                "T04 (second half, as written): after BossesAhead = 0, a second Eikthyr kill is followed by \"Weaker creatures now keep out of your way\" "
-                + $"(message due after the first kill with the defaults: {first}; message due after the second kill: {Standing.MessagePending})");
-            if (Standing.MessagePending)
-            {
-                // Let it show while the hooks are still on: nothing pops up after the test.
-                yield return Until(() => !Standing.MessagePending, Standing.RankMessageDelay + 1f, null, w);
-            }
-            c.Report();
-        }
-        finally
-        {
-            ResetHooks();
         }
     }
 

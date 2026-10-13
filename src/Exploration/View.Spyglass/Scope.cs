@@ -385,10 +385,13 @@ internal static class Scope
     }
 
     // Wheel (and gamepad zoom buttons, like vanilla camera zoom: hold the alt keys) change the zoom while looking.
+    // Pick only written on a frame where wheel or pad moved it. Magnification come capped already: written back with
+    // no input, a lower cap (server's or own setting) took the place of the zoom the player picked, for good.
     private static void UpdateZoom(float dt)
     {
         var scroll = ReadScroll();
-        var m = Magnification;
+        var shown = Magnification;
+        var m = shown;
         if (scroll > 0.001f)
         {
             m *= ZoomStep;
@@ -407,6 +410,10 @@ internal static class Scope
             {
                 m /= Mathf.Pow(PadZoomPerSecond, dt);
             }
+        }
+        if (m == shown)
+        {
+            return;
         }
         var rules = ServerRules.Current;
         _magnification = Mathf.Clamp(m, MinMagnification, Mathf.Max(MinMagnification, rules.MaxMagnification));

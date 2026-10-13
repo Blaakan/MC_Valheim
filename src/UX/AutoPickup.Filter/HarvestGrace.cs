@@ -5,9 +5,10 @@ namespace MC.UX.AutoPickupFilterMod;
 
 // Me remember where local player just harvested or collected by hand (Use on bush, station, stand; scythe swing).
 // Those drops only reach inventory through auto pickup, but they are "manual pickup" for the player: filter must
-// let them in. Me decide ONCE, when drop is born (ItemDrop.Awake postfix): born near such a spot, a little after it
-// = tagged, and tag stay until drop object die (picked up, despawn, unload). No later guess from position or time,
-// so drop far away that player walk to much later still count, and mode/list change never take tag away.
+// let them in. Me decide ONCE, when drop is born (ItemDrop.Awake postfix): born near such a spot (or above it: one
+// pick stack its drops upward), a little after it = tagged, and tag stay until drop object die (picked up, despawn,
+// unload). No later guess from position or time, so drop far away that player walk to much later still count, and
+// mode/list change never take tag away.
 // Ring of 64 spots, no allocation. One spot per frame: whole scythe swing (every plant, same frame) = one box.
 internal static class HarvestGrace
 {
@@ -21,6 +22,7 @@ internal static class HarvestGrace
     private const float EarlySeconds = 0.05f;
 
     // 4 m around the box: spawn points of harvest drops sit within ~2 m of the thing; bushes throw drops up.
+    // Above the box only the flat (sideways) distance count, any height: see CoversSpawn.
     private const float RadiusSqr = 16f;
 
     // Same frame, within 8 m of the box = same interaction (scythe swing loop, or Player.Interact + Pickable.Interact
@@ -91,7 +93,15 @@ internal static class HarvestGrace
             {
                 continue;
             }
-            if ((pos - ClosestInBox(pos, in e)).sqrMagnitude <= RadiusSqr)
+            var d = pos - ClosestInBox(pos, in e);
+            // One pick = column of drops: Pickable.Drop put drop number i 0.5 m * i straight above the plant, no
+            // limit (9 seeds at Resources x3: top one 4.5 m up, big yield go much higher). 4 m ball lost the top
+            // ones. So above the box height no count, only sideways 4 m; beside and below still the ball.
+            if (d.y > 0f)
+            {
+                d.y = 0f;
+            }
+            if (d.sqrMagnitude <= RadiusSqr)
             {
                 return true;
             }

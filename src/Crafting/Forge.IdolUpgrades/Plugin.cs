@@ -151,6 +151,14 @@ internal sealed partial class Plugin : ModPlugin
         ForgeGuard.Reset();
         ServerRules.Start();
         PlayerCheck.Start();
+        try
+        {
+            IdolsTab.AfterOn();
+        }
+        catch (Exception e)
+        {
+            Log.Warning($"Could not refresh the Forge window while turning on: {e.Message}");
+        }
         SelfTests.Register();
     }
 

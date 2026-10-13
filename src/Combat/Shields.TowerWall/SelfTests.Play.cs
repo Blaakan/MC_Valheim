@@ -59,7 +59,6 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(CreatureName, RunCreature),
         new KeyValuePair<string, Func<IEnumerator>>(SwitchName, RunSwitch),
         new KeyValuePair<string, Func<IEnumerator>>(PressName, RunPress),
-        new KeyValuePair<string, Func<IEnumerator>>(PressBugName, RunPressBug),
         new KeyValuePair<string, Func<IEnumerator>>(CrossbowName, RunCrossbow),
         new KeyValuePair<string, Func<IEnumerator>>(LogName, RunLog), // last: it look back at the whole run
     };

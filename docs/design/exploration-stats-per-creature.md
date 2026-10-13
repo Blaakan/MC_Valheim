@@ -7,7 +7,7 @@
 | Category / scope | Exploration / QoL |
 | Side | Client (only the player who wants it installs it) |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` + `assembly_guiutils` in `.ref/`; localization strings and prefab names checked in the installed game data (`resources.assets` localization table, `StreamingAssets/SoftRef/manifest_extended`) |
-| Status | Implemented (0.1.0), smoke test passed, in-game testing pending |
+| Status | Implemented (0.1.1), smoke test passed (0.1.0), in-game testing pending |
 
 ## Goal
 
@@ -134,6 +134,17 @@ before the dead player is destroyed). Unknown keys are kept by vanilla. At spawn
 `PlayerProfile.LoadPlayerData` just before `Player.OnSpawned(bool)`. Between `Game._RequestRespawn` and the next
 spawn, `Player.m_localPlayer` is null while the game and profile still exist.
 
+**The gap with no character** (checked in 1.0.17). After a death the dead `Player` stays for 10 s
+(`Player.OnDeath` → `Game.RequestRespawn(10f, afterDeath: true)`): it is still the local player and still in
+`Player.s_players`. `Game._RequestRespawn` then saves the player data and destroys the object; `Player.OnDestroy`
+removes it from `s_players` and sets `m_localPlayer` to null. `Game.FindSpawnPoint` moves the reference position to
+the spawn point (bed or logout point) and waits for more than `Game.m_respawnLoadDuration` (8 s) and for the area to
+be ready before `Game.SpawnPlayer`. So for at least 8 s the zones around the bed are loaded and owned by this game
+with no player object at all, and `Tameable.TamingUpdate` (which has no player check) keeps running there. The same
+wait happens at login (`Game.FixedUpdate` → `RequestRespawn(0f)`), before the first spawn. `Tameable.Tame` in that
+gap tames the creature and bumps `CreatureTamed`, and finds nobody to send its message to (in single player).
+`Game.SpawnPlayer` order: `Player.SetLocalPlayer`, `PlayerProfile.LoadPlayerData`, `Player.OnSpawned`.
+
 ### 1.6 Multiplayer summary
 
 | Data | Who writes it | Where it lives |
@@ -175,6 +186,10 @@ creature.
   (vanilla sends no message), the player whose game ran `Tame()` (the owner) gets it, **only if the owner is the
   closest player loaded on the owner's game**; if another loaded player is closer, **nobody** gets it. Each tame is
   credited to at most one player.
+- **Tames with no character in the world** (respawn wait, world still loading; 1.5): when the owner's game has no
+  local player and no player loaded at all, the creature name is kept in memory and counted at the next spawn of
+  the local character (0.1.1; before, such a tame was never counted). With another player loaded, the rules above
+  apply without the owner: nobody gets it unless that player was within 30 m.
 - **Display:** a "Creatures" section prepended to the text of the vanilla Player Statistics entry, built each time the
   Compendium opens, only through the public API. No new UI objects.
 - **API:** the public static class `CreatureCounts` reads everything (vanilla kills, stored tames, start date) for the
@@ -194,8 +209,13 @@ turned off = vanilla page, no counting. No transpiler, no per-frame patch, defau
 | `TextsDialog.AddStats()` (private) | Postfix | Searches `m_texts` from the end for the entry whose topic is `Localize("$inventory_stats")` and prepends `StatsSection.Build()` to its text. Not found (another mod removed it): nothing, one debug line. A postfix of `AddStats`, not `UpdateTextsList`, so it runs before other mods' `UpdateTextsList` postfixes. |
 | `Player.Message(MessageType, string, int, Sprite, bool)` | Postfix | If the type is Center, the text ends with `" $hud_tamedone"` (ordinal) and the instance is `Player.m_localPlayer`: one tame of the name before the suffix. Local path (we own the creature and are the closest). The local-player check ignores messages our game sends to remote players. |
 | `Player.RPC_Message(long, int, string, int)` (private) | Postfix | Same test. Remote path: another game (modded or not) tamed it and we were the closest. |
-| `Tameable.Tame()` (private) | Prefix + Postfix | Prefix stores the vanilla guard ("this call will tame") in `__state`. Postfix, only if `__state`: the creature is really tamed (`IsTamed()`, in case another mod skipped the original), a local player exists, `GetClosestPlayer(pos, 30f)` is null (nobody got the message) and `GetClosestPlayer(pos, float.MaxValue)` is the local player → one tame for the local player ("owner" fallback). |
-| `Player.OnSpawned(bool)` | Postfix | For the local player: write the start date once (custom data is loaded just before). |
+| `Tameable.Tame()` (private) | Prefix + Postfix | Prefix stores the vanilla guard ("this call will tame") in `__state`. Postfix, only if `__state`: the creature is really tamed (`IsTamed()`, in case another mod skipped the original) and `GetClosestPlayer(pos, 30f)` is null (nobody got the message). Then, with a local player: `GetClosestPlayer(pos, float.MaxValue)` is the local player → one tame for the local player ("owner" fallback). Without a local player (the gap in 1.5): `GetClosestPlayer(pos, float.MaxValue)` is null (no player loaded at all) → `CounterStore.HoldTame` keeps the name. |
+| `Player.OnSpawned(bool)` | Postfix | For the local player: write the start date once (custom data is loaded just before), then `CounterStore.CreditHeldTames` counts the kept names (logged as "owner"). |
+
+Kept tames live in memory only (a list of names plus the `Game` object that was current when they were kept). They
+are counted at the next local spawn only if `Game.instance` is still that object, so a logout in between (new `Game`
+object, possibly another character) drops them; `OnDeactivated` drops them too. Nothing is written while there is
+no character, because there is no `Player.m_customData` to write to.
 
 Both tame paths use vanilla's own 30 m test in the same frame, so they never both count the same tame. Hooking
 `Player` rather than `MessageHud` means a tame is still counted while the HUD is hidden (Ctrl+F3) or when another mod
@@ -252,7 +272,7 @@ or in the cfg file (the framework reloads it while the game runs).
 | Data | Where | Written by the mod? |
 |---|---|---|
 | Kills per creature (+ weapon types) | Vanilla `m_playerStats[0].m_enemyStats[0..4]` in the `.fch` | **Never** |
-| Tames per creature | `Player.m_customData["MC.Exploration.Stats.PerCreature.Tames"]` | On each counted tame |
+| Tames per creature | `Player.m_customData["MC.Exploration.Stats.PerCreature.Tames"]` | On each counted tame (a tame kept while there was no character: at the next spawn, 3.2) |
 | Day tame counting started | `Player.m_customData["MC.Exploration.Stats.PerCreature.CountingSince"]` | Once per character: first spawn with the mod, the feature turned on mid-game, or the first counted tame; never overwritten |
 
 Tames format, version 1 (documented contract; never change it without changing the version line): lines separated by
@@ -363,6 +383,10 @@ creature tamed with the mod is an ordinary vanilla tame for everyone (nothing st
 | Offspring, hatchling, grown calf, summon | Tamed without `Tame()` | Not counted |
 | Young animal tamed by feeding (if possible) | Message uses its own name | Own row |
 | Death and respawn, logout, other machine, cloud save | `m_customData` saved and carried in the `.fch` | Tames and start date kept |
+| Tame completes while you have no character (respawn wait or world still loading), no other player loaded | Tamed, `CreatureTamed` +1, no message (nobody to send it to) | Kept in memory, you +1 when your character spawns (T21) |
+| Same, but another player is loaded on your game | Message to that player if within 30 m | That player +1 if within 30 m (if modded); otherwise **nobody**, also after your spawn |
+| Tame kept, then you log out (or the game closes) before the spawn | — | Lost (never given to the next character) |
+| Tame kept, then the mod is turned off before the spawn | — | Dropped, like a tame made while the mod is off |
 | Mod off, tame happens, mod back on | — | That tame is not counted; start date unchanged |
 | Mod off, kill happens, mod back on | Kill saved by vanilla | Shown |
 | Stored tames written by a newer mod version | — | Shown as far as readable; new tames not counted (warning) |
@@ -400,6 +424,14 @@ creature tamed with the mod is an ordinary vanilla tame for everyone (nothing st
    cloud saves, and vanilla keeps it if the mod is removed.
 9. **"other", not "mixed"**, for the remainder of the weapon split, because it also holds kills whose weapon type the
    game never saved; parentheses are left out when only "other" is known.
+10. **A tame that completes while the owner has no character is kept and counted at the next spawn** (0.1.1, bug
+    fix: the README promises "in single player you always get your own tames"). Kept only when no player at all is
+    loaded on that game; with another player loaded and nobody within 30 m, nobody gets it (same caution as
+    decision 3: without a body the owner has no position to compare). Memory only: a logout or turning the mod off
+    before the spawn loses it, which is better than giving it to another character or counting it at some later
+    respawn. Known remaining hole: a tame that completes in the very frame `Game._RequestRespawn` destroys the dead
+    character (after the player data was saved, before `Player.OnDestroy` runs) is written to the dying object and
+    lost.
 
 ### Added beyond the request (small)
 

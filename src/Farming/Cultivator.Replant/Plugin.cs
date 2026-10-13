@@ -216,7 +216,8 @@ internal sealed partial class Plugin : ModPlugin
 
     // Patches still on during this call (also at game quit). Each step alone: one failure never skip the rest.
     // Replant target and hint forgot, saplings hidden from the build menu, cultivator back to vanilla levels and
-    // recipe (Rebuild see feature off). Items and saplings stay known (always-on registration).
+    // recipe, this player's own grow time on sapling prefabs and planted saplings (Rebuild see feature off). Items and
+    // saplings stay known (always-on registration).
     protected override void OnDeactivated()
     {
         _featureActive = false;
@@ -249,7 +250,7 @@ internal sealed partial class Plugin : ModPlugin
     }
 
     // Rebuild waits until the rules stay still (a cost typed in a config window change at every key); pending over or
-    // back = at once (TransplantContent.RequestRebuild).
+    // back, or feature off (own grow time setting changed) = at once (TransplantContent.RequestRebuild).
     private static void OnRulesChanged()
     {
         try

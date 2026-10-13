@@ -47,7 +47,9 @@ namespace MC.Farming.CultivatorReplantMod;
 // real button presses, placing through the vanilla ghost, growth on the clock, real Forge upgrades of every level, the
 // mod really turned off and on, far biomes, and multiplayer tests against a dedicated server. Registered from here
 // (RegisterMore).
-// Me force rules only with ServerRules.TestRules / TestPending and feature off with Plugin.TestInactive: never config.
+// Me force rules only with ServerRules.TestRules / TestPending, the player's own settings with ServerRules.TestOwn and
+// feature off with Plugin.TestInactive: never config. GhostVerdict.TestOff = second look at the placement ghost off
+// (control of the PlantEasily checks).
 // Rig put back controls, look, time, auto pickup, crafting station, known recipe, inventory and equipment, and destroy
 // all spawned things and new item drops.
 internal static partial class SelfTests
@@ -96,7 +98,9 @@ internal static partial class SelfTests
     {
         ServerRules.TestPending = false;
         ServerRules.TestRules = null;
+        ServerRules.TestOwn = null;
         Plugin.TestInactive = false;
+        GhostVerdict.TestOff = false;
     }
 
     // ---------- helpers ----------

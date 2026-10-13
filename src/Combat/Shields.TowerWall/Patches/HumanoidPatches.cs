@@ -10,7 +10,8 @@ namespace MC.Combat.ShieldsTowerWallMod.Patches;
 //     vanilla EquipItem then empty both hands on every path); non-player = its copy back to vanilla (decision 25).
 //   StartAttack prefix: local player with a tower in the left hand = bash cooldown first (too soon after the last bash
 //     start: refuse, __result false, vanilla skipped; the only skip of this patch, decision 30; a press made once the
-//     swing is over is kept buffered until the time is up, BashWatch.KeepPress), then heal (bash set as
+//     swing is over is kept buffered until the time is up, BashWatch.KeepPress; kept press end with the tower in
+//     hand: PlayerPatches, PlayerAttackInput prefix), then heal (bash set as
 //     the tower's m_attack, built from the player's unarmed attack) before vanilla look at HavePrimaryAttack. Vanilla
 //     then clone and play it. Sibling MC mods on this method (Dual Wielding, Weapon Moveset, Sneak Ambush) tolerate a
 //     skipped original; my postfix act only on __result true.

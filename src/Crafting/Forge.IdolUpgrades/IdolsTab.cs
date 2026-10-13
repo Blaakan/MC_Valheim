@@ -15,6 +15,9 @@ internal static class IdolsTab
 {
     internal const string Label = "IDOLS";
 
+    // Red note under the cost when the tier's Material setting name no item of this game (typo, empty).
+    private const string NoMetalNote = "<color=red>No valid metal is set for this tier in the settings.</color>";
+
     internal static bool Mode;
 
     private static Button _tab;
@@ -96,6 +99,18 @@ internal static class IdolsTab
             {
                 gui.UpdateCraftingPanel();
             }
+        }
+    }
+
+    // Mod turning on (patches on again). Forge window open: our tab is made only by a crafting panel refresh
+    // (AfterPanelUpdate) and none come by itself, so tab stayed away until window was opened again. Me ask for one,
+    // like vanilla do after an item moved in inventory or got dropped: selection stay, running timer stay.
+    internal static void AfterOn()
+    {
+        var gui = InventoryGui.instance;
+        if (gui != null && InventoryGui.IsVisible() && AtForge(Player.m_localPlayer))
+        {
+            gui.UpdateCraftingPanel();
         }
     }
 
@@ -321,9 +336,13 @@ internal static class IdolsTab
                 .Append(IdolLevels.ChancePercent(target)).Append("% refinement chance)");
             Text.Append("\n\nCost: ");
             var parts = 0;
-            if (cost.MaterialNeed > 0 && cost.Material != null)
+            // Tier metal no item of this game (typo or empty in settings): cost still hold it and upgrade is blocked
+            // (Cost.MaterialOk). No name to show; red note below say why.
+            var noMetal = cost.MaterialNeed > 0 && cost.Material == null;
+            if (cost.MaterialNeed > 0)
             {
-                Text.Append(cost.MaterialNeed).Append(' ').Append(cost.Material.m_itemData.m_shared.m_name);
+                Text.Append(cost.MaterialNeed).Append(' ')
+                    .Append(noMetal ? "metal of this tier" : cost.Material.m_itemData.m_shared.m_name);
                 parts++;
             }
             if (cost.TrophyNeed > 0)
@@ -333,6 +352,10 @@ internal static class IdolsTab
                 parts++;
             }
             Text.Append(parts > 0 ? " and " : "").Append("this idol.");
+            if (noMetal)
+            {
+                Text.Append('\n').Append(NoMetalNote);
+            }
             if (cost.Pool != null && cost.Pool.Names.Count > 0 && cost.TrophyNeed > 0)
             {
                 Text.Append("\n").Append(ClassName(target)).Append(" trophies: ");

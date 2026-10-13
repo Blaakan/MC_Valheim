@@ -13,16 +13,17 @@ namespace MC.UX.ContainerSortMod;
 
 // Me = the two buttons on the container panel: Sort, and criterion (By name / By type / By biome).
 // Both are clones of vanilla Place stacks (same look, sound, scaling), children of its parent, so they hide with the
-// panel. Controller: View/Select = Sort, left stick click = criterion, only while the chest grid is focused.
+// panel. Controller: View/Select = Sort, only while the chest grid is focused. Criterion button = mouse only, by
+// design: no controller key, no glyph.
 // Everything me make die in Destroy (feature off) and come back in Create (feature on / new InventoryGui).
 internal static partial class SortChestUi
 {
     private const string SortName = "MC_ContainerSort_Sort";
     private const string CriterionName = "MC_ContainerSort_Criterion";
 
-    // ZInput button names. Never JoyRStick: Loot Pickup Filter use right stick click (player grid).
+    // ZInput button name of Sort. Criterion button has none (user decision): left stick click (JoyLStick) is the
+    // game's own Take all, right stick click (JoyRStick) the game's own Place stacks. Me take neither.
     internal const string SortKey = "JoyBack";
-    internal const string CriterionKey = "JoyLStick";
 
     private const string SortTopic = "Sort";
     private const string CriterionTopic = "Sort order";
@@ -95,7 +96,7 @@ internal static partial class SortChestUi
         try
         {
             _sort = CloneButton(gui, src, SortName, SortKey, OnSortClicked);
-            _criterion = CloneButton(gui, src, CriterionName, CriterionKey, OnCriterionClicked);
+            _criterion = CloneButton(gui, src, CriterionName, null, OnCriterionClicked); // no key: mouse only
             if (_sort == null || _criterion == null)
             {
                 DestroyObjects();
@@ -210,7 +211,7 @@ internal static partial class SortChestUi
         return root == container.transform ? rootName : rootName + "/" + container.gameObject.name;
     }
 
-    // Labels, tooltips, controller glyphs from current setting. Setting change (button, panel, file) call me too.
+    // Labels, tooltips, Sort's controller glyph from current setting. Setting change (button, panel, file) call me too.
     internal static void RefreshTexts()
     {
         if (!Alive(_sort) || !Alive(_criterion))
@@ -300,15 +301,12 @@ internal static partial class SortChestUi
         }
     }
 
-    // Change criterion only, no sort (one action per button, no surprise save).
+    // Change criterion only, no sort (one action per button, no surprise save). Mouse only: button has no
+    // controller part, so no controller press reach me.
     private static void OnCriterionClicked()
     {
         try
         {
-            if (PadPressOutsideGrid(CriterionKey))
-            {
-                return;
-            }
             var next = Plugin.ReadSortBy() switch
             {
                 SortCriterion.Name => SortCriterion.Type,
@@ -324,7 +322,7 @@ internal static partial class SortChestUi
         }
     }
 
-    // Controller key press that reach us while chest grid NOT focused = not for us (safety net for the frames
+    // Sort's controller key press that reach us while chest grid NOT focused = not for us (safety net for the frames
     // before FixPadGroups could run). Mouse click never have our pad key down.
     private static bool PadPressOutsideGrid(string key)
     {
@@ -430,9 +428,11 @@ internal static partial class SortChestUi
             break;
         }
 
+        // Button without a key (criterion, mouse only) keep no hint at all.
+        var keyed = !string.IsNullOrEmpty(key);
         foreach (var obj in hintObjects)
         {
-            if (hint != null && (obj == hint || hint.transform.IsChildOf(obj.transform) || obj.transform.IsChildOf(hint.transform)))
+            if (keyed && hint != null && (obj == hint || hint.transform.IsChildOf(obj.transform) || obj.transform.IsChildOf(hint.transform)))
             {
                 continue;
             }
@@ -454,7 +454,22 @@ internal static partial class SortChestUi
         }
 
         TMP_Text glyph = null;
-        if (pad != null)
+        if (!keyed)
+        {
+            // Mouse only: no controller part, no glyph. Hint go too: without the pad nobody would hide it, it would
+            // show Place stacks' glyph.
+            if (hint != null)
+            {
+                hint.SetActive(false);
+                Object.Destroy(hint);
+            }
+            if (pad != null)
+            {
+                Object.DestroyImmediate(pad);
+            }
+            pad = null;
+        }
+        else if (pad != null)
         {
             // Same frame as Instantiate, before its first Update: never answer Place stacks' key, never fire because
             // some other group is active.
@@ -551,8 +566,10 @@ internal static partial class SortChestUi
         return false;
     }
 
-    // Vanilla Take all / Place stacks already on one of our keys (other game version, UI mod): key stay theirs,
-    // our button = mouse only. Else one press would fire whichever pad update first (shared 2-frame lock).
+    // Vanilla Take all / Place stacks already on Sort's key (other game version, UI mod): key stay theirs, Sort =
+    // mouse only, one warning. Else one press would fire whichever pad update first (shared 2-frame lock).
+    // Game 1.0.17: Take all = left stick click, Place stacks = right stick click. Me bind neither (criterion button
+    // has no key at all), so nothing clash and nothing is logged for them.
     private static void CheckVanillaKeys(InventoryGui gui)
     {
         foreach (var vanilla in new[] { gui.m_takeAllButton, gui.m_stackAllButton })
@@ -580,8 +597,9 @@ internal static partial class SortChestUi
         }
     }
 
-    // UIGamePad take its group from the nearest parent in Start. Me make sure it is the chest grid group, so our
-    // keys (and glyphs) work only while the chest grid is focused. Only after Start ran (it would overwrite).
+    // UIGamePad take its group from the nearest parent in Start. Me make sure it is the chest grid group, so Sort's
+    // key (and glyph) work only while the chest grid is focused. Only after Start ran (it would overwrite).
+    // Criterion button has no pad: nothing to fix there.
     private static void FixPadGroups(InventoryGui gui)
     {
         var group = ContainerGroup(gui);
@@ -620,6 +638,8 @@ internal static partial class SortChestUi
 
     // Offsets from Place stacks, in its parent's space: follow the vanilla buttons wherever they (or a UI mod) put
     // them. A = same row after Place stacks. B = new row on the side away from the grid.
+    // Vanilla panel: Take all at the left end, name, Place stacks at the right end. So row A go on to the right, past
+    // the panel edge. User looked at it and want it there: that place is fine, never a warning.
     private static void ApplyLayout(InventoryGui gui, bool secondRow)
     {
         if (_parentHasLayoutGroup || !Alive(_sort) || !Alive(_criterion))
@@ -736,7 +756,7 @@ internal static partial class SortChestUi
             Checked.Remove(combo); // panel never came up (or other chest now): try again next opening
             yield break;
         }
-        // Pads started now: put them on chest grid group at once (glyphs only while chest grid focused).
+        // Sort's pad started now: put it on chest grid group at once (glyph only while chest grid focused).
         Guarded(nameof(FixPadGroups), () => FixPadGroups(gui));
 
         // Open animation near zero scale: every rect one point, overlap test see nothing. Wait a bit; still collapsed
@@ -890,20 +910,10 @@ internal static partial class SortChestUi
             }
         }
 
-        // Allowed area = panel, grown to hold the vanilla buttons (they may hang out of the panel rect).
-        var area = WorldRect(gui.m_container);
-        if (take != null && take.gameObject.activeInHierarchy)
-        {
-            area = Union(area, WorldRect(take));
-        }
-        if (stack != null && stack.gameObject.activeInHierarchy)
-        {
-            area = Union(area, WorldRect(stack));
-        }
-        if (!Inside(sort, area, tolerance) || !Inside(criterion, area, tolerance))
-        {
-            return "stick out of the container panel";
-        }
+        // No "outside the panel" rule: the game's own row end at the panel's right edge, so row A always hang right of
+        // the panel (wanted, see ApplyLayout). Old rule warned at every container size for our own layout. What is
+        // left: overlap (above) and off screen (CheckScreen). Me cannot see other mods' own elements, only the game's
+        // panel parts.
         return null;
     }
 
@@ -944,9 +954,6 @@ internal static partial class SortChestUi
     private static bool Inside(Rect inner, Rect outer, float tolerance) =>
         inner.xMin >= outer.xMin - tolerance && inner.xMax <= outer.xMax + tolerance
         && inner.yMin >= outer.yMin - tolerance && inner.yMax <= outer.yMax + tolerance;
-
-    private static Rect Union(Rect a, Rect b) =>
-        Rect.MinMaxRect(Mathf.Min(a.xMin, b.xMin), Mathf.Min(a.yMin, b.yMin), Mathf.Max(a.xMax, b.xMax), Mathf.Max(a.yMax, b.yMax));
 
     // ---------------------------------------------------------------- debug dump
 

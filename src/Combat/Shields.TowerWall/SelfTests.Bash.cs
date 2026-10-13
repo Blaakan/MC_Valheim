@@ -31,10 +31,10 @@ namespace MC.Combat.ShieldsTowerWallMod;
 //                   sword; a bash counts as melee on the creature it hits
 //   tower.switch    tower leave the Towers list in the middle of a slowed bash; real off / on (OnDeactivated, patches
 //                   off; patches on, OnActivated) while braced, and in the middle of a Kick bash
-//   tower.press     set-up and control of the kept-press case: the press is still kept 1 s later, a fresh press
-//                   start an attack once the tower left the hand
-//   tower.bug.keptpress  REAL BUG (fail on this build): a press kept for the bash cooldown start a punch or a sword
-//                   swing by itself once the tower left the hand (TESTING T37)
+//   tower.press     a press kept for the bash cooldown end with the tower in hand (TESTING T37, T42): kept 1 s, then
+//                   the tower unequipped, a sword equipped (at once, and through the action queue like a hotbar key),
+//                   or the mod turned off = nothing swing by itself, and a fresh press after that start an attack; a
+//                   press only 0.2 s old still count, like vanilla
 //   tower.mods.crossbow  Crossbow Stays Loaded: a loaded crossbow put away by the tower is still loaded
 //   tower.log       no error from this mod and no Towers warning under the default list in the whole run (run last)
 internal static partial class SelfTests
@@ -49,7 +49,6 @@ internal static partial class SelfTests
     private const string CreatureName = "tower.creature";
     private const string SwitchName = "tower.switch";
     private const string PressName = "tower.press";
-    private const string PressBugName = "tower.bug.keptpress";
     private const string CrossbowName = "tower.mods.crossbow";
     private const string LogName = "tower.log";
 
@@ -501,7 +500,8 @@ internal static partial class SelfTests
             c.Check(Near(plain, SlashLanded(draugr, 20f, 1f), 0.3f), $"control: the same sword hit after the stagger deals normal damage ({F(plain)})");
             Park(p, draugr, 15f);
 
-            // Troll: two or more bashes at the 2 s cadence (TESTING T13 say two to four; the skill roll is random).
+            // Troll: two or more bashes at the 2 s cadence (TESTING T13 say two to four, now and then five; the skill
+            // roll is random, six about one run in a hundred).
             yield return WaitIdle(p);
             p.EquipItem(tower);
             yield return Fixed;
@@ -522,7 +522,7 @@ internal static partial class SelfTests
                 }
             }
             SelfTest.Note(FollowName, $"Troll (threshold {F(troll.GetStaggerTreshold())}): staggered {staggered} after {bashes} bash(es) at the cooldown's cadence, stagger per bash {string.Join(", ", gains.ToArray())}");
-            c.Check(staggered && bashes >= 2 && bashes <= 6, $"a Troll staggers after two or more bashes 2 s apart, never one ({bashes}; TESTING T13: two to four)");
+            c.Check(staggered && bashes >= 2 && bashes <= 6, $"a Troll staggers after two or more bashes 2 s apart, never one ({bashes}; TESTING T13: two to four, now and then five)");
             Park(p, troll, -25f);
 
             // TESTING T23 (end): NG+. An unaware Draugr take a sneak attack; one that be just bashed is alerted, so the
@@ -1488,22 +1488,37 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------- tower.press, tower.bug.keptpress ----------
+    // ---------- tower.press ----------
 
-    // One round of TESTING T37: bash, one press of the attack button once the swing is over, one second of waiting,
-    // then the tower leave the hand (unequipped, or a sword equipped). What came of the kept press.
+    // How the tower stop waiting for its bash in one round (TESTING T37, T42).
+    private enum PressEnd
+    {
+        Unequip, // the tower is unequipped
+        Swap,    // a sword is equipped (vanilla put the two-handed tower away)
+        Queued,  // a sword is equipped the way a hotbar key or an inventory click do it: through the action queue
+        Off,     // the mod is turned off (the held tower is a plain shield in place)
+    }
+
+    // One round: bash, one press of the attack button once the swing is over, a wait, then the tower stop waiting for
+    // its bash. What came of the kept press.
     private sealed class KeptPress
     {
         internal bool Started;        // the first bash started
-        internal bool Kept;           // 1 s after the press: cooldown still run, press timer still above 0, no new bash
+        internal bool Kept;           // after the wait: cooldown still run, press timer still above 0, no new bash
         internal float Left;          // cooldown left then
         internal float Timer;         // press timer then
-        internal bool Leaked;         // an attack started by itself within 0.7 s of the tower leaving the hand
+        internal float Age;           // seconds from the press to then
+        internal bool Gone;           // the tower did leave the hand (Queued round: the queued equip ended in time)
+        internal float QueueTook;     // Queued round: seconds the sword waited in the action queue
+        internal float QueueTimer;    // Queued round: press timer the last frame the tower was still in hand
+        internal bool SwitchedOff;    // Off round: the mod went off
+        internal bool BackOn;         // Off round: and on again after
+        internal bool Leaked;         // an attack started by itself within 0.7 s of the tower no longer waiting
         internal string LeakedWith = "";
         internal bool Control;        // a fresh press after that do start an attack
     }
 
-    private static IEnumerator KeptPressRound(Rig rig, ItemDrop.ItemData tower, ItemDrop.ItemData sword, Character draugr, bool swap, string test, KeptPress k)
+    private static IEnumerator KeptPressRound(Rig rig, ItemDrop.ItemData tower, ItemDrop.ItemData sword, Character draugr, PressEnd end, float wait, string test, KeptPress k)
     {
         var p = rig.P;
         yield return WaitIdle(p);
@@ -1516,25 +1531,56 @@ internal static partial class SelfTests
         yield return Press(p, draugr, s, test, null);
         k.Started = s.Started;
         var starts = BashWatch.DebugStarts.Count;
+        var pressed = Time.time;
         p.m_queuedAttackTimer = BashWatch.QueuedPress; // one press of the attack button, the swing is over
-        yield return Seconds(1f);
+        yield return Seconds(wait);
         k.Left = BashWatch.CooldownLeft(p);
         k.Timer = p.m_queuedAttackTimer;
+        k.Age = Time.time - pressed;
         k.Kept = s.Started && k.Left > 1f && k.Timer > 0.1f && BashWatch.DebugStarts.Count == starts && !p.InAttack();
-        if (swap)
+        k.QueueTimer = k.Timer;
+        switch (end)
         {
-            p.EquipItem(sword);
+            case PressEnd.Swap:
+                p.EquipItem(sword);
+                break;
+            case PressEnd.Queued:
+                // Vanilla's own entry (hotbar key, inventory click): the equip wait in the action queue, and end in
+                // UpdateActionQueue right before PlayerAttackInput of the same tick. Press stay kept meanwhile.
+                p.ToggleEquipped(sword);
+                break;
+            case PressEnd.Off:
+                k.SwitchedOff = Plugin.DebugSwitch(false);
+                break;
+            default:
+                p.UnequipItem(tower);
+                break;
         }
-        else
-        {
-            p.UnequipItem(tower);
-        }
+        // An attack that is not the one from before (the ended bash, or none) = started by itself. Watched from now
+        // until 0.7 s after the tower stopped waiting (Queued round: after the sword came out, 4 s at most).
+        var before = p.m_currentAttack;
+        var asked = Time.time;
         Attack leaked = null;
-        var until = Time.time + 0.7f;
+        k.Gone = end != PressEnd.Queued || !p.IsItemEquiped(tower);
+        var until = Time.time + (k.Gone ? 0.7f : 4f);
         while (Time.time < until && leaked == null)
         {
+            if (!k.Gone)
+            {
+                k.QueueTimer = p.m_queuedAttackTimer;
+            }
             yield return null;
-            leaked = p.m_currentAttack;
+            if (!k.Gone && !p.IsItemEquiped(tower))
+            {
+                k.Gone = true;
+                k.QueueTook = Time.time - asked;
+                until = Time.time + 0.7f;
+            }
+            var now = p.m_currentAttack;
+            if (now != null && !ReferenceEquals(now, before))
+            {
+                leaked = now;
+            }
         }
         k.Leaked = leaked != null;
         k.LeakedWith = leaked == null ? "none started" : $"an attack with {Name(leaked.GetWeapon())} ('{leaked.m_attackAnimation}') started by itself";
@@ -1546,21 +1592,28 @@ internal static partial class SelfTests
         k.Control = p.m_currentAttack != null && !ReferenceEquals(p.m_currentAttack, last);
         yield return WaitIdle(p);
         p.m_queuedAttackTimer = 0f;
+        if (end == PressEnd.Off && Plugin.DebugOff)
+        {
+            // On again. Own settings = the defaults for this, whatever the config file say (going off cleared the
+            // test rules).
+            TowerRules.DebugOwn = TowerRules.Defaults();
+            ServerRules.OwnChanged();
+            k.BackOn = Plugin.DebugSwitch(true);
+            yield return Fixed;
+        }
         rig.EmptyHands();
         yield return WaitCooldown(p);
     }
 
-    // The set-up and the control of TESTING T37 (what makes the bug test below mean something): with BashCooldown 6
-    // the press is still kept a second later, and a fresh press starts an attack once the tower left the hand. The
-    // expectation itself (nothing swings by itself) is tower.bug.keptpress: it fails on this build, a real bug.
-    private static IEnumerator RunPress() => RunKeptPress(PressName, bug: false);
-
-    private static IEnumerator RunPressBug() => RunKeptPress(PressBugName, bug: true);
-
-    private static IEnumerator RunKeptPress(string test, bool bug)
+    // TESTING T37, T42. BashCooldown 6: a press made once the swing is over is still kept a second later (vanilla's
+    // 0.5 s long over). Then the tower stop waiting for its bash, four ways (unequipped, a sword equipped at once, a
+    // sword through the action queue, the mod turned off): nothing may swing by itself, and a fresh press after that
+    // start an attack (so "nothing" mean something). And a press only 0.2 s old when the tower is unequipped, which
+    // vanilla alone would still hold: it start an attack, like in the normal game.
+    private static IEnumerator RunPress()
     {
-        var c = new Checks(test);
-        var rig = new Rig(test);
+        var c = new Checks(PressName);
+        var rig = new Rig(PressName);
         try
         {
             var p = rig.P;
@@ -1581,24 +1634,58 @@ internal static partial class SelfTests
             {
                 var what = swap ? "a sword is equipped" : "the tower is unequipped";
                 var k = new KeptPress();
-                yield return KeptPressRound(rig, tower, sword, draugr, swap, test, k);
-                if (bug)
-                {
-                    c.Check(k.Kept && !k.Leaked,
-                        $"a press made 1 s ago for the bash must not start another attack once {what}: {k.LeakedWith}"
-                        + (k.Kept ? "" : $" (set-up failed: the press was not kept: {F(k.Left)} s of cooldown left, press timer {F(k.Timer)})"));
-                }
-                else
-                {
-                    c.Check(k.Kept,
-                        $"setup ({what}): 1 s after the press the bash still waits for its cooldown and the press is still kept for it ({F(k.Left)} s left, press timer {F(k.Timer)})");
-                    c.Check(k.Control, $"control ({what}): a new press of the attack button starts an attack");
-                }
+                yield return KeptPressRound(rig, tower, sword, draugr, swap ? PressEnd.Swap : PressEnd.Unequip, 1f, PressName, k);
+                c.Check(k.Kept,
+                    $"setup ({what}): 1 s after the press the bash still waits for its cooldown and the press is still kept for it ({F(k.Left)} s left, press timer {F(k.Timer)})");
+                c.Check(k.Kept && !k.Leaked,
+                    $"a press made 1 s ago for the bash must not start another attack once {what}: {k.LeakedWith}"
+                    + (k.Kept ? "" : $" (set-up failed: the press was not kept: {F(k.Left)} s of cooldown left, press timer {F(k.Timer)})"));
+                c.Check(k.Control, $"control ({what}): a new press of the attack button starts an attack");
             }
+
+            // The way a player do it: the sword through the action queue (hotbar key, inventory click). The press
+            // stay kept all through the draw, and the tower leave the hand in UpdateActionQueue, right before
+            // PlayerAttackInput of the same tick: the press must be gone by then (0.1.0 swung the sword with it as
+            // soon as the draw animation let an attack start).
+            var queued = new KeptPress();
+            yield return KeptPressRound(rig, tower, sword, draugr, PressEnd.Queued, 1f, PressName, queued);
+            var drawn = queued.Kept && queued.Gone && queued.QueueTimer > 0.1f;
+            c.Check(drawn,
+                $"setup (a sword drawn through the action queue): the press is still kept 1 s after it ({F(queued.Left)} s of cooldown left, press timer {F(queued.Timer)}) "
+                + $"and all through the draw (press timer {F(queued.QueueTimer)} the frame before the sword was in hand, {F(queued.QueueTook)} s after it was asked for; in hand {queued.Gone})");
+            c.Check(drawn && !queued.Leaked,
+                $"a press made for the bash must not start another attack once a sword comes out through the action queue: {queued.LeakedWith}");
+            c.Check(queued.Control, "control (a sword drawn through the action queue): a new press of the attack button starts an attack");
+
+            // A young press: the tower leave the hand 0.2 s after it. Vanilla alone would hold that press 0.5 s, so it
+            // start an attack with the fists (TESTING T37, last sentence). 0.4 s = vanilla's 0.5 s less a few ticks.
+            var young = new KeptPress();
+            yield return KeptPressRound(rig, tower, sword, draugr, PressEnd.Unequip, 0.2f, PressName, young);
+            var inTime = young.Kept && young.Age < 0.4f;
+            c.Check(inTime,
+                $"setup (a young press): the tower is unequipped {F(young.Age)} s after the press, while the press is kept for the bash ({F(young.Left)} s of cooldown left, press timer {F(young.Timer)})");
+            c.Check(inTime && young.Leaked,
+                $"a press made {F(young.Age)} s before the tower is unequipped still starts an attack, as in the normal game (which keeps a press {F(BashWatch.QueuedPress)} s): {young.LeakedWith}");
+            c.Check(young.Control, "control (a young press): a new press of the attack button starts an attack");
+
+            // The mod turned off with a press kept (TESTING T42): what the framework do when it is unticked. Last
+            // round: going off clear the test rules.
+            var off = new KeptPress();
+            yield return KeptPressRound(rig, tower, sword, draugr, PressEnd.Off, 1f, PressName, off);
+            c.Check(off.Kept && off.SwitchedOff,
+                $"setup (the mod is turned off): 1 s after the press the press is still kept for the bash ({F(off.Left)} s left, press timer {F(off.Timer)}), then the mod is switched off ({off.SwitchedOff})");
+            c.Check(off.Kept && off.SwitchedOff && !off.Leaked,
+                $"a press made 1 s ago for the bash must not start another attack once the mod is turned off: {off.LeakedWith}");
+            c.Check(off.Control, "control (the mod is turned off): a new press of the attack button starts an attack");
+            c.Check(off.BackOn && !Plugin.DebugOff, "the mod is switched on again");
             c.Report();
         }
         finally
         {
+            if (Plugin.DebugOff)
+            {
+                Plugin.DebugSwitch(true);
+            }
             rig.Done();
         }
     }

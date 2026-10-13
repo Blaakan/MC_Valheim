@@ -23,6 +23,10 @@ namespace MC.Exploration.DeepNorthAwakeningMod;
 //             count) of a zone control nobody owns (or the server owns); at load the highest count of a cell win (a
 //             slot whose zone control a player took is never written again: me take a new one, counts only grow).
 //             Half the target = news "weakening"; target = cleared.
+//   Target:   can go down under a cell's kills (ClearKillsMin / Max changed, live or while the game was closed). The
+//             server then clear that cell with no more kill: at load right after the scan; live RulesSettleSeconds
+//             after the rules stopped changing (slider drag and typed number pass through other values, and a clear
+//             is for good). News go from the cell's seed point.
 //   Cleared:  ClearedSlots (cell id) of such a zone control, read back at load; the cell's kill slot freed.
 //   Lists:    cleared, engaged and kills per cell to everybody on change ("<guid>.Cleared") and to a player after each
 //             rules request.
@@ -41,6 +45,8 @@ internal static class HeldCells
     internal const float ReleaseCheckSeconds = 2f;
     internal const float LocalHoldSeconds = 10f;
     internal const float RetrySeconds = 5f;
+    // Rules changed: me compare kills and targets again only when the rules stayed still this long (unscaled seconds).
+    internal const float RulesSettleSeconds = 1.5f;
     internal const float NewsRange = 100f;
     internal const int NewsWeakening = 1;
     internal const int NewsCleared = 2;
@@ -84,6 +90,8 @@ internal static class HeldCells
     private static bool _slotWarned;
     private static float _sendAt;
     private static float _nextRelease;
+    private static int _rulesVersion;
+    private static float _recheckAt = float.PositiveInfinity;
 
     // Where a cell's kill count was written last. Id kept: the ZDO object may be pooled and reused by another ZDO.
     private struct KillSlot
@@ -242,6 +250,10 @@ internal static class HeldCells
             _scanned = true;
             _dirty = true;
             _sendAt = 0f;
+            // Kill target may be lower now than when the kills were written (setting changed while game was closed).
+            _rulesVersion = ServerRules.Version;
+            _recheckAt = float.PositiveInfinity;
+            ClearReached();
             var around = 0;
             if (_sawNoKall)
             {
@@ -252,6 +264,17 @@ internal static class HeldCells
                      + "defeated toward their clearing"
                      + (around > 0 ? $", {around} around the players wait to be defeated" : "")
                      + ". The others spawn their Jotun again each time a player enters them, until cleared.");
+        }
+        else if (_rulesVersion != ServerRules.Version)
+        {
+            // Rules changed (any setting): wait until they stay still, each new change start the wait again.
+            _rulesVersion = ServerRules.Version;
+            _recheckAt = now + RulesSettleSeconds;
+        }
+        else if (now >= _recheckAt)
+        {
+            _recheckAt = float.PositiveInfinity;
+            ClearReached();
         }
         if (now >= _nextRelease)
         {
@@ -570,11 +593,7 @@ internal static class HeldCells
         Cells.FromId(cell, out var i, out var j);
         if (now >= target)
         {
-            ServerCleared.Add(cell);
-            ServerEngaged.Remove(cell);
-            Kills.Remove(cell);
-            WriteMark(cell);
-            DropKills(cell);
+            MarkCleared(cell);
             Log.Info($"{now} Jotun defeated in Deep North area {i},{j}: the area is cleared for good.");
             News(NewsCleared, cell, p);
         }
@@ -594,6 +613,53 @@ internal static class HeldCells
             _sendAt = Time.unscaledTime + SendDelay;
         }
         _dirty = true;
+    }
+
+    // Server: cell cleared for good: off the lists, mark in the world, its kill slot free.
+    private static void MarkCleared(int cell)
+    {
+        ServerCleared.Add(cell);
+        ServerEngaged.Remove(cell);
+        Kills.Remove(cell);
+        WriteMark(cell);
+        DropKills(cell);
+    }
+
+    // Server: cells whose kills already reach their target (target lowered, see Target on top) are cleared now, no more
+    // kill needed. Same rule as a kill: only while the north is awake, only an awake cell (Kills never hold a cleared
+    // one). Lists go to everybody at once: no game hold the lower target with the old lists for long.
+    private static void ClearReached()
+    {
+        var rules = ServerRules.Current;
+        if (Kills.Count == 0 || !WorldState.Awake(rules))
+        {
+            return;
+        }
+        var seed = WorldState.Seed;
+        List<int> reached = null;
+        foreach (var pair in Kills)
+        {
+            if (pair.Value >= rules.KillTarget(seed, pair.Key) && WorldState.IsAwakeCell(pair.Key, rules))
+            {
+                (reached ??= new List<int>()).Add(pair.Key);
+            }
+        }
+        if (reached == null)
+        {
+            return;
+        }
+        foreach (var cell in reached)
+        {
+            var kills = Kills[cell];
+            var at = SeedOf(cell);
+            Cells.FromId(cell, out var i, out var j);
+            MarkCleared(cell);
+            Log.Info($"{kills} Jotun defeated in Deep North area {i},{j}, where {rules.KillTarget(seed, cell)} are enough "
+                     + "now: the area is cleared for good.");
+            News(NewsCleared, cell, new Vector3(at.x, 0f, at.y));
+        }
+        _dirty = true;
+        _sendAt = 0f;
     }
 
     // Server: a game burst these cells (or found them full). Engaged until no player is near.
@@ -905,7 +971,10 @@ internal static class HeldCells
         {
             return $"; area {i},{j} here is cleared";
         }
-        return $"; area {i},{j} here: {KillsIn(cell)} of {rules.KillTarget(WorldState.Seed, cell)} Jotun defeated, "
+        // Target just lowered to or under the kills: the server clear the area a moment later (ClearReached). Until its
+        // lists come me never show more kills than the area need.
+        var target = rules.KillTarget(WorldState.Seed, cell);
+        return $"; area {i},{j} here: {Math.Min(KillsIn(cell), target)} of {target} Jotun defeated, "
                + (IsEngaged(cell) ? "waits to be defeated" : "spawns its Jotun when entered");
     }
 

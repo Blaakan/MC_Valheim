@@ -16,26 +16,27 @@ namespace MC.Farming.FishingFightMod;
 //                    rules apply (own / server / pending), push debounce, join check verdicts (pure)
 //   fishing.logic    catch bar maths (hold climb, release fall and bounce, zone stay on the track, every fish motion
 //                    stay on the track, harder fish move more), rod verdict (sides, angle limit, both ways), run
-//                    direction, durations, costs, fish profiles, other-mod classification (pure)
+//                    direction, durations, costs, the drag rule of a fight (same for every way the rod is turned,
+//                    never past half the break distance), fish profiles, other-mod classification (pure)
 //   fishing.pending  rules pending (client waiting for the server) = no take-over (vanilla reel)
 //   fishing.fight    live, on a shore found with WorldGenerator (probe spawn is inland): rod in hand, float and Fish1
 //                    spawned and hooked; calm with the fish in the bar = line in, no stamina used, regen on; fish out
 //                    of the bar = line hold, stamina drain; struggle = bar gone, splash key on, fish swim to its side,
 //                    no reel = fish take line, wrong side = x4 stamina and no line, right side = line in, side switch
 //                    flip the verdict; calm again = bar back; reel to the end = fish in the bag, float gone; second
-//                    fish at 0 stamina = lost, fish let go, float stay; screenshots of the bar and the arrow; travel
-//                    back
+//                    fish at 0 stamina = lost, fish let go, float stay; third fish = right-side reel in a fight all
+//                    the way to the catch, rod kept off the line, no pause over a second, no break (the body is
+//                    StruggleReelToCatch in SelfTests.Live.cs); screenshots of the bar and the arrow; travel back
 // More live tests in SelfTests.Live.cs (same rig): fishing.cast (real cast, nibble, hook, empty reel), fishing.phases
 // (own phase timer, side switches, stars and skill), fishing.exits (line break, attack, bow, rod away, float or fish
 // gone, hooked fish picked up), fishing.swim (full bag, deep water), fishing.toggle (feature off and on mid-fight),
-// fishing.input (bar settings, Toggle block, inventory, pause, hidden HUD), fishing.dual (rod from a weapon pair,
-// dodge), fishing.harpoon (harpoon line let go by a cast), and two that fail until the mod is fixed:
-// fishing.bug.struggle-reel (reel in a fight to the catch) and fishing.bug.stranded (fish out of the water).
+// fishing.input (bar settings, Toggle block, inventory, pause, hidden HUD, fish out of the water), fishing.dual (rod
+// from a weapon pair, dodge), fishing.harpoon (harpoon line let go by a cast).
 // Multiplayer tests in SelfTests.Mp.cs (real dedicated server).
 // Me force rules only with ServerRules.TestRules / TestPending, phase and marker with Fight.TestPhase / TestPin /
-// TestSide / TestSwitchRate, the arrow and the bar place with FightHud.TestArrow / TestDisplay, feature off with
-// Plugin.TestBlocked: never config. Rig put back controls, look, items, skill, stamina, world stamina rate, time
-// and the player's place.
+// TestSide / TestSwitchRate, water under the fish with Fight.TestOutOfWater, the arrow and the bar place with
+// FightHud.TestArrow / TestDisplay, feature off with Plugin.TestBlocked: never config. Rig put back controls, look,
+// items, skill, stamina, world stamina rate, time and the player's place.
 internal static partial class SelfTests
 {
     private const string NetworkName = "fishing.network";
@@ -381,6 +382,48 @@ internal static partial class SelfTests
             "reel speed = vanilla lerp x rule");
         c.Check(FightLogic.LineRunSpeed(rules, 1f) > FightLogic.LineRunSpeed(rules, 0f)
                 && Near(FightLogic.LineRunSpeed(rules, 0.5f), rules.LineRunSpeed), "hard fish take line faster");
+
+        // Drag of a fight: judged as if the rod pointed at the float. Fisher at the origin, rod top 3 m ahead and
+        // 1.5 m up, float 9 m north at rod top height: 6 m from the rod top with the rod on the line.
+        var feet = Vector3.zero;
+        var floatAt = new Vector3(0f, 1.5f, 9f);
+        var onLine = new Vector3(0f, 1.5f, 3f);
+        c.Check(Near(FightLogic.PointedDistance(feet, onLine, floatAt), 6f, 0.001f)
+                && Near(Vector3.Distance(onLine, floatAt), 6f, 0.001f),
+            $"rod on the line: the pointed distance is the real rod top to float distance ({F(FightLogic.PointedDistance(feet, onLine, floatAt))} m)");
+        var sameTurned = true;
+        var neverMore = true;
+        var farthest = 0f;
+        for (var yaw = -180f; yaw <= 180f; yaw += 15f)
+        {
+            var top = Yaw(yaw) * 3f + Vector3.up * 1.5f;
+            sameTurned &= Near(FightLogic.PointedDistance(feet, top, floatAt), 6f, 0.001f);
+            farthest = Mathf.Max(farthest, Vector3.Distance(top, floatAt));
+            // Float lower than the rod top, near and far, on the water or at the feet.
+            foreach (var low in new[] { new Vector3(0f, -0.5f, 9f), new Vector3(1f, 0f, 4f), new Vector3(0.5f, 0.2f, 1f) })
+            {
+                neverMore &= FightLogic.PointedDistance(feet, top, low) <= Vector3.Distance(top, low) + 0.0001f;
+            }
+        }
+        c.Check(sameTurned && Near(farthest, 12f, 0.001f),
+            $"the pointed distance is the same for every way the rod is turned (6 m; the real one goes up to {F(farthest)} m with the rod turned away)");
+        c.Check(neverMore, "the pointed distance is never more than the real rod top to float distance (float lower, near or far)");
+        c.Check(FightLogic.PointedDistance(feet, onLine, new Vector3(0.5f, 0.2f, 1f)) < 0f,
+            "float nearer to the fisher than the rod is long: nothing holds the line out (pointed distance below 0)");
+        // Rod 45 degrees off the line: real distance 7.2 m. Line 6 m: the old rule (1 m from the rod top) held the
+        // reel, the pointed rule lets it go on; the line stops when the float is 1 m past it as pointed, or when it
+        // is half the break distance ahead of the float from the real rod top.
+        var off45 = Vector3.Distance(Yaw(-45f) * 3f + Vector3.up * 1.5f, floatAt);
+        c.Check(off45 - 6f > FightLogic.StruggleDrag && FightLogic.StruggleReelOpen(6f, 6f, off45, 10f),
+            $"rod turned 45 deg off a float at the line's end: the line still comes in ({F(off45)} m from the turned rod top, line 6 m)");
+        c.Check(FightLogic.StruggleReelOpen(5.01f, 6f, 6f, 10f) && !FightLogic.StruggleReelOpen(5f, 6f, 6f, 10f)
+                && Near(FightLogic.StruggleDrag, 1f),
+            "the line comes in until the float is 1 m past it (as pointed), then holds");
+        c.Check(FightLogic.StruggleReelOpen(3f, 0f, 7.9f, 10f) && !FightLogic.StruggleReelOpen(3f, 0f, 8f, 10f)
+                && Near(FightLogic.BreakGuard, 0.5f),
+            "the line never runs more than half the rod's break distance ahead of the float (break 10 m: stops at 5 m)");
+        c.Check(FightLogic.StruggleReelOpen(3f, 0f, 3.9f, 1.2f) && !FightLogic.StruggleReelOpen(3f, 0f, 4f, 1.2f),
+            "a rod with a very short break distance: the 1 m of drag still applies, never less");
 
         // Fish profiles.
         var perch = FishProfile.For("Fish1", 1, Heightmap.Biome.Meadows, 1f);
@@ -1297,7 +1340,8 @@ internal static partial class SelfTests
         c.Check(goodCost > 0.1f && Mathf.Abs(goodRate - goodCost) <= goodCost * 0.3f,
             $"right side reel: the normal game's cost of reeling a fighting fish ({F(goodRate)}/s, expected {F(goodCost)}/s)");
         c.Note($"right side reel: float {F(Vector3.Distance(rodTop.position, ff.transform.position) - ff.m_lineLength)} m "
-               + $"past the line (the reel works up to {F(FightLogic.StruggleDrag)} m in a fight)");
+               + $"past the line from the turned rod top, {F(PastPointed(p, st, ff))} m as the reel judges it (rod pointed at "
+               + $"the float; the reel works up to {F(FightLogic.StruggleDrag)} m in a fight)");
         var ratio = goodRate > 0.01f ? wrongRate / goodRate : 0f;
         var wantRatio = FightRules.Default.WrongSideStamina;
         c.Check(goodRate > 0.5f && ratio > wantRatio - 1f && ratio < wantRatio + 1f,
@@ -1467,6 +1511,12 @@ internal static partial class SelfTests
         c.Check(fish2 != null && FishingFloat.FindFloat(fish2) == null && !fish2.IsHooked() && !fish2.IsEscaping()
                 && Near(fish2.m_nview.GetZDO().GetFloat(ZDOVars.s_escape), 0f),
             "the lost fish is free: not tied to the float, not fighting it");
+
+        // Third fish: right-side reel in a fight down to the catch (T25). Empty float and lost fish out first.
+        Kill(ff2 != null ? ff2.gameObject : null);
+        Kill(fish2 != null ? fish2.gameObject : null);
+        yield return null;
+        yield return StruggleReelToCatch(c, rig, st, tap);
     }
 
     // Shore spots tried by the live test (each a trip of about 8 s).

@@ -647,11 +647,20 @@ ignored, L12).
   while the guard is visibly back. So when the prefix refuses a bash for the cooldown and a press is buffered while the
   player is no longer in an attack, it keeps `m_queuedAttackTimer` above 0 until the cooldown ends (two ticks of
   margin, never above 0.5): the bash starts at the first tick allowed. A press made earlier in the swing keeps
-  vanilla's 0.5 s. The time is taken in the `StartAttack` postfix; a start that never reaches its attack state
-  (watchdog A) clears it. With 0 the next bash can start when the last swing ends (vanilla rule, the first test
-  build). 2 s is the rate of the vanilla move the bash now matches in stamina and stagger, the Iron mace's secondary
-  attack (clip about 2 s, 1.1); the slowed punch itself takes about 1.1 s (2.7), so the guard is back for about 0.9 s
-  between two bashes.
+  vanilla's 0.5 s. **The kept press ends with the tower** (0.1.1): it is for the tower's next bash only, so once the
+  tower is no longer in the left hand as a tower (unequipped, another item equipped, put on the back, taken off the
+  `Towers` list) the timer goes back to what vanilla alone would have left of it, which is nothing when the button
+  went down more than 0.5 s ago; a younger press still counts, as in vanilla. `BashWatch` notes the time vanilla would
+  drop the press when it first keeps it (or when the button is pressed again, `Character.m_attack`), and a void prefix
+  on `Player.PlayerAttackInput` gives the press back: that method runs every tick right after the action queue (where
+  a queued equip or unequip happens, `Player.FixedUpdate`) and before vanilla reads the timer, so no `StartAttack` is
+  ever called for the stale press and none has to be refused. Deactivation gives it back too (`BashWatch.Reset`; the
+  patches are gone after that). Until 0.1.1 nothing ended the kept press, and vanilla punched or swung the new weapon
+  with it up to 0.5 s after the tower left the hand (T37). The cooldown's start time is taken in the `StartAttack`
+  postfix; a start that never reaches its attack state (watchdog A) clears it. With 0 the next bash can start when the
+  last swing ends (vanilla rule, the first test build). 2 s is the rate of the vanilla move the bash now matches in
+  stamina and stagger, the Iron mace's secondary attack (clip about 2 s, 1.1); the slowed punch itself takes about
+  1.1 s (2.7), so the guard is back for about 0.9 s between two bashes.
 - **The bash `Attack`** (`BashAttack`, one object shared by every tower copy; vanilla clones it per swing): a
   `MemberwiseClone` of the player's unarmed primary attack (`Humanoid.m_unarmedWeapon.m_itemData.m_shared.m_attack`,
   taken from the player in the `StartAttack` prefix, or from `Player.m_localPlayer` for tooltips; no player exists at
@@ -755,8 +764,10 @@ ignored, L12).
   Against thresholds (1.6), Blocking 0, bashes 2 s apart (the cooldown): a Wood tower staggers a Greydwarf or a
   Skeleton in one bash; an Iron tower always staggers a Draugr (50) in one bash and a Draugr Elite (100) in one about
   7 times in 10 (else two); a Troll (180, draining 36/s, so 72 between two bashes) takes two bashes about 4 times in 10
-  (S1 + S2 ≥ 252), three about 4 times in 10 (S1 + S2 + S3 ≥ 324), four about 2 times in 10, more when the bashes are
-  further apart than 2 s (it was usually two quick bashes 0.75 s apart); a Blackmetal tower staggers a
+  (S1 + S2 ≥ 252), three about 4 times in 10 (S1 + S2 + S3 ≥ 324), four about 2 times in 10 and now and then five
+  (about 1 time in 20 with rolls spread evenly over 75-165: four low rolls in a row stay under 180; seen in the
+  automated run of 2026-10-08), more when the bashes are further apart than 2 s (it was usually two quick bashes
+  0.75 s apart); a Blackmetal tower staggers a
   Goblin (52.5) or a Seeker (60) in one, a Goblin Brute (240) in two or three and a Lox (300, draining 120 between two
   bashes) in two to four (like the Iron tower on a Troll). At Blocking 50 an Iron
   tower staggers a Troll in two. A staggered non-player takes ×2 damage from the next hits (vanilla), and the bearer gets
@@ -896,7 +907,8 @@ compare with `Player.m_localPlayer`; for the local player it reads the cached to
 one field read), updates a few fields of the Braced clone and checks the watchdog reference. `Humanoid.StartAttack`
 (every tick while the attack button is held) returns after one reference compare for other characters and the cached
 held-tower lookup for the local player; during the bash cooldown it refuses after two more compares and one float
-compare, before any heal. `CharacterAnimEvent.Speed` (a few animation events per clip, every character) returns after
+compare, before any heal. `Player.PlayerAttackInput` (every FixedUpdate of the local player) returns after one
+reference compare unless a press is being kept for the cooldown. `CharacterAnimEvent.Speed` (a few animation events per clip, every character) returns after
 one static read unless a bash is being slowed. `Character.RPC_Damage` (every hit on every owned character) tests
 `hit.m_skill == Blocking` and the victim reference first; `Character.ApplyDamage`, `Attack.OnAttackTrigger` and
 `Attack.AddHitPoint` (every ray hit of every melee attack) compare one stored reference; `Character.Damage` (every hit
@@ -1045,7 +1057,8 @@ Goal). Decision 35: from the review of that change (stage 9).
     long. A press during the cooldown starts the bash as soon as the time is up, like the held button: a press once
     the swing is over is kept until then (vanilla's buffer alone keeps it 0.5 s, so a press between about 1.1 and
     1.5 s would have been dropped with no feedback while the guard is visibly back, 2.6); a press early in the swing
-    keeps vanilla's 0.5 s. Other readings kept apart: the per-creature lock (decision 34) and the swing speed
+    keeps vanilla's 0.5 s. The kept press is for the bash only: it ends when the tower leaves the hand or the mod is
+    turned off, keeping just what is left of vanilla's own 0.5 s (0.1.1, 2.6). Other readings kept apart: the per-creature lock (decision 34) and the swing speed
     (decision 32).
 31. **A bash stagger costs at least what a buckler parry stagger costs a middling parrier: `BashStamina` 20 (was 12),
     `BashStagger` stays 25.** **Flagged (numbers).** "Proccing the stagger should not be easier than with a buckler, so maybe increase
@@ -1323,6 +1336,11 @@ and `BashCooldown` are new; `BashStamina` 12 → 20; `BashAnimation` lost `Shiel
   `NetworkGate.PeerHasMod`; this mod's check uses `PeerCompatible` (4). Nothing shared at runtime: each mod refuses by
   its own rule.
 - **Stats Per Creature**: a bash kill is a normal kill (melee kill modifier); nothing to do.
+- **Spyglass, Music Instruments**: both have an always-on bool prefix on `Player.PlayerAttackInput` that skips the
+  method while their item is in the right hand (a tower is never held with one: both are tools). Ours there (0.1.1) is
+  void, skips nothing and only lowers the press timer this mod raised; whether it runs before, after or not at all
+  while theirs skips the method, the kept press is given back at the latest on the first tick the method runs again,
+  before vanilla reads it. Cross test C11.
 
 ### 6.3 External mods (detect and warn; no stand-down in v1)
 
@@ -1408,6 +1426,7 @@ Every body catches its own exceptions and calls `PatchGuard.Report(site, e)`; no
 | `Character.ApplyDamage(HitData, bool, bool, HitData.DamageModifier)` | prefix + postfix | normal | the stored bash hit on this character: add its stagger after vanilla, record a bash stagger; when vanilla returned at its damage check (landed 0.1 or less), call `m_onDamaged(landed, attacker)` once (2.6) | one reference compare per call |
 | `Character.ApplyPushback(Vector3, float)` | prefix | normal | local braced bearer, frontal push, brace holds: scale the push | per push; one reference compare |
 | `Player.GetRunSpeedFactor()` (protected) | postfix | normal | local player with a tower in hand: floor at jog speed | per movement update of players; one reference compare |
+| `Player.PlayerAttackInput(float)` (private) | prefix (void) | normal | a press kept for the bash cooldown whose tower is no longer in the left hand as a tower: the press timer goes back to vanilla's own count (2.6); a kept press that is over is forgotten | every FixedUpdate of the local player (vanilla calls it for the owner only); one reference compare when no press is kept |
 | `ItemDrop.ItemData.GetDamage(int, float)` | postfix | normal | world level > 0 and an applied tower copy: damage without the world-level term | per damage read; one float compare in normal worlds |
 | `ItemDrop.ItemData.GetTooltip(ItemData, int, bool, float, int, bool)` (static) | prefix + postfix | normal | heal; append the tower lines | per tooltip build |
 | `Attack.OnAttackTrigger()` | prefix (bool) | normal | the running bash clone only: count hit events, return false for the second and later; the first opens the one-stagger scope (`BashTarget`, 2.6) | per hit event; one reference compare |
@@ -1439,6 +1458,7 @@ touch other hits.
 | One-stagger scope: vanilla's hit list, the pick | one `Attack.OnAttackTrigger` call of our clone (closed by its finalizer) |
 | Swing speed of the running bash (factor, the clip's own speed, "scaled by me") | per bash; ended with it, reset on deactivation |
 | Last bash start (cooldown) | the local player object; cleared on deactivation and when a start never reached its attack state |
+| Kept press (whose, and when vanilla alone would drop it) | from the first tick the cooldown refuses a buffered press until its bash starts, the press runs out, the tower leaves the left hand or the mod is turned off (the last two give the timer back to vanilla's count) |
 | Braced template | process; its fields follow the rules |
 | Braced clone on the player, cached held-tower verdict | per tower in hand; dropped when `Player.m_localPlayer` changes |
 | Stored bash hit and stagger (creature owner) | one `RPC_Damage` call |
@@ -1456,7 +1476,8 @@ touch other hits.
   keeps one bad item from putting the feature in Error.
 - **`OnDeactivated`** (patches still applied during the call; each step in its own `try`/`catch`, in this order):
   `SelfTests.Unregister`; cancel the local player's running bash if it uses a tower (2.6), which also puts the clip's
-  own speed back (2.7); remove the Braced effect (quietly); revert the local inventory (equipped items included);
+  own speed back (2.7), and, with the other bash state at the end, give a press kept for the cooldown back to
+  vanilla's count (2.6); remove the Braced effect (quietly); revert the local inventory (equipped items included);
   revert the prefabs; unless the application is quitting (plugins are destroyed at quit and call
   `OnDeactivated`), revert every loaded `Container` found with `Object.FindObjectsByType<Container>` and
   `ItemDrop.s_instances`; `PlayerCheck.Stop` (unsubscribes, clears the queue); `ServerRules.Stop`. Nothing is sent to
@@ -1662,8 +1683,8 @@ unverified.
   numbers; the tooltip lists Blunt, stamina use 20, knockback, "Bash stagger: ×25" and "Bash cooldown: 2 s"; bashing
   raises Blocking.
 - T13 **Bash stagger (G6)**: Iron tower, Blocking 0: a `Greydwarf` and a `Draugr` stagger in one bash, a `Troll` in two
-  to four bashes (2 s apart; two or three for about four Trolls in five); hit a staggered enemy with a sword (quick
-  swap): crit effect (×2).
+  to four bashes, now and then five (2 s apart; two or three for about four Trolls in five); hit a staggered enemy
+  with a sword (quick swap): crit effect (×2).
 - T14 **Bash from guard (G6)**: hold block and press attack: the bash plays, the guard is back right after it.
 - T15 **Bash animations (G7)**: try each `BashAnimation`: ShieldPunch, OtherPunch, Kick, Custom with `throw_bomb`,
   `spear_poke`, `mace_secondary` (the list offers only these four names). Note which one looks best, which arm swings,
@@ -1806,7 +1827,8 @@ unverified.
 3. **No secondary attack** on tower shields (the vanilla empty-hand kick is lost): fine, or add the kick (L3)?
 4. **Numbers**: carried -30%, braced -30% more, block armor ×2.5, bash ×25 stagger, bash stamina 20 (was 12), 2 s
    bash cooldown (new), swing speed 0.6 (new), 8 s lock limit (was 5 s; optional now that the bash cooldown exists,
-   decision 34): right amounts? (Decisions 30-34; a Troll now takes two to four bashes, T13, T35.)
+   decision 34): right amounts? (Decisions 30-34; a Troll now takes two to four bashes, now and then five, T13,
+   T35.)
 5. **Stagger resistance from all sides** while braced (decision 7), or front only (L7)?
 6. **Block push**: at 100 the push on attackers is 10-35% stronger than a vanilla tower's (decision 16); lower the
    default?
@@ -2214,6 +2236,33 @@ it: its collider was never in the swing's hit list. Why:
   the late roll (a bash never does), Dual Wielding's queued swap and crossed sheathed pair (a tower is never part of
   either).
 
+**Stage 11 (0.1.1, the kept press), done:** the automated run of 2026-10-08 found that a press kept for the bash
+cooldown (stage 9) started a punch or a sword swing by itself once the tower left the hand (T37, with
+`BashCooldown = 6`). Built clean (Debug and Release); not run in the world or in game yet.
+
+- **Cause.** While the cooldown refuses a bash, `BashWatch.KeepPress` puts `Player.m_queuedAttackTimer` back to up to
+  0.5 every tick, and nothing ended that when the tower stopped waiting for a bash. The `StartAttack` prefix goes back
+  to vanilla as soon as the left item is not a listed tower, so for the next 0.5 s `Player.PlayerAttackInput` kept
+  calling `StartAttack` with the fists or the new weapon. A queued equip makes it easy to hit: the timer is kept all
+  through the equip action, which ends in `UpdateActionQueue` right before `PlayerAttackInput` in the same tick.
+- **Fix** (2.6): the mod ends only what it added. `KeepPress` notes when vanilla alone would drop the press;
+  a void prefix on `Player.PlayerAttackInput` (`BashWatch.ReleasePress`) lowers the timer to vanilla's own count on
+  the first tick the tower is no longer in the left hand as a tower, and `BashWatch.Reset` does the same when the mod
+  is turned off. A press older than 0.5 s is gone; a younger one still counts, as in vanilla (a press made while the
+  next weapon is being drawn still swings it). Clearing the timer in the unequip path was not chosen: it needs every
+  way a tower leaves the hand (unequip, swap, put away, list change), and it would also drop a press vanilla still
+  holds. Refusing the stale `StartAttack` in the existing prefix was not chosen either: it would skip vanilla's
+  `StartAttack` for other weapons too, on a guess about which caller asked for it; lowering the timer first means
+  vanilla never makes that call.
+- **Self-test** `tower.press` (the separate bug test is folded back into it): with `BashCooldown` 6, a press made once
+  the swing is over is still kept 1 s later; then the tower is unequipped, a sword is equipped (`EquipItem` at once,
+  and `Player.ToggleEquipped`, the hotbar's and the inventory's entry, which waits in the action queue while the press
+  stays kept), or the mod is switched off (`Plugin.DebugSwitch`): no attack starts by itself in the next 0.7 s, and a
+  fresh press after that does start one; a press only 0.2 s old when the tower is unequipped still starts a punch.
+  In-game: T37, T42, C11.
+- **Docs**: T13 and the README said a Troll takes two to four bashes; the same run needed five once (four low rolls
+  in a row, 2.6). Both now say "two to four, now and then five"; `tower.follow` keeps its two-to-six bound.
+
 ### Deviations from the design, in short
 
 The details and reasons are in the stage notes above.
@@ -2261,3 +2310,5 @@ The details and reasons are in the stage notes above.
   `BashAnimation` read in any case; no wire change (the ×1 travels in vanilla's `HitData`), so network version 2 stays.
 - Stage 10 (in-world run): self-tests check a free bash lane before each placed bash and put the player back where
   each test found him (7.4); no mod code changed.
+- Stage 11 (0.1.1): a press kept for the bash cooldown ends with the tower in hand and with the mod (a void prefix on
+  `Player.PlayerAttackInput`, 2.6, 7.2); no wire change, network version 2 stays.

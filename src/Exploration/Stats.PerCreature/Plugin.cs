@@ -71,10 +71,12 @@ internal sealed partial class Plugin : ModPlugin
         SelfTests.Register();
     }
 
-    // Me turned off: drop parse cache. Stored data stay on character.
+    // Me turned off: drop parse cache and tames kept for next spawn (not written yet = not counted, like tames
+    // made while off). Stored data stay on character.
     protected override void OnDeactivated()
     {
         CounterStore.ClearCache();
+        CounterStore.ClearHeld();
         SelfTests.Unregister();
     }
 }

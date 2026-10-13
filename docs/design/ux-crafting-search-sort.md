@@ -221,11 +221,12 @@ the same group. Pure enum compares, no state, no allocation. Documented in `docs
 | `Shield`, `Helmet`, `Chest`, `Legs`, `Hands`, `Cape` | `Shield`, `Helmet`, `Chest`, `Legs`, `Hands`, `Shoulder` |
 | `Utility`, `Trinket` | `Utility`, `Trinket` |
 | `Tool` | `Tool` (hammer, hoe, cultivator) |
-| `Torch` | `Torch`, or a weapon type (below) with `m_animationState` `Torch` / `LeftTorch` |
+| `Misc` | a weapon type (below) with `m_animationState` `Torch` / `LeftTorch` whose attack animation is `emote_drink`: the tankards of 1.0.17 (`Tankard`, `Tankard_dvergr`, `TankardAnniversary`, `TankardOdin`; item dump of 2026-10-08) |
+| `Torch` | `Torch` (the player's torch, lanterns, sparkler), or any other weapon type in the `Torch` / `LeftTorch` pose (creature torches) |
 | `Food` / `Potion` | `Consumable` with `m_food`, `m_foodStamina` or `m_foodEitr` > 0 / any other `Consumable` |
 | `Material`, `Fish`, `Trophy`, `Misc` | `Material`, `Fish`, `Trophy`, `Misc` |
 | `SkillTool` | weapon type with animation `FishingRod` / `Scythe`, or skill `Pickaxes`, `WoodCutting`, `Fishing`, `Farming` |
-| `Misc` | weapon type with animation `Feaster` (tankards) |
+| `Misc` | weapon type with animation `Feaster` (tankards of older game versions) |
 | `Weapon` | any other `OneHandedWeapon`, `TwoHandedWeapon`, `TwoHandedWeaponLeft`, `Bow`, `Attach_Atgeir`; family = `m_skillType` |
 | `Other` | everything else (`None`, `Customization`, unknown modded types) |
 
@@ -490,7 +491,7 @@ player sees and have a simple alternative.
    shared localization helper yet).
 8. **One shared classifier, tools apart from weapons** (to confirm with the user): pickaxes, the scythe, the fishing
    rod and torches are under Tools and light, not under a weapon type (vanilla `IsWeapon()` counts torches as weapons);
-   tankards (`Misc` type or `Feaster` animation) are under Other; mead bases follow their item type (Materials if the
+   tankards (`Misc` type, `Feaster` animation, or the torch pose with the drink emote as attack: 1.0.17) are under Other; mead bases follow their item type (Materials if the
    prefab says `Material`, unverified). The rules live in `src/Shared/ItemKinds.cs` (compiled into every MC mod) so
    Sort Chest agrees item by item.
 9. **Counts come from the unfiltered tab list**, so the menu does not change while typing.

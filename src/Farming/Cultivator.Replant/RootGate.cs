@@ -20,8 +20,8 @@ namespace MC.Farming.CultivatorReplantMod;
 // Root lookup: OverlapSphere on the root's own collider layers only (TransplantContent read them from the
 // YggdrasilRoot prefab: static_solid), ResourceRoot in parents, kept on the sapling (RootDrawer) until Unity say it is
 // gone. Placement already need the root within RootRange (Piece.m_mustConnectTo), me look 1 m farther so the root
-// found at placement is found again. PlantEasily grid ignore m_mustConnectTo: such a sapling just wait (Replant give
-// it back).
+// found at placement is found again. PlantEasily ignore m_mustConnectTo: aimed ghost get the rule back from
+// GhostVerdict, its grid copies do not: such a sapling just wait (Replant give it back).
 // Drain on a root another peer own: check run on our copy of its level, RPC land on the owner later, owner skip it
 // quietly when its level too low. Me keep a ledger per root of drains this peer sent and not yet seen land
 // (EffectiveLevel), so several saplings of this peer (often same pass after zone load) never grow on one drain.

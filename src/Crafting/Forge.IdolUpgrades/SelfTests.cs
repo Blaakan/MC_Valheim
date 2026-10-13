@@ -147,7 +147,6 @@ internal static partial class SelfTests
         Test(TimerTabsName, RunTimerTabs),
         Test(TimerLossName, RunTimerLoss),
         Test(BadMaterialName, RunBadMaterial),
-        Test(BugBadMaterialName, RunBugBadMaterial),
         Test(ZeroCostName, RunZeroCost),
         Test(BugZeroCostName, RunBugZeroCost),
         // SelfTests.Inventory.cs
@@ -161,7 +160,6 @@ internal static partial class SelfTests
         Test(OffUpgradeName, RunOffUpgrade),
         Test(OffRefineName, RunOffRefine),
         Test(OnAtForgeName, RunOnAtForge),
-        Test(BugTabAfterOnName, RunBugTabAfterOn),
         Test(PopupOffName, RunPopupOff),
         // SelfTests.Compat.cs
         Test(SearchName, RunSearch),

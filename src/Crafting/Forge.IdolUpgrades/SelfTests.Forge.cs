@@ -34,9 +34,9 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 //   forge.rules.wiring   changed rule setting give new rules snapshot (me write no config value)
 //   forge.timer.tabs     tab switched while timer run: started job still end, once
 //   forge.timer.loss     cost, idol or item gone before timer end: nothing happen, nothing used
-//   forge.rules.bad-material   unknown or empty tier metal: upgrade stay blocked (never free), log name the bad name
+//   forge.rules.bad-material   unknown or empty tier metal: upgrade stay blocked (never free), panel say why in red,
+//                              panel and tooltip cost still count the metal, log name the bad name or empty setting
 //   forge.tooltip.zero-cost    metal cost 0: tooltip show trophies only
-//   forge.bug.bad-material-silent  (real bug, fail until mod fixed) unknown tier metal: panel and tooltip must say why
 //   forge.bug.tooltip-zero-cost    (real bug, fail until mod fixed) trophy cost 0: no comma hanging in tooltip
 internal static partial class SelfTests
 {
@@ -59,7 +59,6 @@ internal static partial class SelfTests
     private const string TimerLossName = "forge.timer.loss";
     private const string BadMaterialName = "forge.rules.bad-material";
     private const string ZeroCostName = "forge.tooltip.zero-cost";
-    private const string BugBadMaterialName = "forge.bug.bad-material-silent";
     private const string BugZeroCostName = "forge.bug.tooltip-zero-cost";
 
     private const string WoodIdol = "Upgrader0Weapon";
@@ -1381,8 +1380,10 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------- forge.rules.bad-material (T24; what the mod say on screen: forge.bug.bad-material-silent) ----------
+    // ---------- forge.rules.bad-material (T24) ----------
 
+    // 0.1.1: mod say on screen why (red note in Idols tab, metal still counted in panel and tooltip cost). Before, panel
+    // and tooltip skipped a tier without metal: player saw every shown cost met and a dead button.
     private static IEnumerator RunBadMaterial()
     {
         var rig = new Rig(BadMaterialName);
@@ -1407,6 +1408,16 @@ internal static partial class SelfTests
             var gui = rig.Gui;
             c.Check(!rig.ButtonOn && !rig.RowCanCraft && rig.Has("Silver") == 5, "unknown metal name: the upgrade stays blocked with the cost carried (never free)");
             c.Check(Logged(mark, LogLevel.Warning, "Unknown item name(s)", "Silverr") != null, $"the log warning names the bad metal: {Tail(mark)}");
+            // What player read (words written out here, not taken from mod code).
+            const string redNote = "<color=red>No valid metal is set for this tier in the settings.</color>";
+            const string panelCost = "Cost: 5 metal of this tier, 5 common trophies of this tier (any mix) and this idol.";
+            const string tooltipCost = "5 metal of its biome, 5 common trophies of its biome";
+            c.Check(rig.Description.Contains(redNote),
+                $"the Idols tab says in red why the upgrade is blocked (no valid metal set for this tier), panel text is '{rig.Description}'");
+            c.Check(rig.Description.Contains(panelCost), $"the panel's cost still counts the 5 metal (without a name), panel text is '{rig.Description}'");
+            c.Check(rig.ButtonTip == L("$msg_missingrequirement"), $"the button's tooltip says the requirement is missing, like the game does, is '{rig.ButtonTip}'");
+            var line = CostLine(L(stack.GetTooltip()));
+            c.Check(line == tooltipCost, $"the idol's tooltip still counts the metal, it does not show the cost as trophies only, cost line is '{line}'");
             gui.OnCraftPressed();
             yield return null;
             c.Check(gui.m_craftTimer < 0f && rig.Has(SilverIdol, 1) == 1 && rig.Has(SilverIdol, 2) == 0 && rig.Has("Silver") == 5 && rig.Has("TrophyWolf") == 5,
@@ -1417,47 +1428,13 @@ internal static partial class SelfTests
             yield return rig.Select(stack);
             c.Check(rig.Row >= 0 && !rig.ButtonOn && !rig.RowCanCraft, "empty metal name: the upgrade stays blocked too");
             c.Check(Logged(mark, LogLevel.Warning, "Unknown item name(s)") != null, $"empty metal name: the log has a warning too: {Tail(mark)}");
-            c.Report();
-        }
-        finally
-        {
-            rig.Dispose();
-        }
-    }
-
-    // ---------- forge.bug.bad-material-silent (T24: real bug, fail until mod fixed) ----------
-
-    // Run 2026-10-07: with Material = "Silverr" the panel text has no red note (only "Cost: 5 common trophies of this
-    // tier (any mix) and this idol.") and idol tooltip cost line is "5 common trophies of its biome": player see every
-    // shown cost met and a dead button. IdolsTab.Description and IdolTooltip.Rewrite skip a tier without metal.
-    private static IEnumerator RunBugBadMaterial()
-    {
-        var rig = new Rig(BugBadMaterialName);
-        var c = rig.C;
-        try
-        {
-            rig.Provoke();
-            ServerRules.TestRules = DefaultRules(r => r.TierMaterial[3] = "Silverr");
-            var stack = rig.Give(SilverIdol, 1, 1);
-            rig.Give("Silver", 5);
-            rig.Give("TrophyWolf", 5);
-            yield return rig.OpenForge();
-            yield return rig.ClickIdolsTab();
-            yield return rig.Select(stack);
-            if (stack == null || rig.Row < 0)
-            {
-                c.Check(false, "the plain idol stack is not listed in the Idols tab");
-                c.Report();
-                yield break;
-            }
-            c.Check(rig.Description.Contains("<color=red>"),
-                $"the Idols tab says in red why the upgrade is blocked (no metal set for this tier), panel text is '{rig.Description}'");
-            var line = CostLine(L(stack.GetTooltip()));
-            c.Check(line != "5 common trophies of its biome", $"the idol's tooltip does not show the cost as trophies only, cost line is '{line}'");
-
-            ServerRules.TestRules = DefaultRules(r => r.TierMaterial[3] = "");
-            yield return rig.Select(stack);
-            c.Check(rig.Description.Contains("<color=red>"), $"empty metal name: the panel says why in red too ('{rig.Description}')");
+            c.Check(Logged(mark, LogLevel.Warning, "Unknown item name(s)", "(empty Material of Tier 3 - Silver idols)") != null,
+                $"empty metal name: the log warning names the empty setting, not an empty name: {Tail(mark)}");
+            c.Check(rig.Description.Contains(redNote), $"empty metal name: the panel says why in red too ('{rig.Description}')");
+            c.Check(rig.Description.Contains(panelCost) && rig.ButtonTip == L("$msg_missingrequirement"),
+                $"empty metal name: the panel's cost still counts the metal and the button's tooltip says the requirement is missing ('{rig.ButtonTip}')");
+            line = CostLine(L(stack.GetTooltip()));
+            c.Check(line == tooltipCost, $"empty metal name: the idol's tooltip still counts the metal, cost line is '{line}'");
             c.Report();
         }
         finally

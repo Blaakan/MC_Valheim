@@ -153,6 +153,11 @@ one at game start, and until Sneak Ambush 0.1.1 and Spyglass 0.1.1 our own item 
 empty list at every return to the menu. A table built on such a list called every default name unknown in one long
 false warning.
 
+A tier whose `Material` names no item of the game (typo or empty) has no metal: the cost still holds it, so the
+upgrade is blocked (`IdolUpgrade.Cost.MaterialOk`; it never becomes free). Since 0.1.1 the player is told why (3.3,
+3.6), and the warning lists an empty `Material` as "(empty Material of Tier N - Title idols)" instead of an empty
+name.
+
 ### 3.3 The Idols tab (`IdolsTab`)
 
 - A clone of `m_tabCraft` (the Craft tab is hidden at the Forge, so its place and its gamepad trigger are free),
@@ -168,6 +173,12 @@ false warning.
   pool's trophy names), "Upgrade to N stars", 3 requirement slots (metal, "Common/Elite/Boss trophies" whose icon goes
   round the pool each second with a tooltip listing each kind and the count held, and the idol itself), button
   "Upgrade idol", interactable only when `IdolUpgrade.Blocker` is null and the station is usable.
+- A cost the settings cannot name is said in red in the description, the mod's own way next to the game's (a dead
+  button with the "Missing requirement" tooltip, which stays): a step without any known trophy ("No trophy is set for
+  this step in the settings.") and, since 0.1.1, a tier without a known metal ("No valid metal is set for this tier in
+  the settings."). The cost sentence still counts that metal, without a name ("5 metal of this tier"); before 0.1.1
+  it left the metal out, so every listed cost looked met under a dead button. Neither case gets a requirement slot
+  (no item, so no icon and no count to show).
 - `OnCraftPressed` prefix: our checks, then the vanilla timer (`ForgeUi.StartTimer`: same fields, vibration, the
   station's craft effect).
 - `DoCrafting` prefix (Priority.First, our recipe only): `IdolUpgrade.Upgrade`, message, the station's done effect,
@@ -256,7 +267,8 @@ false warning.
   item name over the icon's top edge.
 - `ItemDrop.GetHoverText` postfix: a starred idol on the ground reads "(2 stars)" instead of vanilla's raw "[3]".
 - `ItemData.GetTooltip` (static overload) postfix: replaces the vanilla "Quality: q" line with "Level: … (n of 3)",
-  "Refinement chance: N%", and the next upgrade's cost or "Maximum level".
+  "Refinement chance: N%", and the next upgrade's cost or "Maximum level". A tier metal the settings cannot name is
+  still counted in that cost, as "N metal of its biome" (0.1.1; the reason is given in the Idols tab, 3.3).
 
 ### 3.7 Configuration
 
@@ -300,8 +312,13 @@ upgrade or Forge refinement (nothing is consumed before the timer ends), leaves 
 clears an idol selection and rebuilds the list with vanilla rows. Without it, vanilla would take our private recipe
 (no requirements) for a refinement and `DoCrafting` would remove the whole idol stack. Then the Idols tab is
 destroyed, slot click components removed, choices forgotten; star sprites stay alive (3.6).
-Raised max qualities stay until restart (decision 6). On: table rebuilt, the inventory's idols raised again. Leaving the Forge (window closed, walking away) while in Idols mode also restores the vanilla tab look, so the
-next station does not show both vanilla tabs unselected.
+Raised max qualities stay until restart (decision 6). On: table rebuilt, the inventory's idols raised again, and when
+the Forge window is open `IdolsTab.AfterOn` asks for one crafting panel refresh (0.1.1): the IDOLS tab is only made by
+the `UpdateCraftingPanel` postfix and no refresh comes by itself, so the tab stayed away until the window was reopened
+while the odds and text (drawn every frame) were back. It is the call vanilla makes itself with the window open, after
+an item is moved in the inventory or dropped from it (`OnSelectedItem`, `OnDropOutside`): the selected row and a
+running timer stay. Leaving the Forge (window closed, walking away) while in Idols mode also
+restores the vanilla tab look, so the next station does not show both vanilla tabs unselected.
 
 ### 3.10 Compatibility and coordination
 
@@ -408,6 +425,11 @@ next station does not show both vanilla tabs unselected.
     so a copy that changes at level 6 would lose the selection; the swap keeps every vanilla check, count and colour
     and other mods' patches on those methods.
 14. **Network version 2** with the rules layout 2 (3.8). The mod is not released yet, so the version stays 0.1.0.
+15. **A tier metal the settings cannot name** (0.1.1, typo or empty `Material`): the upgrade stays blocked and the
+    game's own signs stay (button off, "Missing requirement" tooltip). The reason is a red line in the description,
+    like the existing one for a step without trophies, and the cost keeps counting the metal without a name (panel
+    and idol tooltip). No requirement slot with a flashing amount, the game's sign for a missing resource: there is
+    no item to show in it.
 
 ### Added beyond the request
 

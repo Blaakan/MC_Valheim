@@ -19,6 +19,7 @@ internal enum FightPhase : byte
 // (FishingFloat.Catch, SetCatch(null), OnHooked(null), destroy). Every exit also call fish.OnHooked(null): vanilla
 // forget it on stamina-out and on a missing rod, fish then stay "hooked" to nothing.
 // Fish side: FishPatches read Phase / RunDir every fish tick and steer the hooked fish (design 2.4).
+// Fish out of the water = no fight (calm, bar on): it can not run there (UpdatePhase, design D16).
 // One fight at a time (Current). Second hooked float of the same player (multi-float mods): vanilla reel for it.
 internal sealed class Fight
 {
@@ -57,10 +58,14 @@ internal sealed class Fight
     // Self test: pin the fish marker (inside the zone / far from it), force a phase and side. Null = normal.
     // TestSide 0 with a forced struggle = phase pinned, side free: the fish pick and switch sides itself (side switch
     // and shallow-water turn run). TestSwitchRate = side switches per second in place of the fish's own rate.
+    // TestOutOfWater = the answer to "is the fish out of the water" for the phase clock (dry land rig has no water).
+    // Null = the game's own (Fish.IsOutOfWater). A forced phase win over that rule: dry land tests force a fight on
+    // a Perch that lie on the ground.
     internal static FishPin? TestPin;
     internal static FightPhase? TestPhase;
     internal static int TestSide = FightLogic.Right;
     internal static float? TestSwitchRate;
+    internal static bool? TestOutOfWater;
 
     internal static void ClearTest()
     {
@@ -68,6 +73,7 @@ internal sealed class Fight
         TestPhase = null;
         TestSide = FightLogic.Right;
         TestSwitchRate = null;
+        TestOutOfWater = null;
     }
 #endif
 
@@ -181,7 +187,8 @@ internal sealed class Fight
             return true;
         }
         var floatPos = ff.transform.position;
-        var magnitude = (rodTop.position - floatPos).magnitude;
+        var topPos = rodTop.position;
+        var magnitude = (topPos - floatPos).magnitude;
         if (!owner.HaveStamina())
         {
             // Vanilla loss: float stay in the water, empty; vanilla run the rest of this tick.
@@ -238,9 +245,13 @@ internal sealed class Fight
                     cost *= rules.WrongSideStamina;
                 }
                 Use(owner, cost * dt);
-                if (Verdict == RodVerdict.Good)
+                // Good side = rod turned away from the fish, so its top is metres off the float: drag is judged as
+                // if the rod pointed at the float (FightLogic.PointedDistance), not from the swung rod top.
+                if (Verdict == RodVerdict.Good
+                    && FightLogic.StruggleReelOpen(ff.m_lineLength, FightLogic.PointedDistance(ownerPos, topPos, floatPos),
+                        magnitude, ff.m_breakDistance))
                 {
-                    ReelIn(ff, reelSpeed * FightLogic.StruggleReelFactor * dt, magnitude, dt, FightLogic.StruggleDrag);
+                    TakeLine(ff, reelSpeed * FightLogic.StruggleReelFactor * dt, dt);
                 }
             }
             else
@@ -291,16 +302,21 @@ internal sealed class Fight
     }
 
     // Line in, as vanilla: only while the float is not dragged more than 'drag' beyond the line (else the line would
-    // run ahead of the float and break it). Vanilla drag 0.2 m (calm). A running fish keep the float about 0.2-0.3 m
-    // past the line (its pull vs the rope pull), so a struggle allow more (StruggleDrag), still far from the 4 m break.
-    // Skill XP like vanilla reeling with a fish on (timer x2).
+    // run ahead of the float and break it). Vanilla drag 0.2 m (calm), from the rod top. A struggle allow more
+    // (StruggleDrag) and has its own test (FightLogic.StruggleReelOpen: the rod is turned away there).
     private static void ReelIn(FishingFloat ff, float amount, float magnitude, float dt, float drag)
     {
         if (ff.m_lineLength > magnitude - drag)
         {
-            ff.m_lineLength -= amount;
-            ff.m_fishingSkillImproveTimer += dt * ff.m_fishingSkillImproveHookedMultiplier;
+            TakeLine(ff, amount, dt);
         }
+    }
+
+    // Skill XP like vanilla reeling with a fish on (timer x2).
+    private static void TakeLine(FishingFloat ff, float amount, float dt)
+    {
+        ff.m_lineLength -= amount;
+        ff.m_fishingSkillImproveTimer += dt * ff.m_fishingSkillImproveHookedMultiplier;
     }
 
     private static void Use(Player owner, float stamina)
@@ -353,6 +369,17 @@ internal sealed class Fight
             return;
         }
 #endif
+        // Fish out of the water (hung on a short line, dragged on the shore) can not run: vanilla never let it swim
+        // there (Fish.CustomFixedUpdate leave before the swim), so my steering never run either. No fight there:
+        // one in progress end (bar back), the calm clock wait until the fish is back in the water.
+        if (FishOutOfWater())
+        {
+            if (Phase == FightPhase.Struggle)
+            {
+                EnterCalm(rules, first: false);
+            }
+            return;
+        }
         PhaseLeft -= dt;
         if (Phase == FightPhase.Calm)
         {
@@ -368,6 +395,18 @@ internal sealed class Fight
             return;
         }
         UpdateSide(dt);
+    }
+
+    // The game's own test (water level under the fish's body). Only reader of it for the phase clock.
+    private bool FishOutOfWater()
+    {
+#if DEBUG
+        if (TestOutOfWater.HasValue)
+        {
+            return TestOutOfWater.Value;
+        }
+#endif
+        return Fish.IsOutOfWater();
     }
 
     // Fighting fish: now and then it turn to the other side (never in its first second on a side).

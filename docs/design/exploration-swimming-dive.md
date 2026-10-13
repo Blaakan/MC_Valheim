@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Swim dive` |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` and `assembly_utils` in `.ref/` (Character, Player, PlayerController, GameCamera, WaterVolume, Floating, EnvMan, SEMan, SE_Stats, ZInput, Humanoid); research briefs of 2026-10-01 (swim physics and input, under-water visuals, framework patterns); sources of BetterDiving (Apache-2.0), Dive In and UnderTheSea (GPL-3.0, read for ideas only), Crystal's Underwater, Aegir, Improved Swimming and ImpactfulSkills read on GitHub (2026-10-01); prefab values measured by the in-world self-tests (2026-10-01) |
-| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (`dive.network`, `dive.logic`, `dive.pending`, `dive.dive`; an earlier run failed one `dive.dive` check, Crouch + Jump held at the surface drained after a wave, fixed by D24); not yet tested by hand in game |
+| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (`dive.network`, `dive.logic`, `dive.pending`, `dive.dive`; an earlier run failed one `dive.dive` check, Crouch + Jump held at the surface drained after a wave, fixed by D24); not yet tested by hand in game. v0.1.1 (2026-10-08): storm-wave fix (D25) after the storm-wave self-test failed on 0.1.0; builds in Debug and Release, self-tests not run on it yet |
 
 ## Goal
 
@@ -75,7 +75,11 @@ diver; creatures that dive or chase under water; weapons under water.
   then `SEMan.ApplyStatusEffectSpeedMods`), lerped by `m_swimAcceleration` per tick for players; the applied
   velocity-change force has `y = 0`. `m_moveDir` comes from `Player.SetControls` and is always horizontal.
 - Vertical ("buoyancy"): target height `GetLiquidLevel() - m_swimDepth`; below it the body speed moves toward up to
-  +10 m/s (50 m/s²), above it toward down to -10 m/s (30 m/s²). Then `m_body.useGravity = true`.
+  +10 m/s (50 m/s²), above it toward down to -10 m/s (30 m/s²). Then `m_body.useGravity = true`. The upward target
+  grows with the distance under the target height, 5 m/s per metre (the full 10 m/s from 2 m under), so on water that
+  rises at `w` m/s a plain swimmer rides `w / 5` m under the target height: more than 0.5 m on a wave that rises
+  faster than 2.5 m/s. Measured (in-world run of 2026-10-08, Valheim 1.0.17, `ThunderStorm` with the wind at 1): a
+  plain swimmer got 0.985 m under the target height within 6 s; at wind 0.3 at most 0.27 m in 10 s.
 - Rotation only when `m_moveDir.magnitude > 0.1` or `AlwaysRotateCamera()`.
 - Animator: `inWater = !IsOnGround()` (read at the start), `onGround = false`.
 - `OnSwimming(targetVel, dt)` only when **not on ground** at the start of the call; `targetVel` is the horizontal
@@ -145,13 +149,17 @@ Local player only. `DiveState` (static, owned by the current `Player.m_localPlay
   vanilla buoyancy then keeps it). Starts when Crouch is held while swimming in water with stamina left.
 - **Deep** (inside Diving): feet more than **0.5 m** under the vanilla rest height `restY = GetLiquidLevel() -
   m_swimDepth`; stays until the feet come back above `restY - 0.2 m` (hysteresis). The under-water rules (no sideways
-  swimming, drain while still, forced ascent at 0 stamina) apply only while deep.
+  swimming, drain while still, forced ascent at 0 stamina) apply only while deep. Deep can only **start** on the
+  dive's own way down: the mod's own vertical speed `Vy` must be below 0 on that tick (`DiveLogic.DivedUnder`, D25).
+  Depth alone is not enough, because a fast wave leaves any swimmer more than 0.5 m under the rest height (1.2). Once
+  deep, the depth alone decides.
 - Diving continues while deep, or while Crouch is held with stamina. So a diver near the surface without Crouch (a
   short tap, or rising above `restY - 0.2`) goes back to vanilla, whose buoyancy finishes the rise smoothly.
 - Diving ends at once when a blocker appears: rules pending (4.3), not swimming, not in water (tar, level lost), dead,
   attached or standing on a ship, teleporting, debug fly.
 
-The pure rules live in `DiveLogic` (`Deep`, `Diving`, `TargetSpeed`, `Blocker`), hammered by `dive.logic`.
+The pure rules live in `DiveLogic` (`Deep`, `DivedUnder`, `Diving`, `TargetSpeed`, `Blocker`), hammered by
+`dive.logic`.
 
 ### 2.2 Keys (G1, G2)
 
@@ -177,7 +185,8 @@ Debug overrides `TestDown` / `TestUp` drive the live self test.
   does not count as moving for the drain and Swim XP rules of 2.5), `OnSwimming` not called on ground (vanilla skips
   it). Vanilla buoyancy, which already ran this tick from the body's own speed, keeps the diver on the waves like any
   swimmer, so there is no one-tick jolt, and a wave can never rise over a diver held at one height and make them deep
-  (D24). Taking over again (Crouch alone, Jump alone, or deep): `Vy` starts from the body speed vanilla just wrote, as
+  (D24). A wave that rises faster than vanilla buoyancy lifts still gets over them for a moment, as it does over any
+  swimmer; that never counts as deep, because their own speed is 0 (D25). Taking over again (Crouch alone, Jump alone, or deep): `Vy` starts from the body speed vanilla just wrote, as
   at a dive start, so there is no jolt either way. Right after a hand-back the floor ray and the water-bottom probe
   reach **0.5 m** further (`HandBackFloorMargin`): without it, at a floor less than about 0.7 m under the rest height,
   vanilla buoyancy would lift the diver out of the floor ray's reach, Crouch would push them back down, and so on (a
@@ -310,6 +319,18 @@ fly, local player present. Held while the local player is teleporting.
   swimming) although they never went down. Deep divers still hold their depth (G2); forced ascent at 0 stamina,
   idle rise and the sea-floor stop are unchanged. After a hand-back the floor must be 0.5 m further down before Crouch
   takes over again, so a diver above a shallow floor floats instead of bobbing against it.
+- **D25 Deep starts only on the dive's own way down** (2.1; fix of 0.1.1, 2026-10-08). D24 was not enough in a storm:
+  vanilla buoyancy lets a wave that rises faster than 2.5 m/s get more than 0.5 m over any swimmer (1.2), and the
+  depth test alone then counted a swimmer holding Crouch and Jump at the surface as deep. From that tick the mod held
+  their height with gravity off while the wave went on rising (feet up to 4.8 m under the rest height in the run),
+  with no sideways swimming and the still-diver drain, until a trough came down to them. Now the first deep tick also
+  needs the mod's own vertical speed to be downward (`Vy < 0`). `Vy` is 0 while the vertical is left to vanilla (D24),
+  and at a dive start it is the body's speed, which points up while a wave lifts the swimmer and takes about 0.3 s of
+  Crouch alone to turn downward: so Crouch pressed a moment before Jump, or a short tap of Crouch, on a rising wave
+  does not latch the diver under it either. Holding Crouch alone still dives, a deep diver still holds their depth
+  (G2), and leaving deep is unchanged (depth only, 0.2 m). Chosen over smoothing the rest height (changes every dive)
+  and over "never deep while handed back" alone (a human presses Crouch a few ticks before Jump, and that one tick of
+  the mod's own drive would latch deep again).
 
 ## 4. Multiplayer
 
@@ -452,7 +473,8 @@ state reset, rules and join check started, self tests registered.
 - `dive.network`: `DiveRules` wire round trip, clamping, layout refusal, only `Pending` pending, `ServerRules.Receive`
   refused on a server, `Select` four cases, `Settled` debounce, `PlayerCheck.Decide` seven cases.
 - `dive.logic`: `DiveLogic` rules (including `VanillaVertical`: near the surface with target 0 and stamina = left to
-  vanilla; deep, moving, idle rise or 0 stamina = not), camera maths, fog maths, corner swap, `ForeignMods.Classify`;
+  vanilla; deep, moving, idle rise or 0 stamina = not; and `DivedUnder`: deep starts only with the own speed below 0,
+  never at 0 or upward, and an already deep diver stays deep at any speed), camera maths, fog maths, corner swap, `ForeignMods.Classify`;
   fog override on
   RenderSettings in one frame (no compounding, base taken again, put back, left alone when overwritten, linear
   start/end put back after a SetEnv that rewrote colour and density); the same for `_SunFogColor` (holds the fog
@@ -470,11 +492,21 @@ state reset, rules and join check started, self tests registered.
   (world StaminaRate modifier removed and put back); Jump rises and hands back at the surface (gravity on again); still
   at the surface drains < 0.2; Crouch and Jump held at the surface: `Deep` and the hand-back sampled every physics tick
   of the 2 s window, the vertical is left to vanilla (hand-back, gravity on) on every tick and the drain is < 0.2 (NOTE
-  of the ride: deep ticks, hand-back ticks, lowest feet under the rest height, largest own speed; NOTE and skip only
-  if a wave still made the diver deep, which D24 should prevent); view back to normal. NOTE dumps: player swim values, collider, eye/head height, body,
+  of the ride: deep ticks, hand-back ticks, lowest feet under the rest height, largest own speed; since 0.1.1 a deep
+  tick in that window fails the test, D25); view back to normal. NOTE dumps: player swim values, collider, eye/head height, body,
   fixed dt, camera values, water volume at the spot (trigger bottom vs ground), fog values at the surface and under
   (with `_SunFogColor`, whether it equals the fog colour, and vanilla `EnvMan.GetSunFogColor`).
   Soft skip (NOTE + pass) when no deep water exists within 5 km.
+- `dive.waves` (live, one trip; T32, T34, D24, D25): Crouch and Jump held at the surface, sampled every physics tick.
+  (1) Wind pinned at 0.3: there are waves (the water moves 0.4 m or more), never deep, the vertical left to vanilla on
+  every tick, stamina within 0.2, and the swimmer rises and falls with the water. (2) Water over the swimmer all at
+  once: the test puts the swimmer 1.2 m under the rest height, once with both keys already held and once as a plain
+  swimmer with Crouch pressed 3 ticks before Jump while vanilla buoyancy lifts them; never deep, left to vanilla from
+  the tick both keys are down, back at the swimming height 2 s later, no drain (at most the few ticks of Crouch
+  alone). (3) The stormiest weather forced with the wind pinned at its strongest, held 10 to 40 s: never deep, left to
+  vanilla on every tick, stamina within 0.2, rises and falls with the water; the run must also have met a wave that
+  put the feet 0.55 m or more under the rest height at least 1 s before the end, otherwise that part fails as
+  "proves nothing" (it cannot pass by luck; run it again). Part 3 was a separate bug test while the bug was open.
 
 ### 7.6 Shared framework used
 
@@ -501,7 +533,8 @@ Console (`devcommands`, `god`, `heal`, `resetskill Swim`, `tod`, `env`, `debugmo
 
 T01-T32: G1 (T01, T11, T12), G2 (T02, T03, T04, T13, T14), G3 (T05, T29), G4 (T06, T07, T08, T27, T32), E4 (T09),
 Swim XP (T10), E1-E3 (T15-T17, T23), tar and Ashlands (T18, T19), exits (T20-T22, T24), settings (T25-T27),
-encumbered (T28), menus (T30), serpent (T31).
+encumbered (T28), menus (T30), serpent (T31). Added with 0.1.1: T34 (G4, D25: a wave over a swimmer is not a dive;
+Crouch a moment before Jump and short taps of Crouch in a storm).
 
 ### Multiplayer
 
@@ -556,7 +589,8 @@ on, Exponential; live dive: 1.6 m/s average descent, 6 stamina per second while 
 |---|---|
 | No seams or squares between water tiles after the flip; the surface seen from below at noon (olive haze above gone with the `_SunFogColor` override) | next in-world `underwater-looking-up` screenshot, T17, T16 |
 | Body sleeps when held at 0 speed | handled by `WakeUp`; T03 |
-| Near-surface hand-back (D24): the diver rides storm waves without turning deep; no bob above a floor 0.2-0.7 m under the rest height (`HandBackFloorMargin`) | next in-world `dive.dive` run (ride NOTE); T32 by hand |
+| Near-surface hand-back (D24): no bob above a floor 0.2-0.7 m under the rest height (`HandBackFloorMargin`) | next in-world `dive.dive` run (ride NOTE); T32 by hand |
+| Storm waves (D25, 0.1.1): Crouch and Jump held at the surface never turn deep, also with Crouch pressed a moment before Jump; the code is built but no self-test has run on it | next in-world `dive.waves` run (all three parts) and `dive.dive`; T32 and T34 by hand |
 | Serpent reach vs a deep diver | T31, M08 |
 | Tombstone floats up from depth; logout under water | T20, T22 |
 | Other ocean volumes (Ashlands, Deep North) have the same 50 m trigger | T19; the mod stops at the trigger bottom anyway (D12) |
@@ -584,3 +618,18 @@ on, Exponential; live dive: 1.6 m/s average descent, 6 stamina per second while 
   `DiveState.HandedBack`, the pure rule `DiveLogic.VanillaVertical` (checked by `dive.logic`) and the 0.5 m floor
   margin after a hand-back. `dive.dive` now also checks that every tick of the window is handed back and NOTEs the
   ride. T32 rewritten (waves, 2 m water).
+- Storm-wave fix (0.1.1, 2026-10-08; after the in-world runs of 2026-10-07 and 2026-10-08 on Valheim 1.0.17. First
+  `dive.waves` in a natural `ThunderStorm` at wind 0.595: a swimmer holding Crouch and Jump was deep on 366 of 500
+  ticks, up to 4.8 m under the rest height, stamina 45.9 -> 2.6. Then the bug test split from it,
+  `dive.bug.storm-waves`, with the wind pinned at 1: the first deep tick came after about 20 s, with the feet 0.46 m
+  under the rest height just after that physics step while the water rose at 2.3 m/s). Cause: `DiveController.Tick`
+  took "feet more than 0.5 m under the rest height" for "dived", also while the vertical was left to vanilla (D24);
+  vanilla buoyancy lets a
+  fast wave get that far over any swimmer (1.2), and once deep the mod held the height while the wave rose. Fix: the
+  new pure rule `DiveLogic.DivedUnder` (deep starts only with `Vy < 0`), one more condition in `Tick`; nothing else
+  changed (no setting, no network change, network version still 1). Tests: the bug test's checks are part 3 of
+  `dive.waves`, which also got the two "water over the swimmer" checks (part 2) and "rises and falls with the waves"
+  in the storm; `dive.logic` checks the rule; `dive.dive` no longer skips its no-drain check when a wave made the
+  diver deep (a deep tick there now fails). T32 reset, T34 new. Not run in game yet. Not changed and seen on the way:
+  a dive that starts with Crouch and Jump pays one physics tick of swim drain (about 0.12 stamina), because the own
+  speed starts from the body's speed and counts as moving for that one tick.

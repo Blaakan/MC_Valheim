@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Better fishing` |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` and `assembly_utils` in `.ref/` (FishingFloat, Fish, Utils, Player, Character, Humanoid, PlayerController, Hud, MonoUpdaters, ZDO, ZDOExtraData, Terminal); research briefs of 2026-10-01 (vanilla fishing, repo conventions, existing fishing mods, MC overlaps, plus a verifier pass); sources of GrindstoneSkills, FeastMaster, ComfyFishing, Angler's Eye, EpicLoot, Trolling Fishing and VHVR read on GitHub for GUIDs and patch shapes (2026-10-01); Stardew Valley 1.5 `BobberBar.update` (decompile mirror) for the catch bar maths |
-| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (`fishing.network`, `fishing.logic`, `fishing.pending`, `fishing.fight`: a live fight on a sea shore; an earlier run failed the struggle reel check, fixed by D13); multi-agent review (11 findings confirmed, all fixed: D11, D12, D14, E6 and test robustness); not yet tested by hand in game |
+| Status | Implemented (v0.1.1 code: 0.1.1 fixes the struggle reel, D15, and fights of a fish out of the water, D16; both builds compile, the self-tests have not been run on 0.1.1 yet). History of 0.1.0: smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (`fishing.network`, `fishing.logic`, `fishing.pending`, `fishing.fight`: a live fight on a sea shore; an earlier run failed the struggle reel check, fixed by D13); multi-agent review (11 findings confirmed, all fixed: D11, D12, D14, E6 and test robustness); not yet tested by hand in game |
 
 ## Goal
 
@@ -98,6 +98,10 @@ request), numbered. Each one is scope and has at least one test (section 8).
 - Every client plays a splash at 2.5 % per tick while `s_hooked == 1` and the ZDO **float** `s_escape > 0`. Vanilla
   ends an escape with the **int** overload (`Set(s_escape, 0)`), which leaves the float value positive: in vanilla the
   splashes go on after the first escape.
+- A fish out of the water never swims: `Fish.IsOutOfWater` is true when the water level under the fish
+  (`m_inWater`, written every frame by the water volume it is in, -10000 outside one) is more than `m_height` below
+  its body, and `Fish.CustomFixedUpdate` then returns (gravity on) before the waypoint and `SwimDirection` code. Its
+  escape timer still runs there (escape stamina cost, halved reel, wiggle), but the fish only hangs or lies.
 
 ### 1.4 Fish species
 
@@ -153,6 +157,9 @@ If another mod's prefix already skipped the tick (`__runOriginal` false), the pr
   the other way is deeper and never sooner than 1 s after the last turn (E5, D12).
 - Phase changes write the fish ZDO **float** `s_escape` (struggle length, then 0) so every game splashes during
   struggles only.
+- A fish out of the water does not fight (D16): while `Fish.IsOutOfWater` is true the calm time does not run, so no
+  struggle starts (the bar goes on), and a struggle in progress ends at once (calm again, a new calm time). The clock
+  goes on when the fish is back in the water.
 
 ### 2.3 Catch bar (G2, G3, G4)
 
@@ -183,7 +190,11 @@ Stardew Valley's `BobberBar` maths, turned from 60 ticks per second and pixels i
   at least `RodAngle` (30) degrees on the side opposite the run, wrong otherwise (G7: two sides).
 - Reeling (Block): cost = vanilla reel cost (with the escape cost) x `StruggleStamina`, x `WrongSideStamina` (4) when
   wrong. Good side: line in at half the reel speed (vanilla halves while escaping), while the float is dragged no more
-  than 1 m past the line (vanilla's calm rule is 0.2 m; a running fish holds the float about that far out, D13).
+  than 1 m past the line (vanilla's calm rule is 0.2 m, D13). In a struggle that distance is measured as if the rod
+  pointed straight at the float (`FightLogic.PointedDistance`: the float's distance from the fisher at rod-top height,
+  minus the rod top's own distance from there), not from the rod top where it is, because the good side is a rod
+  turned away from the fish (D15); and the line never comes in while it is already half the rod's break distance
+  (`m_breakDistance`) ahead of the float as measured from the real rod top, so this reel cannot break the line.
   Wrong side: the line holds.
 - Not reeling: no cost, the line grows at `LineRunSpeed x Lerp(0.6, 1.4, difficulty)` (1.5 m/s for a middle fish).
   Past `m_maxDistance` (30 m) the line breaks ("Line broke"), as does vanilla's break check.
@@ -230,6 +241,30 @@ way to turn the rod (fish runs right -> arrow left), green when the verdict is g
   the running fish keeps the float about 0.2-0.3 m past the line, and vanilla's 0.2 m rule stops the reel.
 - **D14 Leaving a fight hands the fish back cleanly.** `End` makes a still-hooked fish passive (no leftover long
   escape when the feature is turned off mid-fight); every exit where the fisher or float is gone lets the fish go.
+- **D15 The struggle drag is measured as if the rod pointed at the float (0.1.1).** D13 measured it from the rod top
+  where it is. But the good side is a rod turned away from the fish, and the rod top sits about 3.2 m in front of the
+  fisher and 1.45 m above the feet (worked out from the float positions of three in-world runs, section 9). With the
+  rod 30 degrees or more off the line, its top is at least 1.6 m (3.2 m x sin 30) from the float in the flat, wherever
+  the float is, about 2 m with the height; and every turn swings it metres away from a float farther out. The
+  self-tests on 0.1.0 showed both effects: a pause of about 1.3 s after each turn, and a reel that stood still for
+  good at 0.8 to 1.0 m of line with the stamina cost running. A catch on the good side was impossible: it needs the
+  line down to 0.5 m, but the line could not get shorter than the float's distance from the turned rod top (2 m or
+  more) minus the 1 m of drag. One run of `fishing.fight` failed its plain "right side reel: line comes in" check for
+  the same reason (float 0.99 m past the line after the turn). Measured from the fisher instead, the distance is the
+  same whichever way the rod is turned and never more than the real one; it is the real one when the rod points
+  straight at the float (under it for a float that lies lower than the rod top: by about 0.1 m for a float 10 m out
+  on the water, by most of the height difference for a float right below the rod top), and below 0 for a float
+  nearer than the rod is long (a fish at the feet holds no line out). The second condition (never more than half the break distance ahead of the float, but
+  never less than the 1 m of drag) keeps a rod turned far away from running the line into the game's own break rule
+  (the game's rod breaks at 10 m past the line, so this reel stops at 5 m).
+- **D16 A fish out of the water does not fight (0.1.1).** The game never lets a fish swim out of the water (1.3), so
+  the mod's steering never runs there either: a struggle of a fish hanging on a short line or lying on the shore took
+  line and judged the rod side although the fish could not run (self-test on 0.1.0: a fight 2 to 3 s after the hook
+  on dry land, 1.08 m of line a second, wrong side x4). Now the calm time waits and a struggle in progress ends. The
+  alternative (keep the struggle but without a side and without a line run) was not taken: the bar is the clearer
+  thing to show, and the last metres of every catch, where the line lifts the fish out, then end calm. A struggle
+  forced by a self-test (`Fight.TestPhase`) is not ended by this rule: the dry-land tests force one on a Perch that
+  lies on the ground.
 
 ## 4. Multiplayer
 
@@ -373,16 +408,20 @@ Patches come off with the feature; `OnDeactivated` ends the fight and destroys t
 
 ### 7.5 Debug self-tests
 
-`fishing.network`, `fishing.logic`, `fishing.pending`, `fishing.fight` (live on a shore found with `WorldGenerator`:
-rod, float and Fish1 spawned and hooked; calm in and out of the bar; struggle side, no reel, wrong and right side
-costs and line; side switch; calm again; catch; loss at 0 stamina). See `SelfTests.cs` header.
+`fishing.network`, `fishing.logic` (0.1.1: also the drag rule of a fight, D15), `fishing.pending`, `fishing.fight`
+(live on a shore found with `WorldGenerator`: rod, float and Fish1 spawned and hooked; calm in and out of the bar;
+struggle side, no reel, wrong and right side costs and line; side switch; calm again; catch; loss at 0 stamina;
+0.1.1: a third fish reeled on the right side in a fight all the way to the catch, D15). More live tests in
+`SelfTests.Live.cs` (cast, phases, exits, swim, toggle, input, dual, harpoon; 0.1.1: `fishing.input` ends with a Perch
+lying out of the water, D16) and multiplayer tests in `SelfTests.Mp.cs`. See the file headers.
 
 ## 8. Test plan
 
 `src/Farming/Fishing.Fight/TESTING.md`: T01 (G1), T02-T03 (G2), T04 (G3), T05 (G4), T06 (G5, G10), T07 (G6), T08
 (G7), T09 (G8), T10 (G9), T11 (E2), T12-T15 (catch, loss, difficulty E1, cancel E4), T16-T19 (input, menus, display
 E3), T20-T22 (live toggle, Enabled = false, clean log), T23-T25 (logout mid-fight D11, shallows D12, struggle reel
-D13); M01-M06 (rules, refusal, hand-offs, E6); X01-X05 (MC mods).
+D13 and D15), T26 (fish out of the water D16), T27 (hooked fish picked up), T28 (fish pulled out of the water during a
+fight D16); M01-M06 (rules, refusal, hand-offs, E6); X01-X05 (MC mods).
 
 ## 9. Open questions and unverified
 
@@ -394,6 +433,17 @@ D13); M01-M06 (rules, refusal, hand-offs, E6); X01-X05 (MC mods).
 - The struggle swim speed (2.5-4.5 m/s) and turn rate are first guesses: check in game that the run reads clearly and
   the line does not break from the physics alone.
 - Whether 30-45 degrees keeps the float on screen at every FOV and camera distance (D4).
+- Where the rod top is (D15): about 3.2 m in front of the fisher and 1.45 m above the feet while reeling. Not measured:
+  worked out from three end states of the 0.1.0 self-test (float distance from the fisher, its height and its distance
+  from the rod top, with the rod 35 to 45 degrees off the line). `fishing.fight` now notes the two numbers on every
+  run.
+- The rod side at a very short line: the verdict compares the fisher-to-float line with the way the body faces, but a
+  float on a short line hangs from the rod top itself, which is in front of the fisher. With the float nearer than
+  about 1.6 m (flat) to the rod top no facing is 30 degrees off the line for long: the player has to keep turning, or
+  the reel is judged on the wrong side (in the 0.1.0 self-test the rod held still was "wrong" on 9 ticks of 10 there).
+  Since 0.1.1 this mostly ends by itself, because the short line lifts the fish out of the water and the fight ends
+  (D16), but a fish that stays in the water close under the rod can still show it. Left as it is; to check by hand
+  (T25).
 - Which bait each fish takes (game data).
 - ValheimPlus fishing stamina option and VHVR: untested.
 

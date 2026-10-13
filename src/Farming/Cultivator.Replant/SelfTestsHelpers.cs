@@ -116,7 +116,7 @@ internal static partial class SelfTests
 
     // ---------- PlantEasily ----------
 
-    private const string PlantEasilyId = "advize.PlantEasily";
+    private const string PlantEasilyId = GhostVerdict.PlantEasilyId;
 
     private static readonly string[] PlantEasilyTargets =
     {
@@ -125,11 +125,15 @@ internal static partial class SelfTests
 
     private static bool PlantEasilyLoaded => BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey(PlantEasilyId);
 
+    // How to put each lifted patch of PlantEasily back, in the order they were lifted. PutPlantEasilyBack empties it.
+    private static readonly List<Action> PlantEasilyBack = new List<Action>();
+
     // PlantEasily (other mod, on the tester's PC) take over the placement ghost of every cultivator plant: its
     // UpdatePlacementGhost postfix move the ghost onto the terrain and set the status Valid when its own checks pass
     // (it know nothing of the Ancient Root rule, no-build zones or wards), its TryPlacePiece prefix refuse with its
     // own texts, its PlacePiece postfix plant a whole grid per press. Tests of this mod and the vanilla game: those
-    // four patches off for the test, back at the end (Rig undo). Its config never touched. Returns patches lifted.
+    // four patches off for the test, back at the end (Rig undo), or earlier when a test wants PlantEasily on for its
+    // last part (WithPlantEasily). Its config never touched. Returns patches lifted.
     private static int LiftPlantEasily(Rig rig)
     {
         if (!PlantEasilyLoaded)
@@ -137,6 +141,8 @@ internal static partial class SelfTests
             return 0;
         }
         var lifted = 0;
+        // First, so they come back whatever happens below (nothing left to put back = nothing done).
+        rig.Undo(() => PutPlantEasilyBack(rig.Name));
         // Own guard: other mod's patches. A problem = note, test goes on with PlantEasily as it is.
         try
         {
@@ -152,10 +158,10 @@ internal static partial class SelfTests
                 {
                     continue;
                 }
-                lifted += LiftPatches(rig, harmony, method, info.Prefixes, 0);
-                lifted += LiftPatches(rig, harmony, method, info.Postfixes, 1);
-                lifted += LiftPatches(rig, harmony, method, info.Transpilers, 2);
-                lifted += LiftPatches(rig, harmony, method, info.Finalizers, 3);
+                lifted += LiftPatches(harmony, method, info.Prefixes, 0);
+                lifted += LiftPatches(harmony, method, info.Postfixes, 1);
+                lifted += LiftPatches(harmony, method, info.Transpilers, 2);
+                lifted += LiftPatches(harmony, method, info.Finalizers, 3);
             }
         }
         catch (Exception e)
@@ -165,18 +171,96 @@ internal static partial class SelfTests
         return lifted;
     }
 
-    private static int LiftPatches(Rig rig, HarmonyLib.Harmony harmony, System.Reflection.MethodBase method, IEnumerable<HarmonyLib.Patch> patches, int kind)
+    private static int LiftPatches(HarmonyLib.Harmony harmony, System.Reflection.MethodBase method, IEnumerable<HarmonyLib.Patch> patches, int kind)
     {
         var count = 0;
         foreach (var patch in patches.Where(p => p.owner == PlantEasilyId && p.PatchMethod != null).ToArray())
         {
             var again = new HarmonyLib.HarmonyMethod(patch.PatchMethod) { priority = patch.priority, before = patch.before, after = patch.after };
             harmony.Unpatch(method, patch.PatchMethod);
-            rig.Undo(() => harmony.Patch(method, prefix: kind == 0 ? again : null, postfix: kind == 1 ? again : null, transpiler: kind == 2 ? again : null,
+            PlantEasilyBack.Add(() => harmony.Patch(method, prefix: kind == 0 ? again : null, postfix: kind == 1 ? again : null, transpiler: kind == 2 ? again : null,
                 finalizer: kind == 3 ? again : null, ilmanipulator: null));
             count++;
         }
         return count;
+    }
+
+    // Every lifted patch of PlantEasily on again, last lifted first (the order the Rig always undid them in). Each
+    // alone: one that fails never keep the others off. Returns patches put back (0 = none were lifted).
+    private static int PutPlantEasilyBack(string test)
+    {
+        var back = 0;
+        for (var i = PlantEasilyBack.Count - 1; i >= 0; i--)
+        {
+            try
+            {
+                PlantEasilyBack[i]();
+                back++;
+            }
+            catch (Exception e)
+            {
+                SelfTest.Note(test, $"one of PlantEasily's placement patches could not be put back: {e.GetType().Name}: {e.Message}");
+            }
+        }
+        PlantEasilyBack.Clear();
+        return back;
+    }
+
+    // E04, last part of a test that ran with PlantEasily's placement patches lifted: same transplant ghost on same
+    // spot must stay refused the same way with them on. PlantEasily stay on to the end of the test (Rig would put it
+    // back there anyway; lift it again = its grid ghosts stand there with nobody to clear them).
+    // Control first, this mod's second look off (GhostVerdict.TestOff): PlantEasily alone turn the ghost green there.
+    // If not, it is off in the tester's config or refuse the spot itself, and the check after would prove nothing:
+    // control fail, rest skipped.
+    // Place button pressed only on a refused ghost: a green one would plant PlantEasily's whole grid.
+    // PlantEasily not loaded = a note, nothing checked.
+    private static IEnumerator WithPlantEasily(Rig rig, Checks c, PlantKind kind, Vector3 spot, Player.PlacementStatus want, string where, string hint = null)
+    {
+        if (!PlantEasilyLoaded)
+        {
+            c.Note($"PlantEasily is not loaded: the {where} ghost with PlantEasily on (E04) was not checked");
+            yield break;
+        }
+        var p = rig.Player;
+        var inv = rig.Inv;
+        var name = kind.ItemDisplayName;
+        if (CountByName(inv, name) < 1)
+        {
+            rig.Give(kind.ItemName, 1);
+        }
+        var back = PutPlantEasilyBack(rig.Name);
+        rig.Undo(() => GhostVerdict.TestOff = false);
+        GhostVerdict.TestOff = true;
+        var look = new Placing();
+        yield return AimGhost(rig, SaplingPiece(kind), spot, look);
+        var alone = look.Status;
+        GhostVerdict.TestOff = false;
+        if (!c.Check(alone == Player.PlacementStatus.Valid,
+                $"PlantEasily on ({back} patches back), control without this mod's second look: PlantEasily alone turns the {name} ghost {where} green (status {alone}); "
+                + "if not, it is turned off or refuses the spot itself and nothing is proven here"))
+        {
+            yield break;
+        }
+        yield return Frames(3);
+        var status = p.m_placementStatus;
+        if (!c.Check(status == want, $"PlantEasily on: the {name} ghost {where} is still refused (status {status}, want {want})"))
+        {
+            yield break;
+        }
+        if (hint != null)
+        {
+            c.Check(HintText() == hint, $"PlantEasily on: hint '{OneLine(HintText())}'");
+        }
+        var count = CountByName(inv, name);
+        var hashes = new[] { kind.SaplingHash };
+        var standing = LoadedOf(hashes).Count;
+        ClearCenter();
+        yield return PressPlace(rig, kind.SaplingHash, look);
+        yield return Frames(3);
+        var now = LoadedOf(hashes).Count;
+        c.Check(!look.Placed && now == standing && CountByName(inv, name) == count && look.Status == want,
+            $"PlantEasily on: the place button plants nothing {where}, no grid copy either ({standing} -> {now} young plants loaded), no transplant used "
+            + $"({count} -> {CountByName(inv, name)}), ghost still refused (status {look.Status}); centre text '{CenterText()}'");
     }
 
     // ---------- world clock and the game's slow update loop ----------
@@ -281,17 +365,14 @@ internal static partial class SelfTests
     // Default rules, day, no auto pickup, player still (stray mouse or pad never move it), stamina use on (probe world
     // has StaminaRate 0), camera close behind the player (nothing between camera and plant), buttons let go at the end.
     // Also: world clock old enough (single player; a client asks its server in ServerDefaults), and PlantEasily's
-    // placement patches off for the test (plantEasilyOff false = left as the tester has it).
-    private static void PrepareInput(Rig rig, bool defaultRules = true, bool plantEasilyOff = true)
+    // placement patches off for the test (a test that wants them on for its last part: WithPlantEasily).
+    private static void PrepareInput(Rig rig, bool defaultRules = true)
     {
         // Own guard: a problem here must show as a note and failed checks later, never stop every test at its start.
         try
         {
             MakeClockOld();
-            if (plantEasilyOff)
-            {
-                LiftPlantEasily(rig);
-            }
+            LiftPlantEasily(rig);
         }
         catch (Exception e)
         {

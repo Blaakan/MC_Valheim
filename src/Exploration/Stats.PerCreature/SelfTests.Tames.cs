@@ -491,14 +491,42 @@ internal static partial class SelfTests
         c.Report();
     }
 
-    // ---------- percreature.bug.respawn-gap ----------
+    // ---------- percreature.respawn-gap ----------
 
-    // Real bug (in-world run: Boar tamed 0, game's own Creature Tamed total +1): between the removal of the dead
-    // character and the respawn (and while a world loads) there is no local player and no player in the game's player
-    // list (Player.OnDestroy clear both). A fed boar can finish taming then: the game tames it, this mod counts
-    // nothing, ever (Tame postfix leave when no local player, nothing remember the tame). README say "in single player
-    // you always get your own tames". Test ask for the right result, so it FAIL until the mod is fixed. Only this
-    // check live here: every other tame check stay in its own test.
+    // One block, no frame in between: the game has no local player while it tames this creature. listed false = no
+    // player at all (dead body removed = out of the player list too), like in the respawn wait or while a world load.
+    // listed true = the character stay in the list: for the mod that is another player loaded. Me put both back
+    // before me return. True = the game saw no player at all.
+    private static bool TameInGap(Player local, Tameable creature, bool listed)
+    {
+        var players = Player.s_players;
+        var index = listed ? -1 : players.IndexOf(local);
+        try
+        {
+            if (index >= 0)
+            {
+                players.RemoveAt(index);
+            }
+            Player.m_localPlayer = null;
+            var sawNobody = Player.GetClosestPlayer(creature.transform.position, float.MaxValue) == null;
+            creature.Tame();
+            return sawNobody;
+        }
+        finally
+        {
+            Player.m_localPlayer = local;
+            if (index >= 0 && !players.Contains(local))
+            {
+                players.Insert(Mathf.Min(index, players.Count), local);
+            }
+        }
+    }
+
+    // Between the removal of the dead character and the respawn (and while a world loads) there is no local player and
+    // no player in the game's player list (Player.OnDestroy clear both). A fed boar can finish taming then: the game
+    // tames it. Mod keep the name and count it when the character spawn (was a bug: counted nothing, ever; README say
+    // "in single player you always get your own tames"). No real death here: me make the gap with TameInGap and run
+    // what the mod do at every spawn. Real death and respawn = by-hand part of T21.
     private static IEnumerator RunRespawnGap()
     {
         var rig = Rig.Begin(GapName);
@@ -512,7 +540,9 @@ internal static partial class SelfTests
         {
             rig.SetTames(null);
             var boarName = CreatureName(Boar);
-            var far = Ground(local.transform.position + OpenDirection(rig, false, 40f) * 40f);
+            var dir = OpenDirection(rig, false, 40f);
+            var side = Vector3.Cross(Vector3.up, dir);
+            var far = Ground(local.transform.position + dir * 40f);
             var holder = new Tameable[1];
             yield return SpawnTameable(rig, Boar, far, holder);
             var boar = holder[0];
@@ -521,35 +551,19 @@ internal static partial class SelfTests
                 c.Report();
                 yield break;
             }
+
+            // ----- no character at all: the tame is kept, then counted at the spawn -----
             var statBefore = rig.Stat(PlayerStatType.CreatureTamed);
-            // One block, no frame in between: game see no local player and no player at all (dead body removed =
-            // out of the player list too), like in respawn wait. Me put both back in finally.
-            var players = Player.s_players;
-            var listed = players.IndexOf(local);
-            var sawNobody = false;
-            try
-            {
-                if (listed >= 0)
-                {
-                    players.RemoveAt(listed);
-                }
-                Player.m_localPlayer = null;
-                sawNobody = Player.GetClosestPlayer(boar.transform.position, float.MaxValue) == null;
-                boar.Tame();
-            }
-            finally
-            {
-                Player.m_localPlayer = local;
-                if (listed >= 0 && !players.Contains(local))
-                {
-                    players.Insert(Mathf.Min(listed, players.Count), local);
-                }
-            }
+            var mark = _watch.Mark();
+            var sawNobody = TameInGap(local, boar, false);
             c.Check(Player.m_localPlayer == local && Player.GetClosestPlayer(local.transform.position, 1f) == local,
                 "clean-up: the character is the local character again and back in the game's player list");
             c.Check(sawNobody && boar.IsTamed() && rig.Stat(PlayerStatType.CreatureTamed) == statBefore + 1f,
                 $"setup: the game tamed the boar while it had no local character and no character at all, as in the respawn wait "
                 + $"(saw nobody {sawNobody}, tame {boar.IsTamed()}, its own Creature Tamed total +{F(rig.Stat(PlayerStatType.CreatureTamed) - statBefore)})");
+            c.Check(rig.RawTames == null && TameLines(mark).Count == 0 && SameLines(KeptLines(mark), KeptLine(boarName)),
+                $"while there is no character nothing is counted or stored, and the tame is kept: one log line '{KeptLine(boarName)}' "
+                + $"(stored '{Esc(rig.RawTames)}', log {Lines(TameLines(mark))} and {Lines(KeptLines(mark))})");
             // Character back: me run what mod do at every spawn.
             Patches.PlayerPatches.TestSpawned(local);
             yield return null;
@@ -557,6 +571,117 @@ internal static partial class SelfTests
             c.Check(CreatureCounts.GetTames(boarName) == 1,
                 $"a tame that finishes while the character is waiting to respawn must be counted once the character is back: Boar +1 tamed "
                 + $"(found {CreatureCounts.GetTames(boarName)}; the game's own total did go up)");
+            c.Check(rig.RawTames == Stored("1\t" + boarName)
+                    && SameLines(TameLines(mark), TameLine(boarName, "owner", Stored("1\t" + boarName))),
+                $"at the spawn the kept tame is stored like any other: '1\\n1\\t{boarName}' and one log line 'Tame counted: {boarName} (owner). Stored ...' "
+                + $"(stored '{Esc(rig.RawTames)}', log {Lines(TameLines(mark))})");
+            // Later spawn (next death): same tame never counted twice.
+            var rawBefore = rig.RawTames;
+            Patches.PlayerPatches.TestSpawned(local);
+            yield return null;
+            c.Check(CreatureCounts.GetTames(boarName) == 1 && ReferenceEquals(rig.RawTames, rawBefore) && TameLines(mark).Count == 1,
+                $"a later spawn does not count the kept tame again (count {CreatureCounts.GetTames(boarName)}, log {Lines(TameLines(mark))})");
+
+            // ----- two boars finish in the same wait: both counted -----
+            yield return SpawnTameable(rig, Boar, Ground(far + side * 2f), holder);
+            var second = holder[0];
+            yield return SpawnTameable(rig, Boar, Ground(far - side * 2f), holder);
+            var third = holder[0];
+            if (c.Check(second != null && third != null, "could not spawn two more boars"))
+            {
+                var before = CreatureCounts.GetTames(boarName);
+                mark = _watch.Mark();
+                var nobodyForSecond = TameInGap(local, second, false);
+                var nobodyForThird = TameInGap(local, third, false);
+                var kept = KeptLines(mark).Count;
+                Patches.PlayerPatches.TestSpawned(local);
+                yield return null;
+                c.Check(nobodyForSecond && nobodyForThird && second.IsTamed() && third.IsTamed() && kept == 2
+                        && CreatureCounts.GetTames(boarName) == before + 2 && TameLines(mark).Count == 2,
+                    $"two boars that finish taming in the same wait are both counted once the character is back (kept {kept}, count "
+                    + $"{CreatureCounts.GetTames(boarName)}, expected {before + 2}; log {Lines(TameLines(mark))})");
+            }
+
+            // ----- no character of its own, but the game sees another player (further than 30 m): nobody gets it -----
+            yield return SpawnTameable(rig, Boar, Ground(far + side * 4f), holder);
+            var watched = holder[0];
+            if (c.Check(watched != null && Vector3.Distance(watched.transform.position, local.transform.position) > MessageRange,
+                    "could not spawn a boar more than 30 m away for the other-player case"))
+            {
+                var before = CreatureCounts.GetTames(boarName);
+                mark = _watch.Mark();
+                // Character stay in the player list while it is not the local one = a loaded player that is not me.
+                var nobody = TameInGap(local, watched, true);
+                var kept = KeptLines(mark).Count;
+                Patches.PlayerPatches.TestSpawned(local);
+                yield return null;
+                c.Check(!nobody && watched.IsTamed(),
+                    $"setup: the game tamed the boar while it had no local character but saw a player further than 30 m away (saw nobody {nobody}, tame {watched.IsTamed()})");
+                c.Check(kept == 0 && TameLines(mark).Count == 0 && CreatureCounts.GetTames(boarName) == before,
+                    $"a tame that finishes while this game has no character of its own but sees another player is given to nobody, also after the spawn "
+                    + $"(kept {kept}, count {CreatureCounts.GetTames(boarName)}, expected {before}; log {Lines(TameLines(mark))})");
+            }
+
+            // ----- kept in a play session that is over (logout during the wait): not for the next character -----
+            yield return SpawnTameable(rig, Boar, Ground(far - side * 4f), holder);
+            var loggedOut = holder[0];
+            if (c.Check(loggedOut != null, "could not spawn a boar for the ended-session case"))
+            {
+                var before = CreatureCounts.GetTames(boarName);
+                mark = _watch.Mark();
+                var nobody = TameInGap(local, loggedOut, false);
+                var kept = KeptLines(mark).Count;
+                // As after a logout: the Game object that kept the tame is gone.
+                CounterStore.TestEndHeldSession();
+                Patches.PlayerPatches.TestSpawned(local);
+                yield return null;
+                c.Check(nobody && loggedOut.IsTamed() && kept == 1,
+                    $"setup: a tame was kept while there was no character (saw nobody {nobody}, tame {loggedOut.IsTamed()}, kept {kept})");
+                c.Check(TameLines(mark).Count == 0 && CreatureCounts.GetTames(boarName) == before,
+                    $"a tame kept in a play session that is over (logout during the wait) is not given to the character that spawns next "
+                    + $"(count {CreatureCounts.GetTames(boarName)}, expected {before}; log {Lines(TameLines(mark))})");
+            }
+
+            // ----- feature turned off during the wait (Debug block hook, Enabled untouched): the kept tame is dropped -----
+            yield return SpawnTameable(rig, Boar, Ground(far + side * 6f), holder);
+            var switchedOff = holder[0];
+            var plugin = FindPlugin();
+            if (c.Check(switchedOff != null && plugin != null && plugin.IsActive, "could not spawn a boar for the feature-off case, or the feature is not active"))
+            {
+                var before = CreatureCounts.GetTames(boarName);
+                mark = _watch.Mark();
+                var nobody = TameInGap(local, switchedOff, false);
+                var kept = KeptLines(mark).Count;
+                var wentOff = false;
+                // Status line change while off: memory only, this test never write the config file.
+                var saveOnSet = plugin.Config.SaveOnConfigSet;
+                try
+                {
+                    plugin.Config.SaveOnConfigSet = false;
+                    Plugin.TestForceOff = true;
+                    FeatureRegistry.RefreshAll();
+                    wentOff = !plugin.IsActive;
+                    Plugin.TestForceOff = false;
+                    FeatureRegistry.RefreshAll();
+                }
+                finally
+                {
+                    if (Plugin.TestForceOff)
+                    {
+                        Plugin.TestForceOff = false;
+                        FeatureRegistry.RefreshAll();
+                    }
+                    plugin.Config.SaveOnConfigSet = saveOnSet;
+                }
+                Patches.PlayerPatches.TestSpawned(local);
+                yield return null;
+                c.Check(nobody && switchedOff.IsTamed() && kept == 1 && wentOff && plugin.IsActive,
+                    $"setup: a tame was kept while there was no character, then the feature was turned off and on again (saw nobody {nobody}, "
+                    + $"kept {kept}, went off {wentOff}, now {plugin.State}: {plugin.StatusText})");
+                c.Check(TameLines(mark).Count == 0 && CreatureCounts.GetTames(boarName) == before,
+                    $"a kept tame is dropped when the mod is turned off before the character is back, like a tame made while it is off "
+                    + $"(count {CreatureCounts.GetTames(boarName)}, expected {before}; log {Lines(TameLines(mark))})");
+            }
         }
         finally
         {
@@ -564,6 +689,8 @@ internal static partial class SelfTests
             {
                 Player.m_localPlayer = local;
             }
+            // Nothing kept may reach a later test's spawn step.
+            CounterStore.ClearHeld();
             rig.End();
         }
         c.Report();

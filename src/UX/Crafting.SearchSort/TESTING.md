@@ -4,12 +4,17 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+**Build under test:** 0.1.1, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
 MC Mods panel. Smoke test passed 2026-09-29 (loads, patches cleanly, JitCheck clean: 269 methods, 0 failures). No
 in-game test yet.
 
-**Automated checks (2026-10-08):** 34 of 35 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**0.1.1 (2026-10-08):** tankards are listed under Other again (T22, reset): the shared item classifier
+(`src/Shared/ItemKinds.cs`) took the torch pose of the 1.0.17 tankards for a torch. The check of the removed self-test
+`csearch.bug.tankard` is back in `csearch.tools`. The smoke test and the self-tests ran on 0.1.1 on 2026-10-13 (game
+1.0.17, every MC mod loaded): all of this mod's tests passed.
+
+**Automated checks (2026-10-13):** 34 of 34 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -164,9 +169,9 @@ The vanilla log line `Setting selected recipe <n>` appears on every list update:
   (the Hammer and the Torch should be crafted by hand; unverified). Expected: the tools (Hammer, Antler Pickaxe,
   Hoe...) and the Torch come first wherever they are listed; they are not listed under a weapon type. With Debug
   logging, the row lines show `PickaxeAntler ... -> SkillTool -> tools` and `Torch ... -> Torch -> tools`. If the
-  Tankard is listed at the workbench (unverified), it is under Other, not under Weapons or a weapon type.
-  *Automated test failing: Tankards are listed under Tools and light, not under Other (self-test
-  `csearch.bug.tankard`) (the box was ticked by hand).*
+  Tankard is listed at the workbench (it is, in 1.0.17), it is under Other, not under Tools and light, Weapons or a
+  weapon type: with the sort Other it is among the first rows.
+  *Automated: `csearch.tools`.*
 - [x] **T23 Crafting with a filter:** search `arrow` at the workbench, craft Wood Arrows (and x5 with Shift+click).
   Expected: crafting works; after it the list is still filtered and sorted. Type during a craft: the craft finishes
   with the item you started, then the list updates.
