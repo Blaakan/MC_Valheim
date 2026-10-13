@@ -22,17 +22,20 @@ internal sealed class ProbeTimings
 
 // Me run whole probe session as one coroutine on plugin object (BepInEx manager, survive scene change):
 //   menu (MenuDriver) -> wait spawn -> settle -> god mode + no stamina drain -> probe tests -> every SelfTest
-//   (registration order, filter, timeout) -> "[selftest] DONE pass=<tests passed> fail=<tests failed> tests=<run>"
-//   -> quit. Every phase go through SafeRunner: a throw or a hang end as FAIL, never as a silent stuck game.
+//   (registration order, filter, timeout) -> staged tests (StageTests: relog tests with a real log out and world
+//   load each, then the "leave" parts of disabled-start tests) -> "[selftest] DONE pass=<tests passed>
+//   fail=<tests failed> tests=<run>" -> quit. Every phase go through SafeRunner: a throw or a hang end as FAIL,
+//   never as a silent stuck game. Second game of a run (MC_INWORLD_STAGE=disabled, every MC mod off): same start,
+//   then only probe.baseline and the disabled-start checks.
 internal static class ProbeDriver
 {
     internal const string SetupTest = "probe.setup";
 
 #if DEBUG
-    private const float MenuTimeout = 300f;
-    private const float SpawnTimeout = 900f;
+    internal const float MenuTimeout = 300f;
+    internal const float SpawnTimeout = 900f;
     private const float SettleSeconds = 8f;
-    private const float SettleTimeout = 120f;
+    internal const float SettleTimeout = 120f;
 
     private static Coroutine _run;
     private static ResultListener _listener;
@@ -59,6 +62,10 @@ internal static class ProbeDriver
                  + (ProbeSettings.IsMultiplayer ? $", multiplayer: join {ProbeSettings.Join}, scenario '{ProbeSettings.Scenario}'." : "."));
         // Mods read scenario through SelfTest.Scenario ("" = single player).
         AppDomain.CurrentDomain.SetData(SelfTest.ScenarioSlot, ProbeSettings.Scenario);
+        AppDomain.CurrentDomain.SetData(SelfTest.StageSlot, ProbeSettings.Stage);
+        AppDomain.CurrentDomain.SetData(SelfTest.RunDirSlot, ProbeSettings.RunDir);
+        InputDriver.Install();
+        StageTests.RegisterOwn();
         if (_listener == null)
         {
             _listener = new ResultListener();
@@ -103,7 +110,9 @@ internal static class ProbeDriver
                                    + $"{timings.Spawned - timings.WorldRequested:F1} s, settled {timings.Settled - timings.Spawned:F1} s after spawn");
 
             var skipped = new List<string>();
-            var tests = ProbeSettings.IsMultiplayer ? MultiplayerTestList(skipped, out var registeredCount) : SinglePlayerTestList(skipped, out registeredCount);
+            var tests = ProbeSettings.IsMultiplayer ? MultiplayerTestList(skipped, out var registeredCount)
+                : ProbeSettings.DisabledStage ? StageTests.DisabledStageList(skipped, out registeredCount)
+                : SinglePlayerTestList(skipped, out registeredCount);
             SelfTest.Note("probe", $"{tests.Count} test(s) to run ({registeredCount} registered by mods, {skipped.Count} filtered out)");
             if (skipped.Count > 0)
             {
@@ -136,6 +145,16 @@ internal static class ProbeDriver
                     failed++;
                 }
                 yield return BetweenTests(t.Key);
+            }
+
+            if (!ProbeSettings.IsMultiplayer && !ProbeSettings.DisabledStage)
+            {
+                // Staged tests last: each relog test leave and load the world, leave parts put things in the save.
+                var counts = new int[3];
+                yield return StageTests.RunFirstGameStages(timings, counts);
+                run += counts[0];
+                passed += counts[1];
+                failed += counts[2];
             }
         }
         else
@@ -173,7 +192,7 @@ internal static class ProbeDriver
     // BepInEx write its log file every 2 s. Quit from main menu (refused player) is instant: last lines never
     // reached the file and script said "client never logged DONE" (seen 2026-10-08, vanilla-client scenario, about
     // one run in two). In a world the slow shutdown hid it. Me write them out before the quit.
-    private static void FlushLog()
+    internal static void FlushLog()
     {
         try
         {
@@ -345,7 +364,7 @@ internal static class ProbeDriver
     }
 
     // Mod GUID = assembly name. Test method or lambda live in mod dll, so delegate tell who own the test.
-    private static string OwnerOf(Delegate test)
+    internal static string OwnerOf(Delegate test)
     {
         try
         {
@@ -358,31 +377,50 @@ internal static class ProbeDriver
         }
     }
 
-    private static IEnumerator RunTest(string name, Func<IEnumerator> factory, bool[] outcome)
+    internal static ResultListener Listener => _listener;
+
+    // One test = one or more parts (staged tests: before / relog / after), one BEGIN and one END line. A part that
+    // throw or time out end the test: later parts skipped. timeouts: seconds per part (0 = the test timeout).
+    internal static IEnumerator RunTest(string name, Func<IEnumerator> factory, bool[] outcome) =>
+        RunParts(name, OwnerOf(factory), new[] { factory }, new[] { 0f }, outcome);
+
+    internal static IEnumerator RunParts(string name, string owner, Func<IEnumerator>[] parts, float[] timeouts, bool[] outcome)
     {
         // "(<mod GUID>)" let script check -Mod pick really ran.
-        Log.Info($"{SelfTest.Prefix} BEGIN {name} ({OwnerOf(factory)})");
+        Log.Info($"{SelfTest.Prefix} BEGIN {name} ({owner})");
         _listener.Begin();
         var result = new RunResult();
-        IEnumerator root = null;
-        try
+        var seconds = 0f;
+        outcome[0] = true;
+        for (var i = 0; i < parts.Length && outcome[0]; i++)
         {
-            root = factory();
-            if (root == null)
+            if (parts[i] == null)
             {
-                result.Error = new InvalidOperationException("the test returned no coroutine");
+                continue;
             }
+            result = new RunResult();
+            IEnumerator root = null;
+            try
+            {
+                root = parts[i]();
+                if (root == null)
+                {
+                    result.Error = new InvalidOperationException("the test returned no coroutine");
+                }
+            }
+            catch (Exception e)
+            {
+                result.Error = e;
+            }
+            if (root != null)
+            {
+                yield return SafeRunner.Run(root, timeouts[i] > 0f ? timeouts[i] : ProbeSettings.TestTimeout, result);
+            }
+            seconds += result.Seconds;
+            outcome[0] = ReportPhase(name, result);
         }
-        catch (Exception e)
-        {
-            result.Error = e;
-        }
-        if (root != null)
-        {
-            yield return SafeRunner.Run(root, ProbeSettings.TestTimeout, result);
-        }
+        result.Seconds = seconds;
 
-        outcome[0] = ReportPhase(name, result);
         _listener.Snapshot(out var pass, out var fail, out var errors, out var firstError);
         if (pass == 0 && fail == 0)
         {
@@ -402,7 +440,7 @@ internal static class ProbeDriver
     }
 
     // FAIL line for a throw or timeout. True = phase ran to its end.
-    private static bool ReportPhase(string name, RunResult result)
+    internal static bool ReportPhase(string name, RunResult result)
     {
         if (result.Warning != null)
         {
@@ -423,7 +461,7 @@ internal static class ProbeDriver
 
     // Test should clean up; me catch the usual leftovers so next test start from same state, and say so.
     // Wait first: InventoryGui.IsVisible stay true a few frames after Hide (hidden-frame counter).
-    private static IEnumerator BetweenTests(string name)
+    internal static IEnumerator BetweenTests(string name)
     {
         yield return new WaitForSecondsRealtime(0.5f);
         var p = Player.m_localPlayer;

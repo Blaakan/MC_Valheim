@@ -207,6 +207,17 @@ function Enable-ModConfigText([string]$Text) {
     $Text.Substring(0, $at) + $line.Groups['pre'].Value + 'true' + $line.Groups['post'].Value + $Text.Substring($at + $line.Length)
 }
 
+# Other way round: Enabled = true (or no value yet) in [General] become false. $null = already off or no such line.
+function Disable-ModConfigText([string]$Text) {
+    $general = [regex]::Match("$Text", '(?ms)^\[General\][ \t]*\r?$(?<body>.*?)(?=^\[|\z)')
+    if (-not $general.Success) { return $null }
+    $body = $general.Groups['body']
+    $line = [regex]::Match($body.Value, '(?m)^(?<pre>\s*Enabled\s*=\s*)true(?<post>[ \t]*\r?)$')
+    if (-not $line.Success) { return $null }
+    $at = $body.Index + $line.Index
+    $Text.Substring(0, $at) + $line.Groups['pre'].Value + 'false' + $line.Groups['post'].Value + $Text.Substring($at + $line.Length)
+}
+
 # Me check ModRequires graph over ALL mods. Cycle = BepInEx load NO plugin at all (topological sort throw).
 function Assert-ModRequiresAcyclic {
     $graph = @{}

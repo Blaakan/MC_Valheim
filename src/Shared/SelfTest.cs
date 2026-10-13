@@ -19,6 +19,11 @@ namespace MC.Shared;
 // Multiplayer (tools/Test-Multiplayer.ps1): client joined to dedicated server, both with probe. Mod register client
 // test with RegisterMultiplayer (run only in its scenario) and server half with RegisterServerStep; client test call
 // server half with CallServer. Same docs, section "Multiplayer self-tests".
+// Staged tests (single-player run only, after the normal tests): RegisterRelog = test go through a real log out to
+// main menu and load of same world; RegisterDisabledStart = test go through a real game restart with every MC mod
+// Enabled = false. Carry / Carried keep a value over that restart. Same docs, section "Staged tests".
+// Real input: Key, KeyTap, MouseWheel, MouseMove, Pad, PadStick, PadTap, ReleaseInput change device state of
+// keyboard, mouse and a test gamepad (probe do it), so game and mod read a press like from a person.
 internal static class SelfTest
 {
     // Slot names never change: probe and every mod read same slot.
@@ -34,6 +39,17 @@ internal static class SelfTest
     internal const string ServerCallSlot = "MC.SelfTest.ServerCall.v1";
     // string: scenario of this run, set by probe. Missing/empty = single-player run (Test-InWorld).
     internal const string ScenarioSlot = "MC.SelfTest.Scenario.v1";
+    // List<Dictionary<string, object>>: "name" string, "before" / "menu" / "after" Func<IEnumerator> (each may be null).
+    internal const string RelogTestsSlot = "MC.SelfTest.RelogTests.v1";
+    // List<Dictionary<string, object>>: "name" string, "leave" / "check" Func<IEnumerator> (leave may be null).
+    internal const string DisabledTestsSlot = "MC.SelfTest.DisabledTests.v1";
+    // string: stage of this game process, set by probe. "" = first game of a run, DisabledStage = second game.
+    internal const string StageSlot = "MC.SelfTest.Stage.v1";
+    // string: run folder, set by probe (Carry files live there, same folder for both games of a run).
+    internal const string RunDirSlot = "MC.SelfTest.RunDir.v1";
+    // Func<string, object[], bool>: probe's input driver (op, args). Missing = no probe run: input calls say false.
+    internal const string InputSlot = "MC.SelfTest.Input.v1";
+    internal const string DisabledStage = "disabled";
     internal const string Prefix = "[selftest]";
 
     // Multiplayer scenarios (tools/Test-Multiplayer.ps1 -Scenario). Modded = server and client run every MC mod.
@@ -94,6 +110,60 @@ internal static class SelfTest
         lock (list)
         {
             list.RemoveAll(t => t.TryGetValue("name", out var n) && (string)n == name);
+        }
+#endif
+    }
+
+    // Relog test (single-player run, after the normal tests, one real relog per test): before run in the world, then
+    // probe log out to main menu like Esc > Log out (world and character saved), run atMenu there, start same world
+    // with same character again, wait spawn, run after. Each part may be null. Statics of the mod live on (same game
+    // process); objects of the world are gone. after must clean up what before left.
+    [Conditional("DEBUG")]
+    internal static void RegisterRelog(string name, Func<IEnumerator> before, Func<IEnumerator> atMenu, Func<IEnumerator> after)
+    {
+#if DEBUG
+        if (string.IsNullOrEmpty(name) || (before == null && atMenu == null && after == null))
+        {
+            return;
+        }
+        var list = GetRelogTests();
+        lock (list)
+        {
+            list.RemoveAll(t => t.TryGetValue("name", out var n) && (string)n == name);
+            list.Add(new Dictionary<string, object> { ["name"] = name, ["before"] = before, ["menu"] = atMenu, ["after"] = after });
+        }
+#endif
+    }
+
+    [Conditional("DEBUG")]
+    internal static void UnregisterRelog(string name)
+    {
+#if DEBUG
+        var list = GetRelogTests();
+        lock (list)
+        {
+            list.RemoveAll(t => t.TryGetValue("name", out var n) && (string)n == name);
+        }
+#endif
+    }
+
+    // Disabled-start test: leave run at end of first game (mod on: put things in world or inventory, null = nothing),
+    // world and character saved, game closed, every MC mod set Enabled = false, game started again, same world loaded,
+    // check run there (mod off from the start). Register from BindConfig: OnActivated never run in the second game.
+    // Never unregistered. Values for check that are not in the save: Carry in leave, Carried in check.
+    [Conditional("DEBUG")]
+    internal static void RegisterDisabledStart(string name, Func<IEnumerator> leave, Func<IEnumerator> check)
+    {
+#if DEBUG
+        if (string.IsNullOrEmpty(name) || check == null)
+        {
+            return;
+        }
+        var list = GetDisabledTests();
+        lock (list)
+        {
+            list.RemoveAll(t => t.TryGetValue("name", out var n) && (string)n == name);
+            list.Add(new Dictionary<string, object> { ["name"] = name, ["leave"] = leave, ["check"] = check });
         }
 #endif
     }
@@ -166,6 +236,83 @@ internal static class SelfTest
 #if DEBUG
     // Probe read list with this too (same slot).
     internal static List<KeyValuePair<string, Func<IEnumerator>>> GetTests() => Slot(TestsSlot, () => new List<KeyValuePair<string, Func<IEnumerator>>>());
+
+    internal static List<Dictionary<string, object>> GetRelogTests() => Slot(RelogTestsSlot, () => new List<Dictionary<string, object>>());
+
+    internal static List<Dictionary<string, object>> GetDisabledTests() => Slot(DisabledTestsSlot, () => new List<Dictionary<string, object>>());
+
+    // Stage of this game process: "" = first game of the run (mods as configured), DisabledStage = second game
+    // (every MC mod Enabled = false, only disabled-start checks run).
+    internal static string Stage => AppDomain.CurrentDomain.GetData(StageSlot) as string ?? "";
+
+    // Value kept from first game to second game of one run (file in run folder). False / null = no probe run.
+    internal static bool Carry(string key, string value)
+    {
+        var path = CarryPath(key);
+        if (path == null)
+        {
+            return false;
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        File.WriteAllText(path, value ?? "");
+        return true;
+    }
+
+    internal static string Carried(string key)
+    {
+        var path = CarryPath(key);
+        return path != null && File.Exists(path) ? File.ReadAllText(path) : null;
+    }
+
+    private static string CarryPath(string key)
+    {
+        var dir = AppDomain.CurrentDomain.GetData(RunDirSlot) as string;
+        return string.IsNullOrEmpty(dir) || string.IsNullOrEmpty(key) ? null : Path.Combine(dir, "carry", Safe(key, "key") + ".txt");
+    }
+
+    // ---- Real input (probe run only; every call say false when no probe drive the game) ----
+    // Device state change like a person's press: ZInput (keys, buttons, sticks), Unity InputSystem actions and every
+    // other reader of the device see it from the next frame. Game window need no focus. Always ReleaseInput in finally.
+
+    // Keyboard key or mouse button (KeyCode.Mouse0 .. Mouse4) down / up. Stay so until changed.
+    internal static bool Key(KeyCode key, bool down) => SendInput("key", key, down);
+
+    // Down, hold (real time), up, one more frame.
+    internal static IEnumerator KeyTap(KeyCode key, float holdSeconds = 0.15f)
+    {
+        Key(key, true);
+        yield return new WaitForSecondsRealtime(holdSeconds);
+        Key(key, false);
+        yield return null;
+    }
+
+    // Mouse wheel for one frame: +1 = one notch up.
+    internal static bool MouseWheel(float notches) => SendInput("wheel", notches);
+
+    // Mouse movement for one frame (pixels).
+    internal static bool MouseMove(Vector2 delta) => SendInput("move", delta);
+
+    // Test gamepad (made on first call; game switch to gamepad input like with a real one). control: South, East,
+    // West, North (A, B, X, Y of an Xbox pad), LeftShoulder, RightShoulder, LeftStick, RightStick (stick press),
+    // Start, Select, DpadUp, DpadDown, DpadLeft, DpadRight, LeftTrigger, RightTrigger (value 0..1). Buttons: > 0.5 = down.
+    internal static bool Pad(string control, float value) => SendInput("pad", control, value);
+
+    internal static bool PadStick(bool right, Vector2 value) => SendInput("stick", right, value);
+
+    internal static IEnumerator PadTap(string control, float holdSeconds = 0.15f)
+    {
+        Pad(control, 1f);
+        yield return new WaitForSecondsRealtime(holdSeconds);
+        Pad(control, 0f);
+        yield return null;
+    }
+
+    // Every key, button, trigger and stick this run pressed go up; test gamepad removed (game back on keyboard and
+    // mouse after the next keyboard or mouse input, which this call also gives).
+    internal static bool ReleaseInput() => SendInput("release");
+
+    private static bool SendInput(string op, params object[] args) =>
+        AppDomain.CurrentDomain.GetData(InputSlot) is Func<string, object[], bool> driver && driver(op, args);
 
     internal static List<Dictionary<string, object>> GetMultiplayerTests() => Slot(MpTestsSlot, () => new List<Dictionary<string, object>>());
 

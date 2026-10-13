@@ -200,8 +200,16 @@ tests run as well: every deployed mod's tests run unless `-Only` picks tests by 
 4. **Runs the tests.** `probe.baseline` (player exists, position, biome, time of day, screenshots of the world and of
    the inventory), `probe.runner` (checks the test runner itself), then every registered test in registration order,
    each with a timeout. It logs `[selftest] BEGIN <name> (<mod GUID>)` / `[selftest] END <name>: passed|FAILED`
-   (tests that `-Only` skips are listed in `NOTE probe: filtered out: ...`), then
-   `[selftest] DONE pass=<tests passed> fail=<tests failed> tests=<tests run>`, and quits the game.
+   (tests that `-Only` skips are listed in `NOTE probe: filtered out: ...`).
+5. **Runs the staged tests** (see "Staged tests" below): `probe.input`, one relog for the probe's own checks
+   (`probe.relog` and one `probe.relog.<GUID>` per mod), every relog test with its own relog, then the "leave" parts
+   of the disabled-start tests. Then `[selftest] DONE pass=<tests passed> fail=<tests failed> tests=<tests run>`, and
+   it quits the game from the world.
+
+When a disabled-start test is wanted, the script then sets `Enabled = false` for every MC mod, starts the game a
+second time on the same character and world, and the probe runs the checks of that stage. The two games are judged
+as one run (one result list, one `DONE` count); the log copies are `LogOutput.first.log`, `LogOutput.disabled.log`
+and both together in `LogOutput.log`.
 
 The script prints every test's `PASS` / `FAIL` / `NOTE` / `SHOT` lines grouped by test, how many tests each mod ran,
 plus the errors that come from our mods (like the smoke test). It passes only when `DONE` was logged with `fail=0`, no
@@ -289,9 +297,101 @@ internal static class CrossbowSelfTests
   at the spawn stones in the Meadows, shortly before dawn of day 1 (it is dark): a test that needs daylight or a
   given hour sets the time itself and puts it back.
 
+### Staged tests (relog, start with the mods off, quit)
+
+Some things only show after a real log out or a real restart. A single-player run does them after the normal tests,
+so what such a test leaves behind cannot disturb the others. `-Only` picks them by name like any test; with a
+filter, the generic `probe.*` checks below run only when a piece of the filter matches their name.
+
+**Relog test.** `SelfTest.RegisterRelog(name, before, atMenu, after)` (in `OnActivated`; `UnregisterRelog` in
+`OnDeactivated`). The probe runs `before` in the world, logs out like Esc > Log out (character and world are saved),
+runs `atMenu` at the main menu, starts the same world with the same character again, waits for the spawn (god mode
+and stamina rate as before) and runs `after`. Each part may be `null`. It is one test: one `BEGIN`/`END`, at least
+one `Pass` or `Fail` over all parts, each part with the normal timeout; a part that throws or times out ends the
+test (the probe then loads the world again by itself). The game process stays the same, so the mod's statics are
+still there in `atMenu` and `after`: keep what you need in a static field. Objects of the world are gone and
+loaded again from the save. `after` must clean up what `before` left (items, pieces, creatures). Each relog test
+costs about 45 s. Name it `<modshortname>.relog.<what>`.
+
+```csharp
+SelfTest.RegisterRelog("sailing.relog.level", Before, null, After);
+
+private static float _level;
+private static IEnumerator Before() { _level = ...; SelfTest.Pass(Name, $"level {_level} before the log out"); yield break; }
+private static IEnumerator After()
+{
+    if (Mathf.Approximately(ReadLevel(), _level)) SelfTest.Pass(Name, "same level after logging back in");
+    else SelfTest.Fail(Name, $"level {ReadLevel()} after logging back in, {_level} before");
+    yield break;
+}
+```
+
+**Disabled-start test.** `SelfTest.RegisterDisabledStart(name, leave, check)`, called from `BindConfig` through a
+`[Conditional("DEBUG")]` method (in the second game the mod is off, so `OnActivated` never runs; it is never
+unregistered). `leave` (may be `null`) runs at the end of the first game, with the mod on: it puts things into the
+world or the inventory and must report a `Pass`. The game then quits from the world (which saves), the script
+writes `Enabled = false` into every `BepInEx/config/MC.*.cfg` and starts the game again; the probe loads the same
+character and world and runs `check`, with every MC mod off from the start. The mod's code may be called in
+`check`, but its patches are not applied and `OnActivated` has not run. A value that is not in the save goes
+through `SelfTest.Carry(key, text)` in `leave` and `SelfTest.Carried(key)` in `check` (a file in the run folder;
+use keys that start with the test name). `SelfTest.Stage` is `""` in the first game and `SelfTest.DisabledStage`
+in the second. The second game adds about 1.5 minutes to a run, once, however many tests use it. Name the test
+`<modshortname>.disabled.<what>`.
+
+**What the probe and the script check by themselves, for every MC mod** (no code in the mod):
+
+| Test | Passes when |
+|---|---|
+| `probe.relog.<GUID>` | during one log out to the main menu and load of the world, the mod's log source wrote no Warning or Error line and no Error of another source names the mod's code (its namespace or GUID, as in a stack trace) |
+| `probe.quit.<GUID>` | the same for the lines written while the first game quit from the world, with the mods on (judged by the script from the log, after the `DONE` line) |
+| `probe.disabled.<GUID>` | in the second game the mod's state is Disabled with the status "Off (disabled in settings).", and the same log rule holds since that game started |
+
+A `TESTING.md` item of the kind "set Enabled = false, restart, the Status says off and the log has no error" is
+therefore covered by `probe.disabled.<GUID>`; what the mod must add is a `check` for its own part ("the vanilla
+behaviour is back", "the saved items are still there").
+
+### Real input in tests
+
+A test that calls the mod's code right after the key read does not prove the key works. `SelfTest.Key`,
+`KeyTap`, `MouseWheel`, `MouseMove`, `Pad`, `PadStick`, `PadTap` and `ReleaseInput` change the state of the
+input devices themselves (Unity Input System state events on the real keyboard and mouse and on a test gamepad the
+probe adds), which is the road a real press takes: `ZInput` (keys, named buttons, sticks, triggers, the wheel),
+the game and every mod read it from the next frame. The game window needs no focus. `probe.input` checks the
+driver on every unfiltered run.
+
+```csharp
+try
+{
+    yield return SelfTest.KeyTap(KeyCode.Y);              // press, hold 0.15 s, release, one more frame
+    SelfTest.Pad("LeftTrigger", 1f);                      // hold the left trigger of the test gamepad
+    yield return SelfTest.PadTap("RightStick");           // press the right stick
+    SelfTest.PadStick(right: true, new Vector2(1f, 0f));  // push the right stick to the right
+    yield return new WaitForSeconds(0.5f);
+}
+finally
+{
+    SelfTest.ReleaseInput();                              // everything up, test gamepad removed
+}
+```
+
+- `Key(KeyCode, down)` takes keyboard keys and `KeyCode.Mouse0` to `Mouse4`. Gamepad controls are named like the
+  device, not like a layout: `South`, `East`, `West`, `North` (A, B, X, Y on an Xbox pad), `LeftShoulder`,
+  `RightShoulder`, `LeftStick`, `RightStick` (stick presses), `Start`, `Select`, `DpadUp`/`Down`/`Left`/`Right`,
+  `LeftTrigger`, `RightTrigger` (0 to 1). Which game action a control triggers depends on the player's controller
+  layout (`ZInput.InputLayout`): read the layout or the binding in the test instead of assuming the default.
+- A press reaches the whole game, not only the mod: the key does what it does for a player (opens the map, swings
+  the weapon). Pick the moment and clean up like a player would have to.
+- A press shows from the next frame (`yield return null` before reading its effect). The first input of the test
+  gamepad makes the game switch to gamepad input (`ZInput.IsGamepadActive()`), which changes hints and some
+  behaviour; `ReleaseInput` removes the gamepad and the game goes back to keyboard and mouse within a few frames.
+  Always call it in `finally`; the probe also calls it after every staged test.
+- Every call returns `false` when no probe drives the game. Mouse position and clicks on UI elements are not
+  driven: call the handler of the button, as before.
+- Still by hand: how a real controller feels, its rumble, and layouts other than the one the test read.
+
 ### Multiplayer self-tests
 
-`./tools/Test-Multiplayer.ps1 [-Scenario all|modded|vanilla-server|vanilla-client|open-server|each-off] [-Only <tests>] [-NoModBuild] [-KeepRunning] [-Port 2466] [-TimeoutSec 2400] [-TestTimeoutSec 120]`
+`./tools/Test-Multiplayer.ps1 [-Scenario all|modded|vanilla-server|vanilla-client|open-server|each-off|refuse-each] [-Only <tests>] [-NoModBuild] [-KeepRunning] [-Port 2466] [-TimeoutSec 2400] [-TestTimeoutSec 120]`
 runs a real dedicated server and a game client on this PC. Nothing of yours is changed: the server runs from a copy
 of the Steam dedicated server install (`%LOCALAPPDATA%\MC_Valheim\server`, refreshed every run, plus the Doorstop
 loader), and server and client each load BepInEx from their own folder in the run folder
@@ -312,7 +412,8 @@ the server runs the server probe (`tests/Probes/Core.Probe.Server`). Scenarios:
 | `vanilla-server` | probe only | every MC mod | `probe.mp.baseline`: every Both mod `ServerMissing`, every client mod active |
 | `vanilla-client` | every MC mod | probe only | `probe.mp.refused`: the server refuses the player ("Incompatible version"); the script checks a mod logged "Refused" |
 | `open-server` | every MC mod, `AllowPlayersWithoutMod = true` | probe only | the player stays in; the script checks every refusing mod logged that it let the player in |
-| `each-off` | every MC mod | every MC mod | one `probe.mp.off.<GUID>` per Both mod: turned off on the client while in, the server refuses (live re-check), and again when joining with it off; mods without a player check let the player stay, and so do mods with the older player check (`NetworkGate.PeerHasMod` instead of `PeerCompatible`: it only refuses a player who does not have the mod), which the script and the test result name |
+| `refuse-each` (only when named, not in `all`) | one refusing mod at a time, alone (plus the mods it requires) | probe only | one server start per mod, about 2 minutes each: the player is refused and the script checks that the line `Refused ...: does not have the mod` comes from that mod's own log source (`probe.mp.refuse.<GUID>`). With every mod on the server only the first one to refuse writes it |
+| `each-off` | every MC mod | every MC mod | the script also checks each refusing mod's own server log lines, `<player> turned <Mod> off on their game.` and `Refused ...: has the mod turned off` twice (`probe.mp.off-log.<GUID>`), written as test lines to the scenario's `script-checks.log`; one `probe.mp.off.<GUID>` per Both mod: turned off on the client while in, the server refuses (live re-check), and again when joining with it off; mods without a player check let the player stay, and so do mods with the older player check (`NetworkGate.PeerHasMod` instead of `PeerCompatible`: it only refuses a player who does not have the mod), which the script and the test result name |
 
 **Writing a multiplayer test** (Debug builds only; same file as the mod's other self tests):
 

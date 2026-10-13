@@ -10,6 +10,8 @@ namespace MC.Core.ProbeWorldMod;
 //   MC_SELFTEST_FILTER   comma list of substrings: run only tests whose name hold one (probe.* always run).
 //   MC_SELFTEST_TIMEOUT  seconds per test (default 120).
 //   MC_INWORLD_KEEP      "1" = stay in world after DONE, no quit.
+//   MC_INWORLD_STAGE     "" = first game of the run; "disabled" = second game: script set every MC mod Enabled =
+//                        false and started the game again on the same saves, only disabled-start checks run.
 // Multiplayer run (tools/Test-Multiplayer.ps1) add:
 //   MC_MP_JOIN           "host:port" of dedicated server: me join it instead of starting own world.
 //   MC_MP_PASSWORD       its password.
@@ -20,6 +22,7 @@ internal static class ProbeSettings
     internal const string FilterVar = "MC_SELFTEST_FILTER";
     internal const string TimeoutVar = "MC_SELFTEST_TIMEOUT";
     internal const string KeepVar = "MC_INWORLD_KEEP";
+    internal const string StageVar = "MC_INWORLD_STAGE";
     internal const string JoinVar = "MC_MP_JOIN";
     internal const string PasswordVar = "MC_MP_PASSWORD";
     internal const string ScenarioVar = "MC_MP_SCENARIO";
@@ -37,6 +40,8 @@ internal static class ProbeSettings
     internal static string[] Filters { get; private set; } = new string[0];
     internal static float TestTimeout { get; private set; } = 120f;
     internal static bool Keep { get; private set; }
+    internal static string Stage { get; private set; } = "";
+    internal static bool DisabledStage => Stage == MC.Shared.SelfTest.DisabledStage;
 
     // Multiplayer run: server address, password, scenario. Join null = single-player run.
     internal static string Join { get; private set; }
@@ -70,6 +75,7 @@ internal static class ProbeSettings
         var timeout = Environment.GetEnvironmentVariable(TimeoutVar);
         TestTimeout = float.TryParse(timeout, NumberStyles.Float, CultureInfo.InvariantCulture, out var t) && t > 0f ? t : 120f;
         Keep = Environment.GetEnvironmentVariable(KeepVar) == "1";
+        Stage = (Environment.GetEnvironmentVariable(StageVar) ?? "").Trim();
 
         var join = Environment.GetEnvironmentVariable(JoinVar);
         Join = string.IsNullOrEmpty(join) ? null : join.Trim();

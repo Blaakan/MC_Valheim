@@ -1,8 +1,26 @@
 #if DEBUG
 using System;
+using System.Collections.Generic;
 using BepInEx.Logging;
 
 namespace MC.Core.ProbeWorldMod;
+
+// One Warning / Error / Fatal log line (watch window, or read back from the log file).
+internal sealed class LogEntry
+{
+    internal bool Error;
+    internal string Source;
+    internal string Text;
+
+    internal string FirstLine
+    {
+        get
+        {
+            var cut = Text.IndexOf('\n');
+            return cut > 0 ? Text.Substring(0, cut).TrimEnd() : Text;
+        }
+    }
+}
 
 // Each mod log its own "[selftest] PASS/FAIL" lines through its own SelfTest copy, so me cannot count calls. Me listen
 // to BepInEx log instead (every source, also "Unity Log"): while a test run, count PASS, FAIL and other error lines.
@@ -18,6 +36,8 @@ internal sealed class ResultListener : ILogListener
     private int _fail;
     private int _errors;
     private string _firstError;
+    private bool _watching;
+    private List<LogEntry> _watched = new List<LogEntry>();
 
     internal void Begin()
     {
@@ -47,6 +67,26 @@ internal sealed class ResultListener : ILogListener
         lock (_gate)
         {
             _counting = false;
+            _watching = false;
+        }
+    }
+
+    // Watch window: every Warning / Error / Fatal line of every source kept (not test verdict lines), until StopWatch.
+    internal void StartWatch()
+    {
+        lock (_gate)
+        {
+            _watched = new List<LogEntry>();
+            _watching = true;
+        }
+    }
+
+    internal List<LogEntry> StopWatch()
+    {
+        lock (_gate)
+        {
+            _watching = false;
+            return _watched;
         }
     }
 
@@ -54,7 +94,7 @@ internal sealed class ResultListener : ILogListener
     {
         try
         {
-            if (!_counting || eventArgs == null)
+            if ((!_counting && !_watching) || eventArgs == null)
             {
                 return;
             }
@@ -65,6 +105,16 @@ internal sealed class ResultListener : ILogListener
             }
             lock (_gate)
             {
+                if (_watching && (eventArgs.Level & (LogLevel.Warning | LogLevel.Error | LogLevel.Fatal)) != 0
+                    && !text.StartsWith(FailMark, StringComparison.Ordinal))
+                {
+                    _watched.Add(new LogEntry
+                    {
+                        Error = (eventArgs.Level & (LogLevel.Error | LogLevel.Fatal)) != 0,
+                        Source = eventArgs.Source?.SourceName ?? "?",
+                        Text = text,
+                    });
+                }
                 if (!_counting)
                 {
                     return;

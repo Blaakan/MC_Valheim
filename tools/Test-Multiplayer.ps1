@@ -21,11 +21,19 @@
       each-off        server and client run every MC mod; one test per Both mod turns it off on the client while in:
                       a mod that refuses players must refuse (and again when joining with it off), the others not
                       (a mod with the older player check only refuses a player without the mod: the test says so).
+                      The script then checks each refusing mod's own server log lines (probe.mp.off-log.<GUID>):
+                      "<player> turned <Mod> off on their game." and "Refused ...: has the mod turned off" twice.
+      refuse-each     NOT part of 'all' (one server start per refusing mod, about 2 minutes each): like
+                      vanilla-client, but the server has only that one mod (and the mods it requires), so the line
+                      "Refused ...: does not have the mod" must come from that mod itself (probe.mp.refuse.<GUID>).
+                      -Only picks mods by that test name (-Only refuse.MC.Combat.Trinkets).
+    The script's own verdicts are written as test lines to <scenario folder>script-checks.log.
     Run folder: %TEMP%\MC_Valheim_MP\<yyyyMMdd-HHmmss> (10 newest kept): per scenario the client and server BepInEx
     folders with their LogOutput.log, the client's screenshots (client\shots); saves are deleted afterwards.
     The game must be closed (one client at a time) and Steam running. Debug builds only.
 .PARAMETER Scenario
-    One or more of modded, vanilla-server, vanilla-client, open-server, each-off; 'all' (default) = every one, in that order.
+    One or more of modded, vanilla-server, vanilla-client, open-server, each-off; 'all' (default) = every one of
+    these, in that order. refuse-each runs only when named (it can be added to 'all': -Scenario all,refuse-each).
 .PARAMETER Only
     Only run mod tests whose name contains one of these strings (probe tests always run).
 .PARAMETER NoModBuild
@@ -43,7 +51,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'modded', 'vanilla-server', 'vanilla-client', 'open-server', 'each-off')]
+    [ValidateSet('all', 'modded', 'vanilla-server', 'vanilla-client', 'open-server', 'each-off', 'refuse-each')]
     [string[]]$Scenario = @('all'),
     [string[]]$Only,
     [switch]$KeepRunning,
@@ -59,7 +67,10 @@ Import-Module (Join-Path $PSScriptRoot 'lib\Common.psm1') -Force
 $root = Get-RepoRoot
 $game = Get-ValheimDir
 $allScenarios = @('modded', 'vanilla-server', 'vanilla-client', 'open-server', 'each-off')
-$scenarios = if ($Scenario -contains 'all') { $allScenarios } else { @($allScenarios | Where-Object { $Scenario -contains $_ }) }
+# Extra scenarios: only when named (not part of "all"). refuse-each = one server start per refusing mod.
+$extraScenarios = @('refuse-each')
+$scenarios = @(if ($Scenario -contains 'all') { $allScenarios } else { @($allScenarios | Where-Object { $Scenario -contains $_ }) }) +
+    @($extraScenarios | Where-Object { $Scenario -contains $_ })
 if ($KeepRunning -and $scenarios.Count -ne 1) { Write-Fail '-KeepRunning needs exactly one -Scenario.'; exit 1 }
 $filters = @(((@($Only) | Where-Object { $_ }) -join ',') -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $password = 'mcprobe1'
@@ -156,13 +167,21 @@ $modNames = @(Get-ModProjects | ForEach-Object { Get-CsprojProp $_.FullName 'Mod
 $ourRegex = (@("\b$author\.", 'HarmonyLib', 'HarmonyX', 'Chainloader') + ($modNames | ForEach-Object { [regex]::Escape($_) })) -join '|'
 
 # BepInEx folder of one side: core + BepInEx.cfg from your game (read only), MC mods (or not), one probe.
-function New-Tree([string]$Dir, [bool]$WithMods, [string]$ProbeStage) {
+function New-Tree([string]$Dir, [bool]$WithMods, [string]$ProbeStage, [string[]]$OnlyGuids) {
     $b = Join-Path $Dir 'BepInEx'
     [void](New-Item -ItemType Directory -Force -Path (Join-Path $b 'plugins'), (Join-Path $b 'config'))
     Copy-Item -LiteralPath (Join-Path $game 'BepInEx\core') -Destination (Join-Path $b 'core') -Recurse
     $cfg = Join-Path $game 'BepInEx\config\BepInEx.cfg'
     if (Test-Path -LiteralPath $cfg) { Copy-Item -LiteralPath $cfg -Destination (Join-Path $b 'config') }
-    if ($WithMods) { Copy-Item -LiteralPath $modPlugins -Destination (Join-Path $b "plugins\$collection") -Recurse }
+    if ($WithMods -and $OnlyGuids) {
+        # Only these mods: plugins\<collection>\<Category>\<GUID>.
+        foreach ($d in @(Get-ChildItem -LiteralPath $modPlugins -Directory | ForEach-Object { Get-ChildItem -LiteralPath $_.FullName -Directory } | Where-Object { $OnlyGuids -contains $_.Name })) {
+            $to = Join-Path $b "plugins\$collection\$($d.Parent.Name)"
+            [void](New-Item -ItemType Directory -Force -Path $to)
+            Copy-Item -LiteralPath $d.FullName -Destination (Join-Path $to $d.Name) -Recurse
+        }
+    }
+    elseif ($WithMods) { Copy-Item -LiteralPath $modPlugins -Destination (Join-Path $b "plugins\$collection") -Recurse }
     [void](New-Item -ItemType Directory -Force -Path (Join-Path $b "plugins\$collection"))
     $probe = Join-Path $ProbeStage "BepInEx\plugins\$collection"
     Copy-Item -Path (Join-Path $probe '*') -Destination (Join-Path $b "plugins\$collection") -Recurse -Force
@@ -221,12 +240,51 @@ function Get-ErrorBlocks([string]$Text) {
     [pscustomobject]@{ Ours = $ours; Other = $other }
 }
 
-function Invoke-Scenario([string]$Name) {
-    Write-Step "Scenario $Name"
-    $sd = Join-Path $runDir $Name
+# Mod + every mod it needs (ModRequires, all levels).
+function Get-WithRequires([string]$Guid) {
+    $seen = New-Object System.Collections.Generic.List[string]
+    $todo = New-Object System.Collections.Generic.Queue[string]
+    $todo.Enqueue($Guid)
+    $all = @(Get-ModProjects)
+    while ($todo.Count) {
+        $g = $todo.Dequeue()
+        if ($seen.Contains($g)) { continue }
+        $seen.Add($g)
+        $p = $all | Where-Object { $_.BaseName -eq $g } | Select-Object -First 1
+        if ($p) { foreach ($r in @((Get-CsprojProp $p.FullName 'ModRequires') -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) { $todo.Enqueue($r) } }
+    }
+    $seen.ToArray()
+}
+
+# Verdict of the script itself as log lines in the probe's format (same shape as a test: BEGIN, PASS or FAIL, END).
+function New-CheckLines([string]$Test, [bool]$Ok, [string]$Detail) {
+    $probe = 'MC.Core.Probe.World'
+    if ($Ok) {
+        @("[Info   :Probe World] [selftest] BEGIN $Test ($probe)", "[Info   :Probe World] [selftest] PASS ${Test}: $Detail",
+            "[Info   :Probe World] [selftest] END ${Test}: passed (pass=1 fail=0, 0.0 s)")
+    }
+    else {
+        @("[Info   :Probe World] [selftest] BEGIN $Test ($probe)", "[Error  :Probe World] [selftest] FAIL ${Test}: $Detail",
+            "[Info   :Probe World] [selftest] END ${Test}: FAILED (pass=0 fail=1, 0.0 s)")
+    }
+}
+
+function Test-Wanted([string]$Name) {
+    if (-not $filters.Count) { return $true }
+    foreach ($f in $filters) { if ($Name.IndexOf($f, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true } }
+    $false
+}
+
+# $Solo = one refusing mod: scenario refuse-each, a vanilla-client run against a server that has only that mod.
+function Invoke-Scenario([string]$Name, $Solo = $null) {
+    $label = if ($Solo) { "refuse-each ($($Solo.Name) alone on the server)" } else { $Name }
+    Write-Step "Scenario $label"
+    $sd = if ($Solo) { Join-Path $runDir "refuse-each\$($Solo.Guid)" } else { Join-Path $runDir $Name }
+    if ($Solo) { $Name = 'vanilla-client' }
     $serverMods = $Name -ne 'vanilla-server'
     $clientMods = @('modded', 'vanilla-server', 'each-off') -contains $Name
-    $sTree = New-Tree (Join-Path $sd 'server') $serverMods (Join-Path $stage 'server-probe')
+    $only = if ($Solo) { @(Get-WithRequires $Solo.Guid) } else { @() }
+    $sTree = New-Tree (Join-Path $sd 'server') $serverMods (Join-Path $stage 'server-probe') $only
     $cTree = New-Tree (Join-Path $sd 'client') $clientMods (Join-Path $stage 'client-probe')
     if ($Name -eq 'open-server') {
         foreach ($m in $refusing) {
@@ -237,7 +295,8 @@ function Invoke-Scenario([string]$Name) {
         $(if ($clientMods) { 'MC mods + world probe' } else { 'world probe only' }))
     $sLog = Join-Path $sTree 'LogOutput.log'
     $cLog = Join-Path $cTree 'LogOutput.log'
-    $result = [pscustomobject]@{ Name = $Name; Pass = $false; Problems = (New-Object System.Collections.Generic.List[string]); Dir = $sd }
+    $result = [pscustomobject]@{ Name = $label; Pass = $false; Problems = (New-Object System.Collections.Generic.List[string]); Dir = $sd }
+    $checks = New-Object System.Collections.Generic.List[string]
     $server = $null; $client = $null
     try {
         $serverArgs = @('-nographics', '-batchmode', '-name', "MCProbe$Port", '-port', [string]$Port, '-world', 'MCProbeMP',
@@ -312,6 +371,40 @@ function Invoke-Scenario([string]$Name) {
         $who = @($refusing | Where-Object { $st -match ('\[Warning\s*:\s*' + [regex]::Escape($_.Name) + '\] Refused ') } | ForEach-Object { $_.Name })
         if ($who.Count) { Write-Ok "refused by: $($who -join ', ')" } else { $result.Problems.Add('no MC mod logged "Refused" on the server') }
     }
+    if ($Solo) {
+        # Alone on the server, the mod must write its own line for a player who does not have it.
+        $test = "probe.mp.refuse.$($Solo.Guid)"
+        $line = [regex]::Match($st, '(?m)^\[Warning\s*:\s*' + [regex]::Escape($Solo.Name) + '\] (?<text>Refused [^\r\n]*does not have the mod[^\r\n]*)')
+        $refusedOk = $ct -match '\[selftest\] END probe\.mp\.refused: passed'
+        if ($line.Success -and $refusedOk) {
+            foreach ($l in (New-CheckLines $test $true "with only $($Solo.Name) on the server, a player without the mod was refused and its own log line says so: $($line.Groups['text'].Value)")) { $checks.Add($l) }
+        }
+        else {
+            $why = if (-not $refusedOk) { 'the player was not refused (probe.mp.refused did not pass)' } else { "no Warning line 'Refused ...: does not have the mod' from the log source '$($Solo.Name)' on the server" }
+            foreach ($l in (New-CheckLines $test $false "with only $($Solo.Name) on the server: $why")) { $checks.Add($l) }
+            $result.Problems.Add("${test}: $why")
+        }
+    }
+    if ($Name -eq 'each-off') {
+        # Only the mod that is off refuses then: its own lines must be in the server log (turned off while in, then
+        # joining with it off = two refusals).
+        foreach ($m in @($refusing | Where-Object { $_.Live })) {
+            $test = "probe.mp.off-log.$($m.Guid)"
+            if (-not (Test-Wanted $test)) { continue }
+            if ($ct -notmatch ('\[selftest\] BEGIN probe\.mp\.off\.' + [regex]::Escape($m.Guid) + ' ')) { continue }
+            $src = [regex]::Escape($m.Name)
+            $turned = [regex]::Matches($st, '(?m)^\[Info\s*:\s*' + $src + '\] [^\r\n]* turned ' + $src + ' off on their game\.').Count
+            $refusedOff = [regex]::Matches($st, '(?m)^\[Warning\s*:\s*' + $src + '\] Refused [^\r\n]*has the mod turned off').Count
+            $ok = $turned -ge 1 -and $refusedOff -ge 2
+            $detail = "server log of $($m.Name): '<player> turned $($m.Name) off on their game.' $turned time(s) (expected 1 or more), 'Refused ...: has the mod turned off' $refusedOff time(s) (expected 2 or more: while connected, and when joining with it off)"
+            foreach ($l in (New-CheckLines $test $ok $detail)) { $checks.Add($l) }
+            if (-not $ok) { $result.Problems.Add("${test}: $detail") }
+        }
+    }
+    if ($checks.Count) {
+        [IO.File]::WriteAllLines((Join-Path $sd 'script-checks.log'), [string[]]$checks.ToArray())
+        foreach ($m in [regex]::Matches(($checks -join "`n"), $selftestRegex)) { Write-SelftestLine 'X' $m.Groups['kind'].Value $m.Groups['rest'].Value }
+    }
     if ($Name -eq 'open-server') {
         $missing = @($refusing | Where-Object { $st -notmatch ('\[Warning\s*:\s*' + [regex]::Escape($_.Name) + '\][^\r\n]*AllowPlayersWithoutMod is on') } | ForEach-Object { $_.Name })
         if ($missing.Count) { $result.Problems.Add("these mods did not log that they let the player in: $($missing -join ', ')") }
@@ -333,7 +426,12 @@ function Invoke-Scenario([string]$Name) {
 }
 
 $results = @()
-foreach ($s in $scenarios) { $results += Invoke-Scenario $s }
+foreach ($s in $scenarios) {
+    if ($s -eq 'refuse-each') {
+        foreach ($m in @($refusing | Where-Object { Test-Wanted "probe.mp.refuse.$($_.Guid)" })) { $results += Invoke-Scenario 'vanilla-client' $m }
+    }
+    else { $results += Invoke-Scenario $s }
+}
 if (-not $KeepRunning) { [void](Remove-WithRetry $serverSaves) }
 
 Write-Step 'Results'
@@ -346,6 +444,7 @@ foreach ($r in $results) {
         foreach ($p in $r.Problems) { Write-Host "      $p" -ForegroundColor Red }
     }
     Write-Host "      logs: $(Join-Path $r.Dir 'client\BepInEx\LogOutput.log') | $(Join-Path $r.Dir 'server\BepInEx\LogOutput.log')"
+    if (Test-Path -LiteralPath (Join-Path $r.Dir 'script-checks.log')) { Write-Host "      script checks: $(Join-Path $r.Dir 'script-checks.log')" }
 }
 if ($pass) { Write-Host 'MULTIPLAYER TEST PASSED' -ForegroundColor Green; exit 0 }
 Write-Host 'MULTIPLAYER TEST FAILED' -ForegroundColor Red

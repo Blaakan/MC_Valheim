@@ -91,6 +91,13 @@ Check 'no [General] section gives no change' ($null -eq (Enable-ModConfigText "[
 Same 'last section, LF only' (Enable-ModConfigText "[General]${nl}Enabled = false") "[General]${nl}Enabled = true"
 Check 'empty text gives no change' ($null -eq (Enable-ModConfigText ''))
 
+Write-Step 'Turn mod off in its config (second game of Test-InWorld)'
+Same 'only Enabled of [General] changes, CRLF kept' (Disable-ModConfigText $cfgOn) $cfgOff
+Check 'already off gives no change' ($null -eq (Disable-ModConfigText $cfgOff))
+Check 'no [General] section gives no change' ($null -eq (Disable-ModConfigText "[Other]${nl}Enabled = true${nl}"))
+Same 'last section, LF only' (Disable-ModConfigText "[General]${nl}Enabled = true") "[General]${nl}Enabled = false"
+Same 'off and on again gives the same text' (Enable-ModConfigText (Disable-ModConfigText $cfgOn)) $cfgOn
+
 Write-Host ''
 if ($fails -eq 0) { Write-Host 'TOOL TESTS PASSED' -ForegroundColor Green; exit 0 }
 Write-Host "TOOL TESTS FAILED ($fails)" -ForegroundColor Red

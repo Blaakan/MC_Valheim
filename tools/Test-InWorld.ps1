@@ -5,6 +5,10 @@
     registered self test (src/Shared/SelfTest.cs), then read the "[selftest]" log lines, close the game and remove
     the probe. Exit code 0 = the probe logged DONE with fail=0, no error came from our mods, and at least one mod
     test ran (plus: every -Only piece matched a test, and with -Mod a test of the selected mods ran).
+    Staged tests run after the normal ones: relog tests (a real log out to the main menu and load of the same
+    world, one per test), then, when a disabled-start test is wanted, a second game: the script sets Enabled = false
+    for every MC mod, starts the game again on the same character and world and the probe runs the checks there.
+    After the first game the script also judges, per mod, the lines logged while the game quit (probe.quit.<GUID>).
 .DESCRIPTION
     Your own characters and worlds are never touched: the probe points all save data at <run dir>\saves and turns
     Steam Cloud saves off for that game session only, and proves it in the log before it starts the world.
@@ -60,7 +64,7 @@ $probeProj = Join-Path $root "tests\Probes\Core.Probe.World\$probeGuid.csproj"
 $probeCfg = Join-Path $game "BepInEx\config\$probeGuid.cfg"
 $probeDirs = @((Get-ModDeployDir $probeGuid), (Join-Path $game "BepInEx\plugins\$probeGuid"))
 $collectionDir = Join-Path $game ('BepInEx\plugins\' + (Get-ModCollectionFolder))
-$envNames = @('MC_INWORLD_DIR', 'MC_SELFTEST_FILTER', 'MC_SELFTEST_TIMEOUT', 'MC_INWORLD_KEEP')
+$envNames = @('MC_INWORLD_DIR', 'MC_SELFTEST_FILTER', 'MC_SELFTEST_TIMEOUT', 'MC_INWORLD_KEEP', 'MC_INWORLD_STAGE')
 $cfgDir = Join-Path $game 'BepInEx\config'
 $cfgPattern = "$(Get-ModAuthor).*.cfg"
 $probeCfgName = "$probeGuid.cfg"
@@ -145,6 +149,7 @@ Write-Ok "$($cfgNames.Count) mod config file(s) backed up (put back after the ru
 
 # Mod off in its .cfg run no test. Me turn it on for this run (backup above put file back after), unless -AsConfigured.
 $turnedOn = @()
+$script:turnedOff = @()
 if (-not $AsConfigured) {
     foreach ($n in $cfgNames) {
         $p = Join-Path $cfgDir $n
@@ -196,14 +201,19 @@ $restoreConfigs = {
 function Restore-ModConfigs([bool]$CutShort) {
     $out = @(& $restoreConfigs $cfgDir $cfgBackup $cfgPattern $probeCfgName)
     if (-not $out.Count) { Write-Ok "mod config files as before the run ($($cfgNames.Count) checked)"; return }
+    # Files this script changed itself (mod turned on for the run, every mod turned off for the second game): no news.
+    $own = @($turnedOn + $script:turnedOff | ForEach-Object { "$_.cfg" })
+    $quiet = 0
     foreach ($line in $out) {
         $word, $name, $msg = $line -split ' ', 3
+        if ($word -eq 'restored' -and $own -contains $name) { $quiet++; continue }
         switch ($word) {
             'restored' { Write-Warn2 ("config put back as before the run: $name" + $(if ($CutShort) { ' (the run was cut short before the tests cleaned up)' } else { '' })) }
             'removed' { Write-Ok "config created during the run removed: $name" }
             default { Write-Warn2 "could not put back $name ($msg): the copy from before the run is in $cfgBackup" }
         }
     }
+    if ($quiet) { Write-Ok "$quiet mod config file(s) the script changed for the run (Enabled) put back as before" }
 }
 
 function Read-LogText([string]$Path) {
@@ -264,6 +274,56 @@ function Write-SelftestLine([string]$Kind, [string]$Rest, [string]$Indent = '  '
     Write-Host ("{0}{1,-5} {2}" -f $Indent, $Kind, $Rest) -ForegroundColor $color
 }
 
+# Test picked by -Only? Same rule as the probe: no filter = yes, else name hold one piece (case ignored).
+function Test-Wanted([string]$Name) {
+    if (-not $filters.Count) { return $true }
+    foreach ($f in $filters) { if ($Name.IndexOf($f, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true } }
+    $false
+}
+
+# Lines the game wrote after the probe's DONE line = while it quit. Per loaded mod: warning or error line of its
+# log source, or error block naming its code = FAIL probe.quit.<GUID>. Me give back log lines in the probe's format.
+function Get-QuitVerdicts([string]$GameText) {
+    $at = $GameText.LastIndexOf('[selftest] DONE ')
+    if ($at -lt 0) { return @() }
+    $tail = $GameText.Substring($at) -split "`r?`n" | Select-Object -Skip 1
+    $blocks = New-Object System.Collections.Generic.List[object]
+    $cur = $null
+    foreach ($l in $tail) {
+        $m = [regex]::Match($l, '^\[(?<lvl>Debug|Info|Message|Warning|Error|Fatal)\s*:\s*(?<src>[^\]]*?)\]\s?(?<rest>.*)$')
+        if ($m.Success) {
+            $cur = $null
+            if ($m.Groups['lvl'].Value -in @('Warning', 'Error', 'Fatal')) {
+                $cur = [pscustomobject]@{ Error = $m.Groups['lvl'].Value -ne 'Warning'; Source = $m.Groups['src'].Value.Trim(); Text = $m.Groups['rest'].Value; First = $m.Groups['rest'].Value }
+                $blocks.Add($cur)
+            }
+        }
+        elseif ($cur) { $cur.Text += "`n$l" }
+    }
+    $out = New-Object System.Collections.Generic.List[string]
+    foreach ($p in Get-ModProjects) {
+        $guid = $p.BaseName
+        $test = "probe.quit.$guid"
+        if (-not (Test-Wanted $test)) { continue }
+        if ($GameText -notmatch "\[MC:ready\] $([regex]::Escape($guid)) ") { continue }
+        $name = Get-CsprojProp $p.FullName 'ModName'
+        $parts = $guid -split '\.'
+        $ns = if ($parts.Count -ge 3) { "$($parts[0]).$($parts[1]).$(($parts[2..($parts.Count - 1)]) -join '')Mod." } else { "$guid." }
+        $mine = @($blocks | Where-Object { $_.Source -eq $name -or ($_.Error -and ($_.Text.Contains($ns) -or $_.Text.Contains($guid))) })
+        $out.Add("[Info   :Probe World] [selftest] BEGIN $test ($probeGuid)")
+        if ($mine.Count) {
+            $first = (@($mine | Select-Object -First 3 | ForEach-Object { "[$(if ($_.Error) { 'Error' } else { 'Warning' }):$($_.Source)] $($_.First)" }) -join ' || ')
+            $out.Add("[Error  :Probe World] [selftest] FAIL ${test}: $($mine.Count) warning or error line(s) of $name while the game quit from the world, first: $first")
+            $out.Add("[Info   :Probe World] [selftest] END ${test}: FAILED (pass=0 fail=1, 0.0 s)")
+        }
+        else {
+            $out.Add("[Info   :Probe World] [selftest] PASS ${test}: no warning or error line of $name and no error naming its code while the game quit from the world ($($blocks.Count) such line(s) of others)")
+            $out.Add("[Info   :Probe World] [selftest] END ${test}: passed (pass=1 fail=0, 0.0 s)")
+        }
+    }
+    $out.ToArray()
+}
+
 $proc = $null
 $launch = $null
 $done = $null
@@ -273,49 +333,101 @@ $text = ''
 $oldEnv = @{}
 foreach ($n in $envNames) { $oldEnv[$n] = [Environment]::GetEnvironmentVariable($n, 'Process') }
 try {
-    # Env vars only for the game process: me set them, launch, put them back at once.
-    try {
-        [Environment]::SetEnvironmentVariable('MC_INWORLD_DIR', $runDir, 'Process')
-        [Environment]::SetEnvironmentVariable('MC_SELFTEST_FILTER', ($filters -join ','), 'Process')
-        [Environment]::SetEnvironmentVariable('MC_SELFTEST_TIMEOUT', [string]$TestTimeoutSec, 'Process')
-        [Environment]::SetEnvironmentVariable('MC_INWORLD_KEEP', $(if ($KeepRunning) { '1' } else { $null }), 'Process')
-        $launch = Get-Date
-        $proc = @(& (Join-Path $PSScriptRoot 'Start-Game.ps1')) | Where-Object { $_ -is [System.Diagnostics.Process] } | Select-Object -First 1
-    }
-    finally {
-        foreach ($n in $envNames) { [Environment]::SetEnvironmentVariable($n, $oldEnv[$n], 'Process') }
-    }
-    if (-not $proc) { Write-Fail 'game did not start'; exit 1 }
-
-    Write-Step "Wait for the probe (timeout ${TimeoutSec}s)"
-    $deadline = $launch.AddSeconds($TimeoutSec)
-    $printed = 0
-    while ($true) {
-        Start-Sleep -Seconds 2
-        # Me look at exit BEFORE reading: game that already quit has flushed its log, so its DONE is in this read.
-        $exited = $proc.HasExited
-        $text = Read-RunLog
-        if ($text) {
-            $lines = [regex]::Matches($text, $selftestRegex)
-            for ($i = $printed; $i -lt $lines.Count; $i++) { Write-SelftestLine $lines[$i].Groups['kind'].Value $lines[$i].Groups['rest'].Value }
-            $printed = $lines.Count
-            $done = Get-DoneLine $text
-            if ($done) { break }
+    # One game, or two: second one (stage 'disabled') when the probe of the first asked for it.
+    $stages = New-Object System.Collections.Generic.List[string]
+    $stages.Add('')
+    $texts = New-Object System.Collections.Generic.List[string]
+    $total = [pscustomobject]@{ Pass = 0; Fail = 0; Tests = 0 }
+    $allDone = $true
+    for ($si = 0; $si -lt $stages.Count; $si++) {
+        $stage = $stages[$si]
+        $done = $null
+        $exitedEarly = $false
+        $timedOut = $false
+        if ($stage -eq 'disabled') {
+            Write-Step 'Second game: every MC mod turned off (Enabled = false), same character and world'
+            $off = @()
+            foreach ($f in @(Get-ChildItem -LiteralPath $cfgDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $cfgPattern -and $_.Name -ne $probeCfgName })) {
+                $new = Disable-ModConfigText ([IO.File]::ReadAllText($f.FullName))
+                if ($null -eq $new) { continue }
+                [IO.File]::WriteAllText($f.FullName, $new, (New-Object System.Text.UTF8Encoding $false))
+                $off += [IO.Path]::GetFileNameWithoutExtension($f.Name)
+            }
+            $script:turnedOff = $off
+            Write-Ok "$($off.Count) mod(s) turned off in their .cfg for the second game (put back after)"
+            Start-Sleep -Seconds 3
         }
-        if ($exited) { $exitedEarly = $true; Write-Fail "game exited before the probe finished (code $($proc.ExitCode))"; break }
-        if ((Get-Date) -gt $deadline) { $timedOut = $true; Write-Fail "no DONE line within ${TimeoutSec}s"; break }
-    }
+        # Env vars only for the game process: me set them, launch, put them back at once.
+        $proc = $null
+        try {
+            [Environment]::SetEnvironmentVariable('MC_INWORLD_DIR', $runDir, 'Process')
+            [Environment]::SetEnvironmentVariable('MC_SELFTEST_FILTER', ($filters -join ','), 'Process')
+            [Environment]::SetEnvironmentVariable('MC_SELFTEST_TIMEOUT', [string]$TestTimeoutSec, 'Process')
+            [Environment]::SetEnvironmentVariable('MC_INWORLD_KEEP', $(if ($KeepRunning) { '1' } else { $null }), 'Process')
+            [Environment]::SetEnvironmentVariable('MC_INWORLD_STAGE', $(if ($stage) { $stage } else { $null }), 'Process')
+            $launch = Get-Date
+            $proc = @(& (Join-Path $PSScriptRoot 'Start-Game.ps1')) | Where-Object { $_ -is [System.Diagnostics.Process] } | Select-Object -First 1
+        }
+        finally {
+            foreach ($n in $envNames) { [Environment]::SetEnvironmentVariable($n, $oldEnv[$n], 'Process') }
+        }
+        if (-not $proc) { Write-Fail 'game did not start'; exit 1 }
 
-    if ($done -and -not $KeepRunning) {
-        Write-Step 'Wait for the game to quit'
-        if (-not $proc.WaitForExit(90000)) { Write-Warn2 'game did not quit within 90 s: closing it'; Stop-Process -Id $proc.Id -Force }
-        else { Write-Ok 'game quit by itself' }
+        Write-Step "Wait for the probe (timeout ${TimeoutSec}s)"
+        $deadline = $launch.AddSeconds($TimeoutSec)
+        $printed = 0
+        while ($true) {
+            Start-Sleep -Seconds 2
+            # Me look at exit BEFORE reading: game that already quit has flushed its log, so its DONE is in this read.
+            $exited = $proc.HasExited
+            $text = Read-RunLog
+            if ($text) {
+                $lines = [regex]::Matches($text, $selftestRegex)
+                for ($i = $printed; $i -lt $lines.Count; $i++) { Write-SelftestLine $lines[$i].Groups['kind'].Value $lines[$i].Groups['rest'].Value }
+                $printed = $lines.Count
+                $done = Get-DoneLine $text
+                if ($done) { break }
+            }
+            if ($exited) { $exitedEarly = $true; Write-Fail "game exited before the probe finished (code $($proc.ExitCode))"; break }
+            if ((Get-Date) -gt $deadline) { $timedOut = $true; Write-Fail "no DONE line within ${TimeoutSec}s"; break }
+        }
+
+        $quitAlone = $false
+        if ($done -and -not $KeepRunning) {
+            Write-Step 'Wait for the game to quit'
+            if (-not $proc.WaitForExit(90000)) { Write-Warn2 'game did not quit within 90 s: closing it'; Stop-Process -Id $proc.Id -Force }
+            else { Write-Ok 'game quit by itself'; $quitAlone = $true }
+        }
+        Start-Sleep -Seconds 1
+        $text = Read-RunLog
+        # Me judge from this last full read too: DONE can reach the file only at shutdown, after the last poll.
+        $final = Get-DoneLine $text
+        if ($final) { $done = $final; $exitedEarly = $false; $timedOut = $false }
+        if ($text -and $stage -eq '' -and $done -and $quitAlone) {
+            # First game quit from the world with the mods on: judge what each mod logged meanwhile.
+            $verdicts = @(Get-QuitVerdicts $text)
+            if ($verdicts.Count) {
+                Write-Step 'Lines logged while the game quit'
+                foreach ($m in [regex]::Matches(($verdicts -join "`n"), $selftestRegex)) { Write-SelftestLine $m.Groups['kind'].Value $m.Groups['rest'].Value }
+                $vp = @($verdicts | Where-Object { $_ -match '\[selftest\] END \S+ passed' }).Count
+                $vf = @($verdicts | Where-Object { $_ -match '\[selftest\] END \S+ FAILED' }).Count
+                $done = [pscustomobject]@{ Pass = $done.Pass + $vp; Fail = $done.Fail + $vf; Tests = $done.Tests + $vp + $vf }
+                $text = $text.TrimEnd() + "`n" + ($verdicts -join "`n") + "`n"
+            }
+        }
+        if ($text) {
+            $texts.Add($text)
+            [IO.File]::WriteAllText((Join-Path $runDir $(if ($stage) { "LogOutput.$stage.log" } else { 'LogOutput.first.log' })), $text)
+        }
+        if (-not $done) { $allDone = $false; break }
+        $total.Pass += $done.Pass
+        $total.Fail += $done.Fail
+        $total.Tests += $done.Tests
+        if ($stage -eq '' -and -not $KeepRunning -and $text -match '\[selftest\] NOTE probe: second game wanted: disabled') { $stages.Add('disabled') }
     }
-    Start-Sleep -Seconds 1
-    $text = Read-RunLog
-    # Me judge from this last full read too: DONE can reach the file only at shutdown, after the last poll.
-    $final = Get-DoneLine $text
-    if ($final) { $done = $final; $exitedEarly = $false; $timedOut = $false }
+    # Both games judged as one run: one text, one DONE count.
+    $text = $texts -join "`n"
+    if ($allDone) { $done = $total }
     if ($text) { [IO.File]::WriteAllText((Join-Path $runDir 'LogOutput.log'), $text) }
 }
 finally {
@@ -437,7 +549,7 @@ function Test-CfgDisabled([string]$Path) {
 # Me refuse a green run that tested nothing: all filtered out, mods off in their .cfg, Release dll, -Only typo.
 function Test-Coverage {
     $ok = $true
-    $modRan = @($ran | Where-Object { $probeTests -notcontains $_.Name })
+    $modRan = @($ran | Where-Object { $_.Name -notlike 'probe.*' })
     $perMod = @($modRan | Group-Object Owner | ForEach-Object { "$($_.Name) $($_.Count)" })
     Write-Host ("  mod tests run: {0}{1}" -f $modRan.Count, $(if ($perMod.Count) { ' (' + ($perMod -join ', ') + ')' } else { '' }))
     $known = @($modRan + $filteredOut | ForEach-Object { $_.Name })

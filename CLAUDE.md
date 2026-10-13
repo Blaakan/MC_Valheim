@@ -78,7 +78,7 @@ dist/                     packaged zips (git-ignored)
 | Smoke test (launch game, check mods load + patch cleanly, close) | `./tools/Test-Smoke.ps1 [-Mod Crossbow] [-KeepRunning]` |
 | Framework test (probe mods: live toggle, config watch, dependency gating) | `./tools/Test-Framework.ps1` |
 | In-world self-tests (throwaway world "MCProbe", your saves untouched, mod configs put back after, mods off in their cfg turned on for the run; runs every deployed mod's `SelfTest`, screenshots in `%TEMP%\MC_Valheim_InWorld`) | `./tools/Test-InWorld.ps1 [-Mod Sleep.ThroughDay] [-Only sleep.] [-KeepRunning] [-NoBuild] [-AsConfigured]` |
-| Multiplayer self-tests (dedicated server copy + client on this PC, own BepInEx folders in `%TEMP%\MC_Valheim_MP`, nothing of yours changed) | `./tools/Test-Multiplayer.ps1 [-Scenario modded,vanilla-server,vanilla-client,open-server,each-off] [-Only dive.] [-NoModBuild]` |
+| Multiplayer self-tests (dedicated server copy + client on this PC, own BepInEx folders in `%TEMP%\MC_Valheim_MP`, nothing of yours changed) | `./tools/Test-Multiplayer.ps1 [-Scenario modded,vanilla-server,vanilla-client,open-server,each-off,refuse-each] [-Only dive.] [-NoModBuild]` (`refuse-each` only when named: one server start per mod) |
 | **In-game test to-do list** | `./tools/Get-TestTodo.ps1 [-Mod X] [-All]` |
 | Tooling regression tests (after changing tools/) | `./tools/Test-Tools.ps1` |
 | Regenerate the idea backlog from the sheet | `./tools/Update-Backlog.ps1` |
@@ -99,6 +99,12 @@ There are no unit tests: code runs inside Unity. Verification = build + `Test-Sm
 when `src/Shared` changes) (+ `Test-InWorld.ps1` when a mod has self-tests) (+ `Test-Multiplayer.ps1` for Both
 mods and multiplayer tests) + in-game tests.
 
+- Staged tests and real input (same script, after the normal tests): `SelfTest.RegisterRelog` runs a test through a
+  real log out to the main menu and load of the same world; `SelfTest.RegisterDisabledStart` runs one through a second
+  game that the script starts with every MC mod `Enabled = false`; `SelfTest.Key` / `Pad` / `MouseWheel` press real
+  keys, a test gamepad and the wheel. For every mod the run also judges its log lines during a relog, while the game
+  quits and in the second game (`probe.relog.<GUID>`, `probe.quit.<GUID>`, `probe.disabled.<GUID>`). How to write
+  them: `docs/modding/framework.md`, "Staged tests" and "Real input in tests".
 - In-world self-tests (Debug builds): a mod registers coroutines with `SelfTest.Register` (`src/Shared/SelfTest.cs`);
   `./tools/Test-InWorld.ps1` runs them in a throwaway world with isolated saves (how to write one:
   `docs/modding/framework.md`, "In-world self-tests"). Like the smoke test it launches the game (close it first)

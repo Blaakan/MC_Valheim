@@ -94,8 +94,9 @@ is installed, every test that says "Esc → MC Mods" is done in its window inste
 ## In-world self-test harness (`tools/Test-InWorld.ps1`, world probe 0.1.0)
 
 Build under test: the probe's build id is the commit in the `[MC:ready] MC.Core.Probe.World` log line (the run
-folder keeps a copy of the log). Every run checks itself with `probe.baseline` and `probe.runner`; the items below
-check what the script cannot see by itself.
+folder keeps a copy of the log). Every run checks itself with `probe.baseline` and `probe.runner`; an unfiltered run
+also checks the staged tests and the input driver with `probe.input`, `probe.relog`, `probe.stage.relog` and
+`probe.stage.disabled` (W14 to W17). The items below check what the script cannot see by itself.
 
 - [ ] **W01 End to end:** close the game, run `./tools/Test-InWorld.ps1`. After `probe.baseline` and `probe.runner`,
   every deployed mod's self tests run; the summary groups each test's lines under its name and prints
@@ -151,9 +152,36 @@ check what the script cannot see by itself.
   the backup folder. After deleting that run's `config-backup\pending.txt`, the next run starts normally.
 - [ ] **W12 A run that tests nothing fails:** run `./tools/Test-InWorld.ps1 -NoBuild -Only nosuchtest`: both probe tests
   pass, yet it ends with "IN-WORLD TEST FAILED" (exit code 1), saying `-Only 'nosuchtest' matched no test` (with the
-  tests the mods registered) and "no mod test ran, only the probe's own". Run `./tools/Test-InWorld.ps1 -Mod Crossbow`:
-  the other mods' tests still run, it warns `MC.Combat.Crossbow.StaysLoaded ran no test: has no self tests` and
-  fails with "no test of the mods picked with -Mod Crossbow ran". Set `Enabled = false` in
+  tests the mods registered) and "no mod test ran, only the probe's own". Run
+  `./tools/Test-InWorld.ps1 -Mod Crossbow -Only sleep.` (every mod has self tests since 2026-10-13, so the filter
+  stands in for a mod without any): the sleep tests still run, it warns `MC.Combat.Crossbow.StaysLoaded ran no test:
+  its tests were filtered out by -Only` and fails with "no test of the mods picked with -Mod Crossbow ran". Set `Enabled = false` in
   `MC.Exploration.Sleep.ThroughDay.cfg` and run `./tools/Test-InWorld.ps1 -NoBuild -Only sleep.`: it fails with
   `-Only 'sleep.' matched no test` and the warning `MC.Exploration.Sleep.ThroughDay ran no test: it is turned off in
   its .cfg (Enabled = false)`. Set `Enabled = true` again afterwards (the run puts the file back as it found it).
+- [ ] **W14 Staged tests end to end:** close the game, run `./tools/Test-InWorld.ps1 -NoBuild -Only probe.`. Expected,
+  after `probe.baseline` and `probe.runner`: `probe.input` passes; `probe.relog` logs out to the main menu and loads
+  the world again, followed by one `probe.relog.<GUID>` per MC mod; `probe.stage.relog` passes (its three parts in
+  order, the Wood it put in the inventory still there after the relog); the first part of `probe.stage.disabled`
+  passes; `DONE`; the game quits by itself and "Lines logged while the game quit" lists one `probe.quit.<GUID>` per
+  mod. Then "Second game: every MC mod turned off" starts the game again without your help: `probe.baseline`, one
+  `probe.disabled.<GUID>` per mod, the second part of `probe.stage.disabled`, `DONE`. The run ends with one count
+  for both games and `IN-WORLD TEST PASSED`; the run folder holds `LogOutput.first.log`, `LogOutput.disabled.log`
+  and `LogOutput.log`.
+  *Partly automated (`probe.input`, `probe.relog`, `probe.stage.relog`, `probe.stage.disabled`); by hand: Watch one
+  run: the second game starts by itself, both games are counted as one result and the three log copies exist.*
+- [ ] **W15 Configs after the second game:** note the `Enabled` line of two `BepInEx/config/MC.*.cfg` files (one
+  `true`, and set one to `false` yourself), run W14 again. Expected: during the second game every mod is off; after
+  the run both files are byte for byte as before (the one you turned off is off again), and the clean-up says
+  "... mod config file(s) the script changed for the run (Enabled) put back as before" instead of one warning per
+  file.
+- [ ] **W16 A filtered run stays short:** run `./tools/Test-InWorld.ps1 -NoBuild -Only sleep.`. Expected: no
+  `probe.input`, no `probe.relog`, no `probe.quit` lines; a second game only when a test of that filter is a
+  disabled-start test (then only that check and `probe.baseline` run in it).
+- [ ] **W17 Real input leaves nothing behind:** run `./tools/Test-InWorld.ps1 -NoBuild -Only probe.input -KeepRunning`.
+  Expected: `probe.input` passes (key, mouse button, wheel, test gamepad stick, trigger and button all seen by the
+  game; "after ReleaseInput: test gamepad removed, game back on keyboard and mouse, nothing held"). In the game that
+  stays open: the hints show keyboard keys, the character does not move or act by itself, and your own keyboard,
+  mouse and (if you have one) controller work as usual.
+  *Partly automated (`probe.input`); by hand: Play a minute in the game left open: nothing is held down, your own
+  devices work.*

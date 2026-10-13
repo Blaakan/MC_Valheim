@@ -16,7 +16,7 @@ internal static class MenuDriver
 {
     private const string T = ProbeDriver.SetupTest;
 
-    internal static IEnumerator StartWorld(ProbeTimings timings)
+    internal static IEnumerator StartWorld(ProbeTimings timings, bool again = false)
     {
         // Menu ready = FejdStartup.Start ran (profile list loaded) and platform + Steam matchmaking up.
         var seenAt = -1f;
@@ -49,7 +49,15 @@ internal static class MenuDriver
         {
             throw new InvalidOperationException("save isolation not proven: " + error + ". World NOT started.");
         }
-        SelfTest.Pass(T, "save data isolated in the run folder, cloud saves off");
+        if (again)
+        {
+            // Relog inside a test: a PASS here would count as that test's own PASS.
+            SelfTest.Note(T, "save data still isolated in the run folder, cloud saves off");
+        }
+        else
+        {
+            SelfTest.Pass(T, "save data isolated in the run folder, cloud saves off");
+        }
 
         ClearMenuBlockers();
         var fejd = FejdStartup.instance;
