@@ -27,7 +27,10 @@ namespace MC.Exploration.ViewDistantHorizonsMod;
 //   horizons.interior      player lifted above 3000 m (what the game call inside a dungeon): no far tile renderer on,
 //                          nothing painted, no sea, no far object; back down: all back
 //   horizons.interior-off  mod turned off (framework path) while up there, then down: nothing of mine left on real
-//                          zones, vanilla grid with meshes, water plane and fog the game's, no buffer; on again
+//                          zones, vanilla grid with meshes, water plane and fog the game's, no buffer; no error of my
+//                          own code and none of anybody else while the grass grow back (lines whose stack run
+//                          through Valheim Community Patch = known incompatibility of the README: NOTE, no fail);
+//                          on again
 //   horizons.stream        player flown 2 km and back at 90 m/s: far ground under every point around the camera
 //                          at every check, no error, no frame over 3 s; after: zones load, finest tile under the
 //                          camera within 15 s; NOTE frame times
@@ -856,6 +859,12 @@ internal static class WorldTests
             c.Check(player.InInterior() && hid.Ok, "lifted above 3000 m the player counts as inside and the game hides the overworld");
             LodTerrainManager.TestRealZoneLeftovers(out _, out var sunkInside, out _, out _);
             c.Note($"inside, before turning off: {sunkInside} real zones still carry the depth-only values (their renderers are off)");
+            // Me count error lines of the turn-off, by who: from here until game's own distant terrain have its meshes
+            // and grass grew back. Half second first, so nothing of the lift itself get counted.
+            yield return new WaitForSecondsRealtime(0.5f);
+            var ownMark = ErrorWatch.Errors;
+            var knownMark = ErrorWatch.KnownForeignErrors;
+            var otherMark = ErrorWatch.OtherErrors;
 
             Kit.SwitchOff();
             yield return Kit.Frames(2);
@@ -880,6 +889,23 @@ internal static class WorldTests
                 "outside: no far tile, far object or bake object left");
             c.Check(Kit.Near(RenderSettings.fogDensity, raw), $"outside: clear-weather fog is the game's own ({Kit.F(RenderSettings.fogDensity)}, weather {Kit.F(raw)})");
             yield return Kit.Shot(N, "off-outside");
+
+            // Grass keep growing a moment after player is back on ground. Up there grass around player was thrown
+            // away; back down it grow again while game rebuild its own distant terrain. Valheim Community Patch
+            // (0.31.0) throw in its grass ground lookup then ("ArgumentOutOfRangeException ... Heightmap.GetHeight ...
+            // ValheimCommunityPatch.HeightmapSampling.Sample ... ClutterSystem.LateUpdate", 12 to 23 lines a run):
+            // known incompatibility (README; user decision 2026-10-08: no work-around), so those lines go in a NOTE
+            // and never fail. Error of my own code fail. Error line of anybody else fail too (this check was a "bug"
+            // test of its own until then, same walk: "no error line of any plugin"; only the known lines got let go).
+            yield return new WaitForSecondsRealtime(1.5f);
+            var ownOff = ErrorWatch.Errors - ownMark;
+            var knownOff = ErrorWatch.KnownForeignErrors - knownMark;
+            var otherOff = ErrorWatch.OtherErrors - otherMark;
+            c.Note($"turned off inside, back outside: {knownOff} error lines whose stack runs through {ErrorWatch.KnownForeign} (the known incompatibility of the README, not a failure)"
+                   + (knownOff > 0 ? $", the last: {ErrorWatch.LastKnownForeignError}" : ""));
+            c.Check(ownOff == 0, $"turned off inside, back outside: no error from Distant Horizons' own code ({ownOff}: {ErrorWatch.FirstError})");
+            c.Check(otherOff == 0,
+                $"…and no other error line in the log, apart from those whose stack runs through {ErrorWatch.KnownForeign} ({otherOff}, the last: {ErrorWatch.LastOtherError})");
 
             Kit.SwitchOn();
             var up = new Kit.Box();

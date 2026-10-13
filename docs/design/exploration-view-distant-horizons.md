@@ -121,7 +121,11 @@ when it is built. `FillCracks` draws parents lowered under their children.
 
 Exact heights (`Terrain/ExactTerrainBuilder.cs`): levels with spacing at or below `ExactMaxSpacing` queue an
 `ExactBuildData` job; a `HeightmapBuilder.Build` prefix computes it on the builder thread exactly like a real zone (per
-64 m zone, four corner biomes, smoothstep). Exact tiles sit `NearTerrainOffset` below their true height. Wherever a
+64 m zone, four corner biomes, smoothstep). Exact tiles sit `NearTerrainOffset` below their true height. A tile
+flagged exact only takes exact heights (`LodTerrainManager.Fetch`, 0.1.1): the builder keeps 16 finished builds, so
+the exact ones can be gone before the manager fetches them, and `HeightmapBuilder.RequestTerrain` then queues a plain
+(approximate) job for the same place by itself; plain heights that come back for an exact tile are dropped and the
+exact job is queued again. Wherever a
 real zone is loaded (`ZoneSystem.m_zones`), the tile's vertices under it (eroded by one vertex) drop 60 m every frame
 (the "skirt"), so the tile becomes a wall under the real ground; a tile fully under real ground is not drawn.
 
@@ -174,6 +178,20 @@ the real objects only once `ZNetScene.HaveInstance` says they all exist, and tak
 (also for the distant ring). Cards are baked at run time into a 1024x1024 atlas on a free layer, drawn with a clone of
 the game's leaf material; meshes are merged per material with wind off. Objects sit on the far terrain
 (`TrySampleSurface`; rocks and buildings shift with their zone's height error).
+
+When the manager looks again (`DistantObjectManager.Tick`, then `RecomputeDesired`): the camera moved
+`UpdateStepDistance`, the player's reference zone changed, the synced simulation distance changed
+(`ZNet.GetSyncedSimulationDistance`, compared every frame since 0.1.1: the game's near and distant sets follow it),
+near zones are still spawning (every 0.1 s), the far terrain's surface cut changed (at most every 0.25 s), or the
+spyglass boost moved. The camera-step and terrain timers count unscaled time (0.1.1), so the far objects also follow
+the far terrain in a paused game; the wait for spawning zones stays on game time, because the game creates real
+objects on game time (`ZNetScene.Update`) and nothing can change while paused. A near tile
+(Mesh and Full band, and spyglass-boosted tiles) is built again when the far terrain tile under one of its watch
+points changes: the four corners and the centre of its own square, and, since 0.1.1, the strip its trees really reach
+into. A tile draws the zones whose centre lies in it, so its objects reach 32 m past its west and south edge, where
+the far ground belongs to the neighbouring terrain tiles; one point per 256 m of that strip plus its corner is
+watched (enough for every allowed `BaseTileSize`, 128 m and up: the four children of a terrain node always join or
+leave the drawn surface together). Thin and Far tiles are seated once, when built.
 
 ### 3.6 Framework integration (G7) — `Plugin.cs`, `TerrainLink.cs`, `Patches/TerrainLodPatches.cs`
 
@@ -292,7 +310,11 @@ Spyglass, no rebuild on change): `SpyglassDetail` (true), `SpyglassMaxBoost` (4,
 ## 4. Edge cases
 
 - Feature turned on in a world: the vanilla grid disappears at once and the far terrain streams in over a few
-  seconds (sky can show at the horizon meanwhile).
+  seconds (sky can show at the horizon meanwhile). For up to about 2 seconds after turning on, the first coarse
+  tiles keep vertices at ground level inside the loaded zones, until the exact fine tiles replace them (accepted,
+  decision 10).
+- Feature turned off in a world with Valheim Community Patch installed: that mod logs a burst of exceptions (known
+  incompatibility, decision 11).
 - Off and on within one frame (file watcher, console): managers are destroyed immediately, so the new attach never
   finds a dying component.
 - Logout with the feature on: managers die with the scene; `Current` is cleared by the `OnDisable` postfix.
@@ -303,7 +325,13 @@ Spyglass, no rebuild on change): `SpyglassDetail` (true), `SpyglassMaxBoost` (4,
 - Interiors: tiles are skipped by the renderer check (RenderGroupSubscriber), the far sea by
   `RenderGroupSystem.IsGroupActive(Overworld)`.
 - A far-object tile whose build throws: half-made meshes are destroyed and the tile retries after 10 s (one error).
-- Paused single player: `SetEnv` does not run, so turning off writes the fog back itself.
+- Paused single player: `SetEnv` does not run, so turning off writes the fog back itself. Turned on while paused:
+  the far terrain streams in as usual and the far objects follow it (their terrain timer counts unscaled time,
+  0.1.1). The game itself creates and destroys no real objects while paused (`ZNetScene.Update` counts
+  `Time.deltaTime`).
+- Simulation distance changed while standing still (graphics menu, or a server's answer): the far objects look again
+  in the same frame (0.1.1); zones that lost their real objects are drawn far at once, zones that got them are let go
+  as soon as their real objects exist (a few seconds: `ZNetScene.CreateObjectsSorted` makes them over many ticks).
 - Config file from the standalone is not read (new GUID); same keys, new section names.
 
 ## 5. Decisions and open questions
@@ -330,6 +358,33 @@ Spyglass, no rebuild on change): `SpyglassDetail` (true), `SpyglassMaxBoost` (4,
    water-relative bands exact; the shader reads the camera position only for the lift, the fade, the dissolve and the
    snow glint, so moving it changes nothing else. Cost: painted zones (they start about 30 m from the camera) are not
    tessellated; the game tessellates only within 50 m (and below factor 2 beyond 30 m), so no visible change.
+10. **Coarse far tiles under the loaded ground for up to about 2 seconds after turning on: accepted, the mod is not
+    changed** (user decision 2026-10-08, T26). Right after the managers attach (measured for a turn-on in a world; a
+    world load attaches the same way, not measured), the first tiles shown are coarse ones. The skirt (3.1) lowers a
+    vertex only when it and its four neighbours lie in loaded zones, so those tiles keep vertices at ground level
+    inside the loaded zones until the exact fine tiles take their place. Measured by the self tests of 2026-10-08
+    (four runs): 1.3 to 1.4 s, up to
+    about 1900 such vertices, coarsest tile level 6, and no far-tile vertex above the real ground within 200 m of the
+    player in the same runs, so it was geometry only; whether anything shows on screen is left to a look by eye
+    (T26 and the test's screenshot). Not done: applying the cover before a tile is first shown, or hiding coarse
+    tiles over loaded zones until the exact ones are built. The README says "for up to about 2 seconds after turning
+    on"; the self test `horizons.attach-cover` holds that limit (2 s, it was 0.5 s as a `horizons.bug.*` test) and
+    that no far-tile vertex stands above the real ground within 200 m meanwhile.
+11. **Valheim Community Patch errors when the mod is turned off in a world: documented as a known incompatibility,
+    no work-around** (user decision 2026-10-08, C09, T23). With Valheim Community Patch (0.31.0) installed, turning
+    the mod off in a world logs a burst of exceptions from that mod's grass ground lookup
+    (`ArgumentOutOfRangeException` in `Heightmap.GetHeight`, called from `ValheimCommunityPatch.HeightmapSampling.Sample`,
+    reached from `ClutterSystem.LateUpdate` through that mod's patches on the grass generation), between this mod
+    letting go of the far terrain (`TerrainLink.Detach`, which calls the game's own `TerrainLod.ResetMeshes` and
+    `CreateMeshes`) and the game's distant terrain having its meshes. Seen only in the self tests that turn the mod
+    off while the player is in an interior and then bring the player back out, where the grass grows again
+    (`horizons.interior-off` and the former bug test of the same walk: 12 to 23 lines each time, runs of
+    2026-10-07 and 10-08); the tests that turn it off while the player stands still outside logged none
+    (`horizons.toggle`, `horizons.detach`). Nothing else is known to break; whether the grass is placed
+    wrongly afterwards is not known. The cause was read from the stack only, not checked inside the other mod. Not
+    done: keeping the re-created vanilla tiles out of the real-ground list until they are flagged distant and have
+    heights. Tests: `horizons.interior-off` fails on an error from this mod's own code and on any other error line
+    while the mod is off; lines whose stack runs through `ValheimCommunityPatch` are counted in a NOTE.
 
 ### 5.2 Open questions
 
@@ -382,6 +437,39 @@ fixed:
   got the 0.5 m depth drop for the same bump mismatch. Verified with `horizons.near` before and after at the same spot
   (every zone forced to be painted: ovals before, none after). The pale shore strip still looks wider than with the
   mod off, also with real zones left to the game: that is the thinner fog (G6), not the copies.
+
+### 5.6 Faults found by the self tests (fixed in 0.1.1)
+
+Found by the in-world self tests of 2026-10-07 and 10-08 (each had a failing `horizons.bug.*` test), fixed 2026-10-08.
+Not yet run in game on 0.1.1.
+
+- **Turned back on while paused, far objects did not follow the terrain** (T25). `DistantObjectManager.Tick` added
+  `Time.deltaTime` (0 while paused) to the timer that throttles its looks at the far terrain, so trees stayed on the
+  first coarse tiles (up to 35 m off) until the game resumed. Fix: unscaled time for that timer and the camera-step
+  one. Test: `horizons.paused-objects`.
+- **Far objects did not follow a simulation-distance change until the camera moved 32 m** (T28): 128 zones with
+  neither real nor far objects after lowering it, 37 with both after raising it. Nothing asked for a new look when
+  `ZNet.ApplySimulationDistance` changed the game's near and distant sets. Fix: `Tick` compares the synced distance
+  with the one of its last look. Checks: in `horizons.simdistance`, before its camera move.
+- **Exact near tile built from approximate heights** (T27) after the builder trimmed its finished exact heights (a
+  Debug hook does what the 16-entry trim does). Fix: 3.1 (`Fetch`). Test: `horizons.exact-evict`.
+- **Far trees in the 32 m strip past a far-object tile's west / south edge were not stood again** (T30, T22, T05) when
+  the far terrain tile next door refined or merged: up to 0.4 m off (12 of 80 and 7 of 146 sampled trees in two runs;
+  the samples are each tile's first eight trees, which come from its south-west zone first, three quarters of which
+  lies in that strip). The tile only watched the far terrain
+  under its own square. Fix: 3.5 (strip watch points). Tests: `horizons.tree-reseat` (a rebuild of both, and one far
+  terrain tile made to refine next to a tile whose own ground stays) and `horizons.simdistance` (trees at the lowest
+  simulation distance).
+
+Two more findings of the same runs were decided on 2026-10-08 without changing the mod; each had a failing
+`horizons.bug.*` test, both are gone:
+
+- **Coarse far tiles under the loaded ground right after turning on** (T26): accepted for up to about 2 seconds
+  (decision 10). Its bug test became the normal test `horizons.attach-cover`, with a 2 s limit instead of 0.5 s and
+  one more check (no far-tile vertex above the real ground meanwhile).
+- **Valheim Community Patch exceptions when the mod is turned off in a world** (C09, T23): known incompatibility,
+  no work-around (decision 11). The check of its bug test went into `horizons.interior-off` (the same walk), where
+  lines through that mod are a NOTE.
 
 ## 6. Tests
 

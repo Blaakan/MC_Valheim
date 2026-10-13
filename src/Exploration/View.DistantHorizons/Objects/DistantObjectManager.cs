@@ -315,11 +315,22 @@ internal sealed class DistantObjectManager : MonoBehaviour
             _lastRefZone = refZone;
             _dirty = true;
         }
+        // Same sets follow simulation distance too (graphics menu, server's answer). Changed since my last look
+        // (_sim, RecomputeDesired) = re-check now; else zones that lost real objects stay bare and zones that got
+        // them stay drawn twice until camera move.
+        SimulationDistance sim = ZNet.instance != null ? ZNet.instance.GetSyncedSimulationDistance() : SimulationDistance.OriginalDistance;
+        if (!sim.Equals(_sim)) _dirty = true;
+
+        // Game time on purpose: game make real objects on game time (ZNetScene.Update), so paused game spawn nothing
+        // and there is nothing to re-check.
         _readinessTimer += Time.deltaTime;
         if (_readinessPending && _readinessTimer >= 0.1f) _dirty = true; // some near zones still spawning
 
         // Objects sit on far terrain: its surface cut change = re-check (throttled while it stream in).
-        _surfaceTimer += Time.deltaTime;
+        // Real time here and for _timer below, not game time: paused game (Esc menu, single player) has deltaTime 0,
+        // far terrain still stream in there (mod turned on while paused), and me must follow it.
+        float dt = Time.unscaledDeltaTime;
+        _surfaceTimer += dt;
         LodTerrainManager terrain = LodTerrainManager.Instance;
         if (cfg.SnapObjectsToTerrain.Value && terrain != null && terrain.SurfaceVersion != _surfaceVersion && _surfaceTimer >= 0.25f)
         {
@@ -331,7 +342,7 @@ internal sealed class DistantObjectManager : MonoBehaviour
         _boost = ViewBoost.Read(cfg.V(cfg.SpyglassDetail), cfg.V(cfg.SpyglassMaxBoost));
         if (ViewBoost.Poll(ref _boostApplied, _boost, Time.unscaledTime)) _dirty = true;
 
-        _timer += Time.deltaTime;
+        _timer += dt;
         if (_dirty || (_timer >= cfg.ObjectUpdateInterval.Value && Utils.DistanceXZ(camPos, _lastPos) >= cfg.UpdateStepDistance.Value))
         {
             _dirty = false;
@@ -621,6 +632,16 @@ internal sealed class DistantObjectManager : MonoBehaviour
                 sig = sig * 31 + TerrainKeyHash(terrain, minX + 1f, maxZ - 1f);
                 sig = sig * 31 + TerrainKeyHash(terrain, maxX - 1f, maxZ - 1f);
                 sig = sig * 31 + TerrainKeyHash(terrain, (minX + maxX) * 0.5f, (minZ + maxZ) * 0.5f);
+                // Tile draw zones whose CENTRE lie in it (below), so its trees reach 32 m past west and south edge.
+                // Far terrain there belong to tiles next door: they refine and merge on their own time. Me watch
+                // that strip too (one point per 256 m of edge, and the corner), else trees in it keep standing on
+                // ground that is gone.
+                for (float o = 128f; o < size; o += 256f)
+                {
+                    sig = sig * 31 + TerrainKeyHash(terrain, minX - 16f, minZ + o);
+                    sig = sig * 31 + TerrainKeyHash(terrain, minX + o, minZ - 16f);
+                }
+                sig = sig * 31 + TerrainKeyHash(terrain, minX - 16f, minZ - 16f);
             }
         }
 
@@ -1096,7 +1117,7 @@ internal sealed class DistantObjectManager : MonoBehaviour
     private static readonly List<Vector3> s_testTreeAt = new List<Vector3>();
     private static readonly List<Vector3> s_testWatchAt = new List<Vector3>();
 
-    // Self test (horizons.bug.tree-reseat): square of the world (XZ) whose trees every tile build remember
+    // Self test (horizons.tree-reseat): square of the world (XZ) whose trees every tile build remember
     // (Tile.TestWatchAt, at most 128 per tile). Off = nothing remembered. Only looked at, never change what is drawn.
     internal static bool TestWatchOn;
     internal static float TestWatchMinX, TestWatchMinZ, TestWatchMaxX, TestWatchMaxZ;

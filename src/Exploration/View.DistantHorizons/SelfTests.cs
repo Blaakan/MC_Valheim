@@ -23,7 +23,7 @@ namespace MC.Exploration.ViewDistantHorizonsMod;
 //                     back; then TerrainLink.AttachIfInWorld (turn-on-in-a-world path) and far tiles back
 // More tests in own files, registered here: WorldTests (SelfTestsWorld.cs: what get drawn), LifeTests
 // (SelfTestsLife.cs: off-on, settings, console), ObjectTests (SelfTestsObjects.cs: far objects, simulation distance,
-// spyglass), EdgeTests (SelfTestsEdge.cs: one small test per edge case believed wrong today), MpTests (SelfTestsMp.cs:
+// spyglass), EdgeTests (SelfTestsEdge.cs: one small test per edge case), MpTests (SelfTestsMp.cs:
 // client on a dedicated server), NearGroundTests (horizons.near). Shared tools: SelfTestKit.cs. horizons.cleanlog go
 // last: it look back at the whole session.
 // Me never write config (framework rule): detach test call same code the toggle call, without the toggle; tests that

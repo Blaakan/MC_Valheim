@@ -37,6 +37,9 @@ Fixes for the problems the automated in-game tests found on 2026-10-08 (none of 
 - Forge Idol Upgrades 0.1.1: the idol tooltip's cost line reads right when a cost is 0; a starred icon that cannot be
   made yet shows the plain icon, not a white square.
 - Spyglass 0.1.1: turning EdgeBlur off while looking also stops the work behind the blur.
+- Distant Horizons 0.1.1: far trees, rocks and buildings follow the far ground when the mod is turned on while paused
+  and after a simulation-distance change; far trees at tile edges stand on the ground again; near far-terrain tiles
+  always use exact heights.
 
 ## 0.4.0
 

@@ -4,18 +4,28 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
-MC Mods panel. Smoke test passed 2026-10-02 with all 24 MC mods (loads, patches cleanly, JitCheck clean: 592
-methods, 0 failures). In-world self tests (T00) passed 2026-10-02 on the same code: 4/4 `horizons.*`, and the full
-run of every mod's tests with this mod deployed (108/108). Near-ground fix after that (same day, real zones next
-to the player drawn at true size, T21-T22), then the Spyglass boost (same day, C07-C08): smoke test of all 25 MC mods
-passed (JitCheck 700 methods, 0 failures), `horizons.*` 6/6 including the new `horizons.near` and `horizons.boost`,
-run together with the Spyglass mod's tests (in-world run 2026-10-02). No hands-on in-game test yet. The
-standalone Distant Horizons was tested in game by its author (2026-09-21 to 09-28); this port changes its life cycle,
-so everything below is pending.
+**Build under test:** 0.1.1, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+MC Mods panel. 0.1.1 fixed four faults the self tests found in 0.1.0: far objects not following the far terrain when
+the mod is turned back on in a paused game (T25), far objects not following a simulation-distance change until the
+camera moved (T28), a near far tile built from approximate heights after the game's terrain builder dropped its exact
+ones (T27), and far trees in the 32 m strip past the west / south edge of their far-object tile not being stood again
+when the far ground next to that tile changed (T30, T22, T05). Those six items were reset to `[ ]`. Two more findings
+were decided the same day without changing the mod and are now written in the README: the coarse first far tiles
+reaching under the loaded ground for up to about 2 seconds after turning on (T26: reworded to that limit and reset),
+and the errors Valheim Community Patch logs when the mod is turned off in a world (T23: reworded to "no error from
+Distant Horizons' own code" and reset; C09: skipped as a known incompatibility). The self tests ran on 0.1.1 on
+2026-10-13 (game 1.0.17, in-world with Valheim Community Patch installed and with a dedicated server, every MC mod
+loaded): all of this mod's tests passed. The history below is 0.1.0's. Smoke test passed 2026-10-02 with all 24 MC
+mods (loads, patches cleanly, JitCheck clean: 592 methods, 0 failures). In-world self tests (T00) passed 2026-10-02 on
+the same code: 4/4 `horizons.*`, and the full run of every mod's tests with this mod deployed (108/108). Near-ground
+fix after that (same day, real zones next to the player drawn at true size, T21-T22), then the Spyglass boost (same
+day, C07-C08): smoke test of all 25 MC mods passed (JitCheck 700 methods, 0 failures), `horizons.*` 6/6 including the
+new `horizons.near` and `horizons.boost`, run together with the Spyglass mod's tests (in-world run 2026-10-02). No
+hands-on in-game test yet. The standalone Distant Horizons was tested in game by its author (2026-09-21 to 09-28);
+this port changes its life cycle, so everything below is pending.
 
-**Automated checks (2026-10-08):** 33 of 39 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
+**Automated checks (2026-10-13):** 37 of 37 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
 in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
@@ -72,11 +82,13 @@ far plane value (note `cam` in the `DebugLogging` stats line before and after T1
   without the mod: informational). Zones around you still load normally.
   *Partly automated (`horizons.stream`); by hand: Fly it yourself at the game's own fly speed over 3-4 km: detail near
   you appears within a few seconds while moving, it feels smooth, and note the frame rate with and without the mod.*
-- [!] **T05 Far objects:** from a hill on a clear day look at forests, big rocks, ruins and your own buildings 0.5-6 km
+- [ ] **T05 Far objects:** from a hill on a clear day look at forests, big rocks, ruins and your own buildings 0.5-6 km
   away. Expected: forests as tree shapes up to about 6 km, big rocks and buildings up to about 2 km, all standing on
   the ground (not floating, not sunk), no white or black trees.
-  **FAILED:** automated test: Far trees in the 32 m strip past their far-object tile's west / south edge are not stood
-  again when the neighbouring far terrain tile refines or merges (self-test `horizons.bug.tree-reseat`)
+  *Partly automated (`horizons.far-objects`, `horizons.tree-reseat`, `horizons.objects`); by hand: From a hill on a
+  clear day, look: forests read as tree shapes out to about 6 km, big rocks and buildings (yours and ruins) show out
+  to about 2 km and stand on the ground, and no tree is white or black on screen (the tests check a tree and a
+  building part put in the world data, the heights of sampled far trees and the baked tree cards, not the picture).*
 - [ ] **T06 Hand-over to real objects:** walk towards a forest edge 400-600 m away. Expected: as you get close the real
   trees replace the far ones without a moment with no tree and without trees shown twice.
   *Partly automated (`horizons.simdistance`); by hand: Walk towards a forest edge 400-600 m away and watch the moment
@@ -157,51 +169,57 @@ far plane value (note `cam` in the `DebugLogging` stats line before and after T1
   *Partly automated (`horizons.near`, `horizons.seam`); by hand: By eye with Tessellation on and off, low sun, along
   300-400 m of shore and open meadow: no dark ovals, no second surface, no dark straight lines, shore bands as with
   the mod off (screenshots are in the run's shots folder).*
-- [!] **T22 Far ground at the edge of the loaded area, low simulation distance:** Settings > Graphics > lowest
+- [ ] **T22 Far ground at the edge of the loaded area, low simulation distance:** Settings > Graphics > lowest
   simulation distance, Tessellation on, clear noon. Look at the ground 60-200 m away all around (where the real zones
   end). Expected: no dark specks or ovals on the far ground there, and far trees and rocks still standing on it (not
   floating, not sunk). Put the simulation distance back.
-  **FAILED:** automated test: Far trees in the 32 m strip past their far-object tile's west / south edge are not stood
-  again when the neighbouring far terrain tile refines or merges (self-test `horizons.bug.tree-reseat`)
-- [!] **T23 Turning the mod off inside a dungeon:** enter a Burial Chamber or a Troll Cave, Esc → MC Mods → untick
+  *Partly automated (`horizons.simdistance`, `horizons.simdistance-rim`); by hand: At the lowest simulation distance
+  with Tessellation on at clear noon, look at the ground 60-200 m away for dark specks or ovals, and check that far
+  rocks stand on the ground (the tests measure far trees, and the far ground against the real ground at the new rim).*
+- [x] **T23 Turning the mod off inside a dungeon:** enter a Burial Chamber or a Troll Cave, Esc → MC Mods → untick
   Distant Horizons, then walk out. Expected outside: the vanilla distant terrain (land ends about 1.2 km away in fog),
   normal fog, the ground around you drawn normally (no missing, dark or sunken ground), the game's own distant water,
-  no error. Tick it again: the far terrain streams back. Automated: `horizons.interior-off`.
-  **FAILED:** automated test: Turning the mod off in a world sets off Valheim Community Patch exceptions (self-test
-  `horizons.bug.off-foreign-errors`)
+  and no error from Distant Horizons' own code in the log. With Valheim Community Patch installed, red
+  `ArgumentOutOfRangeException ... ValheimCommunityPatch.HeightmapSampling` lines right after walking out are the
+  known incompatibility (README, Compatibility; see C09), not a failure of this item. Tick it again: the far terrain
+  streams back.
+  *Automated: `horizons.interior-off`.*
 - [ ] **T24 Simulation distance change at a coast:** on a coast with the far sea on (`FarWater = true`), Settings >
   Graphics > change the simulation distance and apply, then put it back. Expected: the far sea keeps meeting the near
   water with no flicker, no gap and no white sheet (the game's own distant water plane never shows through the far
   sea), and the far sea starts one zone inside the game's water again. Automated part: `horizons.simdistance`.
   *Partly automated (`horizons.simdistance`); by hand: At a real coast, change the simulation distance and look: no
   flicker, gap or white sheet where the near water meets the far sea.*
-- [!] **T25 Turning the mod back on while paused:** Esc → MC Mods → untick Distant Horizons, tick it again while the
+- [x] **T25 Turning the mod back on while paused:** Esc → MC Mods → untick Distant Horizons, tick it again while the
   game is still paused, and wait until the far terrain has finished streaming. Expected, still paused: the far trees
   within about 1 km stand on the far ground (not floating, not sunk); they do not wait for the game to resume.
-  Automated: `horizons.bug.paused-objects`.
-  **FAILED:** automated test: Turned back on while paused: far objects do not follow the terrain until the game
-  resumes (self-test `horizons.bug.paused-objects`)
-- [!] **T26 Right after turning the mod on (or loading a world):** Esc → MC Mods → untick, tick again, close the menu at
-  once and look at the ground 50-400 m around you during the first seconds. Expected: no coarse far ground drawn over
-  the real ground (no flat or wrong-shaped patches lying on the grass that vanish after a few seconds); only the
-  horizon may show sky for a moment. Automated: `horizons.bug.attach-cover` (it also takes a screenshot of that
-  moment, `coarse-ground-over-loaded-zones`).
-  **FAILED:** automated test: Right after attach, coarse far tiles lie over loaded real ground (self-test
-  `horizons.bug.attach-cover`)
-- [!] **T27 Near far ground keeps exact heights when the terrain builder is busy:** automated only,
-  `./tools/Test-InWorld.ps1 -Mod View.DistantHorizons -Only horizons.bug.exact-evict` (Debug build, game closed). The
+  *Automated: `horizons.paused-objects`.*
+- [ ] **T26 Right after turning the mod on (or loading a world):** Esc → MC Mods → untick, tick again, close the menu at
+  once and look at the ground 50-400 m around you during the first seconds. Expected: within about 2 seconds the
+  coarse first tiles of the far terrain are out of the loaded area around you (the fine tiles have taken their
+  place), and meanwhile nothing far is drawn above the real ground: no flat or wrong-shaped patch lying on the
+  grass. Only the horizon may show sky for a moment. Known and accepted (README, "Good to know"): for up to about
+  2 seconds after turning on, those coarse tiles still reach under the loaded ground (the self tests of 2026-10-08
+  measured 1.3 to 1.4 s, with no far-tile vertex above the real ground within 200 m). Also look at the screenshot
+  the self test `horizons.attach-cover` takes of that moment (`coarse-ground-over-loaded-zones`, in the run's
+  `shots\` folder).
+  *Partly automated (`horizons.attach-cover`); by hand: Right after ticking the mod on (and right after loading a
+  world), look at the ground 50 to 400 m around you for the first seconds, and at the test's screenshot
+  'coarse-ground-over-loaded-zones' in the run's shots folder: no flat or wrong-shaped patch of far ground lying on
+  the real ground (the test measures tile vertices after a turn-on in a world, and looks for far ground above the real
+  ground only within 200 m).*
+- [x] **T27 Near far ground keeps exact heights when the terrain builder is busy:** automated only,
+  `./tools/Test-InWorld.ps1 -Mod View.DistantHorizons -Only horizons.exact-evict` (Debug build, game closed). The
   test makes the game's terrain builder drop the finished heights of one exact far tile before the mod fetches them, as
   happens when many other terrain builds finish in between (exploring fresh land during a long frame). Expected:
   `[selftest] PASS`: that tile is built from exact heights again, or is no longer treated as exact, so no step stays
   where the far ground meets the real ground.
-  **FAILED:** automated test: Exact near tile built from approximate heights after the builder dropped its exact data
-  (self-test `horizons.bug.exact-evict`)
-- [!] **T28 Simulation distance change while standing still:** stand still, Settings > Graphics > lower the simulation
+  *Automated: `horizons.exact-evict`.*
+- [x] **T28 Simulation distance change while standing still:** stand still, Settings > Graphics > lower the simulation
   distance, apply, close the menu and do not move. Expected within a few seconds: the far trees and rocks fill the
   ring the real ones left (no bare ring between the real objects and the far ones). Raise it again without moving:
-  no trees shown twice in the ring. Automated: `horizons.bug.simdistance-still`.
-  **FAILED:** automated test: Far objects do not follow a simulation-distance change until the camera moves 32 m
-  (self-test `horizons.bug.simdistance-still`)
+  no trees shown twice in the ring.
+  *Automated: `horizons.simdistance`.*
 - [ ] **T29 Far sea with a lower ViewDistance:** on a coast in clear weather (`env Clear`, `tod 0.5`), `FarWater =
   true`, set `ViewDistance = 5000` and `fly` up 200 m. Expected (README: `ViewDistance` is "also the outer edge of the
   far sea"): the far sea stops about 5 km out at once while the land beyond is still drawn (coarse, no hole). Note how
@@ -211,13 +229,12 @@ far plane value (note `cam` in the `DebugLogging` stats line before and after T1
   setting both ways, land stays whole).
   *Partly automated (`horizons.viewdistance-sea`); by hand: How it looks: beyond the sheet no water is drawn, so the
   sea bed shows as dry land unless CameraFarClip is lowered too; decide whether that is acceptable.*
-- [!] **T30 Far trees after the far terrain streams in again:** stand on a hill with forest 400-1200 m away, F5 →
+- [x] **T30 Far trees after the far terrain streams in again:** stand on a hill with forest 400-1200 m away, F5 →
   `dh rebuild` and at once `dh objects rebuild`, wait until the far terrain and the far trees are back (about 10 s).
   Expected: every far tree within about 1.2 km stands on the far ground (not floating, not sunk), also the ones near
   the edge of a 256 m / 512 m far-object tile. Found by the self tests (2026-10-07): 12 of 80 sampled trees stood up to
-  0.38 m off until `dh objects rebuild` was run once more. Automated: `horizons.bug.tree-reseat`.
-  **FAILED:** automated test: Far trees in the 32 m strip past their far-object tile's west / south edge are not stood
-  again when the neighbouring far terrain tile refines or merges (self-test `horizons.bug.tree-reseat`)
+  0.38 m off until `dh objects rebuild` was run once more.
+  *Automated: `horizons.tree-reseat`.*
 
 ## 0.1.0 — multiplayer (needs a second player)
 
@@ -274,12 +291,14 @@ far plane value (note `cam` in the `DebugLogging` stats line before and after T1
   installed nothing changes and the log has no Spyglass line.
   *Partly automated (`horizons.spyglass`, `horizons.boost`); by hand: Run once without the Spyglass mod installed and
   check the log has no Spyglass line; try the settings with a real spyglass.*
-- [!] **C09 Valheim Community Patch, turning the mod off in a world:** with Valheim Community Patch installed, go into
-  a dungeon (or `fly` far up and come back down, anything that makes the grass around you grow again), Esc → MC Mods →
-  untick Distant Horizons while inside, walk out and walk around for a minute. Expected: no red
-  `ArgumentOutOfRangeException ... ValheimCommunityPatch.HeightmapSampling` lines in the log, and the grass grows
-  normally around you. Found by the self tests (2026-10-07, Valheim Community Patch 0.31.0): 22 such lines right after
-  turning the mod off, until the game's own distant terrain had its meshes. Automated:
-  `horizons.bug.off-foreign-errors`.
-  **FAILED:** automated test: Turning the mod off in a world sets off Valheim Community Patch exceptions (self-test
-  `horizons.bug.off-foreign-errors`)
+- [-] **C09 Valheim Community Patch, turning the mod off in a world:** skipped: known incompatibility, documented in
+  the README (Compatibility); by decision (2026-10-08) the mod does not work around it. What is seen: with Valheim
+  Community Patch installed (0.31.0), go into a dungeon (or `fly` far up and come back down, anything that makes the
+  grass around you grow again), Esc → MC Mods → untick Distant Horizons while inside, and walk out: the log shows a
+  burst of red `ArgumentOutOfRangeException ... Heightmap.GetHeight ... ValheimCommunityPatch.HeightmapSampling.Sample
+  ... ClutterSystem.LateUpdate` lines from that mod's grass ground lookup (12 to 23 at a time in the self-test runs of
+  2026-10-07 and 10-08), between this mod letting go of the far terrain and the game's own distant terrain having its
+  meshes; then they stop. In the same runs, turning the mod off while standing still outside logged none. Nothing
+  else is known to break; whether the grass is placed wrongly afterwards is not known. The cause was read from the
+  stack trace only, not checked inside the other mod. The self test `horizons.interior-off` counts these lines in a
+  NOTE and does not fail on them (T23).

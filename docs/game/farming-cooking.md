@@ -130,7 +130,10 @@ dev plugin that iterates `ZNetScene.instance.m_prefabs` and `ObjectDB.instance.m
    - vines (`m_attachDistance > 0`) need a `Piece` with `!m_noVines` in range: `NoAttachPiece`
    - Note: with no heightmap under the plant (for example on a floating object), the biome, cultivation, heat and
      cold checks are skipped entirely.
-5. **`Plant.GetGrowTime`** returns `Lerp(m_growTime, m_growTimeMax, Random(seed))`, deterministic per plant.
+5. **`Plant.GetGrowTime`** returns `Lerp(m_growTime, m_growTimeMax, Random(seed))`, deterministic per plant. It reads
+   the two fields of the instance on every `SUpdate` pass: each plant keeps its own point in the range, and writing
+   the fields on a loaded plant changes its due time at the next pass (1.0.17; prefab edits and the first 10 s: see
+   "Learned in the Cultivator Replant review" under the Cultivator revamp idea).
 6. **`Plant.Grow`** (owner):
    - If the plant is unhealthy: with `m_destroyIfCantGrow` it calls `Destroy()`; otherwise it does nothing and
      keeps waiting forever.
@@ -263,6 +266,16 @@ plant grows on the first owner update after enough server time has passed.
 3. `Pickable.RPC_Pick` (owner): spawns `max(m_minAmountScaled, ScaleDrops(m_amount)) + bonus` items (or
    `m_amount` when `m_dontScale`), plus `m_extraDrops`; optionally `BaseAI.AggravateAllInArea` with the `Theif`
    reason; then `RPC_SetPicked(true)` to everybody.
+   - Drops (1.0.17): one drop per item of the pick, each with stack 1, then one drop per extra-drop entry.
+     `Pickable.Drop` puts drop number `i` at the plant + `m_spawnOffset` (0.5 m by default; along the plant's own up
+     axis when `m_spawnOffsetLocalTransform`) + up to 0.2 m sideways + `0.5 m × i` straight up, and gives it an upward
+     speed of 4 m/s. There is no limit: a pick of 9 puts its last drop 4.5 m above the plant.
+   - `Game.ScaleDrops(GameObject, int)` (the Resources world modifier) rounds `amount × m_resourceRate` and clamps it
+     to 1 .. the item's max stack size (1000 for unstackable items); item types in `Game.m_nonScaledDropTypes` are not
+     scaled.
+   - Measured 2026-10-08, game 1.0.17, Resources ×3 (Loot Pickup Filter self-test note; names as written there, not
+     prefab names): pickables that give 8 or more items in one pick include the seed crops (9), kale and oat (9),
+     royal jelly (15), tar (12), big tar (45), meteorite (18) and vines (9 + 3 extra).
 4. `Pickable.SetPicked` (owner): stores `s_picked` and `s_pickedTime`, or destroys a one-shot pickable.
 5. `Pickable.UpdateRespawn` (owner): when `ShouldRespawn()` (more than `m_respawnTimeMinutes` since
    `s_pickedTime`, plus the optional `m_spawnCheck` delegate), broadcasts `RPC_SetPicked(false)`.
@@ -624,6 +637,24 @@ Other clients only see transforms and effects.
   `m_maxDistance` 30; `Fish1` (Perch) `m_staminaUse` 3, `m_escapeStaminaUse` 10. So vanilla reeling costs only the
   fish's own stamina value x quality (3/s calm, 10/s fighting for a plain Perch at Fishing 0). A calm hooked fish
   (`Stop` braking) holds the float back: the line came in at about 0.8 m/s instead of the rod's 2 m/s.
+
+Learned while fixing Fishing Fight 0.1.1 (2026-10-08, 1.0.17):
+- **A fish out of the water never swims.** `Fish.IsOutOfWater()` is true when the water level under the fish
+  (`m_inWater`: written every rendered frame by `WaterVolume.UpdateFloaters`, waves included, and −10000 after it left
+  the volume, as for characters in [exploration-player.md §1](exploration-player.md)) is more than `m_height` below
+  its body. `Fish.CustomFixedUpdate` then turns gravity on and returns before the waypoint, `SwimDirection` and `Stop`
+  code. The escape timer above that return still runs (the fish wiggles, and while it runs the reel costs the escape
+  stamina and comes in at half speed), and the splash effect of a struggling hooked fish is skipped.
+- **The line is three speed servos, not a length limit** (`Utils.Pull`, `ForceMode.VelocityChange`): the float is
+  pulled toward the fish beyond 0.5 m (at half strength, speed `m_moveForce`), the float toward the rod top beyond
+  `m_lineLength` (full strength), and the fish toward the float beyond 1 m (speed `m_hookForce`). The catch test
+  looks only at `m_lineLength <= 0.5`, never at where the float is; the only link between the two is that the line
+  shortens only while `m_lineLength` is more than the rod-top-to-float distance minus 0.2 m.
+- That 0.2 m rule nearly stalls a normal-game reel against an escaping fish: 0.44 to 0.48 m of line in 1.2 s, with
+  line coming in on 14 to 15 of 61 physics ticks (measured 2026-10-08, game 1.0.17, self-test `fishing.toggle`).
+- The rod top (`_RodTop`, the child `FishingFloat.GetRodTop` looks up on the owner) is about 3.2 m in front of the
+  player and 1.45 m above the feet while reeling, so turning the body 45 degrees moves it about 2.45 m (worked out,
+  unverified).
 
 ---
 

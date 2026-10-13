@@ -149,7 +149,11 @@ session, so land you have not been near shows terrain only.
 - **Fog decides what you see.** With normal fog the far land mostly shows on mountains and clear evenings. The mod
   thins clear-weather fog by default (`FogDensityMultiplier = 0.25`); set it to 1 for the normal fog.
 - **Turning it on inside a world**: the normal distant terrain disappears at once and the far terrain streams in over
-  a few seconds, nearest first. At world load this happens behind the loading screen.
+  a few seconds, nearest first. At world load this happens behind the loading screen. For up to about 2 seconds after
+  turning on, the first coarse far tiles still reach under the loaded ground around you, until the fine tiles take
+  their place; where such a tile lies higher than the real ground, a flat or wrong-shaped patch could show on the
+  ground 50 to 400 m away for that moment (in the automated tests it lasted 1.3 to 1.4 seconds and no far ground
+  stood above the real ground within 200 m).
 - **Never-generated land** shows terrain but no trees or buildings: far objects only exist where the game has created
   the zone's objects at some point.
 - **Terrain edits** (raised or dug ground) only show on loaded ground, as in the normal game: seen from far away,
@@ -190,6 +194,14 @@ Built for Valheim 1.0.16. Safe to add or remove at any time: it stores nothing i
   winter the far sea stays open water past the frozen near sea.
 - **Valheim Community Patch, Valheim Performance Optimizations**: should work together. Far tiles never count as the
   ground of a loaded zone for other mods.
+- **Valheim Community Patch, known issue**: with it installed, turning Distant Horizons off in a world logs a burst
+  of red errors from that mod's grass ground lookup (`ArgumentOutOfRangeException` ... `Heightmap.GetHeight` ...
+  `ValheimCommunityPatch.HeightmapSampling.Sample` ... `ClutterSystem.LateUpdate`), between this mod letting go of the
+  far terrain and the game's own distant terrain having its meshes; then they stop. Seen in the automated tests
+  (Valheim Community Patch 0.31.0) when the mod was turned off while the player was in an interior, as inside a
+  dungeon, and then came back out, while the grass around the player grew again: 12 to 23 lines each time. Turning
+  the mod off while standing still outside logged none. Nothing else is known to break. The cause was read from the
+  error's stack trace only, not checked inside the other mod, and this mod does not work around it.
 - **Terrain mods** (AdvancedTerrainModifiers, Infinity Hammer, Heightmap Unlimited): see "Terrain edits" above.
   **Voxheim**: its voxel ground is not covered by `RealTerrainFadeFix` and turns dark beyond about 200 m.
   **Badgers HD Terrain** (replacement terrain shader): the far terrain relies on the game's own shader and may look
@@ -207,4 +219,4 @@ Built for Valheim 1.0.16. Safe to add or remove at any time: it stores nothing i
 - **Swim Dive** (MC): under water its own fog takes over as usual. **Sneak Ambush** (MC): its fog bonus uses the
   weather's own fog, not the rendered one, so thinner fog does not change stealth. **Deep North Awakening** (MC): its
   blizzards keep their fog when their density is at or above `FogStormDensity`.
-- The mods above have not been tested in game with this one yet.
+- Apart from what a bullet above says was seen, the mods above have not been tested in game with this one yet.

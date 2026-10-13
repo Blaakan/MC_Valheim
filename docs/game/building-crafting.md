@@ -40,12 +40,13 @@ Building and crafting in 1.0 are split across three layers:
 ### Flow
 1. `Player.Update` → `Player.UpdatePlacement(takeInput, dt)` every frame while `InPlaceMode()` (`m_buildPieces != null`).
 2. Selecting a piece → `Player.SetupPlacementGhost()`: instantiates the prefab with `ZNetView.m_forceDisableInit = true`, strips joints, rigidbodies, lights, audio, particles, `TerrainModifier`, `Demister`, `WispSpawner`, disables `Windmill`, moves every transform to layer `ghost`, enables the `_GhostOnly` child.
-3. Each frame `Player.UpdatePlacementGhost(flashGuardStone)`:
+3. Each frame `Player.UpdatePlacementGhost(flashGuardStone)`, called from `Player.LateUpdate` on the player's own game (right after it sets the `ZNet` reference position; the method returns at once when there is no ghost) and once more by `TryPlacePiece` just before it reads the status:
    * `Player.PieceRayTest` (camera ray, 50 m, but hit must be within `m_maxPlaceDistance + Piece.m_extraPlacementDistance`).
    * Sequential rule checks that set `m_placementStatus`: station-extension needs a station (`StationExtension.FindClosestStationInRange`) and spacing (`OtherExtensionInRange(m_spaceRequirement)`); `m_blockingPieces/m_blockRadius`; `m_mustConnectTo`; **`hit WearNTear.m_supports == false` → Invalid** (this is why nothing can be built on chests and other non-supporting pieces); water/ground/cultivated/vegetation rules; `m_notOnWood`, `m_notOnTiltingSurface`, `m_inCeilingOnly`, `m_notOnFloor`, teleport-area, dungeon (`GlobalKeys.DungeonBuild`), Deep-North snow rules (`m_allowedInDeepSnow`, `m_requireDeepSnow`, `m_deepSnowBuildHeight`).
    * Positioning: closest collider point, or manual snap point (`TabLeft/TabRight` cycles `m_manualSnapPoint` over the ghost's own snap points).
    * Snapping (skipped while AltPlace is held): `Player.FindClosestSnapPoints(ghost, 0.5f, …)` collects snap points from pieces within 10 m (`Piece.GetSnapPoints(point, radius, …)`; a snap point is **any child transform tagged `snappoint`**), picks the closest pair ≤ 0.5 m, rejects if `IsOverlappingOtherPiece`.
    * Final checks: `Location.IsInsideNoBuildLocation`, `PrivateArea.CheckAccess(pos, wardRadius, flash, wardCheck)`, `CheckPlacementGhostVSPlayers`, `m_onlyInBiome`, `m_noClipping` (`TestGhostClipping`).
+   * Two details of those checks (1.0.17): the `m_mustConnectTo` test overlaps a sphere of `m_connectRadius` at the ghost's own transform, which at that point still holds the position the previous call gave it (the ghost is moved later in the method; the blocking-piece test before it uses the ray hit point). `Location.IsInside` measures a flat XZ distance to the location's centre, so a no-build radius has no height limit: a point far above or below a no-build location (the ground over a dungeon, for example) counts as inside.
    * `SetPlacementGhostValid` tints red via `Piece.SetInvalidPlacementHeightlight`.
 4. Click (`Attack`/`JoyPlace`) → `Player.HaveRequirements(piece, RequirementMode.CanBuild)` → `Player.TryPlacePiece(piece)` (re-runs `UpdatePlacementGhost(true)`, maps status → message) → `Player.PlacePiece(piece, pos, rot, doAttack, cheated)`.
 5. `Player.PlacePiece`: `Object.Instantiate(prefab)` (the new ZDO is owned by the placer), `AddKnownStation` if it contains a `CraftingStation`, `Piece.SetCreator(playerID, platformID)`, `PrivateArea.Setup(name)`, `WearNTear.OnPlaced()`, `ItemDrop.MakePiece(true)` (feasts/placeable items), every `IPlaced.OnPlaced()` (e.g. `Piece.OnPlaced` for harvest pieces), place effects, stats, sets `ZDOVars.s_cheated` if needed.
@@ -72,6 +73,8 @@ Building and crafting in 1.0 are split across three layers:
 | Change cost | `Player.ConsumeResources` / `Player.HaveRequirements(Piece, RequirementMode)` | Shared by build and craft paths — filter by caller |
 | Add snap points | add child `GameObject` tagged `snappoint` to a prefab at `ZNetScene.Awake` | Snapping is purely data-driven |
 | Build menu UX | `PieceTable.UpdateAvailable`, `BuildUi` classes | 1.0 menu uses tags/favourites/recent |
+
+**Compatibility note (third-party mod, not a game fact):** PlantEasily 2.2.2 (plugin GUID and Harmony id `advize.PlantEasily`) has its own postfix on `Player.UpdatePlacementGhost`. It runs its own plant check on the aimed ghost (ground, cultivated, biome, grow space, roof, heat and cold) and, when that check passes, writes `m_placementStatus = Valid` and clears the red highlight whatever the game decided before; it does not look at `Piece.m_mustConnectTo`, no-build locations or wards, and it sets the status nowhere else. A mod whose own placement rule must hold next to it has to put its verdict back in a postfix that runs after it (`[HarmonyAfter("advize.PlantEasily")]`), as Cultivator Replant 0.1.1 does. Read from the PlantEasily 2.2.2 DLL for that fix (2026-10-08), not re-checked for this chapter; a later version may differ.
 
 ---
 
@@ -117,7 +120,8 @@ Owner computes wear/support and applies damage. A non-modded owner will apply va
 * Owner `RPC_AddFuel` **does nothing when `CeilToInt(fuel) >= m_maxFuel`**: the item the sender already removed is lost (a non-owner reading a stale fuel value can waste wood this way).
 * `Fireplace.UseItem`: fuel item or firework items.
 * `Fireplace.UpdateState`: visuals; **if `m_canTurnOff` and it is wet (rain/wind without cover, only computed for prefabs having both Low/High objects) the owner auto-toggles it off**.
-* `Fireplace.GetHoverText` returns **empty string when `m_infiniteFuel`**.
+* `Fireplace.GetHoverText` returns **empty string when `m_infiniteFuel`**. With `m_canRefill` it shows the fuel count and both Use lines; with `m_canRefill` false it keeps one Use line only when `m_canTurnOff` is true and the fire has fuel, and otherwise shows the name alone.
+* `Fireplace.GetHoverText`, `Interact` and `UseItem` read `m_canRefill`, `m_canTurnOff` and `m_infiniteFuel` from the instance on every call (nothing is cached), so a mod that changes them on one instance changes its hover text and behaviour in the same frame. While `m_canRefill` is false, `UseItem` refuses every item, fireworks included.
 * `Fireplace.CanBeRemoved` exists but nothing calls it (dead code in 1.0.16).
 * Radial menu: `Fireplace.TryGetItems` / `CanUseItems` return false for infinite-fuel fires.
 * Prefab data (1.0.16, runtime dump of every `Fireplace` prefab, 2026-09-29; full table in
@@ -430,7 +434,7 @@ the fuel item reference itself is unverified). `piece_FrostFoundry` "Frost Found
 * **Vanilla capacities** (1.0.16 game data): Smelter and Blast Furnace 10 ore / 20 Coal, Eitr Refinery 20 / 20, Charcoal Kiln 25, Windmill 50, Spinning Wheel 40 (no fuel). Only the Windmill has an Empty switch (`m_emptyOreSwitch`); the others drop their output. The station add switches seem to use `m_holdRepeatInterval` 0.2 (holding E keeps adding; read by record layout,
 unverified: `Switch` defaults to −1, which means no repeat). Cooking stations: section 14 of [farming-cooking.md](farming-cooking.md).
 * **No-source conversions**: `ItemConversion.m_from` can be null (`Smelter.Awake` sets `m_noSourceConversion`); `FindCookableItem` skips them, but `Smelter.TryGetItems` (radial menu) dereferences `m_from`: null-check it in any code that reads `m_conversion`.
-* **Cooking station hover vs press**: the hover switches to "take" only when every slot is done (`IsEverythingCooked`), but E takes a finished item as soon as any slot is done (`HaveDoneItem`).
+* **Cooking station hover vs press**: the hover switches to "take" only when every slot is done (`IsEverythingCooked`), but E takes a finished item as soon as any slot is done (`HaveDoneItem`). `CookingStation.GetHoverText` returns an empty text when the station has a food switch (`m_addFoodSwitch`; the same text is put on the switch instead), and otherwise always carries a Use line (the add text, or the take text when no slot is `NotDone`).
 * **Key hints**: vanilla's combined-key hint (`ItemStand.GetHoverText`) shows `$KEY_AltPlace + $KEY_Use`, or `$KEY_AltKeys` when `IsNonClassicFunctionality() && IsGamepadActive()`. `Localization.Localize` serves whole strings from an LRU cache that a key rebind does not evict (only language and input-layout changes do): read live bindings with `Localization.GetBoundKeyString`.
 * **First skill level-up is a Center message**: `Skills.RaiseSkill` uses `MessageType.Center` when the level before the raise was 0 (`TopLeft` afterwards), via `Player.Message` (not logged). Code that mutes Center messages during a loop (cooking raises Cooking 0.4 per item) must keep it.
 

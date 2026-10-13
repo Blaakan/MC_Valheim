@@ -482,7 +482,7 @@ internal sealed class LodTerrainManager : MonoBehaviour
 #if DEBUG
             if (TestEvictExact && t.Exact && TestEvict(builder, t, wg)) TestEvictExact = false;
 #endif
-            HeightmapBuilder.HMBuildData data = builder.RequestTerrain(t.Center, t.Width, t.Scale, true, wg);
+            HeightmapBuilder.HMBuildData data = Fetch(builder, t, wg);
             if (data != null)
             {
                 t.BuildData = data;
@@ -534,13 +534,28 @@ internal sealed class LodTerrainManager : MonoBehaviour
             // Exact tiles put own request on builder queue; poll below then find it like any other.
             if (best.Exact && !ExactTerrainBuilder.TryEnqueue(builder, best.Center, best.Width, best.Scale, wg))
                 best.Exact = false;
-            HeightmapBuilder.HMBuildData data = builder.RequestTerrain(best.Center, best.Width, best.Scale, true, wg);
+            HeightmapBuilder.HMBuildData data = Fetch(builder, best, wg);
             if (data != null)
             {
                 best.BuildData = data; // builder cached it already
                 best.State = TileState.Ready;
             }
         }
+    }
+
+    // Me ask builder for tile's heights (HeightmapBuilder.RequestTerrain); null = not ready yet. Tile flagged exact
+    // take exact heights only. Plain ones can come back for it: builder keep just 16 finished builds, so exact
+    // heights can be trimmed away before me fetch them, and RequestTerrain then queue plain (approximate) job by
+    // itself; job of same place left from other layout look the same. Tile built from those would be drawn
+    // NearTerrainOffset lower and trusted to meet real ground with heights that do not. So me drop them and put
+    // exact job back on queue. Builder gone (quit) = me keep them and tile no longer count as exact.
+    private static HeightmapBuilder.HMBuildData Fetch(HeightmapBuilder builder, LodTile t, WorldGenerator wg)
+    {
+        HeightmapBuilder.HMBuildData data = builder.RequestTerrain(t.Center, t.Width, t.Scale, true, wg);
+        if (data == null || !t.Exact || data is ExactBuildData) return data;
+        if (ExactTerrainBuilder.TryEnqueue(builder, t.Center, t.Width, t.Scale, wg)) return null;
+        t.Exact = false;
+        return data;
     }
 
     private void EnsureRoot()

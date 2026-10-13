@@ -14,35 +14,66 @@ namespace MC.Exploration.ViewDistantHorizonsMod;
 
 // Debug build only. Me = error and warning lines of this mod since game start (BepInEx log listener, put on once and
 // kept: mod off-on in a test must not lose the count). Self test lines ("[selftest] FAIL ...") never count.
+// Every error line of the log go in one of three counts: mine (Errors), not mine but stack run through Valheim
+// Community Patch (KnownForeignErrors: the known incompatibility of the README, tests NOTE it, never fail on it),
+// anybody else's (OtherErrors).
 internal sealed class ErrorWatch : ILogListener
 {
+    // Namespace of Valheim Community Patch, as its frames show in a stack trace.
+    internal const string KnownForeign = "ValheimCommunityPatch";
+
     private static ErrorWatch _instance;
     private static readonly object Gate = new object();
     private static int _errors;
     private static string _firstError = "";
-    private static int _anyErrors;
-    private static string _lastAnyError = "";
+    private static int _knownForeign;
+    private static string _lastKnownForeign = "";
+    private static int _otherErrors;
+    private static string _lastOther = "";
     private static readonly List<string> WarningLines = new List<string>();
 
-    // Error lines of ANY plugin, the game or Unity since game start (self test lines never count), and the last one.
-    internal static int AnyErrors
+    // Error lines not of mine whose text (stack trace) name Valheim Community Patch, and the last one.
+    internal static int KnownForeignErrors
     {
         get
         {
             lock (Gate)
             {
-                return _anyErrors;
+                return _knownForeign;
             }
         }
     }
 
-    internal static string LastAnyError
+    internal static string LastKnownForeignError
     {
         get
         {
             lock (Gate)
             {
-                return _lastAnyError;
+                return _lastKnownForeign;
+            }
+        }
+    }
+
+    // Error lines of any other plugin, the game or Unity: not mine, Valheim Community Patch not in them. And the last.
+    internal static int OtherErrors
+    {
+        get
+        {
+            lock (Gate)
+            {
+                return _otherErrors;
+            }
+        }
+    }
+
+    internal static string LastOtherError
+    {
+        get
+        {
+            lock (Gate)
+            {
+                return _lastOther;
             }
         }
     }
@@ -119,13 +150,7 @@ internal sealed class ErrorWatch : ILogListener
                 }
                 return;
             }
-            // Any error line at all: first line of it, who logged it, and whether its stack name another plugin me know.
-            _anyErrors++;
-            var lineEnd = text.IndexOf('\n');
-            var head = (lineEnd > 0 ? text.Substring(0, lineEnd) : text).Trim();
-            _lastAnyError = (e.Source != null ? e.Source.SourceName + ": " : "") + (head.Length > 160 ? head.Substring(0, 160) : head)
-                            + (text.IndexOf("ValheimCommunityPatch", StringComparison.Ordinal) >= 0 ? " (stack names ValheimCommunityPatch)" : "");
-            // Error of mine, or error of the game or Unity that name my code.
+            // Error of mine, or error of the game or Unity that name my code. Mine win over the two other counts.
             if (mine || text.IndexOf(ModInfo.Guid, StringComparison.Ordinal) >= 0
                      || text.IndexOf("ViewDistantHorizonsMod", StringComparison.Ordinal) >= 0)
             {
@@ -134,6 +159,21 @@ internal sealed class ErrorWatch : ILogListener
                 {
                     _firstError = text.Length > 300 ? text.Substring(0, 300) : text;
                 }
+                return;
+            }
+            // Not mine: who logged it and first line of it. Unity put the stack trace in the same text.
+            var lineEnd = text.IndexOf('\n');
+            var head = (lineEnd > 0 ? text.Substring(0, lineEnd) : text).Trim();
+            var line = (e.Source != null ? e.Source.SourceName + ": " : "") + (head.Length > 160 ? head.Substring(0, 160) : head);
+            if (text.IndexOf(KnownForeign, StringComparison.Ordinal) >= 0)
+            {
+                _knownForeign++;
+                _lastKnownForeign = line;
+            }
+            else
+            {
+                _otherErrors++;
+                _lastOther = line;
             }
         }
     }

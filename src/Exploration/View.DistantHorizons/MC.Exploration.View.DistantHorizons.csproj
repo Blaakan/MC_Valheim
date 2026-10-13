@@ -2,7 +2,7 @@
   <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
   <PropertyGroup>
     <ModName>Distant Horizons</ModName>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <ModScope>New</ModScope>
     <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
     <ModIdea>Distant horizon</ModIdea>

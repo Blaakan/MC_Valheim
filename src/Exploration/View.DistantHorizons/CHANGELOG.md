@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.1
+
+- Turning the mod back on while the game is paused: the far trees, rocks and buildings now follow the far terrain as
+  it streams in. They used to wait for the game to resume and floated or sank by up to tens of metres until then.
+- Changing the simulation distance in the graphics settings while standing still: the far objects follow at once.
+  Before, the ring of land that lost its real trees and buildings stayed bare (or, after raising the distance, showed
+  them twice) until you walked about 32 m.
+- Far trees near the west and south edge of a far-object tile (every 256 m or 512 m within about 1.2 km) are stood on
+  the ground again when the far terrain next to that tile gets finer or coarser. They could float or sink by up to
+  about 0.4 m after walking a while, a simulation-distance change or `dh rebuild`.
+- A near far-terrain tile is always built from exact heights. When the game's terrain builder had dropped them (many
+  terrain builds finishing at once), the tile could be built from approximate heights and show a step where it meets
+  the real ground; the exact heights are now asked for again.
+- README: two known limits are written down. Coarse far ground can reach under the ground near you for up to about
+  2 seconds after turning the mod on (Good to know), and with Valheim Community Patch installed, turning the mod off
+  in a world logs a burst of errors from that mod (Compatibility).
+
 ## 0.1.0
 
 - Initial version in the MC collection, from the standalone Distant Horizons (0.1.0, plugin

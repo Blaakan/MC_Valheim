@@ -16,20 +16,18 @@ namespace MC.Exploration.ViewDistantHorizonsMod;
 //                              black; removed from the world data = gone from the far tiles by themselves
 //   horizons.simdistance       simulation distance lowered to the lowest and put back (ZNet.ApplySimulationDistance,
 //                              what the graphics menu calls): in that same call every far tile keeps my hide distance
-//                              and the game's distant water plane stays out of reach; sea inner radius follows; after
-//                              a 40 m camera move: no zone without objects, none with real and far ones (zones never
-//                              scanned count too); back: the same, rim seam fine. Near trees on the ground there get
-//                              measured only: horizons.bug.tree-reseat judge them
+//                              and the game's distant water plane stays out of reach; sea inner radius follows; camera
+//                              NOT moved: every zone that lost its real objects has far ones; after a 40 m camera
+//                              move: no zone without objects, none with real and far ones (zones never scanned count
+//                              too), near trees stand on the far ground; back: camera NOT moved, no zone keeps real
+//                              and far objects at once; after a move the same, rim seam fine
 //   horizons.simdistance-rim   same change (measured by horizons.simdistance): the real zones beyond the lowest
 //                              distance unloaded (waited for: the game drops them after 4 s, one per tick; other
 //                              mods can keep them), then no far vertex above real ground and the rim seam fine
-//   horizons.bug.simdistance-still  same change, camera NOT moved: zones that lost their real objects get far ones
-//                              (and zones that got real ones lose far ones) without the player moving. Fails today.
-//   horizons.bug.tree-reseat   near trees stand on the far ground after it changed under them. Three looks: far terrain
-//                              and far objects rebuilt together (not every run show the fault); one far terrain tile
-//                              made to refine by a camera move while the object tile east of it keep its own ground
-//                              (trees in the 32 m strip past that tile's west edge: show it every run); and what
-//                              horizons.simdistance measured at the lowest simulation distance. Fails today.
+//   horizons.tree-reseat       near trees stand on the far ground after it changed under them. Two looks: far terrain
+//                              and far objects rebuilt together; and one far terrain tile made to refine by a camera
+//                              move while the object tile east of it keep its own ground (trees in the 32 m strip past
+//                              that tile's west edge: before 0.1.1 they kept the old ground's height every run)
 //   horizons.spyglass          SpyglassDetail off and SpyglassMaxBoost 1 = a raised spyglass changes nothing; boost 4:
 //                              finer built land in the view cone 2 to 5 km out, object tiles and buildings farther
 //                              out, a turned view refines the new direction; boost 8 = more than 4; lowered = within
@@ -41,8 +39,7 @@ internal static class ObjectTests
 {
     private const string FarObjectsName = "horizons.far-objects";
     private const string SimDistanceName = "horizons.simdistance";
-    private const string SimStillName = "horizons.bug.simdistance-still";
-    private const string TreeReseatName = "horizons.bug.tree-reseat";
+    private const string TreeReseatName = "horizons.tree-reseat";
     private const string SimRimName = "horizons.simdistance-rim";
     private const string SpyglassName = "horizons.spyglass";
 
@@ -51,7 +48,6 @@ internal static class ObjectTests
         SelfTest.Register(FarObjectsName, RunFarObjects);
         SelfTest.Register(SimDistanceName, RunSimDistance);
         SelfTest.Register(SimRimName, RunSimRim);
-        SelfTest.Register(SimStillName, RunSimStill);
         SelfTest.Register(TreeReseatName, RunTreeReseat);
         SelfTest.Register(SpyglassName, RunSpyglass);
     }
@@ -61,7 +57,6 @@ internal static class ObjectTests
         SelfTest.Unregister(FarObjectsName);
         SelfTest.Unregister(SimDistanceName);
         SelfTest.Unregister(SimRimName);
-        SelfTest.Unregister(SimStillName);
         SelfTest.Unregister(TreeReseatName);
         SelfTest.Unregister(SpyglassName);
     }
@@ -348,7 +343,7 @@ internal static class ObjectTests
             om.TestTilesBeyond(cam, pieceFar * 1.08f + 1f, out _, out var piecesBeyond);
             c.Check(beyond == 0, $"no object tile farther than ObjectFarDistance ({far:0} m): {beyond}");
             c.Check(piecesBeyond == 0, $"no object tile draws buildings farther than PieceDistance ({pieceFar:0} m): {piecesBeyond}");
-            // Trees "as found" (what tests before left) me no judge here: horizons.bug.tree-reseat do that after far terrain
+            // Trees "as found" (what tests before left) me no judge here: horizons.tree-reseat do that after far terrain
             // rebuild of its own. Here: after my own object rebuild, below.
 
             // Trees and building parts put in the world data: a tree in the far band, one beyond every band, one in the
@@ -436,19 +431,19 @@ internal static class ObjectTests
         }
     }
 
-    // ---------- horizons.bug.tree-reseat
+    // ---------- horizons.tree-reseat
 
     // Trees of near object tiles must stand on far ground drawn under them, also after that ground changed.
-    // The fault (read from code, then seen): object tile draw zones whose CENTRE lie in it, so its trees reach 32 m
-    // past its west and south edge, but it only watch far terrain under own square (DistantObjectManager.Visit,
-    // TerrainKeyHash). Far terrain tile next door refine or merge later = trees in that strip keep old ground's
-    // height. Whether a run show it hang on which of two tiles get done last:
+    // The fault this test found (fixed in 0.1.1): object tile draw zones whose CENTRE lie in it, so its trees reach
+    // 32 m past its west and south edge, but it only watched far terrain under own square (DistantObjectManager.Visit,
+    // TerrainKeyHash). Far terrain tile next door refine or merge later = trees in that strip kept old ground's
+    // height. Whether a run showed it hung on which of two tiles got done last:
     //   2026-10-07  after dh rebuild + dh objects rebuild: 12 of 80 sampled trees up to 0.38 m off
     //   2026-10-07  same thing once more, and 2026-10-08: 0 off
     //   2026-10-08  lowest simulation distance, after the 40 m camera move of horizons.simdistance: 7 of 146, 0.33 m
     //               (the two runs before: 0 of 144)
-    // So three looks here: the rebuild pair (item T30 as written), one made on purpose (ReseatAtEdge: no luck in it),
-    // and what horizons.simdistance measured.
+    // Two looks here: the rebuild pair (item T30 as written) and one made on purpose (ReseatAtEdge: no luck in it).
+    // Trees at the lowest simulation distance: horizons.simdistance judge them where it measure them.
     private static IEnumerator RunTreeReseat()
     {
         const string N = TreeReseatName;
@@ -504,20 +499,6 @@ internal static class ObjectTests
             DistantObjectManager.TestWatchOn = false;
             Unmake(made);
             hold.Release();
-
-            // Look three: lowest simulation distance, measured by horizons.simdistance right after its 40 m camera move.
-            var sim = _lastSim;
-            if (sim != null && sim.Done && sim.SeatMeasured && Kit.Now - sim.At <= 600f)
-            {
-                c.Check(sim.SeatLow.Ok,
-                    $"lowest simulation distance (measured {Kit.Now - sim.At:0} s ago by {SimDistanceName}, after its 40 m camera move): far trees stand on the far ground, "
-                    + $"not floating, not sunk ({sim.SeatLow.Off} of {sim.SeatLow.Known} sampled trees more than 0.1 m off, worst {sim.SeatLow.Worst:0.00} m; "
-                    + $"inside their tile's own square: {sim.SeatLowInside.Text}; in the 32 m strip past its west / south edge: {sim.SeatLowStrip.Text})");
-            }
-            else
-            {
-                c.Note($"{SimDistanceName} did not run in this game session: the far trees at the lowest simulation distance are not judged");
-            }
 
             // Camera is back at the player and my trees are gone: test after me start from far objects that are done.
             yield return Kit.Frames(3);
@@ -651,7 +632,7 @@ internal static class ObjectTests
             + $"({after.Stale} still stand at the height of the ground that is gone; {after.Off} of them more than 0.1 m off the far ground, worst {after.Worst:0.00} m)");
     }
 
-    // ---------- horizons.simdistance and horizons.bug.simdistance-still
+    // ---------- horizons.simdistance and horizons.simdistance-rim
 
     // What the two simulation-distance tests share: one change down and back, measured.
     private sealed class SimRun
@@ -671,15 +652,6 @@ internal static class ObjectTests
         internal int PokingLow = -1;
         internal WorldTests.RimResult RimLow;
         internal float Offset;
-        // Lowered, after the camera move: near trees against the far ground. All sampled ones, then the same ones in two
-        // heaps: inside own square of the tile that draw them, and in the 32 m strip past its west / south edge.
-        internal bool SeatMeasured;
-        internal Seat SeatLow, SeatLowInside, SeatLowStrip;
-        // Camera not moved since the change.
-        internal int StillHolesLow = -1;
-        internal string StillHoleLow = "";
-        internal int StillDoubledBack = -1;
-        internal string StillDoubleBack = "";
     }
 
     private static SimRun _lastSim;
@@ -852,16 +824,19 @@ internal static class ObjectTests
             c.Note($"lowered: real zones {run.ZonesBefore} -> {run.ZonesLow} ({box.Detail})"
                    + (run.Unloaded ? "" : ": the real zones beyond the new distance did NOT unload, so the ground at the new rim cannot be looked at"));
             yield return ObjectsIdle(8f);
-            // Camera not moved yet.
+            // Camera not moved yet: far objects follow the change by themselves (DistantObjectManager.Tick look again
+            // when the game's distance is not the one of its last look). Until 0.1.1 only a 32 m camera move made them
+            // look: 128 zones had neither real nor far objects here (run of 2026-10-07).
             z.Read(om, reach);
-            run.StillHolesLow = z.Holes;
-            run.StillHoleLow = z.FirstHole;
+            var stillHoles = z.Holes;
+            c.Check(z.Holes == 0,
+                $"lowered, without moving: every zone that lost its real objects shows far objects ({z.Holes} zones show neither, first {z.FirstHole})");
 
             yield return Nudge(hold);
             yield return Kit.Settle(settled, 20f, objects: true);
             c.Check(settled.Ok, "lowered: " + settled.Detail);
             yield return ZonesOnce(om, reach, 15f, z);
-            c.Note($"lowered ({run.After}, {ZoneSystem.instance.m_zones.Count} real zones), after a 40 m camera move: {z.WithItems} zones with objects: {z.Real} real, {z.Far} far; before the move {run.StillHolesLow} zones had neither");
+            c.Note($"lowered ({run.After}, {ZoneSystem.instance.m_zones.Count} real zones), after a 40 m camera move: {z.WithItems} zones with objects: {z.Real} real, {z.Far} far; before the move {stillHoles} zones had neither");
             c.Check(z.Holes == 0, $"lowered, after a 40 m move: every zone that lost its real objects has far objects ({z.Holes} have neither, first {z.FirstHole})");
             c.Check(z.Doubled == 0, $"lowered, after a 40 m move: no zone with real and far objects at once ({z.Doubled}, first {z.FirstDouble})");
             var probe = mgr.ProbeNearGround(cam.transform.position, player.transform.position, 200f, out var poking, out var mismatched);
@@ -874,21 +849,25 @@ internal static class ObjectTests
             run.Offset = offset;
             mgr.TestTileRenderers(out shown, out _, out wrongHide, out _);
             c.Check(wrongHide == 0, $"lowered: every shown far tile still has its own hide distance ({wrongHide} of {shown} wrong)");
-            // Near trees on far ground: me only measure here, horizons.bug.tree-reseat judge. Tree in the 32 m strip past
-            // its tile's west / south edge stay on old ground when far terrain tile next door change after tile was
-            // built, and camera move above can make one change (camera at spawn sit right on a split line). Real fault of
-            // the mod, not every run: 7 of 146 off, worst 0.33 m (2026-10-08); 0 off the two runs before.
+            // Near trees on far ground. Camera move above can make a far terrain tile change (camera at spawn sit right
+            // on a split line); tree in the 32 m strip past its tile's west / south edge stand on the tile next door.
+            // Until 0.1.1 those kept the old ground's height: 7 of 146 off, worst 0.33 m (2026-10-08; 0 off the two
+            // runs before). Two heaps in the text say where an off tree stand: inside own square of the tile that
+            // draw it, or in that strip.
             var all = new List<Vector3>();
             var inside = new List<Vector3>();
             var strip = new List<Vector3>();
             om.TestNearTreeSamples(all);
             om.TestNearTreeSplit(inside, strip);
-            run.SeatLow = Measure(mgr, all);
-            run.SeatLowInside = Measure(mgr, inside);
-            run.SeatLowStrip = Measure(mgr, strip);
-            run.SeatMeasured = true;
-            c.Note($"lowered: {run.SeatLow.Known} sampled far trees of near object tiles, {run.SeatLow.Off} more than 0.1 m off the far ground, worst {run.SeatLow.Worst:0.00} m "
-                   + $"(inside their tile's own square: {run.SeatLowInside.Text}; in the 32 m strip past its west / south edge: {run.SeatLowStrip.Text}); judged by {TreeReseatName}");
+            var seat = Measure(mgr, all);
+            var seatInside = Measure(mgr, inside);
+            var seatStrip = Measure(mgr, strip);
+            c.Note($"lowered: {seat.Known} sampled far trees of near object tiles, {seat.Off} more than 0.1 m off the far ground, worst {seat.Worst:0.00} m "
+                   + $"(inside their tile's own square: {seatInside.Text}; in the 32 m strip past its west / south edge: {seatStrip.Text})");
+            c.Check(seat.Ok,
+                "lowered, after a 40 m move: far trees stand on the far ground, not floating, not sunk "
+                + $"({seat.Off} of {seat.Known} sampled trees more than 0.1 m off, worst {seat.Worst:0.00} m; "
+                + $"inside their tile's own square: {seatInside.Text}; in the 32 m strip past its west / south edge: {seatStrip.Text})");
             if (shotName != null)
             {
                 yield return Kit.Shot(shotName, "lowest-simulation-distance");
@@ -904,16 +883,22 @@ internal static class ObjectTests
             yield return ZonesSettle(40f, box);
             c.Check(box.Ok, "put back: the zones loaded again: " + box.Detail);
             yield return ObjectsIdle(8f);
-            z.Read(om, reach);
-            run.StillDoubledBack = z.Doubled;
-            run.StillDoubleBack = z.FirstDouble;
+            // Camera not moved yet: far objects let go of the zones that got real objects by themselves. Until 0.1.1 only
+            // a 32 m camera move made them look: 37 zones kept real and far objects at once here (run of 2026-10-07).
+            // Real objects of zones that came back get made over several seconds (ZNetScene.CreateObjectsSorted: a
+            // hundredth of what is left per tick) and far tile let go of a zone one look after they are there, so me
+            // wait for the hand-over like after the move below; zone that stay doubled still fail (last report).
+            yield return ZonesOnce(om, reach, 30f, z);
+            var stillDoubled = z.Doubled;
+            c.Check(z.Doubled == 0,
+                $"put back, without moving: no zone shows real and far objects at once ({z.Doubled} zones, first {z.FirstDouble})");
 
             yield return Nudge(hold);
             yield return Kit.Settle(settled, 20f, objects: true);
             c.Check(settled.Ok, "put back: " + settled.Detail);
             // Real objects of zones that came back get made over several seconds: me wait for the hand-over.
             yield return ZonesOnce(om, reach, 30f, z);
-            c.Note($"put back, after a 40 m camera move: {z.WithItems} zones with objects: {z.Real} real, {z.Far} far; before the move {run.StillDoubledBack} zones had both");
+            c.Note($"put back, after a 40 m camera move: {z.WithItems} zones with objects: {z.Real} real, {z.Far} far; before the move {stillDoubled} zones had both");
             c.Check(z.Holes == 0 && z.Doubled == 0, $"put back, after a 40 m move: every zone has its objects once ({z.Holes} without, {z.Doubled} twice, first {z.FirstHole}{z.FirstDouble})");
             WorldTests.RimChecks(c, WorldTests.Rim(mgr, offset), "put back: ", offset);
             if (cfg.FarWaterInnerRadius.Value <= 0f)
@@ -1022,34 +1007,6 @@ internal static class ObjectTests
             c.Check(run.PokingLow == 0, $"lowered: {run.PokingLow} far-tile vertices above the real ground within 200 m");
             WorldTests.RimChecks(c, run.RimLow, "lowered (as measured then): ", run.Offset);
             c.Report($"lowest simulation distance: real zones {run.ZonesBefore} -> {run.ZonesLow}, the far ground meets the real ground at the new rim");
-        }
-        finally
-        {
-            Kit.PutBack();
-        }
-    }
-
-    private static IEnumerator RunSimStill()
-    {
-        const string N = SimStillName;
-        var c = new Kit.Checks(N);
-        try
-        {
-            var got = new SimRun[1];
-            yield return Measured(N, c, got);
-            var run = got[0];
-            if (!c.Check(run.Done && run.Changed, $"the simulation distance was lowered and put back ({run.Before} -> {run.After})"))
-            {
-                c.Report("");
-                yield break;
-            }
-            c.Note($"{run.Before} -> {run.After} -> back; real zones loaded {run.ZonesBefore} before, {run.ZonesLow} when the lowered state was looked at "
-                   + "(the camera was not moved between each change and its look, 4 s or more later)");
-            c.Check(run.StillHolesLow == 0,
-                $"after lowering the simulation distance, without moving: every zone that lost its real objects shows far objects ({run.StillHolesLow} zones show neither, first {run.StillHoleLow})");
-            c.Check(run.StillDoubledBack == 0,
-                $"after raising it again, without moving: no zone shows real and far objects at once ({run.StillDoubledBack} zones, first {run.StillDoubleBack})");
-            c.Report("far objects follow a simulation-distance change without the player moving");
         }
         finally
         {
