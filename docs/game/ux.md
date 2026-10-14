@@ -53,6 +53,9 @@ Almost every UX feature in this chapter is client-only. A few need care: anythin
 - There is **no sort API**. Helper views exist: `GetAllItemsInGridOrder()` (used by the radial menu, `Valheim.UI.ItemGroupConfig` / `HammerItemElement`), `GetAllItemsSortedByName()` (unused), `GetAllItemsOfType(...)`, `GetHotbar(includeEmpty)` (row 0, 8 slots) and `GetBoundItems()`.
 - `GetAllItems()` returns the **live list**. Changing `m_gridPos` or `m_stack` on those items directly and then calling `Changed()` once is the cheapest way to rearrange an inventory (one container save). Mod: [Sort Chest](../../src/UX/Container.Sort) sorts open containers this way ([design](../design/ux-container-sort.md)).
 
+### Buttons the game clears itself
+`InventoryGui` calls `ZInput.ResetButtonStatus("JoyButtonY")` when the inventory opens on that controller button, so `ZInput.GetButton("JoyButtonY")` is already false for code that runs after the game's own `Update` in that frame; the generic names of buttons the game does not consume (`JoyLTrigger`) keep their state. `ZInput.ButtonDef.GetActionPath()` throws for a button that has no binding at all (ArgumentOutOfRangeException): guard it when walking over every button.
+
 ### "Bags" in 1.0
 There is no bag or backpack item and no nested inventory in vanilla 1.0. The candidates for "bags" are:
 1. **The player inventory itself.** Its height can grow: `Player.SetInventorySize(rows)` clamps to 0–9, sets `Inventory.SetHeight`, stores the unique key `"invrows"` (`Player.InventoryRowsKey`) and resizes the panel through `InventoryGui.SetInventorySize`. `Player.OnSpawned` reapplies it (default `"4"`). Rows are bought through `StoreGui.OnBuyItem` when a trader's `Trader.TradeItem.m_incrementKey == "invrows"`; which trader item uses this still has to be confirmed in game data. There is also a console command `inventorysize` (cheat, server only). Width stays 8.

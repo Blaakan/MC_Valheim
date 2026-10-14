@@ -96,7 +96,8 @@ is installed, every test that says "Esc → MC Mods" is done in its window inste
 Build under test: the probe's build id is the commit in the `[MC:ready] MC.Core.Probe.World` log line (the run
 folder keeps a copy of the log). Every run checks itself with `probe.baseline` and `probe.runner`; an unfiltered run
 also checks the staged tests and the input driver with `probe.input`, `probe.relog`, `probe.stage.relog` and
-`probe.stage.disabled` (W14 to W17). The items below check what the script cannot see by itself.
+`probe.stage.disabled` (W14 to W17); parked and skipped tests and the clean-up between tests are W18 to W20. The items
+below check what the script cannot see by itself.
 
 - [ ] **W01 End to end:** close the game, run `./tools/Test-InWorld.ps1`. After `probe.baseline` and `probe.runner`,
   every deployed mod's self tests run; the summary groups each test's lines under its name and prints
@@ -185,3 +186,16 @@ also checks the staged tests and the input driver with `probe.input`, `probe.rel
   mouse and (if you have one) controller work as usual.
   *Partly automated (`probe.input`); by hand: Play a minute in the game left open: nothing is held down, your own
   devices work.*
+- [ ] **W18 Parked tests stay out:** `tests/parked-selftests.txt` lists `tower.arm`. Run
+  `./tools/Test-InWorld.ps1 -NoBuild -Only tower.`. Expected: the log says "N parked test(s) ... do not run unless -Only
+  names one exactly", `tower.arm` does not run, the script ends with "parked tests (not run unless named with -Only): N".
+  Run `./tools/Test-InWorld.ps1 -NoBuild -Only tower.arm`: it runs (and fails, which is why it is parked).
+- [ ] **W19 A skipped test is not a failure:** with Tower Shield Wall's `Towers` setting changed from its default, run
+  `./tools/Test-InWorld.ps1 -NoBuild -Only tower.ext.jotunn,tower.fire`. Expected: `tower.ext.jotunn` prints a `SKIP`
+  line saying why and ends `skipped`; `DONE` counts it in `tests` and `skipped`, in neither `pass` nor `fail`; the run
+  passes when `tower.fire` passes.
+- [ ] **W20 A test cannot break the next one:** in a full run (`./tools/Test-InWorld.ps1`), look for NOTE lines that start
+  with "left " or "the player was still standing up" (a test left the player far away, steering, in a window, with a key
+  held, with forced weather, or just respawned). Expected: each one names the test and says what was put back, and the
+  test after it passes or fails for its own reasons (no run of failures after a death test, no fishing test without a
+  shore).

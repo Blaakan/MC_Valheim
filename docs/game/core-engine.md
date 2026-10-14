@@ -288,6 +288,7 @@ Register RPCs in your own component's `Awake` (guard `m_nview.GetZDO() != null`)
 - **`Player.m_customData`**: persisted per **character** (across all worlds), local only (not synced to other peers or the server), and trivially editable by the user. For per-world player data, key it with the world UID. For data others must see, mirror it into the player's ZDO.
 - Custom skills are dropped on load: `Skills.Load` keeps only `Enum.IsDefined(SkillType)` values (`Skills.IsSkillValid`). Custom skills need that check patched (Jotunn's SkillManager does this).
 - Status effects are **not** saved (only guardian power cooldown and foods).
+- **A new body stands up first.** After a respawn and after a world load the new `Player` plays the animation clip `Standing Up`; its Animator state carries the `cutscene` tag, so `Player.InCutscene()` is true, `Player.TakeInput()` is false and the body does not walk until the clip ends (a few seconds after the spawn; measured in the test runs of 2026-10-14). Code that acts on a fresh body (a self-test after a real death, a mod that restores something at spawn) must wait for `!InCutscene()`.
 
 ### Global keys & world modifiers (server-authoritative, persisted)
 - `ZoneSystem.m_globalKeys` (strings `"name value"`), `m_globalKeysValues`, `m_globalKeysEnums`. API: `SetGlobalKey(string|GlobalKeys[, float])`, `GetGlobalKey(...)`, `RemoveGlobalKey`, `GetGlobalKeys`, `CheckKey(key, GameKeyType.Global|Player)`.
@@ -324,6 +325,8 @@ Durability (int ×100), grid pos, world level, a flags byte, then optional quali
 - container ZDOs (`Container.Save` → `ZDOVars.s_items` byte[])
 - dropped world items (`ItemDrop.SaveToZDO` → `s_itemData` byte[]; `index + "_itemData"` for item stands and armor stands)
 - dropping/splitting (`ItemDrop.DropItem` clones)
+
+The crafter id and name are written only when the crafter id is not 0 (a bit of the flags byte, `ItemData.Save`): an item given a crafter name with crafter id 0 comes back from a save with an empty crafter name (seen in the game on 1.0.17: a relog test that told its own items by crafter name lost them). To recognise an item again after a save, use `m_customData`.
 
 **`m_customData` therefore survives equip/unequip, drop/pickup, chests, item stands, logout and world transfer.** It is the right place for per-item mod state (e.g. "crossbow is loaded"). Keep values short, because container ZDOs re-send the whole inventory on every change.
 
