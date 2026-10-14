@@ -1,0 +1,72 @@
+# Parked self-tests: in the code, not run by default, tick nothing (docs/modding/framework.md, "Parked tests").
+# One test per line: name, two spaces, "# reason". Run one with: ./tools/Test-InWorld.ps1 -Only <name>
+# All of these were written on 2026-10-13 and failed their first runs in the game (1.0.17) for a reason that is not
+# worked out yet. "LOOK" = the failure may be a real problem of a mod: worth a look by a person.
+
+# --- Creature Morale
+morale.x.moveset  # jump attack on an afraid Greyling held in front of the player lands no hit within 3 s in some runs (set-up not stable)
+
+# --- Crossbow Stays Loaded
+crossbow.input.hotbar  # LOOK: with the real hotbar keys (crossbow, bow, crossbow) the game queues a reload for 3 physics ticks before the mod drops it; the test allows none. Is a reload bar or animation seen for a moment?
+
+# --- Tower Shield Wall
+tower.arm  # LOOK: measures which hand moves furthest in the bash: right hand +0.83 m, shield hand +0.71 m. A question of how the bash looks, not of numbers
+tower.x.moveset  # LOOK: after a jump the bash lands no hit; after a roll the attack plays 'unarmed_attack0' with the tower shield as weapon. Test or Tower Shield Wall with Weapon Moveset: not worked out
+
+# --- Sneak Ambush
+sneak.smoke-unload  # the cloud is still loaded 397 m away 11 s after the throw (distance or wait assumed wrong)
+sneak.foliage-shade  # crouched against a bush on the sun's side at noon the stealth bar does not drop: the "shade" part of TESTING T09 itself is in doubt
+sneak.x-morale  # LOOK: at boss rank 6 an arrow at an afraid Greydwarf that watches the player counted as a sneak attack and paid Sneak XP. Sneak Ambush with Creature Morale, or the Greydwarf was not really watching
+sneak.x-moveset  # LOOK: with Weapon Moveset active, attack pressed after a jump with a Smoke Screen in hand threw nothing. Mod problem or press timing
+sneak.disabled.items  # first game: the chest's content is not in its saved data right after the Smoke Screens go in
+
+# --- Dual Wielding
+dual.x.moveset  # axe pair, jump attack: the fourth dual axe swing reports no hit pattern
+dual.x.ambush-morale  # set-up: the second Greyling does not see the player, so the backstab checks prove nothing
+
+# --- Encyclopedia
+compendium.input.glyphs  # the two tabs on the Valheim Compendium are not found while the test gamepad is the input
+
+# --- Deep North Awakening
+dn.map.screen  # reads the colours of the map on screen: 0 explored purple places found on the large map
+dn.x.sneak  # sneaking up on the back of an area Jotun: it notices the player every time (3 tried)
+dn.relog.cleared  # the player dies among the Jotun during the first part (god mode off), the test then throws
+
+# --- Music Instruments
+music.x.search  # after typing in the crafting search and closing it, a screen or text field still counts as open
+
+# --- Sailing Skill
+sailing.sneak  # crouched on the deck of a ship that lies still, Sneak Ambush's holding-still bonus never comes on (the player does not count as crouching)
+sailing.input.dive  # expects the diver back at the surface 15 s after the Crouch key is let go; Swim Dive holds the depth
+
+# --- Swim Dive
+dive.input.storm  # LOOK: 5 of 20 checks fail in a storm (TESTING T34): two dives held under a rising wave are left to the normal game half of the time. May be the mod (a wave rising faster than the dive) or the test
+dive.sneak-icons  # control on land fails: Sneak Ambush's "Holding still" icon is not on the player
+dive.moveset-attack  # a real jump at the surface does not arm Weapon Moveset's jump token (set-up)
+dive.death  # dying under water: the camera is 5.6 m from its last place alive and no frame of the death view is under water (set-up or mod: not worked out)
+
+# --- Distant Horizons
+horizons.input.swim-dive  # holding the real Crouch key while swimming does not take the camera under water within 8 s
+horizons.input.fly  # the real keys move the player 0 m in fly mode
+horizons.relog.load-cover  # LOOK: for 12 s after a world load up to 165 far-terrain points stand above the real ground within 200 m (the accepted limit after turning the mod on is about 2 s)
+
+# --- Spyglass
+spyglass.input.sit  # sitting on a chair with the spyglass in hand does not happen (set-up)
+spyglass.input.dive  # expects the diver back at the surface 15 s after the Crouch key is let go; Swim Dive holds the depth
+spyglass.picture  # the test spot shows too little fine detail to tell sharp from blurred
+spyglass.render-scale  # same: too little fine detail in view at render scale 50%
+spyglass.death  # the burning does not kill the player within 12 s, so the death is never played
+
+# --- Cultivator Replant
+replant.input.pad  # LOOK: on the test gamepad the hint "<X button> Replant" lays out 0 glyph pictures (text shown). Does the button picture show on a controller?
+replant.input.pad-layouts  # LOOK: same on the Alternative 1 and 2 layouts
+replant.helm.lox  # from the saddle no bush comes under the crosshair (the ray hits the saddle or the player)
+replant.helm.water  # at a ship's helm the hint "Plant 2 to 6 m from an Ancient Root" shows and gamepad X digs nothing: expectation and behaviour not sorted out
+replant.dungeon  # no free floor in sight inside the nearest dungeon (Crypt3)
+replant.e.planteasily.dungeon  # same place: no free point of the dungeon floor
+
+# --- Fishing Fight
+fishing.lift  # the fish does not stay out of the water on the short line
+fishing.toggle-escape  # times out after 120 s
+fishing.harpoon-throw  # after the real harpoon throw the switch to the rod fails; it also leaves the harpoon's line length changed (40 m) for later tests
+fishing.filter  # full bag: the reel does not end like a catch within 30 s

@@ -58,6 +58,11 @@ internal static partial class SelfTests
                 made.Zdo = ZDOMan.instance.CreateNewZDO(at + new Vector3(3000f, 0f, 3000f), 0);
                 made.Zdo.SetOwner(ZDOMan.GetSessionID() + 1L);
                 made.Zdo.Set(ZDOVars.s_playerID, playerId);
+                // What a real remote player publish and creatures read for a body another game owns (Player.GetStealthFactor,
+                // Character.GetNoiseRange read the ZDO, not the fields): standing in plain view, walking noise. Without
+                // them the stand-in is unseen and unheard (first run: enemy search picked nobody).
+                made.Zdo.Set(ZDOVars.s_stealth, 1f);
+                made.Zdo.Set(ZDOVars.s_noise, 30f);
                 if (bossRank >= 0)
                 {
                     made.Zdo.Set(CreatureKeys.Standing, Standing.Encode(new StandingData(bossRank, null, null)));

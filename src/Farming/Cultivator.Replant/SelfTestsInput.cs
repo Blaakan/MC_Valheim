@@ -371,6 +371,19 @@ internal static partial class SelfTests
         yield return Frames(3);
     }
 
+    // Game button with no binding at all make ZInput.ButtonDef.GetActionPath throw (first run): such a button uses no key.
+    private static string PathOf(ZInput.ButtonDef b)
+    {
+        try
+        {
+            return b.GetActionPath();
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
     private static IEnumerator RunInputRebind()
     {
         if (!WorldReady(InputRebindName))
@@ -420,7 +433,7 @@ internal static partial class SelfTests
             var bush = new Aimed();
             yield return SpawnInReach(rig, taken, "RaspberryBush", 1.2f, bush);
             var oldKey = LetterKeyOf(oldPath);
-            var spare = SpareKeys.FirstOrDefault(k => k.Value != oldPath && !zin.m_buttons.Values.Any(b => b != null && b.GetActionPath() == k.Value));
+            var spare = SpareKeys.FirstOrDefault(k => k.Value != oldPath && !zin.m_buttons.Values.Any(b => b != null && PathOf(b) == k.Value));
             if (!c.Check(tool != null && def != null && bush.Seen, "cultivator in hand, a ripe raspberry bush under the crosshair within reach" + bush.Why)
                 || !c.Check(oldKey != KeyCode.None, $"the Use key of this player is a letter key the test can press ({oldPath})")
                 || !c.Check(spare.Value != null, "a letter key no game button uses is free for the test (o, p, n or i)"))

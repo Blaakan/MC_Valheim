@@ -688,6 +688,7 @@ internal static partial class SelfTests
         internal bool InHand;       // weapon reached the hand
         internal bool LoadedAtOnce; // loaded on every physics tick right after (and through the watch time)
         internal bool ReloadQueued; // game queued a reload for it
+        internal int ReloadTicks;   // physics ticks me saw that reload in the queue (1 or 2 = queued and dropped at once)
         internal bool Loaded;       // loaded at the end of the wait
         internal float Seconds;     // game seconds from "in hand" to "loaded" (or to the end of the wait)
         internal float EitrUsed;    // most eitr missing while me watched, against the level before the swap
@@ -697,13 +698,14 @@ internal static partial class SelfTests
             InHand = false;
             LoadedAtOnce = false;
             ReloadQueued = false;
+            ReloadTicks = 0;
             Loaded = false;
             Seconds = 0f;
             EitrUsed = 0f;
         }
 
         public override string ToString() =>
-            $"in hand {InHand}, loaded at once {LoadedAtOnce}, reload started {ReloadQueued}, loaded {Loaded} after {F(Seconds)} s, eitr used {F(EitrUsed)}";
+            $"in hand {InHand}, loaded at once {LoadedAtOnce}, reload started {ReloadQueued} (seen queued for {ReloadTicks} physics tick(s)), loaded {Loaded} after {F(Seconds)} s, eitr used {F(EitrUsed)}";
     }
 
     // Weapon into the hand the way a right click in the inventory do it (Humanoid.UseItem; the hotbar key call the
@@ -764,6 +766,7 @@ internal static partial class SelfTests
             if (p.IsReloadActionQueued())
             {
                 s.ReloadQueued = true;
+                s.ReloadTicks++;
             }
             rig.Tick();
             yield return Fixed;
@@ -790,6 +793,7 @@ internal static partial class SelfTests
             if (p.IsReloadActionQueued())
             {
                 s.ReloadQueued = true;
+                s.ReloadTicks++;
             }
             rig.Tick();
             yield return Fixed;

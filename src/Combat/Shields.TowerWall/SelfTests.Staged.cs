@@ -88,8 +88,21 @@ internal static partial class SelfTests
         return Player.m_localPlayer != null && view != null && view.Value.IsActive && TowerSync.Active;
     }
 
+    // Mark in the item's custom data: a save keeps it. Crafter name alone is not enough: with crafter id 0 a loaded
+    // character has the item with an empty crafter name (seen in the game), and the test said its items were gone.
+    private const string TestMark = ModInfo.Guid + ".SelfTest";
+
+    private static ItemDrop.ItemData Marked(ItemDrop.ItemData item)
+    {
+        if (item != null)
+        {
+            item.m_customData[TestMark] = "1";
+        }
+        return item;
+    }
+
     private static List<ItemDrop.ItemData> TestItems(Player p) =>
-        p.GetInventory().GetAllItems().Where(i => i != null && i.m_crafterName == TestCrafter).ToList();
+        p.GetInventory().GetAllItems().Where(i => i != null && (i.m_crafterName == TestCrafter || i.m_customData.ContainsKey(TestMark))).ToList();
 
     private static ItemDrop.ItemData TestItem(Player p, string prefab) =>
         TestItems(p).FirstOrDefault(i => i.m_dropPrefab != null && i.m_dropPrefab.name == prefab);
@@ -235,8 +248,8 @@ internal static partial class SelfTests
                 SelfTest.Note(RelogHandsName, $"the player held something before the test ({Hands(p)}): it is put away and stays in the inventory");
             }
             var inv = p.GetInventory();
-            var sword = inv.AddItem("SwordIron", 1, 1, 0, 0L, TestCrafter, false);
-            var tower = inv.AddItem(IronTower, 1, 1, 0, 0L, TestCrafter, false);
+            var sword = Marked(inv.AddItem("SwordIron", 1, 1, 0, 0L, TestCrafter, false));
+            var tower = Marked(inv.AddItem(IronTower, 1, 1, 0, 0L, TestCrafter, false));
             if (sword == null || tower == null)
             {
                 c.Check(false, "could not add SwordIron and ShieldIronTower");
@@ -318,6 +331,12 @@ internal static partial class SelfTests
             var tower = p != null ? TestItem(p, IronTower) : null;
             if (sword == null || tower == null)
             {
+                // First runs: items gone after the load. Me say what the loaded character does carry.
+                if (p != null)
+                {
+                    SelfTest.Note(RelogHandsName, "the loaded character carries: " + string.Join(", ", p.GetInventory().GetAllItems()
+                        .Select(i => $"{(i.m_dropPrefab != null ? i.m_dropPrefab.name : i.m_shared.m_name)} (crafter '{i.m_crafterName}', id {i.m_crafterID}, equipped {i.m_equipped})").ToArray()));
+                }
                 c.Check(false, "the sword and the tower shield held before the log out are not in the loaded character's inventory");
                 c.Report();
                 yield break;
@@ -360,8 +379,8 @@ internal static partial class SelfTests
         yield return WaitIdle(p);
         RemoveTestItems(p);
         var inv = p.GetInventory();
-        var sword = inv.AddItem("SwordIron", 1, 1, 0, 0L, TestCrafter, false);
-        var tower = inv.AddItem(IronTower, 1, 1, 0, 0L, TestCrafter, false);
+        var sword = Marked(inv.AddItem("SwordIron", 1, 1, 0, 0L, TestCrafter, false));
+        var tower = Marked(inv.AddItem(IronTower, 1, 1, 0, 0L, TestCrafter, false));
         var snap = SnapshotOf(IronTower);
         if (sword == null || tower == null || snap == null)
         {

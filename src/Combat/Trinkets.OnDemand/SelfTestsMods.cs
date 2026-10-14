@@ -798,6 +798,7 @@ internal static partial class SelfTests
             c.Check(hitAt >= fleeAt && CombatState.InCombat(linger), $"the hit on the fleeing {GreylingName} did not count as a fight hit");
             var overAt = -1f;
             var fled = true;
+            var targetTime = 0f;
             for (var t = 0f; t < linger + 4f && overAt < 0f; t += Time.deltaTime)
             {
                 if (LogCount(endMark, FightOffLine) > 0)
@@ -807,17 +808,26 @@ internal static partial class SelfTests
                 else
                 {
                     // First run said it took a target: me note which one and when, so the fail tell what happened.
-                    if (fled && greyling != null && ai.m_targetCreature != null)
+                    if (targetTime == 0f && greyling != null && ai.m_targetCreature != null)
                     {
                         c.Note($"the {GreylingName} took the target {ai.m_targetCreature.name} (the player: {ReferenceEquals(ai.m_targetCreature, p)}) "
                                + $"{F(Time.time - hitAt)} s after the hit, alerted {ai.IsAlerted()}, {F(Utils.DistanceXZ(greyling.transform.position, p.transform.position))} m from the player");
                     }
-                    fled &= greyling != null && ai.m_targetCreature == null;
+                    // Game make the attacker the target in the tick of the hit (first run: target at 0 s); Creature
+                    // Morale take it away again. Me count how long it has a target: more than half a second = it turned.
+                    if (greyling == null)
+                    {
+                        fled = false;
+                    }
+                    else if (ai.m_targetCreature != null)
+                    {
+                        targetTime += Time.deltaTime;
+                    }
                 }
                 yield return null;
             }
             c.Check(CombatState.LastExchange == hitAt, "someone hit or was hit during the wait: the fight's end could not be timed");
-            c.Check(fled, $"the {GreylingName} took a target again during the wait: it did not flee all the time (Creature Morale's RoutSeconds shorter than its default 15 s?)");
+            c.Check(fled && targetTime <= 0.5f, $"the {GreylingName} had a target for {F(targetTime)} s of the wait (the tick of the hit aside, a routed one has none): it did not flee all the time (Creature Morale's RoutSeconds shorter than its default 15 s?)");
             c.Check(CombatState.LastTargeted < hitAt, $"a hunt signal came {F(CombatState.LastTargeted - hitAt)} s after the hit, while the {GreylingName} fled");
             c.Check(overAt >= 0f && overAt - hitAt >= linger - 0.05f && overAt - hitAt <= linger + 1.3f,
                 $"'{FightOffLine}' came {(overAt >= 0f ? F(overAt - hitAt) + " s" : "never")} after the hit on the fleeing {GreylingName} (expected about {F(linger)} s)");

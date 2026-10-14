@@ -806,11 +806,17 @@ internal static partial class SelfTests
             var axeIdol = IdolRequirement(axeRecipe, axe);
             c.Check(swordIdol != null && axeIdol != null,
                 $"game data: the recipes of {Sword} and {Axe} ask for an idol at the Forge of Potential (sword {swordIdol != null}, axe {axeIdol != null})");
-            var forgePrefab = ZNetScene.instance.m_prefabs.FirstOrDefault(p =>
+            // Game name of the Forge of Potential is UpgradeStation (first run: search for an upgrader station that is
+            // also a Piece found none). Search by the upgrader flag only when that name is gone.
+            var forgePrefab = ZNetScene.instance.GetPrefab("UpgradeStation");
+            if (forgePrefab == null)
             {
-                var station = p != null ? p.GetComponentInChildren<CraftingStation>(true) : null;
-                return station != null && station.m_upgrader && p.GetComponent<Piece>() != null;
-            });
+                forgePrefab = ZNetScene.instance.m_prefabs.FirstOrDefault(p =>
+                {
+                    var station = p != null ? p.GetComponentInChildren<CraftingStation>(true) : null;
+                    return station != null && station.m_upgrader;
+                });
+            }
             c.Check(forgePrefab != null, "the Forge of Potential (an upgrader crafting station piece) exists in the game");
             if (swordIdol == null || axeIdol == null || forgePrefab == null)
             {

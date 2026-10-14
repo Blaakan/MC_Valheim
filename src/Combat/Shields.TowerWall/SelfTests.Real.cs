@@ -629,7 +629,12 @@ internal static partial class SelfTests
                 .Select(i => i.Metadata.Name).ToList();
             c.Check(users.Count > 0, $"a mod built on Jotunn is installed ({(users.Count > 0 ? string.Join(", ", users.ToArray()) : "none")})");
             c.Check(_tapFromStart, "this mod's log lines were watched from the game's start (before the main menu)");
-            c.Check(TowerRules.Own().Key == TowerRules.Defaults().Key, "this game's own tower settings are the default ones (the item's premise)");
+            // Item is about the default settings. Player changed own Towers settings: not my game to judge here.
+            if (TowerRules.Own().Key != TowerRules.Defaults().Key)
+            {
+                SelfTest.Skip(JotunnName, "this game's own tower settings are not the default ones, and TESTING T41 is about the default settings: not checked on this PC");
+                yield break;
+            }
             var missing = Tap.Bad().Where(b => b.StartsWith("Towers warning with the default settings", StringComparison.Ordinal) && b.Contains("(MISSING)")).ToList();
             c.Check(missing.Count == 0,
                 missing.Count == 0

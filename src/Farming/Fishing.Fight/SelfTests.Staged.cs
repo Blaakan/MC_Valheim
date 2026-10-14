@@ -28,6 +28,7 @@ internal static partial class SelfTests
 
     // Crafter name on the rod a relog test leaves in the inventory over the log out: found again by nothing else.
     private const string TestCrafter = "MC fishing test";
+    private const string TestMark = ModInfo.Guid + ".SelfTest";
     private const string RodPrefabName = "FishingRod";
     private const string FloatPrefabName = "FishingRodFloat";
     private const string FishPrefabName = "Fish1";
@@ -78,7 +79,8 @@ internal static partial class SelfTests
     {
         foreach (var item in p.GetInventory().GetAllItems())
         {
-            if (item != null && item.m_crafterName == TestCrafter && item.m_dropPrefab != null && item.m_dropPrefab.name == RodPrefabName)
+            // Custom data mark: a save keeps it (crafter name with crafter id 0 comes back empty after a load).
+            if (item != null && (item.m_crafterName == TestCrafter || item.m_customData.ContainsKey(TestMark)) && item.m_dropPrefab != null && item.m_dropPrefab.name == RodPrefabName)
             {
                 return item;
             }
@@ -323,6 +325,10 @@ internal static partial class SelfTests
         _relogRecorded = true;
 
         var rod = p.GetInventory().AddItem(RodPrefabName, 1, 1, 0, 0L, TestCrafter, false);
+        if (rod != null)
+        {
+            rod.m_customData[TestMark] = "1";
+        }
         if (!c.Check(rod != null && p.EquipItem(rod, false), "a fishing rod given and taken in hand"))
         {
             c.Report();

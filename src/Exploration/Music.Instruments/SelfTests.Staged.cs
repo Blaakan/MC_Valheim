@@ -727,6 +727,9 @@ internal static partial class SelfTests
             }
             yield return WaitReal(() => !now.IsTeleporting() && ZNetScene.instance.IsAreaReady(now.transform.position), 20f);
             yield return new WaitForSeconds(1f);
+            // New body stand up first (game's own Standing Up animation, Player.InCutscene): no input taken and no walking
+            // until it ends. First runs looked too early and saw frozen keys that were the normal game.
+            yield return WaitReal(() => !now.InCutscene(), 30f);
             c.Check(Performance.Mode == PerformanceMode.None && !Performance.WindowOpen && !SongWindow.IsOpen && !MiniGameHud.Shown,
                 $"after the respawn: nothing plays, no window, no HUD (mode {Performance.Mode})");
             c.Check(EmitterCount() == 0, $"after the respawn: no sound source of the mod left ({EmitterCount()})");
