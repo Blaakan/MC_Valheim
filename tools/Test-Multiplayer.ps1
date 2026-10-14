@@ -75,7 +75,8 @@ if ($KeepRunning -and $scenarios.Count -ne 1) { Write-Fail '-KeepRunning needs e
 $filters = @(((@($Only) | Where-Object { $_ }) -join ',') -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $password = 'mcprobe1'
 $envNames = @('MC_INWORLD_DIR', 'MC_SELFTEST_FILTER', 'MC_SELFTEST_TIMEOUT', 'MC_INWORLD_KEEP', 'MC_MP_JOIN', 'MC_MP_PASSWORD',
-    'MC_MP_SCENARIO', 'MC_MP_SERVER_DIR', 'MC_MP_REFUSING', 'MC_MP_INSTALL_ONLY', 'SteamAppId')
+    'MC_MP_SCENARIO', 'MC_MP_SERVER_DIR', 'MC_MP_REFUSING', 'MC_MP_INSTALL_ONLY', 'MC_SELFTEST_PARKED', 'SteamAppId')
+$parked = @(Get-ParkedSelfTests)
 $author = Get-ModAuthor
 $collection = Get-ModCollectionFolder
 
@@ -319,7 +320,7 @@ function Invoke-Scenario([string]$Name, $Solo = $null) {
         $clientVars = @{ MC_INWORLD_DIR = (Join-Path $sd 'client'); MC_SELFTEST_FILTER = ($filters -join ','); MC_SELFTEST_TIMEOUT = $TestTimeoutSec;
             MC_MP_JOIN = "127.0.0.1:$Port"; MC_MP_PASSWORD = $password; MC_MP_SCENARIO = $Name; MC_INWORLD_KEEP = $(if ($KeepRunning) { '1' } else { '' });
             MC_MP_REFUSING = (($refusing | Where-Object { $_.Live } | ForEach-Object { $_.Guid }) -join ',');
-            MC_MP_INSTALL_ONLY = (($installOnly | ForEach-Object { $_.Guid }) -join ',') }
+            MC_MP_INSTALL_ONLY = (($installOnly | ForEach-Object { $_.Guid }) -join ','); MC_SELFTEST_PARKED = ($parked -join ',') }
         $client = Start-WithEnv (Join-Path $game 'valheim.exe') $game @('-console', '--doorstop-target-assembly', (Join-Path $cTree 'core\BepInEx.Preloader.dll')) $clientVars
         Write-Ok "client pid $($client.Id), waiting for DONE (timeout ${TimeoutSec}s)"
         $deadline = (Get-Date).AddSeconds($TimeoutSec)

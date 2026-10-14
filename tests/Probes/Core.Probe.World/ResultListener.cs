@@ -29,11 +29,13 @@ internal sealed class ResultListener : ILogListener
 {
     private const string PassMark = "[selftest] PASS ";
     private const string FailMark = "[selftest] FAIL ";
+    private const string SkipMark = "[selftest] SKIP ";
 
     private readonly object _gate = new object();
     private bool _counting;
     private int _pass;
     private int _fail;
+    private int _skip;
     private int _errors;
     private string _firstError;
     private bool _watching;
@@ -45,6 +47,7 @@ internal sealed class ResultListener : ILogListener
         {
             _pass = 0;
             _fail = 0;
+            _skip = 0;
             _errors = 0;
             _firstError = null;
             _counting = true;
@@ -59,6 +62,17 @@ internal sealed class ResultListener : ILogListener
             fail = _fail;
             errors = _errors;
             firstError = _firstError;
+        }
+    }
+
+    internal int Skips
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _skip;
+            }
         }
     }
 
@@ -126,6 +140,10 @@ internal sealed class ResultListener : ILogListener
                 else if (text.StartsWith(FailMark, StringComparison.Ordinal))
                 {
                     _fail++;
+                }
+                else if (text.StartsWith(SkipMark, StringComparison.Ordinal))
+                {
+                    _skip++;
                 }
                 else if ((eventArgs.Level & (LogLevel.Error | LogLevel.Fatal)) != 0)
                 {

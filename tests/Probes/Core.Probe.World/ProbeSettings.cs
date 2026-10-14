@@ -10,6 +10,8 @@ namespace MC.Core.ProbeWorldMod;
 //   MC_SELFTEST_FILTER   comma list of substrings: run only tests whose name hold one (probe.* always run).
 //   MC_SELFTEST_TIMEOUT  seconds per test (default 120).
 //   MC_INWORLD_KEEP      "1" = stay in world after DONE, no quit.
+//   MC_SELFTEST_PARKED   comma list of test names from tests/parked-selftests.txt: not run, unless a filter piece
+//                        is exactly that name.
 //   MC_INWORLD_STAGE     "" = first game of the run; "disabled" = second game: script set every MC mod Enabled =
 //                        false and started the game again on the same saves, only disabled-start checks run.
 // Multiplayer run (tools/Test-Multiplayer.ps1) add:
@@ -23,6 +25,7 @@ internal static class ProbeSettings
     internal const string TimeoutVar = "MC_SELFTEST_TIMEOUT";
     internal const string KeepVar = "MC_INWORLD_KEEP";
     internal const string StageVar = "MC_INWORLD_STAGE";
+    internal const string ParkedVar = "MC_SELFTEST_PARKED";
     internal const string JoinVar = "MC_MP_JOIN";
     internal const string PasswordVar = "MC_MP_PASSWORD";
     internal const string ScenarioVar = "MC_MP_SCENARIO";
@@ -41,6 +44,8 @@ internal static class ProbeSettings
     internal static float TestTimeout { get; private set; } = 120f;
     internal static bool Keep { get; private set; }
     internal static string Stage { get; private set; } = "";
+    internal static System.Collections.Generic.HashSet<string> Parked { get; private set; } =
+        new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
     internal static bool DisabledStage => Stage == MC.Shared.SelfTest.DisabledStage;
 
     // Multiplayer run: server address, password, scenario. Join null = single-player run.
@@ -76,6 +81,7 @@ internal static class ProbeSettings
         TestTimeout = float.TryParse(timeout, NumberStyles.Float, CultureInfo.InvariantCulture, out var t) && t > 0f ? t : 120f;
         Keep = Environment.GetEnvironmentVariable(KeepVar) == "1";
         Stage = (Environment.GetEnvironmentVariable(StageVar) ?? "").Trim();
+        Parked = new System.Collections.Generic.HashSet<string>(List(ParkedVar), StringComparer.OrdinalIgnoreCase);
 
         var join = Environment.GetEnvironmentVariable(JoinVar);
         Join = string.IsNullOrEmpty(join) ? null : join.Trim();
@@ -92,6 +98,18 @@ internal static class ProbeSettings
     // Me run test when no filter, or name hold one filter piece (case ignored).
     internal static bool Wanted(string testName)
     {
+        // Parked test: only when asked for by its whole name.
+        if (Parked.Contains(testName))
+        {
+            foreach (var f in Filters)
+            {
+                if (string.Equals(f, testName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
         if (Filters.Length == 0)
         {
             return true;

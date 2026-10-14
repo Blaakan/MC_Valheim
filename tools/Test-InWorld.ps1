@@ -64,7 +64,8 @@ $probeProj = Join-Path $root "tests\Probes\Core.Probe.World\$probeGuid.csproj"
 $probeCfg = Join-Path $game "BepInEx\config\$probeGuid.cfg"
 $probeDirs = @((Get-ModDeployDir $probeGuid), (Join-Path $game "BepInEx\plugins\$probeGuid"))
 $collectionDir = Join-Path $game ('BepInEx\plugins\' + (Get-ModCollectionFolder))
-$envNames = @('MC_INWORLD_DIR', 'MC_SELFTEST_FILTER', 'MC_SELFTEST_TIMEOUT', 'MC_INWORLD_KEEP', 'MC_INWORLD_STAGE')
+$envNames = @('MC_INWORLD_DIR', 'MC_SELFTEST_FILTER', 'MC_SELFTEST_TIMEOUT', 'MC_INWORLD_KEEP', 'MC_INWORLD_STAGE', 'MC_SELFTEST_PARKED')
+$parked = @(Get-ParkedSelfTests)
 $cfgDir = Join-Path $game 'BepInEx\config'
 $cfgPattern = "$(Get-ModAuthor).*.cfg"
 $probeCfgName = "$probeGuid.cfg"
@@ -365,6 +366,7 @@ try {
             [Environment]::SetEnvironmentVariable('MC_SELFTEST_TIMEOUT', [string]$TestTimeoutSec, 'Process')
             [Environment]::SetEnvironmentVariable('MC_INWORLD_KEEP', $(if ($KeepRunning) { '1' } else { $null }), 'Process')
             [Environment]::SetEnvironmentVariable('MC_INWORLD_STAGE', $(if ($stage) { $stage } else { $null }), 'Process')
+            [Environment]::SetEnvironmentVariable('MC_SELFTEST_PARKED', $(if ($parked.Count) { $parked -join ',' } else { $null }), 'Process')
             $launch = Get-Date
             $proc = @(& (Join-Path $PSScriptRoot 'Start-Game.ps1')) | Where-Object { $_ -is [System.Diagnostics.Process] } | Select-Object -First 1
         }
@@ -613,6 +615,7 @@ if ($otherErrors.Count) {
 }
 Write-Host "  shots: $shotsDir"
 Write-Host "  log copy: $(Join-Path $runDir 'LogOutput.log')"
+if ($parked.Count) { Write-Host "  parked tests (not run unless named with -Only): $($parked.Count), see tests\parked-selftests.txt" }
 if ($pass) { Write-Host 'IN-WORLD TEST PASSED' -ForegroundColor Green; exit 0 }
 Write-Host 'IN-WORLD TEST FAILED' -ForegroundColor Red
 exit 1

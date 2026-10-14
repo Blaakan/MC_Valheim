@@ -207,6 +207,13 @@ function Enable-ModConfigText([string]$Text) {
     $Text.Substring(0, $at) + $line.Groups['pre'].Value + 'true' + $line.Groups['post'].Value + $Text.Substring($at + $line.Length)
 }
 
+# Parked self-tests (tests/parked-selftests.txt: "name  # reason" per line): in the code, not run by default.
+function Get-ParkedSelfTests {
+    $file = Join-Path (Get-RepoRoot) 'tests\parked-selftests.txt'
+    if (-not (Test-Path -LiteralPath $file)) { return @() }
+    @([IO.File]::ReadAllLines($file) | ForEach-Object { ($_ -split '#', 2)[0].Trim() } | Where-Object { $_ })
+}
+
 # Other way round: Enabled = true (or no value yet) in [General] become false. $null = already off or no such line.
 function Disable-ModConfigText([string]$Text) {
     $general = [regex]::Match("$Text", '(?ms)^\[General\][ \t]*\r?$(?<body>.*?)(?=^\[|\z)')

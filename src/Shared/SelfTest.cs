@@ -217,6 +217,13 @@ internal static class SelfTest
     [Conditional("DEBUG")]
     internal static void Note(string name, string detail) => Log.Info($"{Prefix} NOTE {name}: {detail}");
 
+    // Premise of the test does not hold on this PC and the test cannot make it hold (player's own settings are not
+    // the ones the item is about, an external mod is not installed): say why and end the test. A test that only
+    // skipped is neither passed nor failed: it counts as not run, its TESTING.md item stays for a person. Never for
+    // a check that could not be set up by bad luck (that is a Fail), never after a Pass or Fail of the same test.
+    [Conditional("DEBUG")]
+    internal static void Skip(string name, string why) => Log.Info($"{Prefix} SKIP {name}: {why}");
+
     // Screenshot of end of this frame (yield one frame after, before change screen again). Only while probe run.
     // One shot per frame: Unity keep only last request of a frame. Same name + label again = file overwritten.
     [Conditional("DEBUG")]

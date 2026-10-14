@@ -254,9 +254,13 @@ internal static class StageTests
     private static IEnumerator One(string name, string owner, Func<IEnumerator>[] parts, float[] timeouts, int[] counts, ProbeTimings timings)
     {
         var outcome = new bool[1];
+        var skippedBefore = ProbeDriver.Skipped;
         yield return ProbeDriver.RunParts(name, owner, parts, timeouts, outcome);
         counts[0]++;
-        counts[outcome[0] ? 1 : 2]++;
+        if (ProbeDriver.Skipped == skippedBefore)
+        {
+            counts[outcome[0] ? 1 : 2]++;
+        }
         // A part that failed half way can leave the game at the main menu: next test need the world.
         var back = new RunResult();
         yield return SafeRunner.Run(EnsureInWorld(timings), ProbeDriver.MenuTimeout + ProbeDriver.SpawnTimeout + ProbeDriver.SettleTimeout, back);

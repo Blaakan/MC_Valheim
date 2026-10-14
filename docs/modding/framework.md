@@ -276,8 +276,17 @@ internal static class CrossbowSelfTests
   small test `<modshortname>.bug.<what>`, so it only blocks the `TESTING.md` items it is about; a check that depends
   on the player's other installed mods (for example "no error line since the game started") also gets its own test.
   A test must report at least one `SelfTest.Pass` or `SelfTest.Fail`, or it
-  fails. `SelfTest.Note` adds context. `SelfTest.Screenshot(name, label)` saves `<name>__<label>.png`; yield two
+  fails. The one exception is `SelfTest.Skip(name, why)`: when the premise of a test does not hold on this PC and
+  the test cannot make it hold (the player's own settings are not the ones the item is about, an external mod is not
+  installed), it says why and ends. A test that only skipped ends as `skipped`: neither passed nor failed, counted
+  as not run, so its `TESTING.md` item stays for a person. Bad luck in the set-up (no creature came, no shore
+  found) is a `Fail`, not a skip, and so is a missing MC mod (every MC mod is loaded in a test run). `SelfTest.Note` adds context. `SelfTest.Screenshot(name, label)` saves `<name>__<label>.png`; yield two
   frames before changing the screen, and take at most one screenshot per frame.
+- **Parked tests.** `tests/parked-selftests.txt` lists self-tests that stay in the code but do not run by default,
+  one per line with the reason (`name  # reason`): new tests that failed their first runs for a reason nobody has
+  worked out yet. A parked test ticks nothing (its `TESTING.md` item stays as it is) and runs only when `-Only` names
+  it exactly (`-Only tower.x.moveset`). Take a test off the list when it is fixed; turn it into a
+  `<modshortname>.bug.<what>` test when the mod turns out to be wrong.
 - Yield `null`, a nested `IEnumerator`, `WaitForSeconds`, `WaitForSecondsRealtime`, `WaitUntil` / `WaitWhile`, an
   `AsyncOperation`, `WaitForEndOfFrame` or `WaitForFixedUpdate`. Do not yield a started `Coroutine`: the timeout
   cannot stop it.
