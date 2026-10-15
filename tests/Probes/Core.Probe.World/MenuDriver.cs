@@ -202,8 +202,18 @@ internal static class MenuDriver
 
     // Multiplayer run: join dedicated server like "-joinserverwithcharacter" (selected character + FejdStartup.JoinServer,
     // which does TransitionToMainScene). Password given before: ZNet.RPC_ClientHandshake enter it by itself.
+    // Character chosen like the menu's Start button (FejdStartup.SelectCharacter = Game.SetProfile, here without its
+    // menu pref write). Without it the game loads its built-in developer profile ("Developer", name "Odev"): that is
+    // what every multiplayer run did until 2026-10-14.
     private static void JoinServer(FejdStartup fejd, ProbeTimings timings)
     {
+        var profile = fejd.m_profiles != null && fejd.m_profileIndex >= 0 && fejd.m_profileIndex < fejd.m_profiles.Count
+            ? fejd.m_profiles[fejd.m_profileIndex] : null;
+        if (profile == null || profile.GetFilename() != ProbeSettings.CharacterName.ToLowerInvariant())
+        {
+            throw new InvalidOperationException($"character '{ProbeSettings.CharacterName}' not selected for the join");
+        }
+        Game.SetProfile(profile.GetFilename(), profile.m_fileSource);
         FejdStartup.ServerPassword = ProbeSettings.Password;
         fejd.m_joinServer = new ServerJoinData(new ServerJoinDataDedicated(ProbeSettings.Join));
         if (!fejd.m_joinServer.IsValid)
@@ -211,7 +221,8 @@ internal static class MenuDriver
             throw new InvalidOperationException($"server address '{ProbeSettings.Join}' not understood");
         }
         timings.WorldRequested = Time.realtimeSinceStartup;
-        SelfTest.Note("probe", $"joining server {ProbeSettings.Join} (scenario '{ProbeSettings.Scenario}')");
+        // Script read the name in this line: the server names the player by it.
+        SelfTest.Note("probe", $"joining server {ProbeSettings.Join} (scenario '{ProbeSettings.Scenario}') as character '{profile.GetName()}'");
         fejd.JoinServer();
         var restored = PrefsGuard.Restore();
         SelfTest.Note(T, $"menu prefs (last character/world, crossplay) put back: {restored} changed");

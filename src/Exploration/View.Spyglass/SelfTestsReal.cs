@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using MC.Shared;
 using UnityEngine;
 using UnityEngine.UI;
@@ -340,7 +341,7 @@ internal static partial class SelfTests
             // Light of noon and clear weather settled: frames a moment apart must be the same picture.
             var fog = new float[1];
             yield return FogSettled(fog, 15f);
-            c.Note($"looking {F(yaw)} degrees, {F(free)} m of open view; render scale {(UpscaledFrameBuffer.m_autoTargetResolution ? "automatic" : UpscaledFrameBuffer.m_targetResolutionVertical >= Screen.height ? "100%" : UpscaledFrameBuffer.m_targetResolutionVertical + " lines")}");
+            c.Note($"looking {F(yaw)} degrees, {F(free)} m of open view; render scale {(RenderScale.Auto ? "automatic" : RenderScale.Target >= Screen.height ? "100%" : RenderScale.Target + " lines")}");
             yield return RaiseUp(c, player, "picture");
             yield return Frames(15);
             if (Scope.State == ScopeState.Raised)
@@ -369,15 +370,15 @@ internal static partial class SelfTests
             yield break;
         }
         var rig = new SpyRig(player, RenderScaleTest);
-        var auto = UpscaledFrameBuffer.m_autoTargetResolution;
-        var target = UpscaledFrameBuffer.m_targetResolutionVertical;
+        var auto = RenderScale.Auto;
+        var target = RenderScale.Target;
         try
         {
             rig.Noon();
             rig.ClearWeather();
             var spy = Hold(rig, c);
             var scaler = Object.FindAnyObjectByType<FrameBufferScaler>(FindObjectsInactive.Include);
-            var buffer = Object.FindAnyObjectByType<UpscaledFrameBuffer>(FindObjectsInactive.Include);
+            var buffer = RenderScale.FindBuffer();
             var raw = scaler != null ? scaler.GetComponent<RawImage>() : null;
             if (spy == null || !c.Check(scaler != null && buffer != null && raw != null && _tap != null,
                     "this game has the render scale setting (its scaled-picture objects exist)"))
@@ -401,11 +402,11 @@ internal static partial class SelfTests
             // values in memory, nothing saved. Put back in finally.
             var lines = (uint)Mathf.Max(64, Screen.height / 2);
             c.Note($"render scale before the test: {(auto ? "automatic" : target >= Screen.height ? "100%" : target + " lines")} of {Screen.height}; set to {lines} lines (50%) for the test");
-            UpscaledFrameBuffer.m_autoTargetResolution = false;
-            UpscaledFrameBuffer.m_targetResolutionVertical = lines;
-            yield return WaitReal(() => buffer.m_renderTexture != null && raw.texture != null, 3f);
+            RenderScale.Auto = false;
+            RenderScale.Target = lines;
+            yield return WaitReal(() => RenderScale.Texture(buffer) != null && raw.texture != null, 3f);
             yield return Frames(5);
-            var picture = buffer.m_renderTexture;
+            var picture = RenderScale.Texture(buffer);
             if (!c.Check(picture != null && ReferenceEquals(raw.texture, picture) && picture.height == (int)lines,
                     $"the game now draws the world at {lines} lines and stretches that picture over the screen ({(picture != null ? picture.width + " x " + picture.height : "no scaled picture")})"))
             {
@@ -472,8 +473,8 @@ internal static partial class SelfTests
         }
         finally
         {
-            UpscaledFrameBuffer.m_autoTargetResolution = auto;
-            UpscaledFrameBuffer.m_targetResolutionVertical = target;
+            RenderScale.Auto = auto;
+            RenderScale.Target = target;
             rig.Restore();
         }
     }
@@ -1259,6 +1260,35 @@ internal static partial class SelfTests
         {
             kit.Finish(T);
         }
+    }
+    // Render scale of the game (UpscaledFrameBuffer statics, its picture field) through reflection, never a direct
+    // reference: the dedicated server's assembly_valheim has the class without these fields, and the Debug JitCheck
+    // failed there on a direct use (multiplayer run 2026-10-14). On the server all of it reads as absent.
+    private static class RenderScale
+    {
+        private const BindingFlags Any = BindingFlags.Public | BindingFlags.NonPublic;
+        private static readonly Type BufferType = typeof(Player).Assembly.GetType("UpscaledFrameBuffer");
+        private static readonly FieldInfo AutoField = BufferType != null ? BufferType.GetField("m_autoTargetResolution", Any | BindingFlags.Static) : null;
+        private static readonly FieldInfo TargetField = BufferType != null ? BufferType.GetField("m_targetResolutionVertical", Any | BindingFlags.Static) : null;
+        private static readonly FieldInfo TextureField = BufferType != null ? BufferType.GetField("m_renderTexture", Any | BindingFlags.Instance) : null;
+
+        internal static bool Auto
+        {
+            get => AutoField != null && (bool)AutoField.GetValue(null);
+            set => AutoField?.SetValue(null, value);
+        }
+
+        internal static uint Target
+        {
+            get => TargetField != null ? (uint)TargetField.GetValue(null) : uint.MaxValue;
+            set => TargetField?.SetValue(null, value);
+        }
+
+        internal static Component FindBuffer() =>
+            BufferType != null && TextureField != null ? Object.FindAnyObjectByType(BufferType, FindObjectsInactive.Include) as Component : null;
+
+        internal static RenderTexture Texture(Component buffer) =>
+            buffer != null && TextureField != null ? TextureField.GetValue(buffer) as RenderTexture : null;
     }
 }
 #endif

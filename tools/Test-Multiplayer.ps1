@@ -298,6 +298,7 @@ function Invoke-Scenario([string]$Name, $Solo = $null) {
     $cLog = Join-Path $cTree 'LogOutput.log'
     $result = [pscustomobject]@{ Name = $label; Pass = $false; Problems = (New-Object System.Collections.Generic.List[string]); Dir = $sd }
     $checks = New-Object System.Collections.Generic.List[string]
+    # Name the server knows the player by: from the client probe's join note (the MCProbe character).
     $server = $null; $client = $null
     try {
         $serverArgs = @('-nographics', '-batchmode', '-name', "MCProbe$Port", '-port', [string]$Port, '-world', 'MCProbeMP',
@@ -372,16 +373,19 @@ function Invoke-Scenario([string]$Name, $Solo = $null) {
         $who = @($refusing | Where-Object { $st -match ('\[Warning\s*:\s*' + [regex]::Escape($_.Name) + '\] Refused ') } | ForEach-Object { $_.Name })
         if ($who.Count) { Write-Ok "refused by: $($who -join ', ')" } else { $result.Problems.Add('no MC mod logged "Refused" on the server') }
     }
+    $joinName = [regex]::Match($ct, "\[selftest\] NOTE probe: joining server [^\r\n]* as character '(?<n>[^'\r\n]+)'")
+    $playerName = if ($joinName.Success) { $joinName.Groups['n'].Value } else { 'MCProbe' }
+    $playerRx = [regex]::Escape($playerName)
     if ($Solo) {
         # Alone on the server, the mod must write its own line for a player who does not have it.
         $test = "probe.mp.refuse.$($Solo.Guid)"
-        $line = [regex]::Match($st, '(?m)^\[Warning\s*:\s*' + [regex]::Escape($Solo.Name) + '\] (?<text>Refused MCProbe\b[^\r\n]*does not have the mod[^\r\n]*)')
+        $line = [regex]::Match($st, '(?m)^\[Warning\s*:\s*' + [regex]::Escape($Solo.Name) + '\] (?<text>Refused ' + $playerRx + '\b[^\r\n]*does not have the mod[^\r\n]*)')
         $refusedOk = $ct -match '\[selftest\] END probe\.mp\.refused: passed'
         if ($line.Success -and $refusedOk) {
             foreach ($l in (New-CheckLines $test $true "with only $($Solo.Name) on the server, a player without the mod was refused and its own log line says so: $($line.Groups['text'].Value)")) { $checks.Add($l) }
         }
         else {
-            $why = if (-not $refusedOk) { 'the player was not refused (probe.mp.refused did not pass)' } else { "no Warning line 'Refused MCProbe ...: does not have the mod' (naming the player) from the log source '$($Solo.Name)' on the server" }
+            $why = if (-not $refusedOk) { 'the player was not refused (probe.mp.refused did not pass)' } else { "no Warning line 'Refused $playerName ...: does not have the mod' (naming the player) from the log source '$($Solo.Name)' on the server" }
             foreach ($l in (New-CheckLines $test $false "with only $($Solo.Name) on the server: $why")) { $checks.Add($l) }
             $result.Problems.Add("${test}: $why")
         }
@@ -394,10 +398,10 @@ function Invoke-Scenario([string]$Name, $Solo = $null) {
             if (-not (Test-Wanted $test)) { continue }
             if ($ct -notmatch ('\[selftest\] BEGIN probe\.mp\.off\.' + [regex]::Escape($m.Guid) + ' ')) { continue }
             $src = [regex]::Escape($m.Name)
-            $turned = [regex]::Matches($st, '(?m)^\[Info\s*:\s*' + $src + '\] MCProbe turned ' + $src + ' off on their game\.').Count
-            $refusedOff = [regex]::Matches($st, '(?m)^\[Warning\s*:\s*' + $src + '\] Refused MCProbe\b[^\r\n]*has the mod turned off').Count
+            $turned = [regex]::Matches($st, '(?m)^\[Info\s*:\s*' + $src + '\] ' + $playerRx + ' turned ' + $src + ' off on their game\.').Count
+            $refusedOff = [regex]::Matches($st, '(?m)^\[Warning\s*:\s*' + $src + '\] Refused ' + $playerRx + '\b[^\r\n]*has the mod turned off').Count
             $ok = $turned -ge 1 -and $refusedOff -ge 2
-            $detail = "server log of $($m.Name), lines naming the player: 'MCProbe turned $($m.Name) off on their game.' $turned time(s) (expected 1 or more), 'Refused MCProbe ...: has the mod turned off' $refusedOff time(s) (expected 2 or more: while connected, and when joining with it off)"
+            $detail = "server log of $($m.Name), lines naming the player: '$playerName turned $($m.Name) off on their game.' $turned time(s) (expected 1 or more), 'Refused $playerName ...: has the mod turned off' $refusedOff time(s) (expected 2 or more: while connected, and when joining with it off)"
             foreach ($l in (New-CheckLines $test $ok $detail)) { $checks.Add($l) }
             if (-not $ok) { $result.Problems.Add("${test}: $detail") }
         }
