@@ -7,10 +7,11 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 **Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
 MC Mods panel. Smoke test passed 2026-09-28 (loads, patches, JitCheck clean). No in-game test yet.
 
-**Automated checks (2026-10-08):** 20 of 20 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 20 of 20 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
+"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
+still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** press F5 for the console → `devcommands`. Spawn gear with `spawn <Name>` (Tab autocompletes):
 - workbench gear (level 1 workbench is enough): `AxeFlint`, `Club`, `KnifeFlint`, `ShieldWood`, `ArmorRagsChest`, `Hoe`;

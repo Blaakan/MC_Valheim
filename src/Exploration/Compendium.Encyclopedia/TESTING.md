@@ -13,10 +13,11 @@ be built stays refused when the mod is turned off and on (the optional side butt
 reset to `[ ]`. Debug and Release build of 0.1.1 without warnings; the self-tests ran on 0.1.1 on 2026-10-13 (game
 1.0.17, every MC mod loaded): all of this mod's tests passed.
 
-**Automated checks (2026-10-13):** 52 of 52 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 59 of 59 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
+"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
+still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** a **new character in a new world** for T05-T08, T13, T21, T25 and T32-T34 (everything starts as "???"), and a
 **mid-game character** for T09. Open the Encyclopedia: inventory (Tab) → the game's **Valheim Compendium** button
@@ -334,14 +335,14 @@ Log lines (Debug level unless noted):
   Encyclopedia from it does not change which tab the raven reopens (G2).
   *Partly automated (`compendium.ui`, `compendium.close`, `compendium.sidebutton`); by hand: After logging out and in
   the raven opens Texts first; the closes done with real key presses.*
-- [ ] **T37 Controller tabs:** controller only. Valheim Compendium open: RT shows the Encyclopedia, LT the Texts; in
+- [x] **T37 Controller tabs:** controller only. Valheim Compendium open: RT shows the Encyclopedia, LT the Texts; in
   the Encyclopedia: LT back to Texts, RT does nothing. Pressing LT on Texts, or RT on the Encyclopedia, changes
   nothing. In both, LT and RT never do anything else: the game's list selection and text scrolling in Texts (D-pad,
   sticks) keep working, the Encyclopedia's LB/RB still change its category tab, the crafting panel's Craft / Upgrade
   tabs behind do not change, and B closes whichever one is shown. With Sort Chest, Loot Pickup Filter and Crafting
   Search and Sort installed, none of their controller shortcuts fires from LT or RT here (G2).
-  *Partly automated (`compendium.ui`, `compendium.pad`); by hand: Everything with a real controller: LT / RT presses,
-  list and text scrolling in Texts, LB / RB in the Encyclopedia, B, and the other mods' shortcuts.*
+  *Automated: `compendium.ui`, `compendium.pad`, `compendium.input.triggers`, `compendium.input.nav`,
+  `compendium.input.crafttabs`, `compendium.input.close-both`, `compendium.input.othermods`.*
 - [x] **T38 Optional button setting live:** default (`SideButton = false`): the inventory's side panel is exactly the
   game's (five buttons at their places; compare with a screenshot without the mod). Set `SideButton = true` with the
   inventory open: the book button appears at once right after the raven, the six buttons evenly spaced; set it back
@@ -401,10 +402,15 @@ Log lines (Debug level unless noted):
   behaviour unchanged.
 - [ ] **X06 Jewelcrafting or EquipmentAndQuickSlots:** their additions to the Valheim Compendium are on its Texts tab
   as usual, and the Encyclopedia carries none of them.
+  *Partly automated (`compendium.x.textspage`, `compendium.x.tamecounts`); by hand: A real Jewelcrafting or
+  EquipmentAndQuickSlots (neither is installed on this PC): their own additions are on the Texts tab as usual and the
+  Encyclopedia shows none of them.*
 - [ ] **X07 AugaLite or Veneer:** no tab (and no button with the optional setting on), at most one warning in the log,
   no error.
-  *Partly automated (`compendium.siderow`); by hand: Everything with a real AugaLite or Veneer: no tab, no button, at
-  most one warning, no error.*
+  *Partly automated (`compendium.siderow`, `compendium.refused-toggle`, `compendium.x.refused-build`); by hand: A real
+  AugaLite or Veneer (not installed on this PC): with their inventory screen there is no tab, no button with the
+  optional setting on, at most one warning and no error. Which refusal (if any) their screen triggers can only be seen
+  with the mod.*
 - [x] **X08 A content mod (Jotunn items or creatures):** its entries are listed and can be discovered.
   *Partly automated (`compendium.x.content`); by hand: A Jotunn content mod: its items and creatures are listed and
   can be discovered.*

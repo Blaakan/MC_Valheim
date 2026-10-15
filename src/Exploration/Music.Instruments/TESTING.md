@@ -38,10 +38,11 @@ the wire, legato, same-frame tap, Space octave up, tambourine keys and sound, no
 freed after End); offline harness 5406 checks (piano map, note off in the synth); same two errors from Sneak Ambush
 and Spyglass only.
 
-**Automated checks (2026-10-08):** 60 of 60 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 80 of 80 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
+"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
+still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina. Items: `spawn MC_Flute`,
@@ -73,12 +74,11 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   wooden flute with finger holes, a silver lyre with strings, a tambourine with a skin and jingles, sized like real
   instruments in the hand; dropped ones lie on the ground, can be picked up, and look the same; the inventory icons
   match the models.
-  *Partly automated (`music.drop`, `music.item`, `music.export`); by hand: Look at them: a wooden flute with finger
-  holes, a silver lyre with strings, a tambourine with a skin and jingles, sized like real instruments in the hand,
-  the same when dropped, and inventory icons that match the models (the screenshots of music.item and the PNG files of
-  music.export can be used). Also watch the dropped flute: it is round (capsule collider) and in the automated run it
-  was still rolling at about 0.1 m/s 6 s after the drop on almost level ground; check that it comes to rest and does
-  not roll away.*
+  *Partly automated (`music.drop`, `music.item`, `music.export`, `music.drop.rest`); by hand: Look at them: a wooden
+  flute with finger holes, a silver lyre with strings, a tambourine with a skin and jingles, sized like real
+  instruments in the hand, the same when dropped, and inventory icons that match the models (screenshots of
+  music.item, PNG files of music.export). The rolling is no longer a by-hand check. Note: the flute's collider is a
+  capsule with no extra damping, so music.drop.rest may fail on sloping ground; that would be the mod, not the test.*
 - [x] **T03 Tools:** equip a torch, then an instrument. Expected: both hands taken (the torch is put away); a weapon or
   torch puts the instrument away; R hangs it at the hip like the hammer.
   *Automated: `music.hands`.*
@@ -109,13 +109,11 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   *Partly automated (`music.midi`, `music.songs`); by hand: With real MIDI files from the internet (a simple one and a
   busy one with drums): by ear, the flute plays a recognizable tune, the lyre the tune with a bass line, the
   tambourine the drums or the tune's rhythm.*
-- [ ] **T08 Rhythm game (G2, G3):** hold any instrument, pick Kjerringa med staven, Perform. Expected: a countdown, then
+- [x] **T08 Rhythm game (G2, G3):** hold any instrument, pick Kjerringa med staven, Perform. Expected: a countdown, then
   notes fall in four lanes toward the line; pressing D F J K on time plays the notes (hits show "Perfect"/"Good"),
   missing shows "Miss" and plays nothing; you cannot walk, open the inventory or use the hotbar while it runs; the song
   repeats. Right click or Esc stops it (Esc also opens the menu).
-  *Partly automated (`music.rhythm`, `music.keys`); by hand: Look at one run: the notes are drawn falling down the
-  four lanes toward the line (the tests check note timing, lanes, texts and keys, not the drawing of the falling
-  notes).*
+  *Automated: `music.rhythm`, `music.keys`, `music.rhythm.drawn`.*
 - [x] **T09 Encore and comfort (G3):** in a shelter (roof and walls) with a burning fire: sit (X) and play the rhythm
   game for 20 seconds, hitting at least half the notes. Expected: the meter fills (it waits when you miss more),
   "Encore! +3 comfort", the Music icon appears with "+3" and 10:00 counting down; as soon as the Encore comes, the
@@ -138,8 +136,9 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   Accessibility → Toggle block on: after each right click you are not left in the block stance. With the lyre: when
   you sit down mid-song (X or a chair), the lyre moves onto your left thigh, its top leaning back toward your chest,
   both hands still on it; stand up (walk) mid-song: it moves back against your body.
-  *Partly automated (`music.seated`, `music.pose`); by hand: Look at the seated lyre: its top leans back toward the
-  chest and both hands are on it. Try a chair or bench once (the test sits with X only).*
+  *Partly automated (`music.seated`, `music.pose`, `music.chair`); by hand: Look once at the seated lyre: its top
+  leans back toward the chest and the right hand is on it too (the tests measure the seat pose and the left hand only;
+  a screenshot music.chair__lyre-on-chair is saved).*
 - [x] **T13 Stops by itself:** while a song plays: (a) `spawn Greyling`, `god` off, let it hit you: the song stops
   ("The hit cut your song short."); (b) stand in fire: it keeps playing; (c) press R: it stops at once; (d) equip a
   weapon from the hotbar: stops at once; (e) walk into deep water until you swim: stops at once. While performing:
@@ -155,10 +154,9 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   read (for example F15), Escape or Mouse1 turns that lane off with one warning in the log. Lane1Key = F5 (the console
   key): during the rhythm game F5 plays lane 1 and the console does not open. Put them back.
   *Automated: `music.settings`, `music.mp.settings`, `music.keys`.*
-- [ ] **T16 Volume sliders:** Settings → Audio: lower the Sound effects slider while a song plays. Expected: the
+- [x] **T16 Volume sliders:** Settings → Audio: lower the Sound effects slider while a song plays. Expected: the
   instrument gets quieter with it; Master too.
-  *Partly automated (`music.play`, `music.listen.more`, `music.synth`); by hand: Move the Sound effects slider, then
-  Master, while a song plays and hear the instrument get quieter (the tests measure the sound before the mixer).*
+  *Automated: `music.play`, `music.listen.more`, `music.synth`, `music.volume.heard`.*
 - [x] **T17 Live toggle off while playing:** the pause menu itself ends the rhythm game and closes the window, so turn
   the mod off without it: (a) while a song plays by itself, untick Music Instruments in the MC Mods panel (Esc); (b)
   while performing, and (c) with the song window open, set `Enabled = false` in
@@ -169,37 +167,38 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   counting down but shows no "+3", its tooltip says "Music heard nearby.", and the Resting comfort drops by 3. Turn it
   back on: everything works again and "+3" returns.
   *Automated: `music.toggle`.*
-- [ ] **T18 Enabled = false + restart:** set Enabled = false, restart the game and load the character. Expected: the
+- [x] **T18 Enabled = false + restart:** set Enabled = false, restart the game and load the character. Expected: the
   instruments are still in the inventory (not lost); no recipes; Status says off. Set it back to true.
-  *Partly automated (`music.toggle`); by hand: Set Enabled = false, restart the game and load the character: the
-  instruments are still in the inventory, there are no recipes, and Status says off.*
-- [ ] **T19 Logout while playing:** play a song, Esc, Logout, Yes. Expected: no sound, window or HUD left in the main
+  *Automated: `music.toggle`, `music.disabled.items`, `probe.disabled.MC.Exploration.Music.Instruments`.*
+- [x] **T19 Logout while playing:** play a song, Esc, Logout, Yes. Expected: no sound, window or HUD left in the main
   menu. Load the world again: everything works.
-  *Partly automated (`music.logout`); by hand: A real Logout to the main menu while a song plays (no sound, window or
-  HUD there), then load the world again.*
+  *Automated: `music.logout`, `music.relog.playing`, `probe.relog.MC.Exploration.Music.Instruments`.*
 - [x] **T20 Pause:** single player. (a) Perform, then Esc. Expected: the rhythm game stops (the menu pauses the game)
   and no note keeps sounding. (b) Let a song play by itself, then Esc. Expected: it plays on behind the menu, like the
   game's music; close the menu: it goes on in time.
   *Automated: `music.pause`.*
 - [ ] **T21 Clean log:** after the other items, the log has no error or warning from Music Instruments
   (`./tools/Watch-Log.ps1 -Mine`), except the warning of T15's bad key.
-  *Partly automated (`music.cleanlog`, `music.mp.server`); by hand: The log after the items done by hand.*
-- [ ] **T22 Window keys:** open the song window while holding W (or the stick forward): the selection does not run up
+  *Partly automated (`music.cleanlog`, `music.mp.server`, `probe.relog.MC.Exploration.Music.Instruments`,
+  `probe.quit.MC.Exploration.Music.Instruments`, `probe.disabled.MC.Exploration.Music.Instruments`); by hand: The log
+  after the items still done by hand (T02, T05, T06, T07, T12, T23, T34, X03 and the multiplayer items with a second
+  player).*
+- [!] **T22 Window keys:** open the song window while holding W (or the stick forward): the selection does not run up
   the list. Up/Down choose a song, Left/Right cycle a MIDI file's part, Enter plays (the chat does not open); with a
   gamepad: D-pad up/down choose, A plays, Y toggles Repeat, B closes; X starts nothing and says the rhythm game is
   played on the keyboard (the gamepad help line does not offer it). Double-click a row: it plays.
-  *Partly automated (`music.windowkeys`, `music.pad`, `music.keys`); by hand: With a real gamepad: stick held forward
-  while opening the window, D-pad, A, Y, B and X. And holding W while opening the window (the test holds an arrow
-  key).*
+  **FAILED:** automated test: on a controller (default layout) B closes the song window and can also make the
+  character jump (B is the game's jump button too: 1 jump in 6 closes) (self-test `music.bug.pad-close-jump`)
 - [ ] **T23 HUD:** perform: the lanes sit to the right of your character (it stays visible), a 3-2-1 countdown, key
   labels under the line, "Perfect"/"Good"/"Miss" near the line, the meter beside the lanes (gold "In tune: the meter
   fills", red "Hit more notes: the meter waits", grey during rests), "Encore! +3 comfort" when it fills. Hide the
   HUD (Ctrl+F3): the rhythm game stays visible. While a song plays by itself: a small line with the title and time.
   Check at your usual GUI scale and once at a different one (Settings). The stop hint under the lanes says "Right click or Esc: stop", and "Start or right
   click: stop" once you touch a gamepad.
-  *Partly automated (`music.hud`, `music.pad`, `music.encore`); by hand: Look at the HUD at your usual GUI scale and
-  once at another (no test changes the scale): key labels under the line, judgements near the line, meter beside the
-  lanes. And the stop hint switching when a real gamepad is touched.*
+  *Partly automated (`music.hud`, `music.pad`, `music.encore`, `music.hud.scale`, `music.input.pad-hud`,
+  `music.input.hide-hud`); by hand: Look once at the meter bar itself while performing: it is drawn beside the lanes
+  (left of lane 1) and fills in the colour its text names (gold, red, grey). The tests measure the meter's text and
+  the lanes on screen, and the meter's value, not the bar's picture.*
 - [x] **T24 Instrument swap:** play a song on the flute, then press the hotbar key of the lyre. Expected: the flute song
   stops at once (no flute song on the lyre), nothing stays posed.
   *Automated: `music.swap`.*
@@ -207,11 +206,12 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   window's title bar for about two seconds (the game freezes) and let go. Expected: the song carries on in time; no
   burst of piled-up notes when the game comes back.
   *Automated: `music.freeze`.*
-- [ ] **T37 Death while playing:** `god` off, `spawn Greyling` (or several) and let it kill you (a) while a song plays
+- [x] **T37 Death while playing:** `god` off, `spawn Greyling` (or several) and let it kill you (a) while a song plays
   by itself, (b) while performing, (c) with the song window open. Expected each time: the music stops, the rhythm
   game, its HUD and the window close, and the game's keys work on the death screen; after you respawn nothing is left
   on the new body (no sound, no playing pose, no HUD, no frozen keys). The instrument is in your tombstone with your
   other items; taken back, it plays as before.
+  *Automated: `music.death.auto`, `music.death.perform`, `music.death.window`.*
 - [x] **T38 ComfortBonus 0:** set ComfortBonus = 0 and perform until the meter is full. Expected: the meter still
   fills and the banner says "Encore!" (no "+0 comfort"); no Music icon, no message, comfort unchanged, also for a
   player nearby who hears the Encore. With Music already running when ComfortBonus goes to 0: its icon shows the time
@@ -227,10 +227,9 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
 
 ### Cross-mod (MC)
 
-- [ ] **X01 Spyglass:** hold the spyglass, raise it; equip an instrument and play; equip the spyglass again. Expected:
+- [x] **X01 Spyglass:** hold the spyglass, raise it; equip an instrument and play; equip the spyglass again. Expected:
   each acts only while it is in your hand; no stuck pose, view or sound.
-  *Partly automated (`music.spyglass`); by hand: Raise the spyglass for real before swapping (the test holds Block but
-  does not check that the view zoomed) and see the view go back to normal with the instrument in hand.*
+  *Automated: `music.spyglass`, `music.x.spyglass`.*
 - [x] **X02 Sleep Through the Day:** with Music on (get an Encore), not Rested, sleep in a bed and wake up. Expected:
   "You feel rested (Comfort: N)" includes the +3.
   *Automated: `music.sleep`.*
@@ -239,14 +238,12 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   each (no stuck capture).
   *Partly automated (`music.crossmod`); by hand: Type in the Encyclopedia search and in the crafting search, close
   them and perform: keys behave normally in each.*
-- [ ] **X04 Sort Chest / Crafting Search and Sort:** sort a chest with instruments, a hammer and a sword. Expected: the
+- [x] **X04 Sort Chest / Crafting Search and Sort:** sort a chest with instruments, a hammer and a sword. Expected: the
   instruments are grouped with the tools.
-  *Partly automated (`music.crossmod`); by hand: Sort a real chest holding instruments, a hammer and a sword: the
-  instruments end up with the tools.*
-- [ ] **X05 Dual Wielding:** with a dual-wield pair in hand, equip an instrument. Expected: the pair is put away, the
+  *Automated: `music.crossmod`, `music.x.sortchest`.*
+- [x] **X05 Dual Wielding:** with a dual-wield pair in hand, equip an instrument. Expected: the pair is put away, the
   instrument is never paired.
-  *Partly automated (`music.hands`, `music.crossmod`); by hand: With Dual Wielding active and a real pair in hand:
-  equip an instrument (the pair is put away) and try to pair a weapon with the instrument (never paired).*
+  *Automated: `music.hands`, `music.crossmod`, `music.x.dualwield`.*
 
 ## 0.1.0 — multiplayer
 
@@ -271,9 +268,9 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
 - [ ] **M04 Shared comfort (G5):** your friend sits near you (within 20 m); you get an Encore. Expected: they also get
   Music ("The music warms you: +3 comfort."), and resting by the fire their comfort is 3 higher (also outdoors); a
   third player farther than 20 m does not.
-  *Partly automated (`music.listen.more`, `music.mp.relay`, `music.listen`); by hand: With real friends: the one
-  within 20 m gets Music and 3 more comfort while resting by the fire (also outdoors); a third one farther away does
-  not.*
+  *Partly automated (`music.listen.more`, `music.mp.relay`, `music.listen`, `music.listen.rest`); by hand: With real
+  friends: the Encore reaching the friend's own game over the network (here the other player is made up on this game),
+  for one within 20 m and not for a third one farther away.*
 - [ ] **M05 MIDI without the file:** play one of your MIDI files. Expected: your friend (who does not have the file)
   hears it.
   *Partly automated (`music.mp.relay`, `music.send`); by hand: A friend without the file hears it.*
@@ -404,11 +401,10 @@ config folder). The friend's own songs folder should not have these files.
   *Partly automated (`music.freeplay.more`, `music.freeplay.piano`); by hand: Switch to a French (AZERTY) keyboard:
   the keys at the same places play, the piano shows W X C V B N , and A to P, and the window's Free play line names
   them.*
-- [ ] **T36 Gamepad:** with a gamepad in use, open the song window: the first song is selected, not Free play. Pick Free
+- [x] **T36 Gamepad:** with a gamepad in use, open the song window: the first song is selected, not Free play. Pick Free
   play and press A: "Free play is played on the keyboard." and nothing starts. Start free play with the mouse, then
   touch the pad: the hint under the piano says "Start or right click: stop".
-  *Partly automated (`music.pad`); by hand: Once with a real gamepad: the game reports it as in use when touched, and
-  the same three things happen.*
+  *Automated: `music.pad`, `music.input.pad-freeplay`.*
 - [x] **T35 No comfort, stops:** free play for a minute by a fire: no meter, no Encore, no Music effect. Put the
   instrument away, swim or get hit: free play stops at once and nothing keeps sounding.
   *Automated: `music.freeplay.stops`.*
@@ -428,12 +424,10 @@ config folder). The friend's own songs folder should not have these files.
 
 ## 0.4.1 — false log messages
 
-- [ ] **M20 Leaving a server without the mod:** join a server that does not have Music Instruments (the MC Mods panel
+- [x] **M20 Leaving a server without the mod:** join a server that does not have Music Instruments (the MC Mods panel
   shows "Inactive: the server does not have this mod"), then log out to the main menu. Expected: no warning from Music
   Instruments while the world closes (no "The wooden flute recipe material ... is not an item in this game", no "...
   is not a crafting station in this game ..." and no "... has no valid material ..." line for any of the three
   instruments); back at the menu the MC Mods panel shows the mod active again. The same after leaving a server that had
   the mod turned off.
-  *Partly automated (`music.badrecipe`); by hand: The real thing: log out to the main menu from a server without the
-  mod, and from one that has it turned off, and read the log for Music Instruments warnings; back at the menu the MC
-  Mods panel shows the mod active again.*
+  *Automated: `music.badrecipe`, `music.mp.vanilla.leave`, `music.mp.leave.off`.*

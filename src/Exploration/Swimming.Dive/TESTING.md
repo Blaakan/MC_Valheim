@@ -14,10 +14,11 @@ patches cleanly, JitCheck clean). In-world self-tests (`./tools/Test-InWorld.ps1
 depth, no sideways movement, drain while still, free at the surface, camera, fog and surface from below). No hands-on
 in-game test yet.
 
-**Automated checks (2026-10-13):** 26 of 26 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 36 of 36 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
+"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
+still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina, `killall` removes nearby creatures.
@@ -83,15 +84,13 @@ one back afterwards. Stamina items need `god` off only where they say so.
 - [x] **T10 Swim skill:** `resetskill Swim`, then dive down and up repeatedly for 30 s. Expected: Swim skill rises.
   Then hold still 5 m down for 30 s: Swim does not rise while you hold still.
   *Automated: `dive.stamina`.*
-- [ ] **T11 Gamepad:** with a gamepad on the Default layout, press and hold the crouch button (left stick press) in
+- [x] **T11 Gamepad:** with a gamepad on the Default layout, press and hold the crouch button (left stick press) in
   deep water, then the jump button. Expected: dive and rise like T01-T02. Repeat on one Alternative layout (Settings,
   Controls) with its crouch button.
-  *Partly automated (`dive.keys`); by hand: A real controller: the crouch button (left stick press) dives and the jump
-  button rises, on the Default layout and on one Alternative layout.*
-- [ ] **T12 Rebound keys:** rebind Crouch to C and Jump to V in the game's settings. Expected: C dives, V rises, Left
+  *Automated: `dive.keys`, `dive.input.pad`, `dive.input.pad-alt`.*
+- [x] **T12 Rebound keys:** rebind Crouch to C and Jump to V in the game's settings. Expected: C dives, V rises, Left
   Ctrl and Space do nothing special. Put the keys back.
-  *Partly automated (`dive.keys`); by hand: Rebind Crouch to C and Jump to V in the settings: C dives, V rises, Left
-  Ctrl and Space do nothing special.*
+  *Automated: `dive.keys`, `dive.input.rebind`, `dive.input.rebind-settings`.*
 - [x] **T13 Under a hull (ceiling rule):** in deep water `spawn Karve`, dive below it and rise into its hull. Expected:
   under the hull W, A, S, D swim you sideways so you can get out; once nothing is above you, the movement keys do
   nothing again. Same under a dock you build over deep water.
@@ -120,9 +119,8 @@ one back afterwards. Stamina items need `god` off only where they say so.
   above everywhere (no square left upside down).
   *Partly automated (`dive.view`); by hand: Looks: waves on the surface from below, no sky showing through, no seams
   or squares between water tiles, no olive haze toward the sun, and the surface from above after surfacing.*
-- [ ] **T18 Tar pit refused:** in a Plains tar pit, hold Crouch. Expected: no dive, the normal tar behaviour.
-  *Partly automated (`dive.exits`, `dive.logic`); by hand: A real Plains tar pit: Crouch does not dive and the normal
-  tar behaviour is unchanged.*
+- [x] **T18 Tar pit refused:** in a Plains tar pit, hold Crouch. Expected: no dive, the normal tar behaviour.
+  *Automated: `dive.exits`, `dive.logic`, `dive.tarpit`.*
 - [x] **T19 Ashlands ocean:** dive in the hot Ashlands sea. Expected: diving works; the heat still burns you (normal
   game), no worse and no better at depth.
   *Automated: `dive.ashlands`.*
@@ -137,10 +135,9 @@ one back afterwards. Stamina items need `god` off only where they say so.
   `debugmode`). Expected: the dive ends (Debug "Dive ended: Teleporting."), you arrive normally, no tint or turned
   surface left anywhere.
   *Automated: `dive.exits`.*
-- [ ] **T22 Log out under water:** 5 m down, log out to the menu, then back in. Expected: the main menu looks normal
+- [x] **T22 Log out under water:** 5 m down, log out to the menu, then back in. Expected: the main menu looks normal
   (no tint); in the world the normal game lifts you to the surface; no leftovers.
-  *Partly automated (`dive.view`); by hand: A real log out 5 m down: the main menu looks normal; after logging back in
-  the normal game lifts you to the surface; nothing is left over.*
+  *Automated: `dive.view`, `dive.relog.underwater`, `probe.relog.MC.Exploration.Swimming.Dive`.*
 - [x] **T23 Free camera:** 5 m down, `freefly`, fly the camera around (also under water), `freefly` again. Expected:
   in the free camera the view is the normal game's (no tint, surface not turned, even under water); back in the
   diver's view everything is as in T15.
@@ -168,8 +165,9 @@ one back afterwards. Stamina items need `god` off only where they say so.
   *Automated: `dive.menus`.*
 - [ ] **T31 Serpent escape:** in deep ocean with a Serpent chasing you (`spawn Serpent`), dive 6 m or more. Expected:
   it stays near the surface and cannot bite you; note how deep you needed to go.
-  *Partly automated (`dive.serpent`); by hand: That it "stays near the surface" and how deep you need to go: read the
-  dive.serpent NOTE (how close it came, how deep it went) or repeat by hand; one Serpent, one run, 7-8 m only.*
+  *Partly automated (`dive.serpent`, `dive.serpent-hunt`); by hand: Only "note how deep you needed to go": the tests
+  prove 6 m (dive.serpent-hunt) and 7-8 m (dive.serpent) with one Serpent each and write how close it came as a NOTE;
+  whether a shallower dive is already safe was not explored.*
 - [x] **T32 No drain when the dive cannot go down (G4):** `heal`, then in water about 1.6 m deep (you swim, but your
   feet are near the floor: a gentle shore slope) hold Crouch for 10 s; repeat a little further out, in water about 2 m
   deep. Then in deep water at the surface, with big waves (`env` a stormy weather), hold Crouch and Jump together for
@@ -197,10 +195,9 @@ one back afterwards. Stamina items need `god` off only where they say so.
   surface within a second or two, the camera goes above water, tint and surface back to normal, no error. Tick it
   again: Crouch dives again.
   *Automated: `dive.exits`.*
-- [ ] **L02 `Enabled = false` + restart:** set `Enabled = false`, restart the game. Expected: Status shows the mod is
+- [x] **L02 `Enabled = false` + restart:** set `Enabled = false`, restart the game. Expected: Status shows the mod is
   off; Crouch does nothing in water; no tint under water ever (the camera never goes under).
-  *Partly automated (`dive.exits`); by hand: Set Enabled = false and restart the game: Status says the mod is off,
-  Crouch does nothing in water, the camera never goes under.*
+  *Automated: `dive.exits`, `dive.disabled.vanilla`, `probe.disabled.MC.Exploration.Swimming.Dive`.*
 - [ ] **L03 Clean log:** play through T01-T32 while `./tools/Watch-Log.ps1 -Mine` runs, then quit the game from the
   menu. Expected: no error or warning from Swim Dive.
   *Partly automated (`dive.motion`, `dive.stamina`, `dive.rules`, `dive.multiplier`, `dive.waves`, `dive.keys`,
@@ -255,11 +252,10 @@ one back afterwards. Stamina items need `god` off only where they say so.
   *Partly automated (`dive.moveset`, `dive.ceiling`); by hand: Dive next to the sea floor, tap Jump, then attack: no
   jump attack; after swimming ashore jump attacks work as usual. Worth one extra try: jump from the shore into the
   water, dive at once and attack where you touch the floor.*
-- [ ] **X02 Dual Wielding (MC):** with a pair equipped, swim and dive. Expected: both weapons are put away while
+- [x] **X02 Dual Wielding (MC):** with a pair equipped, swim and dive. Expected: both weapons are put away while
   swimming and while you hover above the sea floor; where you touch a slope or a rock of the floor, the hide key shows
   the pair as it would a single weapon in the normal game; rising puts them away again. No error.
-  *Partly automated (`dive.floor`); by hand: Where you touch a slope or rock the hide key shows the pair; rising puts
-  both away again; no error from Dual Wielding in the log.*
+  *Automated: `dive.floor`, `dive.dualwield`.*
 - [ ] **X03 Sneak Ambush (MC):** hold Crouch at the surface: you dive, you never sneak (no stealth icon). Under water
   the tint gives no fog stealth icon (its fog comes from the weather).
   *Partly automated (`dive.keys`, `dive.view`); by hand: On screen: no stealth icon while holding Crouch in water and

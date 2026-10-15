@@ -17,9 +17,11 @@ side switch, catch, loss at 0 stamina). An earlier run failed one check (the rig
 dragged the float, fixed by allowing 1 m of drag in a fight). The full suite of every MC mod passed apart from that
 check. No hands-on in-game test yet.
 
-**Automated checks (2026-10-13):** 21 of 21 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
+**Automated checks (2026-10-15):** 22 of 26 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`; failing:
+`fishing.phases`, `fishing.exits`, `fishing.toggle`, `fishing.swim`. An item ending in "Automated: ..." is checked in
+full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
 "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
@@ -48,13 +50,11 @@ one back afterwards. Stamina items need `god` off only where they say so (god mo
 
 ## 0.1.0 — single player
 
-- [ ] **T01 Cast and bite unchanged (G1):** cast near the fish without pressing anything. Expected: same as the normal
+- [x] **T01 Cast and bite unchanged (G1):** cast near the fish without pressing anything. Expected: same as the normal
   game: the line length shows, a fish swims to the float and nibbles (the float dips), wrong bait says "It's not taking
   the bait", pressing Block right after a nibble shows "Hooked". Reeling in before any bite reels the empty line as in
   the normal game (no catch bar) and gives the bait back.
-  *Partly automated (`fishing.cast`); by hand: A fish swimming to the float and nibbling by itself (the float visibly
-  dipping): in the run no Perch nibbled within 8 s, so the test delivered the nibble through the float's own nibble
-  call; the fish's approach is not asserted.*
+  *Automated: `fishing.cast`, `fishing.nibble`, `fishing.wrong-bait`.*
 - [x] **T02 Catch bar appears (G2):** hook a Perch. Expected: a vertical bar to the right of the crosshair with the
   Perch icon moving in it, a green zone at the bottom and a thin line meter beside it; Debug "Fight started: Fish1
   quality 1, difficulty 15 (Mixed), line ... m."
@@ -113,8 +113,9 @@ one back afterwards. Stamina items need `god` off only where they say so (god mo
   swims off free. The attack with the rod is a cast: the hooked float goes away and a new, empty float is cast (one
   bait used).
   *Automated: `fishing.exits`.*
-- [ ] **T16 Gamepad:** with a gamepad on the Default layout, hold the block button (left trigger) to raise the zone and
+- [x] **T16 Gamepad:** with a gamepad on the Default layout, hold the block button (left trigger) to raise the zone and
   turn with the right stick in a fight. Expected: same as T03 and T07.
+  *Automated: `fishing.pad.zone`, `fishing.pad.turn`.*
 - [x] **T17 Toggle block option:** turn on the game's accessibility option "Toggle block". Expected: one press of
   Block keeps the zone rising until the next press. Turn the option off again.
   *Automated: `fishing.input`.*
@@ -192,8 +193,8 @@ one back afterwards. Stamina items need `god` off only where they say so (god mo
   other watches from 10 m away. Expected: the watcher sees the fish and float run to one side and splash during
   fights, and calm between them (no splashes); no errors on either game. Repeat with the watcher allowed in without
   the mod (`AllowPlayersWithoutMod = true`): same sight, no errors.
-  *Partly automated (`fishing.mp.watch`); by hand: A second player watching from 10 m: the fish and float visibly run
-  to one side and splash during fights and are calm between them, with no errors on either game; the same with a
+  *Partly automated (`fishing.mp.watch`, `fishing.mp.watch-run`); by hand: A second player watching from 10 m: the run
+  to one side and the splashes as their game shows them, calm between fights, no errors on their game; the same with a
   watcher let in without the mod.*
 - [ ] **M04 Hand-off: fisher leaves:** while a fish is hooked, the fisher disconnects (once in the calm phase, once
   during a fight). Expected: on the other game the float disappears and the fish swims off normally; when it was
@@ -216,8 +217,9 @@ one back afterwards. Stamina items need `god` off only where they say so (god mo
 - [x] **X01 Swim Dive:** fish while standing in chest-deep water, then step into deep water. Expected: the fishing
   ends as in the normal game when you start swimming (rod put away), the bar disappears; no error.
   *Automated: `fishing.swim`.*
-- [ ] **X02 Trinkets on Demand:** gamepad, full adrenaline bar, a stamina trinket: hold LT (reel) in a fight and press
+- [x] **X02 Trinkets on Demand:** gamepad, full adrenaline bar, a stamina trinket: hold LT (reel) in a fight and press
   the right stick. Expected: the trinket fires, LT keeps reeling, stamina shows the trinket's effect.
+  *Automated: `fishing.pad.trinket`.*
 - [ ] **X03 Harpoon Hooks Tames:** harpoon a tame, then switch to the rod and cast. Expected: the harpoon line
   releases as in the normal game, and the fishing fight works normally afterwards.
   *Partly automated (`fishing.harpoon`, `fishing.cast`); by hand: Throwing a real harpoon at a tame (the test puts the

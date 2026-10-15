@@ -41,10 +41,12 @@ to see on screen, only wasted work). New item T28; no existing item was reset. T
 also turns EdgeBlur on again while looking. The self-tests ran on the three 0.1.1 fixes together on 2026-10-13 (game
 1.0.17, in-world and with a dedicated server, every MC mod loaded): all of this mod's tests passed.
 
-**Automated checks (2026-10-13):** 38 of 38 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 51 of 52 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`; failing:
+`spyglass.mp.server`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by
+them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that
+fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina, `killall` removes nearby creatures.
@@ -80,9 +82,9 @@ changed one back afterwards.
   lifts the spyglass to your right eye while the camera slides forward into your head and zooms in, and the view
   closes in to the round spyglass view. No jerk, no view of the inside of your head; the arm is seen rising only at
   the start.
-  *Partly automated (`spyglass.click`, `spyglass.pose`); by hand: Watch one raise: it must look smooth (no jerk),
-  never show the inside of your head, the arm must be seen rising only at the start, and the round view must be seen
-  closing in.*
+  *Partly automated (`spyglass.click`, `spyglass.pose`, `spyglass.input.click`); by hand: One look at a raise: that it
+  feels smooth and looks right. Every part that can be measured (no frame jump, never inside the head, arm only at the
+  start, round view closing in) is asserted; only the judgment of the look is left.*
 - [ ] **T04 Spyglass view (G4):** while looking. Expected: a sharp round view in the middle (about 70% of the screen
   height), blurred and darker outside it, round on any window shape; no crosshair and no name of what you point at;
   health, hotbar and map still on screen; the zoom is x4 (things look 4 times bigger than before).
@@ -118,17 +120,17 @@ changed one back afterwards.
 - [ ] **T11 Far view without Distant Horizons (G6):** Distant Horizons off (or not installed). On a hill in clear
   weather, raise and look at the horizon at x8. Expected: trees and buildings within about 300-500 m are seen big and
   clear; beyond, the land fades into the normal fog (unchanged by the spyglass). No error in the log.
-  *Partly automated (`spyglass.no-horizons`); by hand: With Distant Horizons really off or not installed, look at the
-  horizon at x8: trees and buildings within about 300-500 m must be big and clear and the land beyond must fade into
-  the normal fog.*
+  *Partly automated (`spyglass.no-horizons`, `spyglass.mp.no-horizons`); by hand: The look: at x8 trees and buildings
+  within about 300-500 m are big and clear, and the land beyond fades into the normal fog.*
 - [ ] **T12 Far view with Distant Horizons (G6):** Distant Horizons on, clear weather (`env Clear`), noon, on a high
   point. Raise and look across the land at x8, wait a few seconds. Expected: far land to the horizon, with less haze
   than without the spyglass; far forests, big rocks and buildings (yours or ruins) several kilometres away; the land
   in the looked-at direction gets finer within a few seconds; turning to a new direction refines it too. Lower:
   detail and haze back as before within a second or two.
-  *Partly automated (`spyglass.horizons`, `spyglass.far`); by hand: Look from a high point: far land to the horizon
-  with less haze, far forests, rocks and buildings several kilometres away, the looked-at direction getting finer
-  within a few seconds (also after turning), and detail and haze back within a second or two after lowering.*
+  *Partly automated (`spyglass.horizons`, `spyglass.far`, `spyglass.horizons.detail`); by hand: The look from a high
+  point: far land to the horizon, far forests, big rocks and buildings several kilometres away really show on screen
+  (the tests count what Distant Horizons is asked to draw and draws as terrain tiles, they do not judge the picture or
+  the far objects).*
 - [x] **T13 Rain keeps its fog:** with Distant Horizons on, `env Rain` (or any storm), raise. Expected: the fog is not
   cleared (only clear weather is). `resetenv`.
   *Automated: `spyglass.rain`.*
@@ -151,26 +153,27 @@ changed one back afterwards.
   Expected: the normal view comes back at once (camera, zoom, fog, crosshair, your body); the spyglass stays in your
   hand; left click does nothing; the recipe is gone from the Forge. Tick it again: everything works again.
   *Automated: `spyglass.toggle`, `spyglass.mp.toggle`.*
-- [ ] **T19 Enabled = false + restart:** set Enabled = false, restart the game and load the character. Expected: the
+- [x] **T19 Enabled = false + restart:** set Enabled = false, restart the game and load the character. Expected: the
   spyglass is still in the inventory (not lost); no recipe; Status says off. Set it back to true.
-  *Partly automated (`spyglass.toggle`, `spyglass.mp.toggle`); by hand: Really restart the game with Enabled = false
-  and load the character: the spyglass must still be in the inventory, no recipe, Status off.*
+  *Automated: `spyglass.toggle`, `spyglass.mp.toggle`, `spyglass.disabled.keeps-item`,
+  `probe.disabled.MC.Exploration.View.Spyglass`.*
 - [ ] **T20 Close walls and roofs:** walk face first into a wall, raise the spyglass and look at it; then stand under a
   low sloped roof or a beam (or a rock overhang) touching your head and raise it toward the roof. Expected: the wall and
   the roof are drawn (you never see through them into the room or sky behind).
-  *Partly automated (`spyglass.close`); by hand: Stand face first at a real wall and under a low roof and look: you
-  must never see through them.*
+  *Partly automated (`spyglass.close`, `spyglass.close-real`); by hand: One look that the wall and the roof really
+  show in the picture (the tests prove the near plane never cuts into them; they do not read the picture). The piece
+  names woodwall, stone_wall_4x2 and wood_roof are unverified: the test falls back on wood_floor stood on edge / laid
+  flat and says which piece it used.*
 - [ ] **T21 No body flash:** look up steeply (the camera comes close to you), raise and lower; then stand indoors with
   your back about 1 m from a wall, raise and lower. Expected: your own body or the back of your head never pops into
   view during the raise or the lowering.
-  *Partly automated (`spyglass.close`, `spyglass.click`); by hand: Watch a raise and a lowering in both places: your
-  body or the back of your head must never pop into view.*
-- [ ] **T22 Logout while looking:** single player, raise the spyglass, Esc (the spyglass comes down behind the menu
+  *Partly automated (`spyglass.close`, `spyglass.click`, `spyglass.close-real`, `spyglass.input.click`); by hand:
+  Watch one raise and lowering in both places: the body or the back of the head must not pop into view (the tests
+  assert the hide rule on every frame, not the picture).*
+- [x] **T22 Logout while looking:** single player, raise the spyglass, Esc (the spyglass comes down behind the menu
   even though the game is paused), Logout, Yes. Expected: the main menu and the character select show no round view,
   blur or dark ring. Load the world again: normal view, the spyglass can be raised.
-  *Partly automated (`spyglass.lowers`); by hand: Do the logout: the main menu and the character select must show no
-  round view, blur or dark ring, and after loading the world again the view must be normal and the spyglass must
-  raise.*
+  *Automated: `spyglass.lowers`, `spyglass.input.esc`, `spyglass.relog.logout`.*
 - [ ] **T23 Clean log:** after T01-T22, the log has no error or warning from Spyglass (`./tools/Watch-Log.ps1 -Mine`).
   *Partly automated (`spyglass.log`, `spyglass.item`); by hand: After the parts only a person can do (T17 render
   scale, T19 restart, T22 logout and reload, T26 real death), check the log for Spyglass warnings or errors.*
@@ -183,13 +186,12 @@ changed one back afterwards.
   only limits the view, it does not change the zoom you picked. If you used the wheel while the limit was 3, the zoom
   it reached is kept instead.
   *Automated: `spyglass.zoom-pick`, `spyglass.wheel`.*
-- [ ] **T26 Death while looking:** `god` off, low health; stand in a fire, raise the spyglass while burning and die
+- [!] **T26 Death while looking:** `god` off, low health; stand in a fire, raise the spyglass while burning and die
   from the burning without lowering it. Expected: at death the normal view comes back at once (no round view, blur,
   dark ring, cleared fog or missing body on the death camera) and the log has no error; after you respawn the view is
   normal and the spyglass is down (it is on the tombstone); once picked up again it can be raised.
-  *Partly automated (`spyglass.aborts`); by hand: A real death is only played with the dead flag: die for real while
-  burning with the spyglass up and check the death camera, the log, the respawn and raising again after picking it up
-  from the tombstone.*
+  **FAILED:** automated test: after dying with the spyglass raised, the death camera stays at the dead player's eye
+  until the respawn, instead of the normal view from outside the body (self-test `spyglass.bug.death-camera`)
 - [x] **T27 Click while it comes down:** raise, left click to lower, and click again before it is fully down.
   Expected: it goes back up from where it was (the camera and the round view do not jump), and the next click lowers
   it as usual.
@@ -197,18 +199,15 @@ changed one back afterwards.
 
 ### Cross-mod (MC)
 
-- [ ] **X01 Distant Horizons settings:** with Distant Horizons on, set its SpyglassDetail = false and raise. Expected:
+- [x] **X01 Distant Horizons settings:** with Distant Horizons on, set its SpyglassDetail = false and raise. Expected:
   no extra detail in the looked-at direction (the haze is still cleared). SpyglassMaxBoost 1: same. Put them back.
-  *Partly automated (`spyglass.horizons`); by hand: Set SpyglassDetail = false, then SpyglassMaxBoost = 1, raise and
-  look: no extra detail in the looked-at direction, haze still cleared.*
-- [ ] **X02 Sort Chest / Crafting Search and Sort:** put a spyglass, a hammer and a sword in a chest and sort it, and
+  *Automated: `spyglass.horizons`, `spyglass.horizons.settings`.*
+- [x] **X02 Sort Chest / Crafting Search and Sort:** put a spyglass, a hammer and a sword in a chest and sort it, and
   look at the crafting list grouping. Expected: the spyglass is grouped with the tools (hammer, hoe), not the weapons.
-  *Partly automated (`spyglass.compat.sort`); by hand: Sort a chest holding a spyglass, a hammer and a sword, and look
-  at the crafting list groups: the spyglass must sit with the tools.*
-- [ ] **X03 Dual Wielding:** with a dual-wield pair in hand, equip the spyglass, then try the dual-wield keys.
+  *Automated: `spyglass.compat.sort`, `spyglass.sort.chest`, `spyglass.sort.crafting`.*
+- [x] **X03 Dual Wielding:** with a dual-wield pair in hand, equip the spyglass, then try the dual-wield keys.
   Expected: the pair is put away (the spyglass takes both hands, like the hammer) and the spyglass is never paired.
-  *Partly automated (`spyglass.compat.dualwield`); by hand: With the spyglass in hand press the Dual Wielding keys
-  (swap H, main-hand Left Alt while equipping): nothing odd may happen.*
+  *Automated: `spyglass.compat.dualwield`, `spyglass.input.dualwield`.*
 - [x] **X04 Tower Shield Wall:** a tower shield in hand, equip the spyglass. Expected: the shield is put away (as with
   the hammer); no error.
   *Automated: `spyglass.compat.towershield`.*
@@ -256,14 +255,12 @@ changed one back afterwards.
 
 ## 0.1.1 — false log messages
 
-- [ ] **M08 Leaving a server without the mod:** join a server that does not have Spyglass (the MC Mods panel shows
+- [x] **M08 Leaving a server without the mod:** join a server that does not have Spyglass (the MC Mods panel shows
   "Inactive: the server does not have this mod"), then log out to the main menu. Expected: no warning from Spyglass
   while the world closes (no "The spyglass recipe material ... is not an item in this game", no "... is not a crafting
   station in this game ..." and no "... has no valid material ..." line); back at the menu the MC Mods panel shows the
   mod active again. The same after leaving a server that had the mod turned off.
-  *Partly automated (`spyglass.item`); by hand: The real thing: log out to the main menu from a server without the
-  mod, and from one that has it turned off, and read the log for Spyglass warnings; back at the menu the MC Mods panel
-  shows the mod active again.*
+  *Automated: `spyglass.item`, `spyglass.mp.leave-no-mod`, `spyglass.mp.leave-mod-off`.*
 
 ## 0.1.1 — EdgeBlur turned off while looking
 

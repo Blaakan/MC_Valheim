@@ -20,10 +20,11 @@ and others); the in-world script still reports two false "missing from the item 
 Sneak Ambush caused by Warfare's item manager (a separate fix) and one PlantEasily exception when a test removes the
 last transplant while it is selected (see E02). No hands-on in-game test yet.
 
-**Automated checks (2026-10-13):** 50 of 50 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 66 of 66 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
+tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
+by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
+that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive, `heal` refills health and stamina, `killall` removes nearby creatures, `debugmode` then `Z` flies.
@@ -139,11 +140,11 @@ changed one back afterwards.
   too, but the young plant says "Needs more room to grow" (vanilla rule); Replant gives it back. In
   ConfigurationManager, RootRange cannot go below 4.
   *Automated: `replant.rootplace`.*
-- [ ] **T14 It takes the root's sap (G3, E6):** before planting set GrowTimeMultiplier = 0.1 and RootSapCost = 40.
+- [x] **T14 It takes the root's sap (G3, E6):** before planting set GrowTimeMultiplier = 0.1 and RootSapCost = 40.
   Plant one Yggdrasil transplant 3-6 m from a root nobody has tapped (full). Put the cultivator away and hover it.
   Expected: "Draws 40 sap from the Ancient Root when grown (root: 50 / 50)". `skiptime 900`. Expected: within about
   20 s it grows into a Yggdrasil shoot tree (trunk grow animation).
-  *Partly automated (`replant.sap`, `replant.mp.rules`); by hand: The trunk grow animation of the new tree.*
+  *Automated: `replant.sap`, `replant.mp.rules`, `replant.trunk`.*
 - [x] **T15 It waits for sap (G3, D7):** right after T14, plant a second Yggdrasil transplant near the same root, at
   least 4 m from the new tree. Expected: hover "(root: 10 / 50)" or a little more, with "- waiting for it to refill".
   `skiptime 900`. Expected: after 30 s it is still a young plant, still healthy. `skiptime 12000`. Expected: within
@@ -193,8 +194,9 @@ changed one back afterwards.
 - [ ] **T23 Costs and refusals:** (a) sprint until stamina is empty, press E on a plant. Expected: the stamina bar
   flashes, nothing is dug. (b) Rebind Use to another key in the settings. Expected: the hint shows the new key and it
   digs; E does not. Put it back. (c) Open the build menu and press E or X over a plant: nothing is dug.
-  *Partly automated (`replant.costs`); by hand: (b) done in the real settings menu: that the hint switches to the new
-  key after rebinding there, and that the physical new key digs.*
+  *Partly automated (`replant.costs`, `replant.input.rebind`); by hand: The Settings > Controls window itself:
+  clicking the Use row there and pressing OK (the test starts the game's key-binding step directly while the pause
+  menu is open; clicks on UI elements are not driven, and the test never saves the binding).*
 - [ ] **T24 No-build zone and dungeon (D4):** inside a Burial Chamber or Troll Cave, dig up a yellow mushroom.
   Expected: it works (no "can't build here" refusal). Trying to plant the transplant inside the dungeon is refused
   by the game as usual.
@@ -228,12 +230,11 @@ changed one back afterwards.
   cultivator is no longer listed in the Upgrade tab; the Forge of Potential lists the cultivator again. Tick it again:
   everything is back.
   *Automated: `replant.toggle`.*
-- [ ] **T31 Enabled = false + restart:** set Enabled = false, restart the game and load the character and world.
+- [x] **T31 Enabled = false + restart:** set Enabled = false, restart the game and load the character and world.
   Expected: the transplants are still in the inventory and in chests; planted young transplants are still there
   (hover shows their name) and grow; no transplants in the build menu; the level 4 cultivator is still level 4;
   Status says off. Set it back to true.
-  *Partly automated (`replant.toggle`); by hand: A real restart with Enabled = false (character, world and chests
-  loaded from disk) and the Status line saying off.*
+  *Automated: `replant.toggle`, `replant.disabled.kept`, `probe.disabled.MC.Farming.Cultivator.Replant`.*
 - [ ] **T33 Ship helm and lox saddle:** stand in shallow water at a coast and `spawn Raft`, take the helm, then
   equip the cultivator (hotbar key) and steer close to a bush (`spawn RaspberryBush` on the shore) so it is within
   reach. Expected: no Replant hint and no yellow crosshair while steering. Press E. Expected: you let go of the helm
@@ -274,9 +275,10 @@ changed one back afterwards.
   Expected: it stays a young plant (with the mod off a transplant grows on your own GrowTimeMultiplier, as the README
   says: 1 = 5 h for a bush); after `skiptime 20000` it grows. The same after a restart with Enabled = false and
   GrowTimeMultiplier = 0.5: a transplant then needs 2.5 h (`skiptime 10000`), not 5 h.
-  *Partly automated (`replant.toggle`, `replant.mp.allowed`); by hand: The restart with Enabled = false and
-  GrowTimeMultiplier = 0.5 (a transplant then needs 2.5 h), and the setting really changed in the config window after
-  unticking the mod in single player (the single-player test changes it in memory).*
+  *Partly automated (`replant.toggle`, `replant.mp.allowed`, `replant.disabled.owngrow`, `replant.mp.offgrow`); by
+  hand: GrowTimeMultiplier = 0.5 really written in the config file before the restart (the test reads the file's own
+  value after a real restart with the mod off and halves it in memory: a test may not write settings), and the setting
+  changed in the config window after unticking the mod in single player.*
 - [x] **T40 Transplant planted before the mod is turned off:** with the mod on set GrowTimeMultiplier = 0.1, wait a
   second, plant a raspberry transplant and stay near it. Untick Cultivator Replant in the MC Mods panel, then set
   GrowTimeMultiplier = 1, wait 15 s and `skiptime 2000`. Expected: it stays a young plant (the setting changed while
@@ -284,30 +286,36 @@ changed one back afterwards.
   *Automated: `replant.toggle`, `replant.mp.allowed`.*
 - [ ] **T32 Clean log:** after every other single-player item, the log has no error or warning from Cultivator
   Replant (`./tools/Watch-Log.ps1 -Mine`), apart from the warnings T26 asked for.
-  *Partly automated (`replant.log`); by hand: The log of a hands-on play session (the test only sees what the
-  automated tests did).*
+  *Partly automated (`replant.log`, `probe.relog.MC.Farming.Cultivator.Replant`,
+  `probe.quit.MC.Farming.Cultivator.Replant`, `probe.disabled.MC.Farming.Cultivator.Replant`); by hand: The log of a
+  hands-on play session (the tests only see what the automated run did).*
 
 ### Cross-mod (MC)
 
-- [ ] **X01 Forge Idol Upgrades:** with it on, at a Forge of Potential with a cultivator, a Stone axe and idols.
+- [x] **X01 Forge Idol Upgrades:** with it on, at a Forge of Potential with a cultivator, a Stone axe and idols.
   Expected: no cultivator in the list; refining the axe follows Forge Idol Upgrades' rules; its log has no "Another
   mod may take over refinement" or "Another mod changes crafting or the Forge of Potential" warning naming this mod.
   At the Forge, upgrading a cultivator from level 3 to 4 still works.
-  *Partly automated (`replant.x.idol`); by hand: That refining the axe follows Forge Idol Upgrades' own rules.*
-- [ ] **X02 Crafting Search and Sort:** at a Forge of level 4 or more, Upgrade tab, level 3 cultivator: search
+  *Automated: `replant.x.idol`, `replant.x.idol-refine`.*
+- [x] **X02 Crafting Search and Sort:** at a Forge of level 4 or more, Upgrade tab, level 3 cultivator: search
   `black metal`. Expected: the Cultivator is listed. Search `bronze`: it is not. With a level 1 cultivator: `bronze`
   lists it, `black metal` does not.
+  *Automated: `replant.x.search`.*
 - [ ] **X03 Encyclopedia:** after having a transplant, open the Encyclopedia. Expected: the transplant is listed
   (Materials) with its name, sprout icon and description; the transplant young plants are listed among the
   cultivator's pieces; the Cultivator page lists levels 4 to 7 with their materials and Forge levels 4 to 7, and no
   level from 2 to 7 shows a Wooden Battle Idol at an upgrade station; Black metal lists the Cultivator under "used
   in". Known: the page still has the line "Beyond quality 7: at an upgrade station only", and the Wooden Battle
   Idol's page still lists the Cultivator under "used in".
-- [ ] **X04 Loot Pickup Filter:** mode "Only selected" with an empty list. Dig up a ripe raspberry bush. Expected: the
+  *Partly automated (`replant.x.encyclopedia`); by hand: In the Encyclopedia window itself: the transplant's row in
+  the Materials list with its sprout icon, and the young transplants in the list among the cultivator's pieces (the
+  test reads the pages' text, not the window, its lists or its icons).*
+- [x] **X04 Loot Pickup Filter:** mode "Only selected" with an empty list. Dig up a ripe raspberry bush. Expected: the
   raspberries are picked up (a hand harvest) and the transplant goes to the inventory.
-- [ ] **X05 Spyglass:** with the cultivator in hand the Replant hint shows; switch to the spyglass and raise it: the
+  *Automated: `replant.x.lootfilter`.*
+- [x] **X05 Spyglass:** with the cultivator in hand the Replant hint shows; switch to the spyglass and raise it: the
   spyglass view as usual, no hint; back to the cultivator: the hint is back, E digs.
-  *Partly automated (`replant.x.spyglass`); by hand: Raising the spyglass: its view as usual.*
+  *Automated: `replant.x.spyglass`, `replant.x.spyglass-view`.*
 
 ### Other mods
 
@@ -323,6 +331,9 @@ changed one back afterwards.
   (d) with the grid on, plant your last transplant of a kind while it is selected: note whether PlantEasily logs
   "ArgumentOutOfRangeException ... GhostGrid.GetGhostObject" (seen in the in-world tests when a test removed the last
   transplant while it was selected; a PlantEasily error, not ours); (e) no other error in the log.
+  *Partly automated (`replant.e.planteasily.grid`, `replant.e.planteasily.root`); by hand: (c) with PlantEasily's
+  ReplantOnHarvest turned on: picking a wild raspberry bush while carrying a raspberry transplant plants nothing (the
+  setting is off in this PC's PlantEasily config and a test may not change another mod's settings).*
 - [ ] **E03 Recipe changing mod (optional):** with WackysDatabase or RecipeCustomization changing the Cultivator
   recipe (for example 3 Wood for level 1, 1 Wood per level). Expected: levels 1 to 3 cost what that mod says; the
   upgrade from level 3 to 4 still asks only for 5 Black metal and 10 Linen thread (no Wood), also after that mod
@@ -395,8 +406,9 @@ changed one back afterwards.
   device: the transplant items get the plain produce icon on the server, which players do not see); players with the
   mod can dig, plant, grow and upgrade; dropped transplants and young transplants are still there after a server
   restart.
-  *Partly automated (`replant.mp.server`); by hand: A real server restart: dropped and planted transplants still there
-  afterwards.*
+  *Partly automated (`replant.mp.server`, `replant.relog.world`); by hand: A real dedicated server restart: dropped
+  and planted transplants still there afterwards on the server's own world (the multiplayer run cannot restart its
+  server inside a scenario).*
 - [ ] **M10 Hand-off to a player with the mod turned off:** AllowPlayersWithoutMod = true on the host; a friend who
   has the mod with Enabled = false joins. Expected: they stay connected; the host log warns that they play without
   the server's rules (not that they lose transplants). (a) Drop a transplant next to them: they see it and can pick
@@ -425,14 +437,15 @@ changed one back afterwards.
   transplants in the build menu). Drop a transplant next to the
   host player. Expected: it disappears within a few seconds, and the host's log says "Destroyed invalid prefab ZDO"
   (as the README warns).
-  *Partly automated (`probe.mp.baseline`); by hand: No Replant and no transplants in the build menu on that server,
-  and the host without the mod deleting a dropped transplant ("Destroyed invalid prefab ZDO").*
+  *Partly automated (`probe.mp.baseline`, `replant.mp.noserver`); by hand: A friend without the mod hosting: their
+  game deleting a dropped transplant within a few seconds and logging 'Destroyed invalid prefab ZDO' (a dedicated
+  server holds no objects and never does that).*
 - [ ] **M14 Own grow time of a player with the mod turned off:** AllowPlayersWithoutMod = true on the host, whose
   GrowTimeMultiplier stays 1. A friend with the mod sets their own GrowTimeMultiplier = 0.1, joins and unticks
   Cultivator Replant in the MC Mods panel. Plant a raspberry transplant next to the friend and walk far away so only
   the friend is near it, then `skiptime 2000` on the host. Expected: it grows on the friend's game within about 10 s
   (their own setting: 0.1 = 30 min for a bush; the server's 1 would need 5 h), as the README says for players with the
   mod turned off.
-  *Partly automated (`replant.mp.allowed`); by hand: A real friend with the mod turned off whose game runs the area:
-  the transplant really growing there after `skiptime 2000` on the host (the test reads the grow time that game holds:
-  its own setting, not the server's).*
+  *Partly automated (`replant.mp.allowed`, `replant.mp.offgrow`); by hand: Two real players: the host plants it and
+  walks away so that only the friend's game, with the mod turned off, runs the area (here one client plants it, turns
+  the mod off and runs it).*

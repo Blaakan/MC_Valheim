@@ -660,6 +660,13 @@ Valheim 1.0.20 (network version 41) wiped every tag made before it and changed h
 - So the work of [Cheated Tag Remover](../../src/UX/CheatedTag.Remover) (0.1.0, written on 1.0.17) is done by the
   game itself once a world and a character are loaded in 1.0.20; the mod's own tag rules (bool on objects, layout
   109 on items) no longer match the game's.
+- **Impact on the MC mods** (review of 2026-10-15 with `./tools/Update-GameRefs.ps1`): 10 of the classes the mods
+  patch changed (`Character`, `Console`, `CookingStation`, `InventoryGui`, `ItemDrop`, `Minimap`, `Piece`, `Player`,
+  `Terminal`, `ZNet`). Only two mods depend on what changed: Forge Idol Upgrades (the refinement roll and the Forge's
+  tag, handled in 0.2.0) and Cheated Tag Remover (to rework). The rest (the tag helpers above, the per-character drop
+  counter `CharacterDrop.s_pseudoCounter`, the map data cache, the save and network versions) is nothing the other
+  mods read, write or patch, and the smoke test on 1.0.20 passed for all 28 mods: their self-test results from 1.0.17
+  still stand.
 
 ### How it spreads
 Object to items: `Piece.DropResources`, `DropOnDestroyed`, `Character.OnDeath` (drops, ragdoll),

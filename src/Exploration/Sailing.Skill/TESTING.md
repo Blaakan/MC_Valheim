@@ -18,10 +18,11 @@ test (`./tools/Test-Smoke.ps1`) passed 2026-10-01: loads, patches cleanly, JitCh
 run with the same ship code failed `sailing.ship`'s paddle comparison at 0.25 s (wave noise); the check now compares
 the 0.5 s and 1 s speeds. No hands-on in-game test yet.
 
-**Automated checks (2026-10-13):** 27 of 27 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 38 of 38 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
+"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
+still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `die` kills you (with `god` off), `heal` refills health. Skills:
@@ -54,9 +55,10 @@ main character for the death and reset items.
 - [ ] **T01 The skill exists:** `raiseskill Sailing 10`, open the Skills panel (Tab, Skills). Expected: a "Sailing" row
   at level 10 with a sail icon; its tooltip explains the skill; the console shows "Skill Sailing = 10". Type
   `raiseskill Sa` and press Tab. Expected: it completes to "Sailing" (also for `resetskill`).
-  *Partly automated (`sailing.panel`, `sailing.skill`); by hand: The look of the icon (one glance at
-  shots/sailing.panel__skills.png or the Skills panel: does the Sailing row's icon read as a sail), and one real Tab
-  press in the console after typing 'raiseskill Sa' (and 'resetskill Sa').*
+  *Partly automated (`sailing.panel`, `sailing.skill`, `sailing.input.tab`); by hand: Only the look of the icon: one
+  glance at shots/sailing.panel__skills.png (or the Skills panel): does the Sailing row's icon read as a sail. (The
+  letters 'raiseskill Sa' are put into the input box as text: the harness presses keys, it does not type characters
+  into a text field.).*
 - [x] **T02 XP at the helm:** `resetskill Sailing`, take the helm of a Karve and sail (or paddle) about 400 m, not
   Rested, then let go of the helm. Expected: the first level-up shows the game's big centre message "Skill improved
   Sailing: 1", without an icon; later ones appear at the top left with the sail icon; Sailing is about 5 after 400 m
@@ -100,10 +102,9 @@ main character for the death and reset items.
   shore) and let it break up. Expected: (a) full damage numbers, no "hit … best Sailing" Debug line; (b) it loses health
   every second like the normal game until it breaks.
   *Automated: `sailing.damage`.*
-- [ ] **T11 Level kept:** Sailing at some level with progress in the bar; log out and back in. Expected: same level and
+- [x] **T11 Level kept:** Sailing at some level with progress in the bar; log out and back in. Expected: same level and
   progress. `resetskill Sailing`. Expected: the row is gone.
-  *Partly automated (`sailing.panel`, `sailing.skill`); by hand: A real logout and login: the test does not leave the
-  world, it checks the saved data and a freshly loaded skills object instead.*
+  *Automated: `sailing.relog.level`, `probe.relog.MC.Exploration.Sailing.Skill`, `sailing.panel`, `sailing.skill`.*
 - [x] **T12 Console all:** `raiseskill all 5`. Expected: Sailing rises by 5 with the other skills. `resetskill all`.
   Expected: Sailing is gone with the others.
   *Automated: `sailing.panel`, `sailing.skill`.*
@@ -151,15 +152,19 @@ main character for the death and reset items.
   the character, log out, set `Enabled = true`, start again. Expected: `Status` reads "Off (disabled in settings)." in
   the first session and Sailing is still listed with its level and icon; after the second start the level is unchanged;
   no error in the log.
-  *Partly automated (`sailing.toggle`, `sailing.skill`); by hand: The real thing with Enabled = false and two
-  restarts: Status reads 'Off (disabled in settings).', the level is unchanged after the second start, no error in the
-  log.*
-- [ ] **L03 Clean log:** play through T01-T16 while `./tools/Watch-Log.ps1 -Mine` runs, then quit the game from the
+  *Partly automated (`sailing.disabled.level`, `sailing.disabled.saved`,
+  `probe.disabled.MC.Exploration.Sailing.Skill`, `sailing.toggle`, `sailing.skill`); by hand: The start after that
+  with Enabled = true again: the level is unchanged and that start logs no error (the run has no third game; the tests
+  show the character file written by the mod-off game holds the level and progress, and T11's relog shows a game with
+  the mod on loads them from the file). The look of the icon in the mod-off game:
+  shots/sailing.disabled.level__skills.png.*
+- [x] **L03 Clean log:** play through T01-T16 while `./tools/Watch-Log.ps1 -Mine` runs, then quit the game from the
   world (Esc, Logout, Exit). Expected: no error and no warning from Sailing Skill (also not while the game quits).
-  *Partly automated (`sailing.cleanlog`, `sailing.panel`, `sailing.xp`, `sailing.hud`, `sailing.sail`, `sailing.map`,
-  `sailing.damage`, `sailing.ram`, `sailing.toggle`, `sailing.reach`, `sailing.upwind`, `sailing.paddle`,
-  `sailing.heel`, `sailing.crew`); by hand: Warnings logged while the game quits (after the tests end, nothing in the
-  game can read them; errors there already fail the run), and a real hand-played session.*
+  *Automated: `sailing.disabled.first-log`, `probe.quit.MC.Exploration.Sailing.Skill`,
+  `probe.relog.MC.Exploration.Sailing.Skill`, `sailing.cleanlog`, `sailing.panel`, `sailing.skill`, `sailing.math`,
+  `sailing.helm`, `sailing.xp`, `sailing.hud`, `sailing.sail`, `sailing.map`, `sailing.damage`, `sailing.ram`,
+  `sailing.toggle`, `sailing.reach`, `sailing.upwind`, `sailing.paddle`, `sailing.heel`, `sailing.crew`,
+  `sailing.input.tab`, `sailing.relog.level`.*
 - [x] **L04 Turned on mid-voyage:** start with `Enabled = false`, take the helm, then tick the mod on while sailing.
   Expected: XP starts ("At the helm of …" Debug line) and the handling changes within a second.
   *Automated: `sailing.toggle`.*
@@ -207,8 +212,10 @@ lines.
 - [ ] **M05 Best sailor protects the ship:** A (Sailing 100) on deck, B (Sailing 0) at the helm; a Serpent bites the
   ship. Expected: half damage (Debug line on the game that simulates the ship: "best Sailing aboard 100"). A jumps off
   and swims away: full damage again.
-  *Partly automated (`sailing.mp.crew`); by hand: A real second player at the helm (Sailing 0) while the Sailing-100
-  player stands on deck, a real Serpent bite, and the player really jumping off and swimming away.*
+  *Partly automated (`sailing.mp.crew`, `sailing.real.serpent`); by hand: A real second player at the helm at Sailing
+  0 while the Sailing-100 player stands on deck (two games), and that player really jumping off and swimming away with
+  the Serpent then biting the ship at full damage (a hunting Serpent follows the swimmer, so the second bite on an
+  empty ship cannot be forced).*
 - [ ] **M06 Map reveal is personal:** A (Sailing 100) and B (Sailing 0) on the same ship. Expected: A reveals the wider
   circle on A's map, B the normal one on B's.
   *Partly automated (`sailing.mp.crew`, `sailing.map`); by hand: Two real players (Sailing 100 and Sailing 0) on the
@@ -225,8 +232,9 @@ lines.
 - [ ] **M08 Server without the mod:** join a server without the mod with a character that has Sailing. Expected: the MC
   Mods panel shows "Inactive: the server does not have this mod. …"; normal handling, no XP; the Skills panel still
   shows Sailing; after logging out and back in single player the level is unchanged.
-  *Partly automated (`probe.mp.baseline`, `sailing.mp.vanilla-server`); by hand: Logging out and loading the character
-  in single player to see the level unchanged, and the MC Mods panel drawing the status line.*
+  *Partly automated (`probe.mp.baseline`, `sailing.mp.vanilla-server`, `sailing.mp.vanilla-server.saved`); by hand:
+  Really logging out and loading that character in a single-player world to see the level unchanged (a multiplayer run
+  cannot start a single-player world), and the MC Mods panel drawing the status line (how it looks).*
 - [ ] **M09 Mod turned off, refused:** `AllowPlayersWithoutMod = false` (default) on the server. (a) A player with the
   mod and `Enabled = false` joins. Expected: about a second after joining their game shows "Incompatible version" and
   goes back to the menu; the server log says "Refused <player>: has the mod turned off". (b) A player with the mod on
@@ -241,8 +249,10 @@ lines.
   that DLL over a second player's copy (put the normal build back afterwards), and join a server with network version
   1. Expected: refused about a second after joining; the server log says "has another version of the mod (network
   version 2, the server has 1)".
-  *Partly automated (`sailing.mp.join`, `sailing.network`); by hand: A real client built with network version 2
-  joining and being refused.*
+  *Partly automated (`sailing.mp.other-version`, `sailing.mp.join`, `sailing.network`); by hand: A DLL really built
+  with -p:ModNetworkVersion=2 joining: the test sends that copy's hello while already connected, so the build property
+  ending up in the hello and the refusal at the very moment of joining are not exercised. Everything the item expects
+  of the server and of the refused player is asserted.*
 - [x] **M11 Dedicated server:** a dedicated server with the mod and Debug logging (in its `BepInEx/config/BepInEx.cfg`,
   add `Debug` to `LogLevels` under `[Logging.Disk]`). Expected: it starts without errors from Sailing Skill (no icon is
   drawn there); players sail with the server's settings (M01).
@@ -274,11 +284,10 @@ lines.
 
 ## 0.1.0 — other mods
 
-- [ ] **X01 Encyclopedia (MC):** with Sailing at level 0 or missing, browse the Encyclopedia's item pages (weapons,
+- [x] **X01 Encyclopedia (MC):** with Sailing at level 0 or missing, browse the Encyclopedia's item pages (weapons,
   tools, food: their text reads skill levels). Expected: the Sailing row in the Skills panel is neither added nor
   removed by it.
-  *Partly automated (`sailing.panel`); by hand: Browsing the Encyclopedia's item pages by hand (the test calls its
-  text reader directly).*
+  *Automated: `sailing.encyclopedia`, `sailing.panel`.*
 - [ ] **X02 Swim Dive (MC):** dive and surface next to a ship at sea at Sailing 100. Expected: while swimming, the
   normal map reveal; climbing aboard gives the wider one; no errors from either mod.
   *Partly automated (`sailing.crew`); by hand: Really diving and surfacing with Swim Dive next to the ship.*

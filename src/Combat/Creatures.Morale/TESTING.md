@@ -27,10 +27,11 @@ without deploying): close the game and run `dotnet build ValheimMods.slnx` befor
 change's build id in the MC Mods panel, and ConfigurationManager's `Display` section has no `ShowOnNameplates` setting
 (an older build still has it).
 
-**Automated checks (2026-10-13):** 33 of 33 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 54 of 54 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
+tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
+by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
+that fails.
 
 **Setup:** use a Debug build (`dotnet build ValheimMods.slnx` deploys it to the game). It adds the setting
 `ForceBossRank` (section `[Debug]` of `BepInEx/config/MC.Combat.Creatures.Morale.cfg`, applied while the game runs):
@@ -82,10 +83,10 @@ food `Mushroom` and `RawMeat`, the raid `army_eikthyr`, the English creature nam
 - [ ] **T03 Sleep and rest near afraid creatures:** rank 4; build a bed and a campfire, `spawn Greydwarf 3` about 10 m
   away. Expected: they run from you but never attack; at the fire you get Rested; at night you can sleep in the bed
   (no message about enemies nearby); no combat music.
-  *Partly automated (`morale.rest`); by hand: Lie down in a real roofed bed at night next to afraid Greydwarfs and
-  sleep through the night (the test only runs the bed's enemy check, it does not sleep), and listen that no combat
-  music plays.*
-- [ ] **T04 Boss kill raises the rank:** a character that has killed no boss, `ForceBossRank = -1`: `spawn Eikthyr`,
+  *Partly automated (`morale.rest`, `morale.sleep`); by hand: Listen that no combat music plays (the tests assert the
+  game's combat music state, not the sound). The roof and the fire of the bed are stood in for in morale.sleep, so one
+  real roofed bed by a fire was never slept in by a test.*
+- [x] **T04 Boss kill raises the rank:** a character that has killed no boss, `ForceBossRank = -1`: `spawn Eikthyr`,
   kill it. Expected: Eikthyr's own death message, **no** "Weaker creatures now keep out of your way" (nothing is afraid
   of a rank 1 player with the default settings); the log shows "Standing: boss rank 1 (Eikthyr), ..."; boars still
   attack you. Then set `BossesAhead = 0` (boars and necks are now afraid of you), `spawn Eikthyr` again and kill it.
@@ -95,8 +96,7 @@ food `Mushroom` and `RawMeat`, the raid `army_eikthyr`, the English creature nam
   Elder, the next boss) and kill it. Expected: about 4-5 s after the kill, once The Elder's death message has faded,
   "Weaker creatures now keep out of your way" in the middle of the screen; the log shows "Standing: boss rank 2 (The
   Elder), ...". Put `BossesAhead` back to 2.
-  *Partly automated (`morale.kills`, `morale.publish`); by hand: The same with real boss kills on a fresh character (a
-  self-test must not kill a boss): Eikthyr's own death message at both kills, the necks, and the optional Elder kill.*
+  *Automated: `morale.kills`, `morale.publish`, `morale.boss-kill`.*
 - [x] **T05 Kill step:** rank 2, in the Meadows; note your Greyling kill count N. Set `KillSteps` = N+3 (the number), then kill 3
   Greylings (`spawn Greyling`). Expected: after the third, a corner message "Greyling: N+3 kills. They will be afraid
   of you sooner."; the Standing log line shows "Greyling +1"; other Greylings are now afraid of you (one boss early),
@@ -173,20 +173,21 @@ food `Mushroom` and `RawMeat`, the raid `army_eikthyr`, the English creature nam
   `spawn Seeker 3`; `Charred_Mage` with `spawn Charred_Melee 3`; `Greydwarf_Shaman_Frozen` with
   `spawn Greydwarf_Frozen 3`.
   *Automated: `morale.packs-other`.*
-- [ ] **T20 Always normal:** rank 8. Expected: `Eikthyr` attacks you, and a Boar within 60 m of Eikthyr while it
+- [x] **T20 Always normal:** rank 8. Expected: `Eikthyr` attacks you, and a Boar within 60 m of Eikthyr while it
   fights you behaves as in the normal game (it does not run from you); a raid (`event army_eikthyr`, unverified name)
   attacks you; a training dummy (`piece_TrainingDummy`) takes your hits as usual; a Dvergr (`Dverger`) you hit fights
   back.
-  *Partly automated (`morale.exempt`); by hand: Start a real raid (`event army_eikthyr`, name unverified) at rank 8
-  and see its creatures attack; the test only checks a creature that carries the raid flag.*
+  *Automated: `morale.exempt`, `morale.raid`.*
 - [ ] **T21 Night hunters:** covered by the `morale.calm` self-test. In normal play: rank 7 or more (the Fulings are
   Plains creatures), at night in the Meadows of a world where Yagluth is dead (or after `setkey defeated_goblinking`).
   Expected: a group of hunting Fulings does not attack you (afraid) and runs when you come within about 12 m; with
   `NightHuntersCanBeAfraid = false`, they hunt you. Optional, at rank 6 (the Fulings hunt you): run more than 200 m
   away from a Fuling that chases you. Expected: it keeps chasing you, as in the normal game. They are rare: skip when
   none appears.
-  *Partly automated (`morale.exempt`, `morale.calm`); by hand: A natural group of hunting Fulings at night in a world
-  where Yagluth is dead, and the optional step: a Fuling that chases you at rank 6 keeps chasing beyond 200 m.*
+  *Partly automated (`morale.exempt`, `morale.calm`, `morale.night-hunters`); by hand: The optional step: a Fuling
+  that chases you at rank 6 keeps chasing beyond 200 m. It cannot be staged on one game: the game unloads a creature
+  farther than about 180 m from the only player. Also a group the game decides to spawn by itself (rare); the test
+  forces the spawn's chance and interval.*
 - [x] **T22 Taming:** rank 6: find (or `spawn`) a `Wolf`, drop meat (`RawMeat`, unverified name) near it and step
   back beyond about 16 m, or sneak. Expected: it eats and becomes tame after the usual taming time; while it runs from
   you it is alert and taming pauses, as in the normal game; it never attacks you unless you corner it (`tame`
@@ -207,9 +208,9 @@ food `Mushroom` and `RawMeat`, the raid `army_eikthyr`, the English creature nam
   partial names you typed on the way ("G", "Gr", ...). Add a typo (`Boarr`). Expected: the log warns that `Boarr` is
   not a creature of this game. Set `RoutSeconds = 5`: the next rout lasts about 5 s. Set `FearRange = 25`: afraid
   creatures run when you are within about 25 m. Put every setting back.
-  *Partly automated (`morale.settings`, `morale.rules`, `morale.rout`); by hand: Type the changes letter by letter in
-  ConfigurationManager (the test changes the rules in memory, never the real config entries) and check that no warning
-  shows for the half-typed names.*
+  *Partly automated (`morale.settings`, `morale.rules`, `morale.rout`, `morale.mp.typed-settings`); by hand: Type the
+  name in the ConfigurationManager window itself, in single player (a single-player test may not write real settings
+  and cannot click in that window; the test sets the real setting key by key on the dedicated server instead).*
 - [x] **T27 Follower in no home biome list:** rank 0; remove `Greydwarf` from the `BlackForest` list (it keeps
   following the Troll in `Packs`). `spawn Troll`, `spawn Greydwarf 3` near it, kill the Troll; while the Greydwarfs
   run, hit one of them. Expected: they all run away; when the rout ends, the one you hit fights you, the others are
@@ -271,16 +272,21 @@ food `Mushroom` and `RawMeat`, the raid `army_eikthyr`, the English creature nam
   it). With another character that has killed no boss: set `BossesAhead = 0` first, then kill Eikthyr. Expected:
   about 4-5 s after the kill, once Eikthyr's death message has faded, "Weaker creatures now keep out of your way" in
   the middle of the screen. Put `BossesAhead` back to 2.
-  *Partly automated (`morale.kills`, `morale.publish`); by hand: The same with real Eikthyr kills on fresh characters
-  (a self-test must not kill a boss).*
+  *Partly automated (`morale.kills`, `morale.publish`, `morale.boss-kill`); by hand: The last step on a really
+  different character: the test empties the boss kills of the same test character and publishes again instead of
+  logging in with another character. Also BossesAhead as the real setting: the test changes it through the in-memory
+  rules (a single-player test may not write settings), so the 'about a second later' of a real settings change is not
+  seen in this test.*
 - [ ] **T24 Clean log:** play through T01-T34 while `./tools/Watch-Log.ps1 -Mine` runs. Expected: no error and no
   warning from Creature Morale with the default settings (the warnings asked for in T26 aside).
   *Partly automated (`morale.rules`, `morale.publish`, `morale.calm`, `morale.provoke`, `morale.stealth`,
   `morale.rout`, `morale.kinds`, `morale.ranks`, `morale.rest`, `morale.kills`, `morale.missiles`, `morale.fight`,
   `morale.senses`, `morale.packs`, `morale.packs-other`, `morale.rout-hit`, `morale.rout-end`, `morale.exempt`,
-  `morale.tame`, `morale.toggle`, `morale.settings`, `morale.sleeper`, `morale.spawn-biome`, `morale.handover`); by
-  hand: Watch the log during the hands-on steps that stay manual (real boss kill, real raid, real sleep,
-  ConfigurationManager typing).*
+  `morale.tame`, `morale.toggle`, `morale.settings`, `morale.sleeper`, `morale.spawn-biome`, `morale.handover`,
+  `morale.sleep`, `morale.day-sleep`, `morale.boss-kill`, `morale.raid`, `morale.night-hunters`, `morale.two-players`,
+  `morale.session-log`, `probe.relog.MC.Combat.Creatures.Morale`, `probe.quit.MC.Combat.Creatures.Morale`); by hand:
+  Watch the log during the steps that are still done by hand: typing in the ConfigurationManager window, a bed under a
+  real roof, and the hands-on parts of the other open items.*
 
 ## 0.1.0 — multiplayer
 
@@ -291,8 +297,9 @@ Needs a second player (P2). "P1 rank 8" = `ForceBossRank = 8` on P1's game (Debu
   P1 while P2, whom they fight, is near them; both players see the same health bars (no line of the mod's own). P2
   walks 50 m away: they now run from P1 when P1 comes within 12 m. Then P1 runs `spawn Greydwarf 3` (P1's game controls
   them) with P2 next to P1. Expected: the same.
-  *Partly automated (`morale.mp.shared`, `morale.rules`); by hand: Two real players of different rank next to the same
-  Greydwarfs, on both owners' games: who is attacked, who is run from, and when P2 leaves.*
+  *Partly automated (`morale.mp.shared`, `morale.rules`, `morale.two-players`); by hand: Two real players: what the
+  Greydwarfs do over time on both owners' games (attack P2, do not run from P1 while P2 is near, run from P1 once P2
+  is 50 m away), the same health bars on both screens, and the case where P2's game controls them.*
 - [ ] **M02 Rout across games:** rank 0 for both. P1 runs `spawn Greydwarf 4`; P2 runs `spawn Troll` 15 m from them;
   P2 kills the Troll. Expected: the Greydwarfs flee; P1's log (Debug level) shows "Rout from another game applied to 4
   creature(s)."
@@ -307,8 +314,9 @@ Needs a second player (P2). "P1 rank 8" = `ForceBossRank = 8` on P1's game (Debu
   it attacks P1. P2 then lands an arrow next to it. Expected: it keeps fighting P1 (its target; the near miss
   provokes it toward P2 as well, each anger with its own timer). Second part: P1 hits a fresh afraid Greydwarf once
   and walks away; 5 minutes later P2 hits it. Expected: it fights P2 and never goes for P1.
-  *Partly automated (`morale.rules`); by hand: Everything in the item: two players provoking the same Greydwarf, each
-  with their own timer.*
+  *Partly automated (`morale.rules`, `morale.two-players`); by hand: Two real players: the second player exists for
+  one frame per step in the test, so the fight with P2 over time, P1 cornering it, a real arrow of P2 and the real 5
+  minutes (4 s in the test) are not seen.*
 - [ ] **M05 Rout across an ownership change:** rank 0 for both. P2 runs `spawn Troll` and `spawn Greydwarf 4`; P1 kills
   the Troll; while the Greydwarfs run, P1 hits one of them and P2 walks 300 m away. Expected: on P1's game they keep
   running from the same place until the rout ends; then the one P1 hit fights P1, and the others are afraid of P1 for
@@ -348,21 +356,21 @@ Needs a second player (P2). "P1 rank 8" = `ForceBossRank = 8` on P1's game (Debu
   ..."; the client goes back to the menu with "Incompatible version". With `AllowPlayersWithoutMod = true` on the
   server: the client stays, the server logs a warning naming the problem, and the Greydwarfs attack that player once
   they see or hear them; turned back on: no refusal, and they are afraid of that player again.
-  *Partly automated (`probe.mp.off.MC.Combat.Creatures.Morale`, `morale.mp.off-allowed`); by hand: The server log line
-  'Refused <player>: their game has the mod turned off. ...' in the refusing case, and Greydwarfs controlled by the
-  other player's game.*
-- [ ] **M09 Joins with the mod turned off:** a client with `Enabled = false` in its config joins. Expected: refused
+  *Partly automated (`probe.mp.off.MC.Combat.Creatures.Morale`, `morale.mp.off-allowed`, `morale.mp.refused-log`); by
+  hand: Greydwarfs controlled by the other player's game next to the client (needs a second player).*
+- [x] **M09 Joins with the mod turned off:** a client with `Enabled = false` in its config joins. Expected: refused
   about a second after joining (usually before its character appears); the server log names "has the mod turned off".
-  *Partly automated (`probe.mp.off.MC.Combat.Creatures.Morale`); by hand: Read the server log: it must name 'has the
-  mod turned off'.*
+  *Automated: `probe.mp.off.MC.Combat.Creatures.Morale`, `morale.mp.refused-log`.*
 - [ ] **M12 Joins with another network version:** (optional, needs a second build with another `ModNetworkVersion`,
   for example the first test build `3cda33b+dirty`, network version 1; this build is 2) such a client joins. Expected: refused the same way; the server log names "has another version of the mod (network
   version N, the server has M)".
+  *Partly automated (`morale.mp.other-version`); by hand: A real second build joining: the check at join time for that
+  build (the test changes the hello of an already connected client).*
 - [ ] **M10 Dedicated server:** mod on a dedicated server and both players. Expected: the server log shows the mod
   loaded, no error; M02 and M08 work through it.
-  *Partly automated (`probe.mp.baseline`, `morale.mp.shared`, `morale.mp.off-allowed`, `morale.mp.rules`); by hand:
-  Two players on the dedicated server for the cross-game parts of M02 and M08, and a look at the server log for
-  errors.*
+  *Partly automated (`probe.mp.baseline`, `morale.mp.shared`, `morale.mp.off-allowed`, `morale.mp.rules`,
+  `morale.mp.server-log`, `morale.mp.refused-log`); by hand: Two players on the dedicated server for the cross-game
+  parts of M02 and M08.*
 - [x] **M11 Server turns the mod off:** the host (or the dedicated server's config) turns the mod off. Expected: the
   clients' copies turn off (MC Mods panel: "Inactive: the server has this mod turned off ..."), nobody is refused;
   afraid creatures stop running and notice players again as in the normal game once they see or hear them. Back on:
@@ -403,34 +411,33 @@ Needs a second player (P2). "P1 rank 8" = `ForceBossRank = 8` on P1's game (Debu
   corners it. At rank 0, creatures that chase you forget you after a smoke burst; a routing pack is unaffected. An
   afraid creature whose health bar the smoke hid gets its bar back once it is out of the smoke and you aim at it, with
   the game's red alert icon while it runs from you and no icon once it calms down. Expected: all of this, no errors.
-  *Partly automated (`morale.provoke`, `morale.senses`, `morale.stealth`); by hand: Every Smoke Screen step (not
-  sensed inside the cloud, a shot from the cloud provokes, no cornering in smoke, health bar back after the smoke) and
-  the Sneak Ambush XP.*
+  *Partly automated (`morale.provoke`, `morale.senses`, `morale.stealth`, `morale.x.sneak-xp`); by hand: Every Smoke
+  Screen step: not sensed inside the cloud, a shot from the cloud provokes and the others do not notice, no cornering
+  in smoke, creatures forget you at rank 0, the health bar back after the smoke.*
 - [ ] **X02 Encyclopedia (MC):** look at an afraid creature you have never met, first while it runs from you (alert
   icon), then calm. Expected: it counts as met; the Encyclopedia shows its normal name.
-  *Partly automated (`morale.kinds`); by hand: Open the Encyclopedia and see the creature listed with its normal
-  name.*
-- [ ] **X03 Creature Kill and Tame Counts (MC):** after T05. Expected: the Greyling kill count it shows is the count
+  *Partly automated (`morale.kinds`, `morale.x.encyclopedia`); by hand: Open the Encyclopedia window once and see the
+  creature's row (the test reads the entry text, not the window).*
+- [x] **X03 Creature Kill and Tame Counts (MC):** after T05. Expected: the Greyling kill count it shows is the count
   the kill step used.
-  *Partly automated (`morale.kills`); by hand: Read the Greyling count in MC Creature Kill and Tame Counts' own
-  window.*
-- [ ] **X04 Sleep Through the Day (MC):** afraid Greydwarfs near the bed, running or not. Expected: they do not stop a
+  *Automated: `morale.kills`, `morale.x.kill-counts`.*
+- [x] **X04 Sleep Through the Day (MC):** afraid Greydwarfs near the bed, running or not. Expected: they do not stop a
   day sleep; hostile ones (rank 0) do.
-  *Partly automated (`morale.rest`); by hand: A real day sleep with MC Sleep Through the Day next to afraid
-  Greydwarfs.*
-- [ ] **X05 Tower Shield Wall (MC)** (its C06; the New Game+ part pairs with its T23): rank 4, shield bash an afraid
+  *Automated: `morale.rest`, `morale.day-sleep`.*
+- [x] **X05 Tower Shield Wall (MC)** (its C06; the New Game+ part pairs with its T23): rank 4, shield bash an afraid
   Greydwarf: crouch-sneak up behind one that has not noticed you, or catch one that runs (the bash is slow: its hit
   lands about 0.8 s after you press attack, and the next bash waits 2 s). Expected: it stops running (if it was) and
   fights you. In a New Game+ world (world level 1): a bash on an afraid Greydwarf provokes it too, and a knife hit
   right after the bash is not a sneak attack.
-- [ ] **X06 Harpoon Hooks Tames (MC):** rank 3, in the Meadows. Harpoon (`SpearChitin`) an afraid wild Boar. Expected: it fights you
+  *Automated: `morale.x.tower-bash`, `morale.x.tower-bash-ngplus`.*
+- [x] **X06 Harpoon Hooks Tames (MC):** rank 3, in the Meadows. Harpoon (`SpearChitin`) an afraid wild Boar. Expected: it fights you
   (the harpoon deals damage). Hook your own tame with afraid Boars more than 4 m from it. Expected: the hook works and
   those Boars do not come for you.
-  *Partly automated (`morale.missiles`); by hand: The hook itself (MC Harpoon Hooks Tames): that hooking your own tame
-  works.*
-- [ ] **X07 Dual Wielding (MC)** (its X06): rank 4, hit an afraid Greydwarf with the off-hand weapon only (the second
+  *Automated: `morale.missiles`, `morale.x.harpoon-hook`.*
+- [x] **X07 Dual Wielding (MC)** (its X06): rank 4, hit an afraid Greydwarf with the off-hand weapon only (the second
   swing of the combo: swing once in the air, then hit it; sneak up on it or catch it first, since a cornered one
   already fights back). Expected: it fights you, like after a main-hand hit.
+  *Automated: `morale.x.dual-wield`.*
 - [ ] **X08 Weapon Moveset (MC)** (its X04 and X05): rank 3, in the Meadows. A sneak roll attack on an afraid
   `Greyling` that faces you (from beyond 12 m, so it sees you before it runs). Expected: no sneak attack and no Sneak
   Ambush XP. The same from behind it, unseen: a sneak attack. A jump attack on an afraid Greyling. Expected: it fights
@@ -451,14 +458,17 @@ Needs a second player (P2). "P1 rank 8" = `ForceBossRank = 8` on P1's game (Debu
 - [x] **L02 Off during a rout:** turn the mod off while a pack is running away. Expected: the creatures stop running
   (normal game).
   *Automated: `morale.toggle`.*
-- [ ] **L03 `Enabled = false` + restart:** set `Enabled = false` in `BepInEx/config/MC.Combat.Creatures.Morale.cfg`,
+- [x] **L03 `Enabled = false` + restart:** set `Enabled = false` in `BepInEx/config/MC.Combat.Creatures.Morale.cfg`,
   start the game and load a world. Expected: Status "Off (disabled in settings)."; creatures behave as in the normal
   game; no "Standing:" line in the log.
+  *Automated: `probe.disabled.MC.Combat.Creatures.Morale`, `morale.disabled.vanilla`.*
 - [ ] **L04 Clean log:** over the whole test session (single player and multiplayer). Expected: no error from Creature
   Morale.
   *Partly automated (`morale.rules`, `morale.publish`, `morale.calm`, `morale.provoke`, `morale.stealth`,
   `morale.rout`, `morale.kinds`, `morale.ranks`, `morale.rest`, `morale.kills`, `morale.missiles`, `morale.fight`,
   `morale.senses`, `morale.packs`, `morale.packs-other`, `morale.rout-hit`, `morale.rout-end`, `morale.exempt`,
   `morale.tame`, `morale.toggle`, `morale.settings`, `morale.sleeper`, `morale.spawn-biome`, `morale.handover`,
-  `morale.mp.rules`, `morale.mp.shared`, `morale.mp.off-allowed`, `morale.mp.server-off`); by hand: The dedicated
-  server's own log and the hands-on session.*
+  `morale.mp.rules`, `morale.mp.shared`, `morale.mp.off-allowed`, `morale.mp.server-off`, `morale.session-log`,
+  `morale.mp.server-log`, `morale.mp.refused-log`, `probe.relog.MC.Combat.Creatures.Morale`,
+  `probe.quit.MC.Combat.Creatures.Morale`, `probe.disabled.MC.Combat.Creatures.Morale`); by hand: The log of a
+  hands-on session (the steps that are still done by hand).*

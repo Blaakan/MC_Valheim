@@ -25,10 +25,11 @@ after Kall; the target reached: cleared, "The Jotun Retreat" shown, no storm, no
 `dn.map` (map scanned; awake area purple, sleeping one not; own colours back with ShowAreas off, at stage 0 and while
 waiting for the server's rules) and `dn.morkhalla`. No hands-on in-game test yet.
 
-**Automated checks (2026-10-13):** 30 of 30 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 39 of 39 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
+"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
+still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive, `killall` removes nearby creatures, `goto <x> <z>` (whole numbers) teleports you (the Deep North is
@@ -63,13 +64,11 @@ changed one back afterwards. Use a new world for T01-T05 (or `deepnorth_stones 0
   Advance" (once); log "A Malicious Ice was broken at ...: 1 broken in this world, Deep North stage 1."; `pevents list`
   shows no new invasion; `listkeys` shows `mc_dn_stones 1`; `deepnorth_stones` shows about 20 % of the areas awake.
   *Automated: `dn.breaks`.*
-- [ ] **T03 Invaded areas (G2):** after T02, travel through the Deep North (`goto`, then walk or fly a few hundred
+- [x] **T03 Invaded areas (G2):** after T02, travel through the Deep North (`goto`, then walk or fly a few hundred
   metres). Expected: in some places Krigen (both kinds), Hexen and Elaking appear around you (up to about a dozen), day
   and night; in others the north stays quiet. Going back to a quiet place, it stays quiet; an invaded place stays
   invaded after leaving and loading the world again.
-  *Partly automated (`dn.stage1`, `dn.dormant`); by hand: Leave an invaded place and come back, and quit and load the
-  world again: the same places are still invaded and the quiet ones still quiet (the test visits each place once and
-  does not reload the world).*
+  *Automated: `dn.stage1`, `dn.dormant`, `dn.areas.return`, `dn.relog.areas`.*
 - [x] **T04 Second Malicious Ice (G3):** break another. Expected: "The Jotun Advance"; still no new invasion in
   `pevents list`; `deepnorth_stones` about 40 % awake; the invaded places of T03 are still invaded.
   Over about 20 area Jotun, more 1-star ones than at stage 1 (roughly one in five).
@@ -93,8 +92,8 @@ changed one back afterwards. Use a new world for T01-T05 (or `deepnorth_stones 0
   back. Walk south out of the Deep North next to an invaded area at its edge: the blizzard stops at the Deep North
   line. StormShare = 0: never a blizzard from the mod. Default (33): over an hour, an area storms now and then for 5-10
   minutes.
-  *Partly automated (`dn.storm`, `dn.dormant`); by hand: With god mode off, let a meteor land on you: it hurts. Walk
-  out of a storming area: normal weather comes back. The look and sound of the blizzard.*
+  *Partly automated (`dn.storm`, `dn.dormant`, `dn.storm.leave`, `dn.storm.meteorhit`); by hand: The look and the
+  sound of the blizzard and of the meteors.*
 - [x] **T10 Nature fights back (G9):** at stage 0, `spawn JotunWarrior` and `spawn TrollFrost` next to each other (stand
   well away): they ignore each other. At stage 1 or more (`deepnorth_stones 1`): they fight. A `Moose` stays out of it.
   NatureFightsBack = false: they ignore each other again.
@@ -144,9 +143,10 @@ changed one back afterwards. Use a new world for T01-T05 (or `deepnorth_stones 0
   (`deepnorth_stones` there says the area is cleared), and `deepnorth_stones` never shows more kills than the area
   needs (no "9 of 8"). The same when the lower values are set while the game is closed: after loading the world the
   area is cleared at once.
-  *Partly automated (`dn.killtarget`, `dn.mp.killtarget`); by hand: Set the lower values while the game is closed
-  (config file), then load the world: the area is cleared at once (the test makes the server read the world again with
-  the lower values in force instead of restarting the game).*
+  *Partly automated (`dn.killtarget`, `dn.mp.killtarget`, `dn.relog.killtarget`); by hand: Only the config-file road:
+  with the game closed, lower ClearKillsMin / ClearKillsMax in the .cfg, start the game and load the world: the area
+  is cleared at once. (The test lowers the values in memory at the main menu between a real log out and load; a test
+  may not write the config file and the game is not restarted.).*
 - [x] **T26 Kill target passing by a lower value (G10):** same start as T24 (after Kall, ClearKillsMin = ClearKillsMax
   = 12, 9 Jotun killed in an invaded area, `deepnorth_stones` shows "9 of 12 Jotun defeated"). Lower ClearKillsMin and
   ClearKillsMax and put both back to 12 within about a second (in ConfigurationManager: drag each slider down and
@@ -191,8 +191,9 @@ changed one back afterwards. Use a new world for T01-T05 (or `deepnorth_stones 0
   breaking a Malicious Ice shows "The Jotun Advance" and starts one invasion; `listkeys` still shows `mc_dn_stones`.
   Tick it again: the blizzard and the area spawns come back, the count goes on from where it was.
   *Automated: `dn.toggle`.*
-- [ ] **T17 `Enabled = false` + restart:** the game starts with no error; the Deep North is the normal game; the MC Mods
+- [x] **T17 `Enabled = false` + restart:** the game starts with no error; the Deep North is the normal game; the MC Mods
   panel shows the mod off.
+  *Automated: `probe.disabled.MC.Exploration.DeepNorth.Awakening`, `dn.disabled.north`.*
 - [ ] **T18 Clean log:** after T01-T15, no error or exception from the mod in `BepInEx/LogOutput.log`.
   *Partly automated (`dn.cleanlog`); by hand: After your own hands-on checks, look once at BepInEx/LogOutput.log for
   errors from this mod.*
@@ -247,20 +248,20 @@ changed one back afterwards. Use a new world for T01-T05 (or `deepnorth_stones 0
   where they explored, the same areas for both players.
   *Partly automated (`dn.mp.rules`); by hand: With two players: both maps show the same purple areas where each
   explored.*
-- [ ] **M10 Kill target lowered on the server:** dedicated server after Kall with ClearKillsMin = ClearKillsMax = 6
+- [x] **M10 Kill target lowered on the server:** dedicated server after Kall with ClearKillsMin = ClearKillsMax = 6
   and StormShare = 100. A player kills 3 Jotun in an invaded area (`deepnorth_stones` there shows "3 of 6 Jotun
   defeated") and stays in it. On the server, set ClearKillsMin = ClearKillsMax = 3 (its config file, or
   ConfigurationManager on a host). Expected: a couple of seconds later, without another kill, the server log says
   "3 Jotun defeated in Deep North area ..., where 3 are enough now: the area is cleared for good."; the player sees
   "The Jotun Retreat", `deepnorth_stones` says the area is cleared, the blizzard stops there and its purple leaves the
   map.
-  *Partly automated (`dn.mp.killtarget`); by hand: Stand in the area when the server's setting goes down: "The Jotun
-  Retreat" shows, the blizzard stops and the purple leaves the map (the test's player stays at the spawn).*
+  *Automated: `dn.mp.killtarget`, `dn.mp.killtarget.there`.*
 
 ## 0.1.0 — cross-mod
 
-- [ ] **X01 Creatures Morale:** in an invaded area, fight area Jotun. Expected: they never flee; Gammeltroll and Barka
+- [x] **X01 Creatures Morale:** in an invaded area, fight area Jotun. Expected: they never flee; Gammeltroll and Barka
   fighting them follow Morale's normal rules.
+  *Automated: `dn.x.morale`, `dn.x.morale.nature`.*
 - [ ] **X02 Sneak Ambush:** sneak up on area Jotun. Expected: sneaking works on them like on other creatures (they do
   not hunt you down from far away).
   *Partly automated (`dn.stage1`); by hand: With Sneak Ambush on, sneak up on an area Jotun: sneaking works like on

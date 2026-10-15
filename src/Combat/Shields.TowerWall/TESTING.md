@@ -25,10 +25,11 @@ itself): T37 is reset, T42 and C11 are new, and T13 now says a Troll takes two t
 holds every kept-press check) and the smoke test ran on this change on 2026-10-13 (game 1.0.17, every MC mod loaded):
 all of this mod's tests passed, `tower.group` on a second run alone.
 
-**Automated checks (2026-10-13):** 40 of 40 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 55 of 55 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
+tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
+by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
+that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). Give
 yourself items with `spawn <name> <amount> <quality> p` (`p` puts it straight into your inventory:
@@ -107,11 +108,9 @@ to the hit, estimated from the clip data; T34).
   Expected: their poison shows "Blocked" and you get little poison (a fifth or less of it). Turn your back: the full
   poison. With `BlockUnblockableAttacks = false`: the poison goes through as in the normal game.
   *Automated: `tower.poison`, `tower.block`.*
-- [ ] **T11 Still unblockable:** while braced, take fall damage, stand in fire, and let a `Greydwarf` hit you from
+- [x] **T11 Still unblockable:** while braced, take fall damage, stand in fire, and let a `Greydwarf` hit you from
   behind. Expected: none of them is blocked.
-  *Partly automated (`tower.wall`, `tower.block`); by hand: Stand in a real campfire while braced and check the burn
-  is not blocked (no 'Blocked' text, no stamina spent): the test's fire hit is built in code, the campfire's own
-  damage was not driven.*
+  *Automated: `tower.wall`, `tower.block`, `tower.fire`.*
 - [ ] **T12 Bash:** press attack with the tower shield. Expected: a shield-arm strike (ShieldPunch), about 20 stamina,
   low damage numbers; the tooltip lists Blunt, stamina use 20, knockback, "Bash stagger: ×25" and "Bash cooldown:
   2 s"; bashing a creature raises the Blocking skill.
@@ -149,13 +148,12 @@ to the hit, estimated from the clip data; T34).
   black metal sword with a tower shield). Expected: one with a tower shield fights with its sword and its shield as in
   the normal game.
   *Automated: `tower.creature`, `tower.data`, `tower.hands`.*
-- [ ] **T21 Lock limit:** alone, `ShieldIronTower`, bash a `Draugr` continuously. Expected: it staggers on the first
+- [x] **T21 Lock limit:** alone, `ShieldIronTower`, bash a `Draugr` continuously. Expected: it staggers on the first
   bash, then not again for about 8 s however often you bash, and it attacks you between staggers. With
   `BashStaggerLock = 0`: every bash that lands after the previous stagger ended staggers it again (with bashes 2 s
   apart and a Draugr stagger of about 2.5 s, about every other bash; it is staggered most of the time). Note how long
   each stagger lasts.
-  *Partly automated (`tower.cadence`, `tower.lock`); by hand: That the Draugr attacks you between staggers (the test
-  Draugr has its AI off).*
+  *Automated: `tower.cadence`, `tower.lock`, `tower.foe`.*
 - [x] **T22 Immovable:** braced with stamina, take a `Troll` punch from the front. Expected: it does not push you back;
   from behind it does; with stamina at one block or less, the punch that breaks your guard pushes you. With
   `BraceKnockbackResistPercent = 0`: blocked punches push you again (less than unblocked ones).
@@ -344,8 +342,9 @@ to the hit, estimated from the clip data; T34).
   and `ShieldIronTower` together, quit to the main menu, tick the mod again, join the host. Expected: only one of the
   two is equipped after joining (the game keeps the one it equips last, from the order it stored your items, as when
   loading a character with the mod on); the other is in the inventory; no error in the log.
-  *Partly automated (`tower.equip`); by hand: The real join: untick the mod, hold both, quit, tick it, join the host,
-  and check one stays equipped with no error in the log.*
+  *Partly automated (`tower.equip`, `tower.relog.hands`); by hand: The same when joining a host as a client (there the
+  server's rules arrive after the character is loaded): untick, hold both, quit, tick, join, and see one stay equipped
+  with no error.*
 - [ ] **M17 Remote players see the slow bash:** player B watches player A bash. Expected: B sees the same slow swing
   as A, with the hit when A's swing lands; the host sets `BashAnimationSpeed = 1` for comparison. Repeat with a friend
   without the mod (`AllowPlayersWithoutMod = true` on the host). Expected: the same slow swing.
@@ -357,20 +356,23 @@ to the hit, estimated from the clip data; T34).
 - [ ] **C01 Sort Chest, Crafting Search and Sort, Encyclopedia (MC):** sort a chest with tower shields and round
   shields, look at them in the crafting list and in the Encyclopedia. Expected: tower shields sort and group with
   shields, not with weapons.
-  *Partly automated (`tower.data`); by hand: Sort a chest, open the crafting list and the Encyclopedia with the three
-  mods and check tower shields sit with the shields.*
+  *Partly automated (`tower.data`, `tower.x.sort`, `tower.x.kinds`); by hand: Open the crafting list (Crafting Search
+  and Sort) and the Encyclopedia and see that tower shields sit with the shields on those screens; only the classifier
+  they group by is checked, not the screens.*
 - [x] **C02 Crossbow Stays Loaded (MC):** load a `CrossbowArbalest`, equip a tower shield (the crossbow is put away),
   equip the crossbow again. Expected: still loaded.
   *Automated: `tower.mods.crossbow`.*
-- [ ] **C03 Forge Idol Upgrades (MC):** refine a tower shield at the Forge of Potential (names in Forge Idol Upgrades'
+- [x] **C03 Forge Idol Upgrades (MC):** refine a tower shield at the Forge of Potential (names in Forge Idol Upgrades'
   `TESTING.md`). Expected: still two-handed, block armor of its new quality ×2.5.
+  *Automated: `tower.x.forge`.*
 - [ ] **C04 Weapon Moveset (MC):** with a tower shield, jump and attack in the air; then roll and press attack in the
   second half of the roll (where a weapon's roll attack would flow out of the roll). Expected: the normal bash with its
   own stagger, no jump or roll attack; after the roll the bash starts only once the roll is over, it never cuts into
   the roll (Weapon Moveset's X03).
-- [ ] **C05 Dual Wielding (MC):** with two one-handed weapons paired, equip a tower shield. Expected: both weapons are
+- [x] **C05 Dual Wielding (MC):** with two one-handed weapons paired, equip a tower shield. Expected: both weapons are
   put away. With the tower shield, equip a one-handed weapon. Expected: the tower shield is put away (Dual Wielding's
   X03).
+  *Automated: `tower.x.dual`.*
 - [ ] **C06 Creature Morale (MC):** at boss rank 4, where Greydwarfs are afraid of you (Creature Morale's
   `ForceBossRank = 4` in a Debug build, or a character that helped kill Moder; stand in the Meadows: a Greydwarf
   spawned there still counts as a creature of its home biome, the Black Forest). An afraid `Greydwarf` runs away when
@@ -385,21 +387,18 @@ to the hit, estimated from the clip data; T34).
   them.
   *Partly automated (`tower.warn`); by hand: With ZenCombat, CaptainValheim, Goo's Combat Overhaul or ShieldBash
   really installed: the Warning names them.*
-- [ ] **C08 Sneak Ambush (MC):** crouch up to an unaware `Greydwarf` and bash it. Expected: no backstab, no
+- [x] **C08 Sneak Ambush (MC):** crouch up to an unaware `Greydwarf` and bash it. Expected: no backstab, no
   sneak-attack XP; raising the tower shield ends the crouch. In a New Game+ world (as T23): bash an unaware creature,
   then hit it with `KnifeCopper` at once. Expected: no backstab and no Sneak XP (the bash alerted it) (Sneak Ambush's
   X02).
-  *Partly automated (`tower.data`, `tower.follow`); by hand: With Sneak Ambush: no sneak XP for the bash, raising the
-  shield ends the crouch, and the KnifeCopper case.*
-- [ ] **C09 Harpoon Hooks Tames (MC):** hook a tame with the Abyssal Harpoon (`SpearChitin`), then switch to a tower
+  *Automated: `tower.data`, `tower.follow`, `tower.x.sneak`.*
+- [x] **C09 Harpoon Hooks Tames (MC):** hook a tame with the Abyssal Harpoon (`SpearChitin`), then switch to a tower
   shield and bash a wild `Greydwarf`. Expected: the tame still takes no damage from the harpoon; the bash staggers the
   Greydwarf as in T13.
-  *Partly automated (`tower.follow`, `tower.bash`); by hand: Hook a tame with the Abyssal Harpoon first and check it
-  still takes no harpoon damage after switching to the tower shield.*
-- [ ] **C10 Creature Kill and Tame Counts (MC):** kill a `Greyling` with bashes only. Expected: its line gains one
+  *Automated: `tower.follow`, `tower.bash`, `tower.x.harpoon`.*
+- [x] **C10 Creature Kill and Tame Counts (MC):** kill a `Greyling` with bashes only. Expected: its line gains one
   melee kill.
-  *Partly automated (`tower.creature`); by hand: The line in Creature Kill and Tame Counts gaining one melee kill (the
-  probe player is in god mode, which marks kills as cheated).*
+  *Automated: `tower.creature`, `tower.x.kills`.*
 
 ## 0.1.1 — false log messages, kept press
 
@@ -423,20 +422,19 @@ turned off. Not run in the game yet.
   `MC_NoSuchShield` only.
   *Partly automated (`tower.warn`); by hand: A real start with a Jotunn-based item mod installed, read by a person: no
   MISSING warning at the main menu; then the typo case typed into the config file in a world.*
-- [ ] **M18 Leaving a server without the mod:** join a server that does not have Tower Shield Wall (the MC Mods panel
+- [x] **M18 Leaving a server without the mod:** join a server that does not have Tower Shield Wall (the MC Mods panel
   shows "Inactive: the server does not have this mod"), then log out to the main menu. Expected: no "The Towers
   setting names items this game does not have (MISSING)" warning while the world closes; back at the menu the MC Mods
   panel shows the mod active again. The same after leaving a server that had the mod turned off.
-  *Partly automated (`tower.warn`); by hand: The real thing: log out to the main menu from a server without the mod,
-  and from one that has it turned off, and read the log for the MISSING warning; back at the menu the MC Mods panel
-  shows the mod active again.*
+  *Automated: `tower.warn`, `tower.mp.leave`, `tower.mp.leave-off`.*
 - [x] **T42 Kept press ends when the mod is turned off:** set `BashCooldown = 10`. Bash, press attack once right after
   the swing is over, then, before the 10 s are up, untick `Enabled` in ConfigurationManager (F1), or Esc → MC Mods →
   untick Tower Shield Wall. Expected: nothing swings by itself when the mod goes off (the tower shield in your hand is
   a normal shield again, and the waiting press does not punch). Press attack again. Expected: a punch. (Hard to time by
   hand: the `tower.press` self-test checks the same case, so mark this `[-]` if you cannot make it.)
   *Automated: `tower.press`.*
-- [ ] **C11 Spyglass, Music Instruments (MC):** set `BashCooldown = 6`. Bash, press attack once right after the swing
+- [x] **C11 Spyglass, Music Instruments (MC):** set `BashCooldown = 6`. Bash, press attack once right after the swing
   is over, then equip the spyglass (names in Spyglass' `TESTING.md`); another time an instrument (names in Music
   Instruments' `TESTING.md`). Expected: nothing swings by itself while it comes out; a click with it does what it did
   before (no punch); put it away again. Expected: still no punch by itself.
+  *Automated: `tower.x.spyglass`, `tower.x.instrument`, `tower.input.spyglass`, `tower.input.instrument`.*

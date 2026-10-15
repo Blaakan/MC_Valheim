@@ -13,10 +13,11 @@ server (`./tools/Test-Multiplayer.ps1 -Scenario modded,vanilla-server -Only trin
 passed. History, on 0.1.0: smoke test passed 2026-10-01; the in-world self-tests of that day gave the measured values
 below (their NOTE lines). No hands-on in-game test yet.
 
-**Automated checks (2026-10-13):** 38 of 38 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `d144018`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 55 of 55 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
+tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
+by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
+that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off; turn it off for the items where you take hits), `heal` refills health,
@@ -114,23 +115,31 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
   Expected: the trinket fires. Release the left trigger before the right stick: your weapons are not put away; hold
   the right stick longer: the radial menu does not open. The right stick alone still puts your weapons away (tap) and
   opens the radial menu (hold). The message and the tooltip show the gamepad buttons while the gamepad is in use.
-  *Partly automated (`trinkets.controls`, `trinkets.keys`); by hand: Everything with a real gamepad: left trigger +
-  right stick fires, weapons are not put away and the radial menu does not open from that press, the right stick alone
-  keeps its actions, and the labels switch to gamepad glyphs while the pad is in use.*
+  *Partly automated (`trinkets.input.pad-default`, `trinkets.controls`, `trinkets.keys`); by hand: Look once at the
+  screenshot trinkets.input.pad-default__gamepad-message.png in the run's shots folder: the top-left message
+  "Adrenaline full: press ... to trigger your trinket" draws the two gamepad buttons (left trigger + right stick) as
+  button pictures, not as raw "<sprite ...>" text or empty gaps. The test compares the texts (the game's sprite tags);
+  it cannot see how they are drawn, and nobody has seen them on screen yet (TESTING.md: everything about gamepads is
+  unverified). The tooltip line holds the same text (asserted) in the game's usual tooltip text field, but it is not
+  in the picture: if a gamepad is at hand, hover the trinket once and see the same button pictures there. Everything
+  else of the item is asserted with the test gamepad; a physical controller is not needed for it.*
 - [ ] **T13 Gamepad, alternative layouts:** switch to Alternative 1, then Alternative 2 (Settings, Controls). Press
   left trigger + right stick with a full bar. Note what else happens (Alternative 1: weapons put away or the radial
   menu opening from the left trigger, crouch; Alternative 2: shield raised, crouch, the "alternative placement"
   message). Then set `GamepadModifier = RightBumper`, `GamepadButton = DPadRight` and try again. Expected: the trinket
   fires; note any side effect, for the README's advice.
-  *Partly automated (`trinkets.controls`); by hand: The whole item: the Alternative 1 and 2 layouts with a real
-  gamepad, the side effects to note, and the RightBumper + DPadRight pair.*
-- [ ] **T14 Other keys:** set `TriggerKey = U` while playing. Expected: U fires, Y does nothing; the full-bar message
+  *Partly automated (`trinkets.input.pad-layouts`, `trinkets.controls`); by hand: Read the NOTE lines of
+  trinkets.input.pad-layouts once and compare them with the gamepad advice in the README (the item asks to note the
+  side effects for that advice: the test records them, it does not judge the advice). The test's press is a quick one
+  (modifier and button down and up within about 0.2 s), so the notes hold what a tap does; what holding the modifier
+  longer does before the button (Alternative 1: the radial menu opening from the left trigger) and the "alternative
+  placement" message on screen (the test notes the toggle, not the message) are not recorded: try those once by hand,
+  or accept the README advice for them as it is.*
+- [x] **T14 Other keys:** set `TriggerKey = U` while playing. Expected: U fires, Y does nothing; the full-bar message
   and the tooltip say [U]. Set `TriggerKey = F13`. Expected: one Warning "Controls.TriggerKey = F13: the game cannot
   read this key, so the keyboard trigger is off."; the message then names the gamepad buttons. Set `TriggerKey = None`
   and `GamepadButton = None`. Expected: the message says to set a trigger key; the tooltip says "no key set".
-  *Partly automated (`trinkets.keys`, `trinkets.mp.rules`, `trinkets.controls`); by hand: Press the real keys once (no
-  test presses a real key anywhere): with the default setting Y fires; after TriggerKey = U, U fires and Y does
-  nothing.*
+  *Automated: `trinkets.input.keys`, `trinkets.keys`, `trinkets.mp.rules`, `trinkets.controls`.*
 - [ ] **T15 Full-bar feedback:** wear a trinket, fill the bar by fighting. Expected: when it becomes full, the bar
   flashes and the top left says "Adrenaline full: press [Y] to trigger your trinket"; while it stays full, it flashes
   again every 4 seconds; the message comes back at most every 20 seconds. With
@@ -157,8 +166,9 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
 - [x] **T19 Other ranged weapons unchanged:** throw a spear, cast a staff, throw a bomb. Expected: no "Ranged shot" line,
   normal adrenaline.
   *Automated: `trinkets.other-ranged`.*
-- [ ] **T20 Respawn and login:** with a half bar, die (`god` off) or log out and back in. Expected: the bar is empty
+- [x] **T20 Respawn and login:** with a half bar, die (`god` off) or log out and back in. Expected: the bar is empty
   (normal game), no error.
+  *Automated: `trinkets.respawn`, `trinkets.relog.bar`, `probe.relog.MC.Combat.Trinkets.OnDemand`.*
 - [x] **T21 A loss from a full bar:** wear `TrinketBronzeHealth` (its bar holds 50), `adrenaline 999`, then
   `adrenaline 45` (the console takes 5 away). Expected: the bar shows 45 and no trinket effect starts: a loss lowers the
   bar, also a full one, and never fires the trinket. Then `adrenaline 25` and `adrenaline 20`. Expected: 20, nothing
@@ -177,11 +187,11 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
   full without firing the trinket (normal game: the drain never fires it). (c) Tick it on again. Expected: Y works
   again, the bar stops draining, the tooltip line is back.
   *Automated: `trinkets.toggle`.*
-- [ ] **L02 `Enabled = false` + restart:** set `Enabled = false` in `BepInEx/config/MC.Combat.Trinkets.OnDemand.cfg`
+- [x] **L02 `Enabled = false` + restart:** set `Enabled = false` in `BepInEx/config/MC.Combat.Trinkets.OnDemand.cfg`
   and start the game. Expected: `Status` reads "Off (disabled in settings)."; the bar drains and fires at once as in
   the normal game; Y does nothing; no tooltip line; no error in the log.
-  *Partly automated (`trinkets.mp.toggle`, `trinkets.toggle`); by hand: The restart: set Enabled = false in the cfg
-  file, start the game, and check Status reads "Off (disabled in settings)." and the log has no error.*
+  *Automated: `probe.disabled.MC.Combat.Trinkets.OnDemand`, `trinkets.disabled.vanilla-bar`, `trinkets.disabled.key`,
+  `trinkets.toggle`, `trinkets.mp.toggle`.*
 - [ ] **L03 Clean log:** play through T01-T20 while `./tools/Watch-Log.ps1 -Mine` runs, then quit the game from the
   world (Esc, Logout, Exit). Expected: no error and no warning from Trinkets on Demand (the F13 warning of T14 aside),
   in particular no Unity warning about a missing "Flash" animator parameter.
@@ -241,9 +251,10 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
   1. Expected: refused about a second after joining; the server log says "has another version of the mod (network
   version 2, the server has 1)". With `AllowPlayersWithoutMod = true` they stay, and their MC Mods panel says the
   versions cannot talk to each other; their bar works as in the normal game.
-  *Partly automated (`trinkets.network`); by hand: The whole live case: a second build with ModNetworkVersion=2 joins,
-  is refused with the "network version 2, the server has 1" reason; with AllowPlayersWithoutMod it stays and its panel
-  says the versions cannot talk to each other.*
+  *Partly automated (`trinkets.mp.other-version`, `trinkets.network`); by hand: A real second build (DLL built with
+  -p:ModNetworkVersion=2) joining from the start: the test sends that copy's hello and the server's answer by hand
+  from the normal build, so the join-time check (hello before the player is in) and a really different DLL are not
+  exercised.*
 - [x] **M09 Dedicated server:** a dedicated server with the mod and one player. Do T02, T08 and T17 there. Expected:
   the same results as in single player (everything runs on the player's game); no error in the server's log.
   *Automated: `trinkets.mp.fight`, `trinkets.mp.full-bar`, `trinkets.mp.server-log`.*
@@ -252,9 +263,9 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
   dodge: A gets the normal game's 5 adrenaline). Expected (changed in 0.2.0: other players count like creatures): a
   fight starts for A, as after dodging a creature: the Debug line "In a fight: adrenaline income on." and 1 adrenaline
   per second for 6 seconds after the dodge.
-  *Partly automated (`trinkets.dodge-fight`); by hand: Two real players with PvP on: A rolls through B's swing or
-  arrow and gets the income for 6 seconds. The self-test sends the perfect-dodge message itself, with nothing hunting
-  the player.*
+  *Partly automated (`trinkets.dodge-fight`, `trinkets.pvp-dodge-arrow`); by hand: Two real players with PvP on: B's
+  game sending the perfect-dodge message over the network after a real swing or a flying arrow (the test has no second
+  game; the stand-in's arrow is given to the hit code on one game, not flown).*
 - [ ] **M11 Fighting another player (PvP on for both):** two players with the mod, both with PvP on, no creature nearby,
   both wear a trinket, `adrenaline 0`, `god` off. (a) A hits B once. Expected: a fight starts for A (the attacker) and
   for B (the victim): each gets 1 adrenaline per second for 6 seconds after the hit (besides whatever
@@ -266,20 +277,18 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
 - [ ] **M12 PvP off for one of them:** as M11, but only A has PvP on (then the other way round: only B). A swings at B
   and B swings at A. Expected: no hit does damage (normal game) and no fight starts for either: no income, no Debug "In
   a fight" line. With PvP off for both: the same.
-  *Partly automated (`trinkets.pvp`); by hand: Two real players swinging at each other with PvP off on one side, then
-  on the other: no income on either game.*
+  *Partly automated (`trinkets.pvp`, `trinkets.pvp-dodge-arrow`); by hand: Two real players swinging at each other
+  with PvP off on one side, then on the other: no damage and no income on either game.*
 
 ## 0.1.0 — other mods
 
-- [ ] **X01 Dual Wielding (MC):** dual wield two `KnifeCopper` (see Dual Wielding's README), wear a trinket.
+- [x] **X01 Dual Wielding (MC):** dual wield two `KnifeCopper` (see Dual Wielding's README), wear a trinket.
   Expected: H swaps hands and Y fires the trinket (no clash); a both-hands hit pays adrenaline once per swing as
   without this mod; with a full bar, dual-wield swings that hit or miss do not fire it.
-  *Partly automated (`trinkets.dual-wield`); by hand: Press the real H and Y keys (swap and fire do not clash), and
-  check a both-hands hit pays once per swing on a creature.*
-- [ ] **X02 Weapon Moveset (MC):** jump and roll attacks with `SwordIron` on a `Greydwarf`, wear a trinket. Expected:
+  *Automated: `trinkets.dual-wield`, `trinkets.input.dual-wield`, `trinkets.dual-wield-creature`.*
+- [x] **X02 Weapon Moveset (MC):** jump and roll attacks with `SwordIron` on a `Greydwarf`, wear a trinket. Expected:
   they pay adrenaline like other swings and count as a fight (income); press Y mid-roll with a full bar: it fires.
-  *Partly automated (`trinkets.gates`, `trinkets.no-fight`); by hand: Jump and roll attacks with SwordIron on a
-  Greydwarf: they pay adrenaline like other swings and start the income.*
+  *Automated: `trinkets.moveset`, `trinkets.gates`, `trinkets.no-fight`.*
 - [x] **X03 Crossbow Stays Loaded (MC):** load two crossbows, fire one, swap to the other (still loaded) and fire at
   once. Expected: the second shot's Debug "Ranged shot" line says about 1 s since the last shot and x1 or close to it
   (under 1.5 s since the last shot earns no bonus), not x2.67.
@@ -291,14 +300,12 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
   a half bar rises by the normal block amount (a tower shield never parries); with a full bar, the block does not fire
   the trinket.
   *Automated: `trinkets.block-fight`.*
-- [ ] **X06 Sneak Ambush (MC):** in a fight with a `Greydwarf`, throw a Smoke Screen at your feet and stay inside.
+- [x] **X06 Sneak Ambush (MC):** in a fight with a `Greydwarf`, throw a Smoke Screen at your feet and stay inside.
   Expected: it loses you, and about 6 seconds after the last hit Debug "Fight over: adrenaline income off.".
-  *Partly automated (`trinkets.block-fight`, `trinkets.targeting`); by hand: A real Smoke Screen: the Greydwarf loses
-  you and the fight ends about 6 s after the last hit.*
-- [ ] **X07 Creature Morale (MC):** make a `Greyling` flee (Creature Morale's own test setup). Expected: while it flees
+  *Automated: `trinkets.smoke-screen`, `trinkets.block-fight`, `trinkets.targeting`.*
+- [x] **X07 Creature Morale (MC):** make a `Greyling` flee (Creature Morale's own test setup). Expected: while it flees
   and nobody hits, the fight ends after about 6 seconds; hitting it again starts a new one.
-  *Partly automated (`trinkets.block-fight`, `trinkets.targeting`); by hand: A really fleeing Greyling (Creature
-  Morale): the fight ends after about 6 s while it flees, hitting it starts a new one.*
+  *Automated: `trinkets.morale-afraid`, `trinkets.morale-flee`, `trinkets.block-fight`, `trinkets.targeting`.*
 - [ ] **X08 Other mods (optional):** with BetterTrinkets (or Passive_Trinket_Modifiers, or Balrond Battle Flow)
   installed. Expected: one Warning "<mod> (<GUID>) also changes when or what trinkets fire, so Trinkets on Demand stays
   off …" naming its plugin name and GUID (note them for the design doc), and the MC Mods panel says "Inactive: <mod>
@@ -308,12 +315,11 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
   `ezomic.valheim.surge`), and both work.
   *Partly automated (`trinkets.controls`); by hand: The whole item with the real third-party mods installed: the
   Warning, the panel text, the Info lines and their real GUIDs.*
-- [ ] **X09 Music Instruments (MC):** wear a trinket, full bar, take an instrument out and start Free play (see Music
+- [x] **X09 Music Instruments (MC):** wear a trinket, full bar, take an instrument out and start Free play (see Music
   Instruments' README), then play the Y key of the upper octave (and the U key after setting `TriggerKey = U`).
   Expected: the note plays and the trinket does not fire; no "Adrenaline not full yet" or other answer of this mod
   shows (the full-bar message may still name [Y]). Stop playing. Expected: Y fires the trinket again.
-  *Partly automated (`trinkets.gates`); by hand: Real free play with an instrument: the Y (and U) note plays and the
-  trinket does not fire.*
+  *Automated: `trinkets.input.music`, `trinkets.gates`.*
 - [x] **X10 Trinket with an up-front adrenaline gain:** a trinket whose effect gives adrenaline the moment it starts
   (no trinket of the normal game does; another mod's trinket can, and the self-test `trinkets.full-bar` builds one).
   Full bar, press Y; fill the bar again while the effect runs and press Y again. Expected: each press fires once (the

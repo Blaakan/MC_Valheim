@@ -28,10 +28,11 @@ setting `KnifePairBlock`, network version 2): smoke test passed, and the in-worl
 passed (`./tools/Test-InWorld.ps1 -Mod Weapons.DualWield -Only dual.data,dual.block`). Every item below is still to
 test.
 
-**Automated checks (2026-10-08):** 34 of 34 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `66b484f`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 58 of 58 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
+tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
+by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
+that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (it does not change stamina costs), `ghost` makes creatures ignore you, `heal` refills health and
@@ -86,8 +87,8 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
   comes first and the swing waits for it (T32); never a swing that changes weapons midway. Press H quickly several
   times: at most one swap every half second. Swing once, press
   H, swing again: the second swing is the first swing of the combo again. (Animation and timing: T32.)
-  *Partly automated (`dual.swap`, `dual.equip`, `dual.attack`); by hand: Hear the equip sound and see the hands swap
-  in view with the equip animation; press the real H key once.*
+  *Partly automated (`dual.swap`, `dual.equip`, `dual.attack`, `dual.input.swap`); by hand: Hear the equip sound and
+  see the hands swap in view with the equip animation (how it sounds and looks).*
 - [x] **T05 Shield:** with the pair, equip the buckler. Expected: the buckler in the left hand, the sword kept, the axe
   put away. Then equip the axe. Expected: the axe replaces the sword, the buckler stays (no pair).
   *Automated: `dual.equip`.*
@@ -137,7 +138,7 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
   *Automated: `dual.trees`.*
 - [x] **T16 Hide and draw:** with the pair, press R, R, several times. Expected: the same hands each time.
   *Automated: `dual.keep`.*
-- [ ] **T17 Eating:** with the pair, eat a `Raspberry` from the inventory (`puke` lets you eat again). Expected: as in
+- [x] **T17 Eating:** with the pair, eat a `Raspberry` from the inventory (`puke` lets you eat again). Expected: as in
   the game, no food shows in your hand and both weapons stay in your hands. Then `spawn FeastMeadows` and eat at it
   (E). Whether the game hides the main weapon there is unverified (the `dual.data` self-test notes it for every feast).
   If it does: the main weapon disappears for about a second, then the same hands. Eat and roll at once: the same hands
@@ -146,23 +147,19 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
   Spawn `FeastBlackforest` next to the first feast, eat at one and at once at the other (within the second): the same
   hands after (not the axe alone in the main hand). The self-test `dual.keep` covers the hidden main weapon with food
   from the inventory, and two foods eaten in a row while it is hidden.
-  *Partly automated (`dual.keep`, `dual.places`); by hand: Eat at a feast next to deep water and jump in: after
-  leaving the water the same hands.*
-- [ ] **T18 Stations, beds, barber, swimming:** with the pair, use a workbench, sleep in a bed, use the barber, swim.
+  *Automated: `dual.keep`, `dual.places`, `dual.real.feast-water`.*
+- [x] **T18 Stations, beds, barber, swimming:** with the pair, use a workbench, sleep in a bed, use the barber, swim.
   Expected: after each (press R if the weapons are hidden), the same hands. Sit on a chair: the weapons stay in hand
   (as in the game).
-  *Partly automated (`dual.places`, `dual.sheath`, `dual.keep`); by hand: Sleep a real night in a bed, use the barber
-  station and swim with a pair: same hands after.*
-- [ ] **T19 Relog:** log out and in with the pair. Expected: the same hands. Drag the off-hand weapon to another
+  *Automated: `dual.places`, `dual.sheath`, `dual.keep`, `dual.real.sleep`, `dual.real.barber`, `dual.real.swim`.*
+- [x] **T19 Relog:** log out and in with the pair. Expected: the same hands. Drag the off-hand weapon to another
   inventory slot (it now loads last), relog: the same hands. Drag the main weapon to another slot (now it loads last),
   relog: the same hands.
-  *Partly automated (`dual.pair`, `dual.keep`); by hand: A real log out and log in with the pair (three times, as
-  described).*
-- [ ] **T20 Death:** die with the pair in a normal world. Expected: both weapons in the tombstone, nothing equipped
+  *Automated: `dual.pair`, `dual.keep`, `dual.relog.pair`, `dual.relog.off-last`, `dual.relog.main-last`.*
+- [x] **T20 Death:** die with the pair in a normal world. Expected: both weapons in the tombstone, nothing equipped
   after respawn. Then `setkey DeathKeepEquip` and die with the pair. Expected: the same pair after respawn. Then
   `removekey DeathKeepEquip`.
-  *Partly automated (`dual.places`, `dual.keep`, `dual.pair`); by hand: Die for real in a normal world and with
-  DeathKeepEquip and look at the hands after the respawn.*
+  *Automated: `dual.places`, `dual.keep`, `dual.pair`, `dual.real.death`, `dual.real.death-keep`.*
 - [x] **T21 Inventory moves:** with the pair, drag the main weapon to an empty slot. Expected: the same pair. Drag the
   main weapon onto the off-hand weapon's slot, then the off-hand weapon onto the main weapon's slot. Expected: the same
   pair each time. Drag the main weapon into a chest. Expected: the axe moves to the main hand. Pair again and drop the
@@ -213,12 +210,11 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
   `ExcludedWeapons = SwordIron` (the main weapon). Expected: the axe (off hand) is put away, the sword stays alone.
   Clear it.
   *Automated: `dual.keep`, `dual.pair`.*
-- [ ] **T31 Keys:** set `SwapHandsKey = J`: J swaps, H does nothing. Set `SwapHandsKey = None`: no key swaps. Set
+- [x] **T31 Keys:** set `SwapHandsKey = J`: J swaps, H does nothing. Set `SwapHandsKey = None`: no key swaps. Set
   `MainHandKey = None`: Left Alt + equip pairs like a normal equip. Set `SwapHandsKey = JoystickButton0`: a warning
   "Controls.SwapHandsKey = JoystickButton0: gamepad buttons are not supported yet, so swapping your weapons between
   your hands is off. Pick a keyboard key or a mouse button.", and no key swaps. Put both back (`LeftAlt`, `H`).
-  *Partly automated (`dual.swap`); by hand: Change the two settings for real and press the real keys (J, H, Left Alt)
-  once: the test never touches the keyboard or the config.*
+  *Automated: `dual.swap`, `dual.input.keys`, `dual.input.pad`, `dual.mp.keys`.*
 - [ ] **T32 Swap animation and timing:** with the pair, stand still and press H; then walk and press H. Expected: first
   the game's equip animation, with the "Equipping <axe>" bar for about a fifth of a second (like switching weapons on
   the hotbar), then the weapons change hands with the draw animation of the hide key (R). While walking, the speed
@@ -229,9 +225,9 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
   while sprinting". Press H, then start sprinting at once: no swap, the same message. Press H twice very quickly: one
   swap. Note how the two animations look together (a stiff jump from one to the other, a draw that plays too late) and
   whether the swap feels too slow or too fast.
-  *Partly automated (`dual.swap`, `dual.equip`, `dual.attack`); by hand: Watch how the two animations look together
-  and whether the swap feels too slow or fast; walking speed during the swap; the hold-attack and single-click timing
-  notes.*
+  *Partly automated (`dual.swap`, `dual.equip`, `dual.attack`, `dual.input.swap-attack`, `dual.input.swap-walk`); by
+  hand: Watch how the equip animation and the draw animation look together (a stiff jump from one to the other, a draw
+  that plays too late) and whether the swap feels too slow or too fast.*
 - [ ] **T33 Sheathed pair placement:** press R with each pair: two `SwordIron`, `SwordIron` + `AxeIron`, `MaceIron` +
   `SwordIron`, two `KnifeBlackMetal` (`spawn KnifeBlackMetal 2 p`), `KnifeFlint` + `KnifeBlackMetal`,
   `KnifeBlackMetal` + `SwordIron`, and `SwordIron` + `KnifeBlackMetal`. Look from behind, from the front and from both
@@ -255,8 +251,10 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
   then true while lying, then get up: the back pair is crossed within a moment of standing, the knives are one per
   hip. Note what looks wrong (blades through the body, the legs or the ground, the crossing point, the angle of the
   knives, a knife floating off the hip, a weapon floating off the back).
-  *Partly automated (`dual.visuals`, `dual.sheath`); by hand: Look at each pair from all sides for clipping and
-  floating; swimming with a pair; note what looks wrong.*
+  *Partly automated (`dual.visuals`, `dual.sheath`, `dual.real.swim-sheath`); by hand: Look at each sheathed pair from
+  behind, the front and both sides, standing, walking, running (and while swimming) for what a program cannot judge:
+  blades through the body, the legs or the ground, a weapon floating off the back or the hip, how the X and the knives
+  look.*
 - [x] **T34 Knife pair block:** first `resetskill Blocking` (the skill raises every block), and eat `MeatPlatter`,
   `SerpentStew` and `HoneyGlazedChicken` (80 health each, about 265 max health: a block or parry fails when the damage
   that gets through fills your stagger bar, 40% of your max health). Two `KnifeBlackMetal`: hold block and let a
@@ -281,18 +279,20 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
   back, where the game puts it; press R: only the sword is drawn. `Status` shows why the feature is off each time, and
   back to active when turned on.
   *Automated: `dual.toggle`, `dual.mp.toggle`.*
-- [ ] **L02 `Enabled = false` + restart:** log out with the pair, set `Enabled = false` in
+- [x] **L02 `Enabled = false` + restart:** log out with the pair, set `Enabled = false` in
   `BepInEx/config/MC.Combat.Weapons.DualWield.cfg` and start the game. Expected: `Status` reads "Off (disabled in
   settings).", the pair loads as one weapon (no error), equipping is vanilla (a second one-handed weapon replaces the
   first).
-  *Partly automated (`dual.toggle`, `dual.mp.toggle`); by hand: Set Enabled = false in the config file and start the
-  game with a saved pair.*
+  *Automated: `dual.toggle`, `dual.mp.toggle`, `dual.disabled.pair`, `probe.disabled.MC.Combat.Weapons.DualWield`.*
 - [ ] **L03 Clean log:** play through the items above while `./tools/Watch-Log.ps1 -Mine` runs, and quit the game while
   dual wielding. Expected: no error and no warning from Dual Wielding, except those an item provokes on purpose (T07,
   T25, T31; the server's "Refused", "plays without" and "connected without" warnings of M01-M05; "Server does not have
   Dual Wielding" in M14; the other-mod warning of X08).
-  *Partly automated (`dual.log`); by hand: Play through by hand with the log open, and quit the game while dual
-  wielding.*
+  *Partly automated (`dual.log`, `probe.relog.MC.Combat.Weapons.DualWield`, `probe.quit.MC.Combat.Weapons.DualWield`,
+  `dual.disabled.pair`, `dual.relog.pair`, `dual.relog.off-last`, `dual.relog.main-last`); by hand: Keep the log open
+  (./tools/Watch-Log.ps1 -Mine) while doing the items that are still done by hand (the looks of T04, T26, T32, T33 and
+  the second-player items): no error or warning from Dual Wielding there either. The automated play-through and the
+  quit while dual wielding need no person.*
 
 ## 0.1.0 — multiplayer
 
@@ -309,8 +309,10 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
 - [ ] **M03 Other network version refused:** a player with the network version 3 build of the Setup joins. Expected:
   refused about a second after joining ("Incompatible version"); the server log says "their game has another version
   of the mod (network version 3, the server has 2)"; their MC Mods panel says the versions cannot talk to each other.
-  *Partly automated (`dual.mp.version`, `dual.data`); by hand: Join with a real network-version-3 build: refused, and
-  its MC Mods panel says the versions cannot talk.*
+  *Partly automated (`dual.mp.version`, `dual.data`, `dual.mp.version-panel`, `dual.mp.allow-back`); by hand: Join
+  with a real build made with ModNetworkVersion 3 while the server refuses from the start: refused about a second
+  after joining. The tests only make this build say 'version 3' (one build, one client), so the join-time check
+  against a real other build stays by hand.*
 - [ ] **M04 Allowed without the mod:** set `AllowPlayersWithoutMod = true` on the server; the three players of M01-M03
   join. Expected: all three play; for each the server log warns "<player> plays without Dual Wielding: their game
   <reason>. AllowPlayersWithoutMod is on, so they may play, without this mod's rules (with another dual wield mod
@@ -413,14 +415,16 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
   in the Meadows, still gives the backstab as long as it has not seen you; one that watches you gives none.)
   *Partly automated (`dual.others`, `dual.elements`); by hand: A real ambush on an unaware Greyling: backstab applied,
   the Sneak skill gaining once, and the Creature Morale case.*
-- [ ] **X05 Forge Idol Upgrades (MC):** refine the off-hand weapon at the Forge of Potential. Expected: it comes back
+- [x] **X05 Forge Idol Upgrades (MC):** refine the off-hand weapon at the Forge of Potential. Expected: it comes back
   unequipped, the main weapon stays. Refine the main weapon: the off-hand weapon moves to the main hand.
-- [ ] **X06 Creature Morale (MC):** boss rank 3 (Creature Morale's Debug setting `ForceBossRank = 3`, see its
+  *Automated: `dual.x.forge`.*
+- [x] **X06 Creature Morale (MC):** boss rank 3 (Creature Morale's Debug setting `ForceBossRank = 3`, see its
   `TESTING.md`), in the Meadows, `spawn Greyling`: it is afraid of you (it runs when you come within about 12 m and it
   sees or hears you, with the game's red alert icon on its health bar while it runs). Crouch up to it from behind, unseen, with `SwordIron`
   (main) + `AxeIron` (off); swing once in the air beside it without touching it, then hit it with the second swing (an
   off-hand hit; if it starts running, catch up and hit it with the off-hand swing). Expected: it stops running and
   fights you, as after a main-hand hit.
+  *Automated: `dual.x.morale`.*
 - [ ] **X07 Goo's Combat Overhaul** (optional, without Smoothbrain DualWield): pair two weapons and fight. Expected: a
   pair swing costs stamina once; note whether its lunge and speed tuning applies to pair swings; no errors.
 - [ ] **X08 Other dual wield mods:** install Smoothbrain DualWield next to the mod. Expected: the BepInEx log says Dual
@@ -430,6 +434,6 @@ build back afterwards (build again without `-p:ModNetworkVersion=3` and copy it 
   the mod refuses that player ("has the mod turned off").
   *Partly automated (`dual.data`); by hand: Install Smoothbrain DualWield, then RustyMods DualWielder, and read the
   log and the panel.*
-- [ ] **X09 Creature Kill and Tame Counts (MC):** kill a `Greyling` with a sword + axe pair (let an off-hand hit land
+- [x] **X09 Creature Kill and Tame Counts (MC):** kill a `Greyling` with a sword + axe pair (let an off-hand hit land
   the kill). Expected: the kill counts under melee in its line of the Compendium's Player Statistics.
-  *Partly automated (`dual.kills`); by hand: Open the Compendium's Player Statistics and read the Greyling line.*
+  *Automated: `dual.kills`, `dual.x.kills-page`.*

@@ -19,10 +19,11 @@ the other installed mods, one of them Jotunn-based): in-world self-tests 33 of 3
 `sneak.smoke-late` on a second run alone), multiplayer scenarios all passed; the log has no Sneak Ambush line at the
 main menu, and none after "ZNet OnDestroy" in the client log of the server-without-mods scenario (five before).
 
-**Automated checks (2026-10-08):** 48 of 48 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `42058fe`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 65 of 65 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
+tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
+by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
+that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `die` kills you (with `god` off), `heal` refills health and stamina,
@@ -109,10 +110,9 @@ skill-gain world modifier.
   "-30%". `tod 0.5`: "-4%". `env Clear`: no fog icon. Standing up: no fog icon. `resetenv`, `tod -1`, in the Swamp:
   a fog icon of 4-9% in its rain and dark weathers. Inside a dungeon (a Burial Chamber): no fog icon.
   *Automated: `sneak.fog`, `sneak.cover`.*
-- [ ] **T12 In the mist:** in the Mistlands mist, without a Wisplight, crouch. Expected: an "In the mist" icon without a
+- [x] **T12 In the mist:** in the Mistlands mist, without a Wisplight, crouch. Expected: an "In the mist" icon without a
   number; it goes when you stand up.
-  *Partly automated (`sneak.fog`); by hand: Real Mistlands mist: that the icon shows there without a Wisplight (the
-  test forces the mist input and never goes to the Mistlands).*
+  *Automated: `sneak.fog`, `sneak.mist-real`.*
 - [x] **T13 Recipe:** a character that never picked up Resin, Coal or Leather scraps, next to a workbench
   (`spawn piece_workbench`, unverified). `spawn Resin 2 p`, `spawn Coal 1 p`, `spawn LeatherScraps 1 p`. Expected: the
   Smoke Screen recipe appears at the workbench once all three were picked up; crafting uses 2 Resin + 1 Coal + 1
@@ -124,9 +124,9 @@ skill-gain world modifier.
   its feet; on water: on the surface); it hides until about 15 s after it lands (the smoke starts thinning a little
   before that) and is gone about 4 s later. No damage numbers, no Smoked icon or choking, the campfire keeps burning,
   no Smoke Screen dropped back; the Greydwarf 12 m away and the one that was hit stay unaware.
-  *Partly automated (`sneak.smoke-default`, `sneak.smoke-throw`, `sneak.content`); by hand: The looks: that the throw
-  looks like the Smoke Bomb's, that the cloud is grey and about 8 m wide and thins before it ends, and that no damage
-  number appears. (In round 1 no deep water was in reach: the water burst was not exercised.).*
+  *Partly automated (`sneak.smoke-default`, `sneak.smoke-throw`, `sneak.content`, `sneak.smoke-water`); by hand: Only
+  the looks: that the throw looks like the game's Smoke Bomb, that the cloud is grey and about 8 m wide to the eye and
+  thins before its end, and that no damage number shows.*
 - [x] **T15 Hidden inside:** stand in a cloud, an unaware Greydwarf 6-10 m away outside it, facing you. Expected: it
   does not notice you, even when you walk or run inside the cloud (it cannot hear you either). An "In smoke" icon
   while you are inside (crouched or standing); it goes about 1 s after you leave.
@@ -224,15 +224,14 @@ skill-gain world modifier.
   *Partly automated (`sneak.toggle`); by hand: Starting the game with Enabled = false: the Status text "Off (disabled
   in settings).", Smoke Screens saved in the inventory and in a chest still there after loading, and no error at
   start-up.*
-- [ ] **L03 Clean log:** play through T01-T26 while `./tools/Watch-Log.ps1 -Mine` runs, then quit the game from the
+- [x] **L03 Clean log:** play through T01-T26 while `./tools/Watch-Log.ps1 -Mine` runs, then quit the game from the
   world (Esc, Logout, Exit). Expected: no error and no warning from Sneak Ambush (in particular no "Could not find the
   smoke look", no "Smoke Bomb (BombSmoke) is missing" at the main menu and no recipe warning, also not while the game
   quits).
-  *Partly automated (`sneak.content`, `sneak.attack`, `sneak.xp-sources`, `sneak.still-notice`, `sneak.still-ends`,
-  `sneak.foliage`, `sneak.fog`, `sneak.smoke-default`, `sneak.smoke-burst`, `sneak.smoke-reveal`, `sneak.smoke-boss`,
-  `sneak.smoke-hunt`, `sneak.smoke-late`, `sneak.toggle`, `sneak.death`); by hand: A play-through of T01-T26 and
-  quitting the game: the log outside the test runs (start-up, main menu, quit) is not judged, apart from the start-up
-  error above.*
+  *Automated: `sneak.log-clean`, `probe.relog.MC.Combat.Sneak.Ambush`, `probe.quit.MC.Combat.Sneak.Ambush`,
+  `sneak.relog.inactive-leave`, `sneak.recipe`, `sneak.content`, `sneak.attack`, `sneak.xp-sources`,
+  `sneak.still-notice`, `sneak.still-ends`, `sneak.foliage`, `sneak.fog`, `sneak.smoke-default`, `sneak.smoke-burst`,
+  `sneak.smoke-reveal`, `sneak.smoke-boss`, `sneak.smoke-hunt`, `sneak.smoke-late`, `sneak.toggle`, `sneak.death`.*
 - [ ] **L04 Turned on mid-game:** start the game with `Enabled = false`, hit a few Greydwarfs (they fight you), then
   tick the mod on and do T20 with its setup (`resetskill Bows`, two-star Greydwarfs, so the shot does not kill).
   Expected: the Greydwarf you shoot from the smoke survives, sees you and fights you.
@@ -291,8 +290,8 @@ skill-gain world modifier.
   another player's game being blinded (alert icons off on both screens) and fighting A after his hit.*
 - [ ] **M10 Thrower teleports:** A throws a Smoke Screen, B stands inside it; A goes through a portal (or dies and
   respawns at a far bed). Expected: the cloud stays for B and still hides B until its end.
-  *Partly automated (`sneak.mp.cloud`); by hand: A real thrower going through a portal (or dying far away) while a
-  second player stands in the cloud.*
+  *Partly automated (`sneak.mp.cloud`, `sneak.mp.unload`); by hand: A second player standing in the cloud who stays
+  hidden until its end while the thrower is away.*
 - [ ] **M11 Other fights untouched:** B fights a Greydwarf in melee about 10 m from the edge of the spot where A throws
   a Smoke Screen. Expected: it keeps fighting B.
   *Partly automated (`sneak.smoke-blind`); by hand: Two real players: B fighting in melee near A's throw.*
@@ -357,9 +356,9 @@ skill-gain world modifier.
   Expected: no warning from Sneak Ambush while the world closes (no "The Smoke Screen recipe material … is not an item
   in this game", no "… is not a crafting station in this game …" and no "… has no valid material …" line); back at the
   menu the MC Mods panel shows the mod active again. The same after leaving a server that had the mod turned off.
-  *Partly automated (`sneak.content`); by hand: The real thing: log out to the main menu from a server without the
-  mod, and from one that has it turned off, and read the log for Sneak Ambush warnings; back at the menu the MC Mods
-  panel shows the mod active again.*
+  *Partly automated (`sneak.content`, `sneak.relog.inactive-leave`, `probe.relog.MC.Combat.Sneak.Ambush`); by hand:
+  The same with a real server: log out to the main menu from a server without the mod and from one that has it turned
+  off, read the log for Sneak Ambush warnings and see the MC Mods panel show the mod active again.*
 
 ## 0.1.0 — other mods
 
@@ -382,18 +381,16 @@ skill-gain world modifier.
   *Partly automated (`sneak.xp`, `sneak.smoke-reveal`); by hand: Everything with Creature Morale at boss rank 6:
   afraid creatures that see you give no backstab or XP, unseen hits pay, smoke hides you from afraid ones, routs and
   cornering.*
-- [ ] **X02 Tower Shield Wall (MC):** (= Tower Shield Wall's C08) crouch and hold still until the icon shows, then raise
+- [x] **X02 Tower Shield Wall (MC):** (= Tower Shield Wall's C08) crouch and hold still until the icon shows, then raise
   a `ShieldWoodTower`. Expected: the crouch and the Holding still icon end. A shield bash on an unaware Greydwarf:
   no backstab and no Sneak XP. From inside a Smoke Screen cloud, bash a Greydwarf. Expected: it sees you and fights
   you. NG+ variant, in a world at world level 1 (setup: Tower Shield Wall's T23): bash an unaware Greydwarf, then hit it
   with a knife. Expected: the knife hit is no sneak attack and pays no Sneak XP (the bash alerted it).
-  *Partly automated (`sneak.still-ends`, `sneak.smoke-sight`); by hand: The shield bash itself (Tower Shield Wall): no
-  backstab and no Sneak XP from a bash on an unaware Greydwarf, and the NG+ variant.*
-- [ ] **X03 Dual Wielding (MC):** (Dual Wielding's X04 checks the same from its side) with `KnifeCopper` and
+  *Automated: `sneak.still-ends`, `sneak.smoke-sight`, `sneak.x-tower`, `sneak.x-tower-ng`.*
+- [x] **X03 Dual Wielding (MC):** (Dual Wielding's X04 checks the same from its side) with `KnifeCopper` and
   `SwordIron` equipped as a pair, equip a Smoke Screen. Expected: the pair is put away and the Smoke Screen never goes
   to the off hand. Sneak attack an unaware Greydwarf with the pair. Expected: one "Sneak attack" message and XP once.
-  *Partly automated (`sneak.xp`); by hand: With Dual Wielding: equipping a Smoke Screen puts the pair away and never
-  goes to the off hand; a real paired sneak attack gives one message and XP once.*
+  *Automated: `sneak.x-dual`, `sneak.xp`, `dual.others`.*
 - [ ] **X04 Weapon Moveset (MC):** (same as Weapon Moveset's X04 (a)-(c)) jumping or rolling with a Smoke Screen
   equipped, then attacking. Expected: the plain throw. With Creature Morale off (or a character with no boss kills, or
   from behind the Greyling), a sneak roll (crouch + jump) into a roll attack on an unaware `Greyling`. Expected: a
@@ -402,16 +399,15 @@ skill-gain world modifier.
   Expected: no backstab and no XP.
 - [x] **X05 Harpoon Hooks Tames (MC):** hook a tamed Boar with `SpearChitin`. Expected: no Sneak XP, no errors.
   *Automated: `sneak.x-harpoon`.*
-- [ ] **X06 Encyclopedia (MC):** a creature you only ever saw inside the smoke (bar hidden). Expected: it is not "met"
+- [x] **X06 Encyclopedia (MC):** a creature you only ever saw inside the smoke (bar hidden). Expected: it is not "met"
   until its bar shows.
-- [ ] **X07 Forge Idol Upgrades (MC):** both installed. Expected: both load, the Forge of Potential works, the Smoke
+  *Automated: `sneak.x-encyclopedia`.*
+- [x] **X07 Forge Idol Upgrades (MC):** both installed. Expected: both load, the Forge of Potential works, the Smoke
   Screen can be crafted.
-  *Partly automated (`sneak.recipe`); by hand: That the Forge of Potential works (Forge Idol Upgrades' own self-tests
-  cover it).*
-- [ ] **X08 Crossbow Stays Loaded (MC):** sneak attack an unaware Greydwarf with `CrossbowArbalest` (bolts `BoltBone`,
+  *Automated: `sneak.recipe`, `sneak.x-forge`, `forge.tab`, `forge.cost`, `forge.success`, `forge.failure`.*
+- [x] **X08 Crossbow Stays Loaded (MC):** sneak attack an unaware Greydwarf with `CrossbowArbalest` (bolts `BoltBone`,
   unverified). Expected: Debug "Sneak attack: 3.5 Sneak XP (ranged)."; Crossbow Stays Loaded works as usual.
-  *Partly automated (`sneak.xp-sources`, `sneak.xp`); by hand: A real crossbow shot, and that Crossbow Stays Loaded
-  works as usual next to it.*
+  *Automated: `sneak.x-crossbow`, `sneak.xp-sources`, `sneak.xp`.*
 - [ ] **X09 Creature Kill and Tame Counts (MC):** A hits a Greydwarf with a Smoke Screen and B kills it. Expected: both
   get the kill (the normal game's "took part" credit, documented).
   *Partly automated (`sneak.smoke-throw`); by hand: Two players with Creature Kill and Tame Counts: A's Smoke Screen

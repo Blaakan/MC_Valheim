@@ -18,9 +18,11 @@ tests on 0.1.0: all 23 items of that version were ticked by hand in the test iss
 2026-10-07). The ticks of the items that 0.2.0 did not change are kept here (T01 to T15, M01 to M04, M07, C01); M05 and
 M06 were ticked on 0.1.0 too, and are open again because 0.2.0 changed what they check.
 
-**Automated checks (2026-10-13):** the three in-world self-tests and the multiplayer scenarios
-(`./tools/Test-Multiplayer.ps1`, dedicated server) passed on 0.2.0. An item ending in "Automated: ..." is checked in
-full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part.
+**Automated checks (2026-10-15):** 2 of 2 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
+"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
+still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`), then
 `nocost` to build without materials (it does not affect fire fuel: refuelling always takes the item).
@@ -93,9 +95,9 @@ Unless a test says otherwise, both players have the mod turned on and `AllowPlay
   switching back.
 - [ ] **M05 Dedicated server:** install on a dedicated server and on both players. Expected: the behaviour of M01 and
   of M06 to M09; the server log shows the mod loaded, no error.
-  *Partly automated (`probe.mp.refused`, `probe.mp.off.MC.Building.Lights.Switchable`); by hand: With two real
-  players on a dedicated server: M01 (one switches a torch, the other sees it) and M07 (the server's list reaches the
-  player); the server log shows the mod loaded.*
+  *Partly automated (`probe.mp.refused`, `probe.mp.off.MC.Building.Lights.Switchable`); by hand: With two real players
+  on a dedicated server: M01 (one switches a torch, the other sees it) and M07 (the server's list reaches the player);
+  the server log shows the mod loaded.*
 - [ ] **M06 Player without the mod refused:** default settings. A friend without the mod joins. Expected: about a
   second after joining (usually still in the loading screen) their game goes back to the main menu with "Incompatible
   version"; the host's log: `Refused <name> (<id>): does not have the mod. This server requires Switchable Lights on

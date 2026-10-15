@@ -14,10 +14,11 @@ right of the container panel (they stay there), and sorts tankards in Other agai
 C03 were reworded where needed and reset to `[ ]`. The smoke test and the self-tests ran on 0.1.1 on 2026-10-13 (game
 1.0.17, every MC mod loaded): all of this mod's tests passed, `sortchest.toggle` on a second run alone.
 
-**Automated checks (2026-10-13):** 24 of 24 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 24 of 24 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
+"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
+still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** use a **test character and a test world** (the console `spawn` marks items as cheated for achievements).
 Press F5 for the console → `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`), then

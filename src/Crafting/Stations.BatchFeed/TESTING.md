@@ -11,10 +11,11 @@ kept looking at it (the hint now asks the spot under the crosshair again every h
 self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): all of
 this mod's tests passed.
 
-**Automated checks (2026-10-13):** 33 of 33 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-15):** 33 of 33 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
+`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
+"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
+still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** press F5 for the console → `devcommands`, then `nocost` (every piece shows in the hammer menu and builds
 for free, no workbench needed); `god` is optional. `spawn Hammer 1 p`. Spawn items with `spawn <Name> <amount> p`

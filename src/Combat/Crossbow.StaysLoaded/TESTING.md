@@ -66,14 +66,18 @@ two-crossbow tests. Keep `./tools/Watch-Log.ps1 -Mine` open, or check `BepInEx/L
 
 - [ ] **W01 Defaults:** crossbows and the grappling hook keep their load across swaps; Dundr (StaffLightning) does
   NOT: swap away and back, it reloads and costs eitr again (vanilla).
-- [ ] **W02 Add Dundr live:** in the cfg (or MC Mods / ConfigurationManager) set `Weapons.ExtraItems` to
+- [x] **W02 Add Dundr live:** in the cfg (or MC Mods / ConfigurationManager) set `Weapons.ExtraItems` to
   `GrapplingHook, StaffLightning` while in game. Dundr now keeps its charge across swaps, no restart.
-- [ ] **W03 Exclude one crossbow:** set `Weapons.ExcludedItems = CrossbowArbalest`. The Arbalest reloads after every
+  *Automated: `crossbow.mp.extra-items`, `crossbow.mp.cfg-file`, `crossbow.extra-items`.*
+- [x] **W03 Exclude one crossbow:** set `Weapons.ExcludedItems = CrossbowArbalest`. The Arbalest reloads after every
   swap; other crossbows still keep their load. Clear it again: the Arbalest keeps its load.
-- [ ] **W04 Crossbows off:** `Weapons.Crossbows = false`: crossbows reload as vanilla, the grappling hook still keeps
+  *Automated: `crossbow.mp.excluded`, `crossbow.excluded`.*
+- [x] **W04 Crossbows off:** `Weapons.Crossbows = false`: crossbows reload as vanilla, the grappling hook still keeps
   its load. Back to `true` afterwards.
-- [ ] **W05 Debug list:** the `[reload weapon]` log lines show `keeps load (config) True` for crossbows and the
+  *Automated: `crossbow.mp.crossbows-off`, `crossbow.crossbows-off`.*
+- [x] **W05 Debug list:** the `[reload weapon]` log lines show `keeps load (config) True` for crossbows and the
   grappling hook, `False` for StaffLightning (with defaults).
+  *Automated: `crossbow.mp.debug-list`, `crossbow.debug-list`.*
 
 ## 0.1.0 — v0.2 regression (the loaded check changed: durability stamp, block/repair re-stamp)
 
@@ -92,6 +96,9 @@ Quick re-run of the draft tests that touch the new logic.
 
 - [ ] **M01 Remote visual:** a friend watches you swap back to a loaded crossbow. Expected: they see it loaded
   (bolt visible) and see you fire without a reload.
+  *Partly automated (`crossbow.mp.remote-flag`); by hand: A second player watches: he sees the bolt on your crossbow
+  right after you swap back to it, and sees you fire without a reload animation (what his game draws from the flag
+  cannot be seen from one client).*
 - [ ] **M02 Give to a modded friend:** load a crossbow, put it in a chest (or drop it), friend with the mod takes and
   equips it. Expected: loaded for them.
 - [ ] **M03 Give to a vanilla friend:** same with a friend WITHOUT the mod. Expected: they must reload (vanilla).
@@ -100,4 +107,9 @@ Quick re-run of the draft tests that touch the new logic.
   stamp is tied to durability, which drops whenever anyone fires). Also repair it yourself before equipping: you must
   still reload. (Known limit: if the friend without the mod fires AND repairs it before giving it back, it cannot be
   detected.)
-- [ ] **M05 Vanilla server:** join a server/host that does not have the mod. Expected: the mod works for you.
+  *Partly automated (`crossbow.vanilla-shot`); by hand: A real second player without the mod fires the crossbow you
+  gave him and gives it back: you must reload, also when you repair it before equipping. (The known limit, friend
+  fires and repairs it himself, is documented and not a test.) The automated test fires the shot in the same game with
+  the mod's patches removed instead of in a second game.*
+- [x] **M05 Vanilla server:** join a server/host that does not have the mod. Expected: the mod works for you.
+  *Automated: `crossbow.mp.vanilla-server`.*
