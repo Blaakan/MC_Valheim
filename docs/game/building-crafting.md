@@ -350,6 +350,7 @@ else if (idol.breakChance >= 1 - r) -> item destroyed; return ceil((GetAmount(1)
 else                                -> new item at quality q-1           ("$msg_upgrader_failed")
 resources (idols only, because of the upgrader filter) are consumed in all three cases
 ```
+* **1.0.20: the roll is no longer free.** `r` = `Player.GetItemUpgradeChance(itemPrefabName.GetStableHashCode() + targetQuality)`: a seed per character and per (item, target quality), first the player name's hash plus that number, then the next one drawn after each roll; the seeds are saved in the character (`Player.m_itemUpgradeSeeds`, `PlayerData.PostLaunch`). Reloading a save from before a refinement gives the same result again, and two characters get different sequences. The call reseeds Unity's global `Random` (`Random.InitState`). With the `upgrader` test flag (`test upgrader`) it logs the seed and the roll. A mod that rolls the refinement itself with `Random` leaves this rule (Forge Idol Upgrades 0.1.1 does, `ForgeRefine.cs`).
 * Idol cost per attempt = `Requirement.GetAmount(targetQuality)` (upgrader resources add their `m_amount` on top of the per-level scaling).
 * Duration 8 s + 1 s × target quality, reduced by the station's crafting skill.
 * The original item is removed **before** the roll; success/fail re-create it through `Inventory.AddItem` (loses `m_customData`, resets durability/crafter/world level). UI warning `$inventory_upgraderwarning` "Maximum safe quality. Refinement may break your item."

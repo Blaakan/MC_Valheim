@@ -284,6 +284,7 @@ Register RPCs in your own component's `Awake` (guard `m_nview.GetZDO() != null`)
 ### Player profile (client)
 - `PlayerProfile` (`.fch` in `characters_local/`, or cloud). It holds: stats (10 difficulty buckets × 205 `PlayerStatType`), `m_firstSpawn`, **per-world** `WorldPlayerData` keyed by world UID (spawn/logout/death/home points, map data), `m_playerID`, name, and `m_playerData`, **an opaque blob produced by `Player.Save`**.
 - `Game.SavePlayerProfile` calls `PlayerProfile.SavePlayerData(Player.m_localPlayer)`, then `Minimap.SaveMapData`, `SaveLogoutPoint` and `PlayerProfile.Save`. A server can request it from all clients (`ZNet.SaveOtherPlayerProfiles` → `SavePlayerProfile` RPC).
+- 1.0.20 (`PlayerData.PostLaunch = 34`) adds two tables at the end of `Player.Save`: `CharacterDrop.s_pseudoCounter` (per-character drop counters) and `m_itemUpgradeSeeds` (the Forge of Potential roll, see `docs/game/building-crafting.md`).
 - `Player.Save/Load` (version `PlayerData.ChunkedNorth = 33`): health/stamina/eitr, guardian power, **inventory** (`Inventory.Save`), known recipes, stations, materials, tutorials, uniques (player keys), trophies, biomes, known texts, appearance, foods, **skills** (`Skills.Save`), **`Player.m_customData`** (`Dictionary<string,string>`), and build-UI favorites.
 - **`Player.m_customData`**: persisted per **character** (across all worlds), local only (not synced to other peers or the server), and trivially editable by the user. For per-world player data, key it with the world UID. For data others must see, mirror it into the player's ZDO.
 - Custom skills are dropped on load: `Skills.Load` keeps only `Enum.IsDefined(SkillType)` values (`Skills.IsSkillValid`). Custom skills need that check patched (Jotunn's SkillManager does this).
@@ -643,6 +644,23 @@ the full trace is in [docs/design/ux-cheatedtag-remover.md](../design/ux-cheated
   `yesiuseddevcommandsbutiwantmyachievementsanyway`: that character's game ignores tags, nothing is removed).
 - **Per world:** `Achievements.IsWorldCheated` (a world-modifier key the World Modifiers GUI cannot produce).
 
+### 1.0.20: clean slate and a new object tag (checked 2026-10-15)
+Valheim 1.0.20 (network version 41) wiped every tag made before it and changed how an object's tag is stored
+(`Version` names the step `CheatCleanSlate`: World 42, Player 47; `Item.NewCheats` = 110; `PlayerData.PostLaunch` =
+34). The new helpers sit in `CheatUtils` (extension methods, `internal`, reachable through the publicized assembly):
+- **Objects:** the tag is now the ZDO int `s_cheated` **equal to 2** (`CheatUtils.IsCheated`; `SetCheated` writes 2,
+  `SetCheated(false)` / `RemoveCheated` remove the key). The old tag, a bool stored as int 1, no longer counts, so every
+  object tagged before 1.0.20 is clean for the game while `ZDO.GetBool(s_cheated)` still answers true for it. Every
+  game call that read or wrote the bool (`Character`, `Piece`, `CookingStation`, `InventoryGui.DoCrafting`,
+  `Player`, `Terminal`) uses the helpers now. Code that reads the tag must use `IsCheated()` to agree with the game.
+- **Items:** records are written with layout 110 (same bytes as 109). `ItemDrop.ItemData.Load` reads the flags bit as
+  the tag only from layout 110 on, so every item saved before 1.0.20 loads untagged. `ItemDrop.EnsureValid` (was
+  `ResetVariantIfInvalid`) and `Inventory.AddItem` tag an item again when `CheatUtils.HasCheatedProperties` (total
+  damage above 10 000).
+- So the work of [Cheated Tag Remover](../../src/UX/CheatedTag.Remover) (0.1.0, written on 1.0.17) is done by the
+  game itself once a world and a character are loaded in 1.0.20; the mod's own tag rules (bool on objects, layout
+  109 on items) no longer match the game's.
+
 ### How it spreads
 Object to items: `Piece.DropResources`, `DropOnDestroyed`, `Character.OnDeath` (drops, ragdoll),
 `InventoryGui.DoCrafting` (the **crafting station's** tag marks every item crafted at it), `Smelter.Spawn`,
@@ -696,7 +714,7 @@ line, `ItemData.GetTooltip`); nothing shows it on objects.
 
 | Constant | Value | Where |
 |---|---|---|
-| Network version | 40 (const, inlined) | `Version.c_networkVersion`, `ZNet.SendPeerInfo/RPC_PeerInfo` |
+| Network version | 41 since 1.0.20, 40 before (const, inlined) | `Version.c_networkVersion`, `ZNet.SendPeerInfo/RPC_PeerInfo` |
 | Max players | 10 (const) | `ZNet.ServerPlayerLimit` |
 | Zone size | 64 m | `ZoneSystem.m_zoneSize` |
 | ZDO sector grid | 512 × 512 zones | `ZNet.Awake` → `new ZDOMan(512)` |
@@ -709,7 +727,7 @@ line, `ItemData.GetTooltip`); nothing shows it on objects.
 | Steam send rate | 153 600 B/s | `ZSteamSocket.RegisterGlobalCallbacks` |
 | Autosave | 1800 s (+30 s warning) | `Game.m_saveInterval`, `Game.UpdateSaving` |
 | Unused-asset GC | ≥20 min / hourly | `Game.CollectResourcesCheck*` |
-| Save versions | Player 46, World 41, Item 109, PlayerData 33 | `Version` |
+| Save versions | 1.0.20: Player 47, World 42, Item 110, PlayerData 34 (1.0.17: 46, 41, 109, 33) | `Version` |
 | Localization cache | 100 entries (LRU) | `Localization.m_cache` |
 | Dedicated server ref pos | (1e6, 0, 1e6) | server `Game.FixedUpdate` |
 
