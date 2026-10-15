@@ -8,6 +8,12 @@ one marked stack marks the stacks it is merged into. On a shared server this end
 "This item was summoned through cheating means." on most items, and the game has no way to remove it. This mod removes
 the mark from the saved world, once, when you ask for it.
 
+> **Needs rework for Valheim 1.0.20.** Valheim 1.0.20 (October 2026) cleared every cheated tag made before it, on
+> objects and on items, and stores new tags in a new way. This version was written for Valheim 1.0.17: on 1.0.20 it
+> still clears the tag of objects, but its count includes old object tags the game no longer sees, and it leaves the
+> tag of items saved by 1.0.20 alone (it only knows the item format of 1.0.17). Do not rely on it until a version for
+> 1.0.20 is out.
+
 ## Features
 
 - **`cheated_clear`** removes the cheated tag from:
