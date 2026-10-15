@@ -63,6 +63,10 @@ Not done from the sheet: a skill gate (non-goal).
 - `Player.ConsumeResources(..., itemQuality: -1)` removes idols from the first stacks in list order, any quality.
 - `OnCraftPressed` at an upgrader requires `recover requirements + 1` empty slots (room for a broken item's refund).
 - Duration: 8 s + 1 s × target quality, reduced by the station's crafting skill (`UpdateRecipe`).
+- **Valheim 1.0.20:** the roll is `Player.GetItemUpgradeChance(itemPrefabName.GetStableHashCode() + targetQuality)`,
+  a seed per character and per (item, target quality) saved in the character (`m_itemUpgradeSeeds`), so a reload
+  gives the same result; the station's tag is `CheatUtils.IsCheated` (ZDO int `cheated` = 2; the bool tag of older
+  versions no longer counts). See `docs/game/building-crafting.md` and `docs/game/core-engine.md` §20.
 
 ### 1.2 Tabs, list and panel (`InventoryGui`)
 
@@ -206,8 +210,9 @@ name.
 - `OnCraftPressed` prefix: when an idol is held (or no-cost) and OnFailure is LoseLevels, start the timer without the
   vanilla free-slot rule (decision 5); with Destroy, vanilla's press (and its free-slot rule) runs.
 - `DoCrafting` prefix (Priority.Last, skipped when `__runOriginal` is already false: another mod took over): replaces
-  the vanilla upgrader branch. Same guards (item present, DLC), roll with `Random.Range(0, 1)`, success when
-  `chance >= roll` (vanilla comparison):
+  the vanilla upgrader branch. Same guards (item present, DLC), roll with the game's own seeded roll
+  (`Player.GetItemUpgradeChance`, same number as vanilla; decision 17), success when `chance >= roll` (vanilla
+  comparison):
   - success: `Remake` at quality + 1: what vanilla's `Inventory.AddItem` re-creation gives (taken off, full
     durability, the refiner as crafter, current world level, cheated mark from inputs or station) but on the same
     item object, so other mods' custom data survives (decision 2); vanilla `$msg_upgrader_success`;
@@ -441,6 +446,13 @@ restores the vanilla tab look, so the next station does not show both vanilla ta
     happens in the Idols tab, every other idol tooltip ends with that line or with "Maximum level.", and the Idols tab
     keeps its own sentence in that case ("Cost: this idol."). The alternative, no line at all, would hide the Idols
     tab from the tooltip exactly when the upgrade is free.
+17. **The roll and the station tag go the game's way since Valheim 1.0.20** (0.2.0, user decision 2026-10-15). 1.0.20
+    made the vanilla refinement roll a sequence per character and per item and level, saved with the character, so
+    a reload gives the same result; the mod's own `Random.Range` roll left that rule (a refinement could be retried
+    by reloading). The mod now calls `Player.GetItemUpgradeChance` with the number vanilla uses (item prefab name hash
+    + target level) and compares it with its own chance; `TestRoll` (Debug) still forces it. The station's tag is read
+    with the game's `CheatUtils.IsCheated` (`ForgeRefine.StationCheated`, used by refinements and idol upgrades): a
+    Forge tagged by an older version no longer marks what is made there. The mod needs 1.0.20 or later from 0.2.0 on.
 
 ### Added beyond the request
 

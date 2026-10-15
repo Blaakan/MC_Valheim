@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+- For Valheim 1.0.20: the refinement roll follows the game's new rule. Valheim 1.0.20 rolls a refinement from a
+  sequence kept per character and per item and level, saved with the character, so reloading a save gives the same
+  result again. The mod now uses that same roll (before, it rolled its own random number, which a reload changed).
+  The chances themselves are unchanged.
+- For Valheim 1.0.20: a Forge of Potential counts as "cheated" by the game's new rule. Valheim 1.0.20 cleared the
+  cheated tag of everything made before it; a Forge tagged by an older version no longer marks what you refine or
+  upgrade there as cheated (before, the mod still read the old tag).
+- Needs Valheim 1.0.20 or later.
+
 ## 0.1.1
 
 - Fixed a false warning, "Unknown item name(s) in the idol settings, ignored: ...", that listed every default item. It

@@ -5,6 +5,8 @@ refinement odds, from 35% for a plain idol to 95% for a 3-star idol, and by defa
 level instead of destroying your weapon or armor. High-level items need higher-tier idols, so an early item can no
 longer climb forever on cheap idols.
 
+**Needs Valheim 1.0.20 or later** (version 0.2.0 uses the refinement roll the game added in 1.0.20).
+
 ## Features
 
 - **Idols have levels.** Every Battle and Protection idol can be upgraded 3 times: plain, 1 star, 2 stars, 3 stars.
@@ -147,6 +149,11 @@ stars and its Forge cannot spend a starred idol on its own.
   without the mod, a Forge cannot spend a starred idol on its own.
 - **The refinement chance is rolled when the timer ends**, like in vanilla. Closing the window during the timer
   cancels the attempt and uses nothing.
+- **The roll is the game's own (Valheim 1.0.20 and later).** The game keeps the sequence of refinement rolls per
+  character and per item and level, and saves it with the character: reloading a save from before a refinement gives
+  the same result again. The mod uses that same roll with its own chances, so this holds with the mod too.
+- **The cheated tag follows the game's rule.** Something refined or upgraded at a Forge that the game counts as
+  cheated is marked cheated, as in vanilla. Since Valheim 1.0.20 a Forge tagged by an older version no longer counts.
 - Idol upgrades don't raise a skill; refinements raise Crafting as in vanilla.
 
 ## Installation

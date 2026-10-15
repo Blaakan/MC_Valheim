@@ -149,6 +149,9 @@ internal static partial class SelfTests
         Test(TimerLossName, RunTimerLoss),
         Test(BadMaterialName, RunBadMaterial),
         Test(ZeroCostName, RunZeroCost),
+        // SelfTests.Roll.cs (0.2.0, Valheim 1.0.20 rules)
+        Test(SeededName, RunSeeded),
+        Test(StationTagName, RunStationTag),
         // SelfTests.Inventory.cs
         Test(IconRowsName, RunIconRows),
         Test(GridName, RunGrid),

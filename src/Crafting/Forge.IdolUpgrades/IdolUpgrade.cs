@@ -138,10 +138,8 @@ internal static class IdolUpgrade
                 cheated |= inventory.ItemCheated(name);
             }
         }
-        // Vanilla also mark anything made at a cheated station (built with no-cost).
-        var station = player.GetCurrentCraftingStation();
-        var stationView = station != null ? station.GetComponent<ZNetView>() : null;
-        cheated |= stationView != null && stationView.GetZDO() != null && stationView.GetZDO().GetBool(ZDOVars.s_cheated);
+        // Vanilla also mark anything made at a cheated station (built with no-cost), by its 1.0.20 rule.
+        cheated |= ForgeRefine.StationCheated(player.GetCurrentCraftingStation());
         cheated &= !PlayerProfile.s_bypassCheatChecks;
         if (!Free())
         {

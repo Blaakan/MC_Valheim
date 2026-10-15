@@ -1,6 +1,7 @@
 #if DEBUG
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using MC.Shared;
 using TMPro;
@@ -65,8 +66,10 @@ internal static partial class SelfTests
         return item;
     }
 
-    // Mod off: one vanilla refinement of this item with a roll me know. Me seed Unity random so its next number
-    // (vanilla DoCrafting roll = its first random call for an item that no stack) lie in [low, high].
+    // Mod off: one vanilla refinement of this item with a roll me know. Valheim 1.0.20 vanilla roll =
+    // Player.GetItemUpgradeChance(recipe item prefab hash + target level): InitState(character's seed for that
+    // number), then Random.value. Me find a seed whose first value lie in [low, high] and give it to the character for
+    // that number; character's seeds put back after (the probe character keep nothing of the test).
     private static IEnumerator VanillaRoll(Rig rig, ItemDrop.ItemData item, float low, float high)
     {
         yield return rig.Select(item);
@@ -78,7 +81,7 @@ internal static partial class SelfTests
             for (var s = 1; s < 20000 && seed < 0; s++)
             {
                 UnityEngine.Random.InitState(s);
-                var roll = UnityEngine.Random.Range(0f, 1f);
+                var roll = UnityEngine.Random.value;
                 if (roll >= low && roll <= high)
                 {
                     seed = s;
@@ -100,16 +103,28 @@ internal static partial class SelfTests
             rig.C.Check(false, $"the vanilla press did not start the timer (message '{rig.Center}')");
             yield break;
         }
+        // Press set m_craftRecipe and m_craftUpgradeItem: only now me know the number DoCrafting roll for (first try
+        // read them before the press and gave the seed to a wrong number).
+        var player = rig.P;
+        var seedsBefore = new Dictionary<int, int>(player.m_itemUpgradeSeeds);
+        if (gui.m_craftRecipe == null || gui.m_craftUpgradeItem == null)
+        {
+            gui.m_craftTimer = -1f;
+            rig.C.Check(false, "the vanilla press picked no recipe or no item to refine");
+            yield break;
+        }
+        var hash = gui.m_craftRecipe.m_item.gameObject.name.GetStableHashCode() + gui.m_craftUpgradeItem.m_quality + 1;
         saved = UnityEngine.Random.state;
         try
         {
-            UnityEngine.Random.InitState(seed);
+            player.m_itemUpgradeSeeds[hash] = seed;
             gui.DoCrafting(rig.P);
         }
         finally
         {
             UnityEngine.Random.state = saved;
             gui.m_craftTimer = -1f;
+            PutSeedsBack(player, seedsBefore);
         }
         yield return null;
     }

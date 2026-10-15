@@ -2,7 +2,7 @@
   <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
   <PropertyGroup>
     <ModName>Forge Idol Upgrades</ModName>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
     <ModScope>QoL</ModScope>
     <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). Also cover part of "Boss summon
          revamp" (boss trophies get a use); backlog link only the first idea. -->

@@ -8,12 +8,43 @@ namespace MC.Crafting.ForgeIdolUpgradesMod;
 // 1.0.16), and the idol spent in both cases. Me: chance from the level of the idol actually spent; success = item
 // one level up; failure = item loses LevelsLost levels (default 1, never below 1) or is destroyed like vanilla
 // (setting OnFailure). Idol always spent.
+// Roll and station tag go the game's way since Valheim 1.0.20: roll = Player.GetItemUpgradeChance (seed per character
+// and per item and target level, saved in the character: reload give same result), tag = CheatUtils.IsCheated.
 internal static class ForgeRefine
 {
 #if DEBUG
-    // Self test force the roll (0..1) instead of Unity random. Null = normal.
+    // Self test force the roll (0..1) instead of the game's roll. Null = normal.
     internal static float? TestRoll;
+
+    // Self test read what the game's roll gave the last refinement (null = TestRoll was used, or none yet).
+    internal static float? LastGameRoll;
 #endif
+
+    // Tag of the station a thing is made at, by the game's own rule since Valheim 1.0.20: ZDO int "cheated" = 2
+    // (CheatUtils.IsCheated). The bool tag of older games (stored as 1) no longer count, for the game and for me.
+    internal static bool StationCheated(CraftingStation station)
+    {
+        var view = station != null ? station.GetComponent<ZNetView>() : null;
+        var zdo = view != null ? view.GetZDO() : null;
+        return zdo != null && zdo.IsCheated();
+    }
+
+    // Same roll as vanilla InventoryGui.DoCrafting: item prefab name hash + target level, through the player's seeds.
+    private static float Roll(Player player, Recipe recipe, int quality)
+    {
+#if DEBUG
+        if (TestRoll.HasValue)
+        {
+            LastGameRoll = null;
+            return TestRoll.Value;
+        }
+        var game = player.GetItemUpgradeChance(recipe.m_item.gameObject.name.GetStableHashCode() + quality);
+        LastGameRoll = game;
+        return game;
+#else
+        return player.GetItemUpgradeChance(recipe.m_item.gameObject.name.GetStableHashCode() + quality);
+#endif
+    }
 
     internal struct Plan
     {
@@ -104,15 +135,8 @@ internal static class ForgeRefine
             }
         }
         var cheated = cheatedInputs || player.NoCostCheat();
-        var stationView = station != null ? station.GetComponent<ZNetView>() : null;
-        var stationCheated = stationView != null && stationView.GetZDO() != null && stationView.GetZDO().GetBool(ZDOVars.s_cheated);
-        var roll = Random.Range(0f, 1f);
-#if DEBUG
-        if (TestRoll.HasValue)
-        {
-            roll = TestRoll.Value;
-        }
-#endif
+        var stationCheated = StationCheated(station);
+        var roll = Roll(player, recipe, quality);
         var success = plan.Chance >= roll;
         var name = item.m_shared.m_name;
         var rules = ServerRules.Current;

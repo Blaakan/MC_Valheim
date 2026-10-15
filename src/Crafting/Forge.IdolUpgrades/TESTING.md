@@ -4,11 +4,12 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
-Mods panel). Smoke test (`./tools/Test-Smoke.ps1`) passed 2026-09-30: loads, patches cleanly, JitCheck clean (494
-methods, 0 failures). Automated in-world self-tests (`./tools/Test-InWorld.ps1 -Mod Forge.IdolUpgrades`) pass:
-`forge.catalog`, `forge.icons`, `forge.tooltip`, `forge.popup`, `forge.idols` (includes what turning the mod off does to a running
-idol upgrade), `forge.refine`, `forge.tiers` (the idol tier rule against the ForgeUpgradeChart of the idea sheet, and a
+**Build under test:** 0.2.0, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+Mods panel). The 0.2.0 paragraph below says what changed and what ran on it. First smoke test
+(`./tools/Test-Smoke.ps1`) passed 2026-09-30: loads, patches cleanly, JitCheck clean (494 methods, 0 failures).
+Automated in-world self-tests (`./tools/Test-InWorld.ps1 -Mod Forge.IdolUpgrades`) pass: `forge.catalog`,
+`forge.icons`, `forge.tooltip`, `forge.popup`, `forge.idols` (includes what turning the mod off does to a running idol
+upgrade), `forge.refine`, `forge.tiers` (the idol tier rule against the ForgeUpgradeChart of the idea sheet, and a
 level 6 Stone axe that asks for and spends a Bronze idol at the Forge). No hands-on in-game test yet.
 
 **0.1.1 (2026-10-08):** fixes the false "Unknown item name(s)" warning that listed every default item at the main menu
@@ -32,10 +33,21 @@ back in `forge.tooltip.zero-cost` and `forge.icons.empty-copy`; no `forge.bug.*`
 all 0.1.1 fixes together on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): all
 of this mod's tests passed.
 
-**Automated checks (2026-10-13):** 54 of 54 self-tests mapped to this list passed (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1`) on the working tree of commit `eb633be`. An item ending in "Automated: ..." is checked
-in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**0.2.0 (2026-10-15, for Valheim 1.0.20):** the refinement roll is the game's own seeded roll
+(`Player.GetItemUpgradeChance`, the same result after reloading a save) and a Forge's cheated tag is read by the
+game's new rule, so a Forge tagged by an older version no longer marks what is refined there (T30 and T31, new;
+self-tests `forge.refine.seeded` and `forge.refine.station-tag`). On Valheim 1.0.20, 2026-10-15: smoke test passed
+(every MC mod loads, patches and passes JitCheck); in-world self-tests: all 46 of this mod's tests and the 2 Cultivator
+Replant tests at the Forge passed, and so did the Forge tests of five other MC mods (`tower.x.forge`, `dual.x.forge`,
+`replant.x.idol`, `replant.x.idol-refine`, `csearch.potential`, `sneak.x-forge`). The multiplayer self-tests have not
+run on 0.2.0 yet: the dedicated server copy still runs 1.0.17, which refuses a 1.0.20 game.
+
+**Automated checks (2026-10-15):** 49 of 49 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
+tree of commit `9afc663`; 7 more named here have no result on that code yet (not run since their test or the mod
+changed, parked, or only in a later run). An item ending in "Automated: ..." is checked in full by the named
+self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated
+test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). Find a
 Forge of Potential (Mountains location), or place one with `spawn UpgradeStation` (it is big: step back so you are
@@ -202,14 +214,27 @@ the idol and refinement tests: it makes everything free.
   at once, and so is the IDOLS tab (no need to close and reopen the Forge); the UPGRADE tab stays selected, with the
   same item.
   *Automated: `forge.on.at-forge`.*
-- [ ] **T29 No false "Unknown item name(s)" warning:** with the default settings, start the game while
+- [ ] **T30 Same result after a reload (Valheim 1.0.20):** at the Forge, refine an item (Stone axe at level 3 with
+  plain `Upgrader0Weapon`) and note the result and the log line "Refinement of AxeStone to level 4 ... (35% chance,
+  roll R)". Quit the game at once with Alt+F4 (no log out, so the character is not saved), start again, load the same
+  character and world, and refine the same axe at the same level again. Expected: the same roll R and the same result.
+  On a second character the rolls are different.
+  *Partly automated (`forge.refine.seeded`); by hand: The real reload (quit with Alt+F4 after the refinement, load the
+  same character and world, refine again: the same roll in the log line), and a second character that rolls
+  differently (the test gives the character's seeds back as saved instead of reloading).*
+- [ ] **T31 Old cheated tag on a Forge (Valheim 1.0.20):** a Forge of Potential built in a world played with Valheim
+  1.0.17 or older with `devcommands` and no cost (`nocost`), so the old game tagged it. Refine an axe there in
+  1.0.20. Expected: the axe is not marked cheated (no grey tooltip line). A Forge built with `nocost` in 1.0.20: the
+  refined axe is marked cheated, as in vanilla.
+  *Partly automated (`forge.refine.station-tag`); by hand: A Forge really tagged by Valheim 1.0.17 or older (built
+  with nocost in an old world) and one built with nocost in 1.0.20 (the test writes the two tag values on a Forge
+  itself).*
+- [x] **T29 No false "Unknown item name(s)" warning:** with the default settings, start the game while
   `./tools/Watch-Log.ps1 -Mine` runs, load a world, then log out to the main menu. Expected: the log never shows an
   "Unknown item name(s) in the idol settings, ignored: ..." warning that lists items the game has (`Upgrader0Weapon`,
   `Wood`, `TrophyDeer`, ...), neither at the start nor back at the main menu. The self-test `forge.cleanlog` checks
   the part from the start of the game to the end of the tests; the return to the main menu needs a look at the log.
-  *Partly automated (`forge.cleanlog`, `forge.catalog`); by hand: Load a world, log out to the main menu and read the
-  log: no 'Unknown item name(s)' warning listing the default items may appear there (the automated single-player run
-  never goes back to the menu).*
+  *Automated: `forge.cleanlog`, `forge.catalog`, `probe.relog.MC.Crafting.Forge.IdolUpgrades`.*
 
 ## 0.1.0 — multiplayer (needs a second player)
 

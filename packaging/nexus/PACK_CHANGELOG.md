@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2
+
+- Forge Idol Upgrades 0.2.0, for Valheim 1.0.20: the refinement roll is the game's own (the same result after
+  reloading a save, as in vanilla 1.0.20), and a Forge tagged as cheated by an older version no longer marks what you
+  refine there. Needs Valheim 1.0.20.
+
 ## 0.4.1
 
 Fixes for the problems the automated in-game tests found on 2026-10-08 (none of these versions is released).
