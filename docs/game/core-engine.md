@@ -131,6 +131,17 @@ decision reduces to three questions:
 
 **Why both ObjectDB hooks:** the main-scene `ObjectDB` is a fresh scene object every session. The menu one is built by `CopyOtherDB` from a prefab. Character loading (`Player.Load` → `Inventory.Load` → `Inventory.AddItem(int prefabHash, …)`) resolves items through `ObjectDB.instance`. **An item whose prefab is not registered at load time is silently dropped (`Failed to find item prefab`) and disappears at the next save.** The same happens in container ZDOs when a client without the mod opens them and saves.
 
+**When content libraries register** (decompiled Warfare 1.9.4 and Jotunn 2.30.2, 2026-10-16; how MC mods deal with
+it: `docs/modding/framework.md`, "Third-party content"):
+
+| Library | Items, recipes | Item data edits | Pieces | Creature spawns |
+|---|---|---|---|---|
+| blaxxun ItemManager (Warfare, Therzie mods) | `ObjectDB.Awake` **prefix** and `CopyOtherDB` **postfix**, method priority 700, then `UpdateRegisters`; prefabs in a `ZNetScene.Awake` prefix | server-synced recipe config edits the `Recipe` objects in place (enabled, station, resources) | PieceManager, same pattern | CreatureManager |
+| Jotunn | `ObjectDB.Awake` prefix (`CopyOtherDB` prefix priority -100) | mods edit in `ItemManager.OnItemsRegistered` = `ObjectDB.Awake` postfix **priority 0** | `ObjectDB.Awake` postfix priority 200; custom build categories added when a tool is equipped | `SpawnSystemList` on an inactive object, added to each `SpawnSystem` in a `SpawnSystem.Awake` prefix (not on the zone controller prefab) |
+
+At the main menu, the first `ObjectDB.Awake` with ItemManager mods holds only those mods' items (no vanilla `Wood`).
+A postfix at `Priority.Low` (200) or higher reads item data before Jotunn mods' edits; priority -500 reads after.
+
 ### Data & persistence
 - Registries are rebuilt each session, but **prefab assets are shared and live across sessions**. Mutations to vanilla prefabs, such as `m_shared` fields, `PieceTable.m_pieces` or recipe lists on prefabs, are not undone on logout. Every registration must be **idempotent** (check `Contains`/`HasPrefab` first).
 

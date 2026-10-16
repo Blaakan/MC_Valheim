@@ -115,6 +115,48 @@ the feature stays off for the session with an error status.
 
 Uninstalling a mod that adds items still removes those items from inventories: say so in the mod's README.
 
+## Third-party content
+
+Players install content mods (Warfare, Monstrum, RtD, Jotunn packs) next to MC mods. An MC mod that acts on a kind of
+thing (tower shields, reload weapons, lights, wild plants, creatures, trophies) must pick up the ones those mods add,
+the way the Encyclopedia lists Warfare's recipes and drops without being told about them. The audit of every mod
+(`docs/research/third-party-content-audit.md`) lists where each one stands.
+
+Rules:
+
+- **Detect by game data, never by a table of vanilla names.** Decide from the thing's own data: components
+  (`Fireplace`, `Pickable`, `Humanoid`), item type, pose, skill, flags (`m_requiresReload`), stats (parry bonus),
+  spawn entries, recipes. Name lists in the settings stay as overrides: an add list (with per-item values, like
+  Tower Shield Wall's bash damage) and an exclude list that wins. Check the rule against the vanilla data (a runtime
+  dump) so today's vanilla set stays the same, and say in the design doc which vanilla item would change.
+- **Read data late.** Content libraries register in different places: blaxxun ItemManager (Warfare) adds items in an
+  `ObjectDB.Awake` prefix; Jotunn adds them there too, but Jotunn mods edit item data in `OnItemsRegistered`, an
+  `ObjectDB.Awake` postfix at priority 0, and add pieces in a postfix at priority 200; Jotunn creatures' spawn
+  entries live in a `SpawnSystemList` injected into each `SpawnSystem` instance (read `SpawnSystem.m_instances`, not
+  only the zone controller prefab). A postfix that reads item data runs after all of these (Tower Shield Wall uses
+  priority -500), or the list is built lazily in the world.
+- **Rebuild when content changes.** Server-synced item editors add items after the player joins. Keep the
+  `ContentPrint` (`src/Shared/ContentPrint.cs`: ObjectDB and ZNetScene objects plus item, recipe and prefab counts) a
+  list was built from and build again when `ContentPrint.Now()` differs; it is five field reads, fine once per frame.
+  It does not see in-place edits that keep every count.
+- **Copies only creatures carry are not player content.** A rule that picks items should leave out items that a
+  creature prefab carries (`Humanoid` default and random gear) and no recipe makes, like `FW_ShieldBlackmetalTower`.
+
+Testing: `tests/Probes/Core.Probe.Content` is a stand-in content mod that the in-world and multiplayer scripts deploy
+on every side. Its prefabs are clones of vanilla prefabs under names that start with `MCProbeTP_`
+(`src/Shared/SelfTestContent.cs` lists them for the mods' tests), each registered the way a real library does it:
+the ItemManager way (`ObjectDB.Awake` prefix, `CopyOtherDB` postfix), the Jotunn way (data edited in the priority-0
+postfix), the Jotunn piece way (priority-200 postfix), the Jotunn creature way (a spawn list put in each `SpawnSystem`
+in its `Awake` prefix) and after the world loaded (a few seconds after the player spawned, like a server sync). The
+kit holds tower and round shields, a plain sword, a sword with its own attack animation name, a reload weapon and an
+axe on a custom skill (made the way SkillManager makes skills), a trophy, a creature that drops it with a Meadows spawn
+entry that never spawns (it needs a global key nobody sets) and a torch in the Hammer's table; add what a mod's test
+needs. Its own test `probe.content` always runs and proves the content is in the game (item
+database, prefab list, recipe, data as wanted, a copy made by name points back at the clone). A mod's
+`<prefix>.thirdparty` test checks it treats each stand-in like the vanilla thing it copies, and that a control
+(a stand-in that must not qualify) stays out; when a real content mod is installed (Warfare), the same test also
+checks its real items and notes when it is not installed. `probe.content` notes which real content mods are present.
+
 ## Dependencies
 
 A mod declares the MC mods it needs in its csproj (`<ModRequires>MC.Core.Magic</ModRequires>`). The build turns that

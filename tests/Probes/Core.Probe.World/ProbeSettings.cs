@@ -96,6 +96,8 @@ internal static class ProbeSettings
         .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).Where(s => s.Length > 0).ToArray();
 
     // Me run test when no filter, or name hold one filter piece (case ignored).
+    internal const string ContentTest = "probe.content";
+
     internal static bool Wanted(string testName)
     {
         // Parked test: only when asked for by its whole name.
@@ -110,7 +112,8 @@ internal static class ProbeSettings
             }
             return false;
         }
-        if (Filters.Length == 0)
+        // Stand-in content check (tests/Probes/Core.Probe.Content) always run: mods' third-party tests need its content.
+        if (Filters.Length == 0 || string.Equals(testName, ContentTest, StringComparison.Ordinal))
         {
             return true;
         }

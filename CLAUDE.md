@@ -33,12 +33,13 @@ Directory.Build.props     shared build rules, game refs, mod identity from proje
 Directory.Build.targets   metadata checks, ModInfo.g.cs generation, deploy to game
 Local.props               machine-only (ValheimDir); written by tools/Setup.ps1; git-ignored
 ValheimMods.slnx          solution (solution folders = categories)
-src/Shared/               compiled into every mod as internal code: Log, JitCheck, ItemDataExtensions, ItemKinds
+src/Shared/               compiled into every mod as internal code: Log, JitCheck, ItemDataExtensions, ItemKinds, ContentPrint
 src/Shared/Framework/     mod framework: ModPlugin life cycle, FeatureRegistry, NetworkGate, FeaturePanel (see docs/modding/framework.md)
 src/Shared/TESTING.md     in-game tests for the framework
 src/<Category>/<System>.<Feature>/   one mod = one project = one DLL = one Thunderstore package (+ TESTING.md)
 templates/Mod/            template used by tools/New-Mod.ps1
-tests/Probes/             throwaway probe mods for tools/Test-Framework.ps1, Test-InWorld.ps1, Test-Multiplayer.ps1 (never shipped)
+tests/Probes/             throwaway probe mods for tools/Test-Framework.ps1, Test-InWorld.ps1, Test-Multiplayer.ps1 (never shipped;
+                          Core.Probe.Content = stand-in third-party content mod)
 tools/                    PowerShell workflow scripts (see Commands)
 docs/backlog.md           GENERATED idea backlog (tools/Update-Backlog.ps1): feasibility, who needs it, existing mods
 docs/game/                game-systems knowledge base per category + core-engine.md (read before designing)
@@ -99,6 +100,14 @@ There are no unit tests: code runs inside Unity. Verification = build + `Test-Sm
 when `src/Shared` changes) (+ `Test-InWorld.ps1` when a mod has self-tests) (+ `Test-Multiplayer.ps1` for Both
 mods and multiplayer tests) + in-game tests.
 
+**A change to one mod tests that mod, never all mods** (user rule, 2026-10-16). `-Only` lists: the mod's own tests
+(`<prefix>.`, e.g. `tower.`), every self-test named in its `TESTING.md` / GitHub issue automation notes (probe tests
+too, such as `probe.mp.off.<GUID>`), and the related mods' tests that exercise it (other mods' `SelfTests*.cs` that
+name its GUID or items: for Tower Shield Wall `morale.x.tower-bash`, `sneak.x-tower`, `trinkets.block-fight`,
+`dual.others`, `moveset.x.towershield`, `spyglass.compat.towershield`). In-world: `Test-InWorld.ps1 -Mod
+<System.Feature> -Only '<list>'`; multiplayer: `Test-Multiplayer.ps1 -Only '<list>'`. A run without `-Only` runs
+every deployed mod's tests (~900 tests, about 3 hours): only when the user asks for a full run.
+
 - Staged tests and real input (same script, after the normal tests): `SelfTest.RegisterRelog` runs a test through a
   real log out to the main menu and load of the same world; `SelfTest.RegisterDisabledStart` runs one through a second
   game that the script starts with every MC mod `Enabled = false`; `SelfTest.Key` / `Pad` / `MouseWheel` press real
@@ -110,7 +119,8 @@ mods and multiplayer tests) + in-game tests.
   `docs/modding/framework.md`, "In-world self-tests"). Like the smoke test it launches the game (close it first)
   and takes ~1-2 min plus the tests. Every deployed mod's tests run unless `-Only` filters them; the run fails when
   no mod test ran, or when `-Mod` / `-Only` picked tests that did not run (it says why). It puts
-  `BepInEx/config/MC.*.cfg` back as before the run, also after Ctrl+C or a timeout.
+  `BepInEx/config/MC.*.cfg` back as before the run, also after Ctrl+C or a timeout. Both scripts also deploy the
+  stand-in third-party content mod (`tests/Probes/Core.Probe.Content`); its check `probe.content` always runs.
 - Multiplayer self-tests: a mod registers client tests with `SelfTest.RegisterMultiplayer(name, scenario, run)` and
   their server halves with `SelfTest.RegisterServerStep` (called from the client test with `SelfTest.CallServer`);
   `./tools/Test-Multiplayer.ps1` runs them with a real dedicated server (`docs/modding/framework.md`, "Multiplayer
@@ -246,6 +256,13 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   on `UnityEngine.Object` (use `== null`).
 - Multiplayer: know who runs the code — `Player.m_localPlayer`, `m_nview.IsOwner()`, `ZNet.instance.IsServer()`.
   Client-side mods only change the local player's own state.
+- **Third-party content is picked up automatically** (user rule, 2026-10-16): a mod that acts on a kind of thing
+  (shields, reload weapons, lights, plants, creatures, trophies) detects it by its game data, never by a table of
+  vanilla names; name lists in the settings are add/exclude overrides. Read item data after every other
+  `ObjectDB.Awake` postfix (Jotunn mods edit items at priority 0), rebuild when `ContentPrint` changes (late items),
+  read spawn entries from `SpawnSystem.m_instances` too, and leave out creature-only copies. Each such mod has a
+  `<prefix>.thirdparty` self-test on the stand-in content (`SelfTestContent`) and on Warfare when installed
+  (`docs/modding/framework.md`, "Third-party content"; where each mod stands: `docs/research/third-party-content-audit.md`).
 - Per-item state: `ItemData.m_customData` through `MC.Shared.ItemDataExtensions`, key `"{ModInfo.Guid}.<Name>"`.
 - Config: BepInEx `ConfigEntry`; section `General` with `Enabled` first; descriptions are user-facing English.
 - `src/Shared` stays tiny and generic. Features that several mods must share at runtime go in a `Core` mod that

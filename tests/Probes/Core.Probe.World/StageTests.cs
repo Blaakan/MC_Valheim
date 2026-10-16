@@ -24,7 +24,7 @@ namespace MC.Core.ProbeWorldMod;
 // start the game again on the same saves (MC_INWORLD_STAGE=disabled). Second game:
 //   probe.baseline, probe.disabled.<GUID> (mod is off with the "disabled in settings" status, its log is clean since
 //   game start), then every registered check part.
-// Filter (-Only) pick these like any test; probe.baseline and probe.runner are the only ones that always run.
+// Filter (-Only) pick these like any test; probe.baseline, probe.runner and probe.content (stand-in content) always run.
 internal static class StageTests
 {
     internal const string Input = "probe.input";

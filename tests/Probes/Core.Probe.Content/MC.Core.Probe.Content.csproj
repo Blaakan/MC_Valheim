@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Me = stand-in third-party content mod for tools/Test-InWorld.ps1 and tools/Test-Multiplayer.ps1 (Debug build).
+    Never shipped: lives outside src/, scripts deploy me before a run and remove me after. Idle unless a test run
+    env var is set (MC_INWORLD_DIR or MC_MP_SERVER_DIR). Then me add made-up modded items, pieces and creatures the
+    way real content libraries do (blaxxun ItemManager, Jotunn, server-synced item editors), so self tests check that
+    MC mods pick up third-party content. Both: server and client need same items, like a real content mod.
+  -->
+  <PropertyGroup>
+    <ModName>Probe Content</ModName>
+    <Version>0.1.0</Version>
+    <ModScope>New</ModScope>
+    <ModSide>Both</ModSide>
+    <ModMultiplayer>Compatible</ModMultiplayer>
+    <ModMultiplayerNotes>Test tool: adds stand-in third-party items on the test server and the test client of tools/Test-Multiplayer.ps1.</ModMultiplayerNotes>
+    <ModDescription>Stand-in third-party content mod for MC self tests. Does nothing unless tools/Test-InWorld.ps1 or tools/Test-Multiplayer.ps1 launched the game.</ModDescription>
+  </PropertyGroup>
+</Project>

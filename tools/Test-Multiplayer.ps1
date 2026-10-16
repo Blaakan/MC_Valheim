@@ -147,6 +147,12 @@ else {
 if ($LASTEXITCODE -ne 0) { Write-Fail 'build failed: world probe'; exit 1 }
 & dotnet build (Join-Path $root 'tests\Probes\Core.Probe.Server\MC.Core.Probe.Server.csproj') -c Debug -nologo -v q -p:DeployToGame=true "-p:DeployBepInExDir=$stage\server-probe\BepInEx\"
 if ($LASTEXITCODE -ne 0) { Write-Fail 'build failed: server probe'; exit 1 }
+# Me put stand-in third-party content mod (tests/Probes/Core.Probe.Content) on both sides, like a real content mod
+# every player and the server have. New-Tree copy each probe stage into its tree.
+foreach ($side in @('client-probe', 'server-probe')) {
+    & dotnet build (Join-Path $root 'tests\Probes\Core.Probe.Content\MC.Core.Probe.Content.csproj') -c Debug -nologo -v q -p:DeployToGame=true "-p:DeployBepInExDir=$stage\$side\BepInEx\"
+    if ($LASTEXITCODE -ne 0) { Write-Fail "build failed: stand-in content mod ($side)"; exit 1 }
+}
 $modPlugins = Join-Path $stage "mods\BepInEx\plugins\$collection"
 if (-not (Test-Path $modPlugins)) { Write-Fail "no mods built into $modPlugins"; exit 1 }
 Write-Ok 'built'
@@ -164,7 +170,7 @@ foreach ($p in Get-ModProjects) {
 }
 $installOnly = @($refusing | Where-Object { -not $_.Live })
 if ($installOnly.Count) { Write-Warn2 "older player check (a player who turns the mod off is NOT refused, only one without the mod): $(($installOnly | ForEach-Object { $_.Name }) -join ', ')" }
-$modNames = @(Get-ModProjects | ForEach-Object { Get-CsprojProp $_.FullName 'ModName' } | Where-Object { $_ }) + 'Probe World', 'Probe Server'
+$modNames = @(Get-ModProjects | ForEach-Object { Get-CsprojProp $_.FullName 'ModName' } | Where-Object { $_ }) + 'Probe World', 'Probe Server', 'Probe Content'
 $ourRegex = (@("\b$author\.", 'HarmonyLib', 'HarmonyX', 'Chainloader') + ($modNames | ForEach-Object { [regex]::Escape($_) })) -join '|'
 
 # BepInEx folder of one side: core + BepInEx.cfg from your game (read only), MC mods (or not), one probe.

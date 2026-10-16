@@ -69,7 +69,14 @@ $parked = @(Get-ParkedSelfTests)
 $cfgDir = Join-Path $game 'BepInEx\config'
 $cfgPattern = "$(Get-ModAuthor).*.cfg"
 $probeCfgName = "$probeGuid.cfg"
-$probeTests = @('probe.baseline', 'probe.runner')
+# Me also deploy stand-in third-party content mod (tests/Probes/Core.Probe.Content): mod self tests check they pick up
+# modded items. Its cfg is made by the game during the run: skip it in config backup and restore like the probe cfg.
+$contentGuid = 'MC.Core.Probe.Content'
+$contentProj = Join-Path $root "tests\Probes\Core.Probe.Content\$contentGuid.csproj"
+$contentCfg = Join-Path $game "BepInEx\config\$contentGuid.cfg"
+$contentDirs = @((Get-ModDeployDir $contentGuid), (Join-Path $game "BepInEx\plugins\$contentGuid"))
+$skipCfgNames = @($probeCfgName, "$contentGuid.cfg")
+$probeTests = @('probe.baseline', 'probe.runner', 'probe.content')
 # Me split -Only like the probe do (comma inside one string = two pieces).
 $filters = @(((@($Only) | Where-Object { $_ }) -join ',') -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 
@@ -104,9 +111,16 @@ if (-not (Test-Path $probeDll)) { Write-Fail "probe not deployed: $probeDll"; ex
 # Me start probe with default config (Enabled = true), never a leftover one.
 if (Test-Path $probeCfg) { [IO.File]::Delete($probeCfg) }
 Write-Ok "probe deployed: $probeDll"
+Write-Step 'Build + deploy stand-in content mod (Debug)'
+& dotnet build $contentProj -c Debug -nologo -v q -p:DeployToGame=true
+if ($LASTEXITCODE -ne 0) { Write-Fail 'build failed: stand-in content mod'; exit 1 }
+$contentDll = Join-Path $contentDirs[0] "$contentGuid.dll"
+if (-not (Test-Path $contentDll)) { Write-Fail "stand-in content mod not deployed: $contentDll"; exit 1 }
+if (Test-Path $contentCfg) { [IO.File]::Delete($contentCfg) }
+Write-Ok "stand-in content mod deployed: $contentDll"
 
 # Me know every MC mod name: errors naming one of them (or MC. / Harmony) are ours.
-$modNames = @(Get-ModProjects | ForEach-Object { Get-CsprojProp $_.FullName 'ModName' } | Where-Object { $_ }) + 'Probe World'
+$modNames = @(Get-ModProjects | ForEach-Object { Get-CsprojProp $_.FullName 'ModName' } | Where-Object { $_ }) + 'Probe World', 'Probe Content'
 $ourRegex = (@("\b$(Get-ModAuthor)\.", 'HarmonyLib', 'HarmonyX', 'Chainloader') + ($modNames | ForEach-Object { [regex]::Escape($_) })) -join '|'
 
 $runBase = Join-Path $env:TEMP 'MC_Valheim_InWorld'
@@ -141,7 +155,7 @@ Write-Ok "run folder: $runDir"
 # Me copy every MC mod config before launch: tests set real settings for a moment, and a run cut short (Ctrl+C,
 # timeout, kill) skip their clean-up. files.txt written last = backup whole; no files.txt = restore touch nothing.
 $cfgNames = @(Get-ChildItem -LiteralPath $cfgDir -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like $cfgPattern -and $_.Name -ne $probeCfgName } |
+    Where-Object { $_.Name -like $cfgPattern -and $skipCfgNames -notcontains $_.Name } |
     ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $cfgBackup; $_.Name })
 [IO.File]::WriteAllLines((Join-Path $cfgBackup 'files.txt'), [string[]]$cfgNames)
 # pending.txt = configs not put back yet. Restore delete it when every file went back fine; next run check it.
@@ -165,7 +179,7 @@ if (-not $AsConfigured) {
 # Me put MC mod configs back byte for byte once game gone: changed or deleted ones from backup, ones born in run
 # deleted. Self-contained (no module function): hidden -KeepRunning watcher run same text. One output line per file.
 $restoreConfigs = {
-    param([string]$ConfigDir, [string]$BackupDir, [string]$Pattern, [string]$Skip)
+    param([string]$ConfigDir, [string]$BackupDir, [string]$Pattern, [string[]]$Skip)
     $list = Join-Path $BackupDir 'files.txt'
     if (-not (Test-Path -LiteralPath $list)) { return }
     $names = @([IO.File]::ReadAllLines($list) | Where-Object { $_ })
@@ -181,7 +195,7 @@ $restoreConfigs = {
         catch { "failed $n $($_.Exception.Message)" }
     }
     foreach ($f in @(Get-ChildItem -LiteralPath $ConfigDir -File -ErrorAction SilentlyContinue)) {
-        if ($f.Name -notlike $Pattern -or $f.Name -eq $Skip -or $names -contains $f.Name) { continue }
+        if ($f.Name -notlike $Pattern -or $Skip -contains $f.Name -or $names -contains $f.Name) { continue }
         try { [IO.File]::Delete($f.FullName); "removed $($f.Name)" } catch { "failed $($f.Name) $($_.Exception.Message)" }
     }
     # Me check each backed-up file is back as before; only then drop the pending marker.
@@ -200,7 +214,7 @@ $restoreConfigs = {
 
 # Game must be gone before this (else its config watcher reload the files mid-session).
 function Restore-ModConfigs([bool]$CutShort) {
-    $out = @(& $restoreConfigs $cfgDir $cfgBackup $cfgPattern $probeCfgName)
+    $out = @(& $restoreConfigs $cfgDir $cfgBackup $cfgPattern $skipCfgNames)
     if (-not $out.Count) { Write-Ok "mod config files as before the run ($($cfgNames.Count) checked)"; return }
     # Files this script changed itself (mod turned on for the run, every mod turned off for the second game): no news.
     $own = @($turnedOn + $script:turnedOff | ForEach-Object { "$_.cfg" })
@@ -244,8 +258,8 @@ function Remove-WithRetry([string]$Path) {
 
 function Remove-Probe {
     $ok = $true
-    foreach ($dir in $probeDirs) { if (-not (Remove-WithRetry $dir)) { $ok = $false; Write-Warn2 "could not remove $dir" } }
-    if (-not (Remove-WithRetry $probeCfg)) { $ok = $false; Write-Warn2 "could not remove $probeCfg" }
+    foreach ($dir in @($probeDirs + $contentDirs)) { if (-not (Remove-WithRetry $dir)) { $ok = $false; Write-Warn2 "could not remove $dir" } }
+    foreach ($cfg in @($probeCfg, $contentCfg)) { if (-not (Remove-WithRetry $cfg)) { $ok = $false; Write-Warn2 "could not remove $cfg" } }
     # Me also drop category/collection folders left empty.
     foreach ($dir in @((Join-Path $collectionDir 'Core'), $collectionDir)) {
         try { if ((Test-Path $dir) -and -not (Get-ChildItem $dir -Force)) { [IO.Directory]::Delete($dir) } } catch { }
@@ -256,13 +270,13 @@ function Remove-Probe {
 # -KeepRunning: game still open, dll locked. Me leave a hidden PowerShell that cleans up once the game exits.
 function Start-CleanupWatcher([int]$GamePid) {
     $q = { param($s) "'" + ($s -replace "'", "''") + "'" }
-    $targets = @($probeDirs + $probeCfg + $savesDir) | ForEach-Object { & $q $_ }
+    $targets = @($probeDirs + $contentDirs + $probeCfg + $contentCfg + $savesDir) | ForEach-Object { & $q $_ }
     $cmd = "Wait-Process -Id $GamePid -ErrorAction SilentlyContinue; Start-Sleep -Seconds 3; " +
         "foreach (`$t in @($($targets -join ', '))) { for (`$i = 0; `$i -lt 15 -and (Test-Path -LiteralPath `$t); `$i++) " +
         "{ Remove-Item -LiteralPath `$t -Recurse -Force -ErrorAction SilentlyContinue; if (Test-Path -LiteralPath `$t) { Start-Sleep -Seconds 1 } } }; " +
         "foreach (`$d in @($(& $q (Join-Path $collectionDir 'Core')), $(& $q $collectionDir))) " +
         "{ if ((Test-Path `$d) -and -not (Get-ChildItem `$d -Force)) { Remove-Item -LiteralPath `$d -Force } }; " +
-        "`$r = @(& {$restoreConfigs} $(& $q $cfgDir) $(& $q $cfgBackup) $(& $q $cfgPattern) $(& $q $probeCfgName)); " +
+        "`$r = @(& {$restoreConfigs} $(& $q $cfgDir) $(& $q $cfgBackup) $(& $q $cfgPattern) @($(($skipCfgNames | ForEach-Object { & $q $_ }) -join ', '))); " +
         "if (`$r.Count) { [IO.File]::WriteAllLines($(& $q $cleanupLog), [string[]]`$r) }"
     $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
     Start-Process -FilePath 'powershell.exe' -WindowStyle Hidden -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encoded) | Out-Null
@@ -348,7 +362,7 @@ try {
         if ($stage -eq 'disabled') {
             Write-Step 'Second game: every MC mod turned off (Enabled = false), same character and world'
             $off = @()
-            foreach ($f in @(Get-ChildItem -LiteralPath $cfgDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $cfgPattern -and $_.Name -ne $probeCfgName })) {
+            foreach ($f in @(Get-ChildItem -LiteralPath $cfgDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $cfgPattern -and $skipCfgNames -notcontains $_.Name })) {
                 $new = Disable-ModConfigText ([IO.File]::ReadAllText($f.FullName))
                 if ($null -eq $new) { continue }
                 [IO.File]::WriteAllText($f.FullName, $new, (New-Object System.Text.UTF8Encoding $false))
