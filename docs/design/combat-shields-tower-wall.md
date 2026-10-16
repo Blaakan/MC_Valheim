@@ -5,10 +5,10 @@
 | Mod | Tower Shield Wall |
 | GUID / project | `MC.Combat.Shields.TowerWall` (`src/Combat/Shields.TowerWall/`, root namespace `MC.Combat.ShieldsTowerWallMod`, package `ShieldsTowerWall`) |
 | Category / scope | Combat / Revamp |
-| Side | Both: the server (or host) and every player install it (user rule for mods that change the experience); multiplayer Compatible; network version 2 (own RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, rules layout 2, plus the framework's `<guid>.Hello` / `<guid>.HelloAck` / `<guid>.HelloState`); no ZDO keys |
+| Side | Both: the server (or host) and every player install it (user rule for mods that change the experience); multiplayer Compatible; network version 3 (own RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, rules layout 3 since 0.2.0, plus the framework's `<guid>.Hello` / `<guid>.HelloAck` / `<guid>.HelloState`); no ZDO keys |
 | Sheet idea | `Better tower shields` (`<ModIdea>` in the csproj) |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim` in `.ref/`; item, animator, creature and status-effect data dumped at runtime from a real world (Debug DataDump self-test, 2026-09-29); other shield mods' sources and pages read on 2026-09-29 (CaptainValheim, SecondaryAttacks, ReliableBlock and ReliableBlockRebuilt, Combat Adjustments, WeaponArts, ShieldMeBruh on GitHub; Goo's Combat Overhaul, ZenCombat, ShieldBash, Make Tower Shields Great Again on Thunderstore); design reviewed against `.ref` on 2026-09-30, and aligned the same day with this run's shared changes (`NetworkGate` peer state, `ItemKinds` shield rule); the user's feedback after the first in-game test (build `3cda33b+dirty`) applied on 2026-09-30, with the runtime facts of that day's in-world run (all self-tests passed; their NOTE lines) |
-| Status | Implemented (v0.1.0 code), in-game testing; bash reworked after the first in-game test (decisions 30-34, stage 8 of section 10), then reviewed (decision 35, stage 9). Section 10 holds the implementation notes; its short list of deviations closes the section |
+| Status | Implemented (v0.2.0 code: tower shields from other mods by their data, 2.0.2 and decisions 36-39), in-game testing; bash reworked after the first in-game test (decisions 30-34, stage 8 of section 10), then reviewed (decision 35, stage 9). Section 10 holds the implementation notes; its short list of deviations closes the section |
 
 ## Goal
 
@@ -415,7 +415,8 @@ the skill-scaled value, block force, parry lines), knockback (`m_attackForce`), 
 
 - **Tower list** (`Towers` setting): `ShieldWoodTower:6, ShieldBoneTower:8, ShieldIronTower:12,
   ShieldSerpentscale:15, ShieldBlackmetalTower:20, ShieldFlametalTower:28, ShieldGoldTower:32` = prefab name and the
-  bash's blunt damage. An entry without `:n` uses 10. Checked against the vanilla snapshot of each prefab: unknown
+  bash's blunt damage. An entry without `:n` used 10 (since 0.2.0: damage from block armor, and shields that cannot parry
+  at all are towers without being listed, 2.0.2). Checked against the vanilla snapshot of each prefab: unknown
   names are logged once as MISSING (Combat Adjustments' lesson: a silent typo is a bug); an entry that is not a shield
   (item type Shield, animation Shield, skill Blocking) is refused with a Warning; a shield that can parry
   (`m_timedBlockBonus > 1`, e.g. `ShieldBanded`) is accepted with a Warning that it loses its parry.
@@ -484,6 +485,47 @@ the skill-scaled value, block force, parry lines), knockback (`m_attackForce`), 
 `m_skillType` (Blocking), `m_animationState` (Shield), `m_maxQuality`, durability, weight, `m_blockAdrenaline`,
 `m_damageModifiers` (Serpentscale pierce resistance) and `m_secondaryAttack` (empty) stay vanilla. The NG+ damage
 term of `GetDamage` is removed for tower copies by a postfix (2.6, decision 21).
+
+#### 2.0.2 Tower shields from other mods (0.2.0)
+
+User rule of 2026-10-16: MC mods pick up the content other mods add by its data, never by a table of vanilla names
+(`docs/modding/framework.md`, "Third-party content"; audit: `docs/research/third-party-content-audit.md`).
+
+- **Rule** (`AutoTowers`, default on): an item is a tower when its vanilla data is shield data (item type Shield,
+  animation Shield, skill Blocking) with `m_timedBlockBonus` below 1, and it is not creature-only. Vanilla data = the
+  snapshot when the prefab was a tower before (its live data carries tower data), else the live data (never written).
+  Runtime dump of 2026-10-16 (game 1.0.20, Warfare 1.9.4 installed): the seven vanilla towers and the creature copies
+  `FW_`/`SP_ShieldBlackmetalTower` have 0; `ShieldIronSquare` 1 (a parry needs above 1, so it cannot parry either, but
+  strict "below 1" keeps it out as in 0.1); round shields 1.5, bucklers 2.5, the creature club `Axe1h_JotunWarrior`
+  (shield data) 1.5. Warfare: `ShieldBronzeTower_TW` (block 34, force 100), `ShieldChitinTower_TW` (43, 100),
+  `ShieldCarapaceTower_TW` (124, 115) have 0 and movement -0.2; its round shields 1.5, bucklers 2.5.
+- **Creature-only** (decision 37): no `Recipe` in `ObjectDB.m_recipes` has it as `m_item` (enabled or not) AND some
+  `ZNetScene` prefab's `Humanoid` lists it (`m_defaultItems`, `m_randomWeapon`, `m_randomArmor`, `m_randomShield`,
+  `m_randomSets[].m_items`, `m_randomItems[].m_prefab`). Without a ZNetScene (main menu) such a recipe-less shield is
+  left undecided until the in-world pass. The run of 2026-10-16 found exactly `FW_ShieldBlackmetalTower` and
+  `SP_ShieldBlackmetalTower` (logged "left out as creature-only").
+- **Overrides**: `Towers` adds shields the rule leaves out and sets bash damage (`Name:n`); `ExcludedTowers` (new)
+  wins over both, silently (the default `Towers` name the seven vanilla towers, so excluding one is the plain way to
+  keep it normal).
+- **Bash damage** (decision 38): `:n` when given; else from the snapshot's block armor at quality 1, straight lines
+  through the vanilla points (10, 6) (32, 8) (52, 12) (60, 15) (104, 20) (140, 28) (158, 32), flat below 10, last slope
+  above 158, capped at 200 (`TowerRules.ScaledBashDamage`). Vanilla towers land on their values; Warfare Bronze 8.4,
+  Chitin 10.2, Carapace 24.44; an entry without `:n` used 10 before.
+- **When** (decision 39): the `ObjectDB.Awake` / `CopyOtherDB` postfixes run at priority -500, after every other
+  postfix, Jotunn's `OnItemsRegistered` (priority 0) included, where Jotunn mods edit item data; so the snapshot and the
+  rule see the edited data. Content that arrives later (server-synced item editors, the stand-in's after-load shield)
+  changes `ContentPrint` (`src/Shared/ContentPrint.cs`: ObjectDB and ZNetScene objects, item, recipe and prefab counts):
+  `TowerSync.HasWork` compares it every `ZNet.Update` and applies again (new catalog, prefabs and live copies written).
+  The Custom bash trigger set is keyed on the same print.
+- **Log**: one Info line whenever the set changes: "Tower shields: N; found automatically: ...; left out as
+  creature-only: ...", so players see which modded shields became towers.
+- **Wire**: rules layout 3 (`AutoTowers`, `ExcludedTowers` appended), network version 3. Each game classifies its own
+  item database with the server's rules; with the same content mods (every content mod of note enforces it) the sets
+  are the same.
+- **Known limit**: a mod that clones a vanilla tower after this mod wrote it (item editors that clone after join)
+  copies the tower data (type `TwoHandedWeaponLeft`); such a copy is no shield by the rule, has no snapshot and is not
+  reverted. Seen with the stand-in content when its after-load shield cloned `ShieldBoneTower`; the stand-in now clones
+  `ShieldBanded`.
 
 ### 2.1 G1 Two-handed
 
@@ -1125,6 +1167,18 @@ Goal). Decision 35: from the review of that change (stage 9).
     one side, so its first hit is the creature furthest to that side. Done on the bearer's game (2.6), so it needs no
     RPC and works on creatures owned by any game; a creature in its lock limit can be the pick (the lock lives on its
     owner), and then that bash staggers nobody: turn to another creature (T36).
+36. **Tower shields from other mods by their data** (0.2.0, 2.0.2; user decision 2026-10-16: "every shield with parry
+    bonus 0"). Replaces the list-only rule of decision 10 for modded shields; the vanilla set stays the same (checked
+    by `tower.thirdparty` and the runtime dump). `Towers` becomes add and bash damage, `ExcludedTowers` is new,
+    `AutoTowers` turns the rule off. Strict "below 1" keeps `ShieldIronSquare` (1) out as before.
+37. **Creature-only copies stay normal by their data** (user decision 2026-10-16, chosen over an exclude-list default
+    and over making them towers): no recipe and carried by a creature. Covers `FW_`/`SP_ShieldBlackmetalTower` and
+    creature gear of other mods; a boss-drop tower without a recipe that no creature carries is still a tower.
+38. **Bash damage from block armor** for towers without `:n` (user decision 2026-10-16, chosen over a flat 10): the
+    vanilla towers' armor-to-damage points, so a modded tower bashes like a vanilla tower of its armor.
+39. **Read item data after Jotunn's late edits, and again when content changes**: postfix priority -500 and the
+    `ContentPrint` re-apply (2.0.2). The first in-world pass (main menu) still snapshots: decision 26 holds, the
+    snapshot now includes edits other mods make in any `ObjectDB.Awake` postfix.
 
 ## 4. Multiplayer
 
@@ -1229,7 +1283,9 @@ in multiplayer the server's (or host's) value is used by everyone (4).
 | General | Enabled | `true` | on/off | framework | Turn the mod on or off. Takes effect immediately. |
 | General | Status | — | — | — | Written by the mod: whether it is active, and if not, why. |
 | General | AllowPlayersWithoutMod | `false` | on/off | server only | Used only by the server (or the host). Off: a player whose game does not have this mod, has it turned off, or has a version that cannot talk to the server's, is refused about a second after joining, or after turning it off ("Incompatible version"), so everyone plays with the same tower shields. On: such players may play; for them tower shields are normal. |
-| Tower shields | Towers | `ShieldWoodTower:6, ShieldBoneTower:8, ShieldIronTower:12, ShieldSerpentscale:15, ShieldBlackmetalTower:20, ShieldFlametalTower:28, ShieldGoldTower:32` | shield prefab names; bash damage 0-200 | yes | Which shields are tower shields (prefab names, as used by the spawn command), each with the blunt damage of its bash after a colon (10 when left out). Only shields are accepted; a shield that can parry loses its parry. |
+| Tower shields | AutoTowers | `true` | on/off | yes | On: every shield that cannot parry at all (parry bonus 0) is a tower shield, also shields added by other mods, except copies only creatures carry. Off: only the shields named in Towers (0.2.0, 2.0.2). |
+| Tower shields | Towers | `ShieldWoodTower:6, ShieldBoneTower:8, ShieldIronTower:12, ShieldSerpentscale:15, ShieldBlackmetalTower:20, ShieldFlametalTower:28, ShieldGoldTower:32` | shield prefab names; bash damage 0-200 | yes | More tower shields and the bash damage of each (prefab names, as used by the spawn command), each with the blunt damage of its bash after a colon; without a number (and for shields found by AutoTowers) the damage comes from the shield's block armor on the vanilla towers' scale (0.2.0; 10 before). Only shields are accepted; a shield that can parry loses its parry. |
+| Tower shields | ExcludedTowers | (empty) | shield prefab names | yes | Shields that are never tower shields, even when AutoTowers finds them or Towers names them (0.2.0). |
 | Tower shields | BlockArmorMultiplier | `2.5` | 1-10 | yes | Tower shield block armor is multiplied by this (also the armor gained per quality level). |
 | Tower shields | BlockForcePercent | `100` | 0-200 | yes | How hard a block pushes the attacker back, in percent of the tower shield's own block force. Because tower shields block more of each hit, 100 already pushes somewhat harder than a normal tower shield would; lower keeps attackers within bash range. |
 | Tower shields | CarrySlowPercent | `30` | 0-40 | yes | How much slower you jog while a tower shield is in your hands (sprinting is slowed 1.5 times as much, but never below jogging speed). Not while it is put away on your back. Armor slowness adds to it. The normal game value is 10. |
@@ -1513,6 +1569,15 @@ two takes the bash, and each Punchstep clip steps the player forward (root motio
 after many bashes the player can stand right in front of a rock. A Hit event after which the target took nothing
 names what stands in the lane in its NOTE.
 
+- **`tower.thirdparty`** (0.2.0, 2.0.2): with the stand-in content of the test scripts (`tests/Probes/Core.Probe.Content`)
+  the ItemManager-way tower (bash 12), the Jotunn late-edit tower (snapshot holds parry 0, bash 10) and the after-load
+  tower (bash 8, no restart) are towers found automatically; the round stand-in is never written; `FW_`/`SP_` are
+  left out as creature-only, `ShieldIronSquare` and `ShieldBanded` stay normal, no vanilla shield is found beyond the
+  default list; the stand-in tower takes both hands; `ExcludedTowers` reverts it (prefab and inventory copy);
+  `AutoTowers` off = list only; listed without `:n` = scaled damage, with `:5` = 5. With Warfare installed: its three
+  towers at 8.4 / 10.2 / 24.44, its round shields and bucklers normal (else a NOTE). `tower.data` also NOTEs every
+  shield-like item of the game (vanilla data from the snapshot when written). `tower.mp.rules` checks the server's
+  `ExcludedTowers` and `AutoTowers` reach the client (M19).
 - **`tower.data`**: every default tower prefab exists and after activation has the 2.0.1 values (type, override,
   parry ≤ 1, parry adrenaline 0, block armor = snapshot × 2.5, block force, movement -0.30, blunt from the list,
   blockable/dodgeable, block charges off); `FW_ShieldBlackmetalTower`, `SP_ShieldBlackmetalTower`, `ShieldBanded` and
@@ -1785,9 +1850,9 @@ unverified.
 - M13 **Two tower players (G6)**: A and B both bash the same `Draugr` in turn: it is not kept staggered (the 8 s lock
   limit applies to both).
 - M14 **Other network version refused (G8)**: build a copy with another network version (`dotnet build
-  src/Combat/Shields.TowerWall -p:ModNetworkVersion=3 -p:DeployToGame=false`, then rebuild without the override) and
+  src/Combat/Shields.TowerWall -p:ModNetworkVersion=4 -p:DeployToGame=false`, then rebuild without the override) and
   give its DLL to the friend: they are refused ("Incompatible version") about a second after joining, and the server
-  log says they have another version of the mod (network version 3, the server has 2). With
+  log says they have another version of the mod (network version 4, the server has 3). With
   `AllowPlayersWithoutMod = true` they may play: their MC Mods panel says the versions cannot talk to each other, and
   their towers are vanilla. A build of the first test (network version 1) is refused the same way.
 - M15 **Ally's spell (G5 a)**: PvP off, player B casts the Staff of Protection (`StaffShield`) next to player A, who
@@ -1846,6 +1911,9 @@ unverified.
 15. **One heavy stagger per bash** (decision 35): in a group, only the creature you face is staggered by a bash; the
     others take its damage and push. Fine, or should the tower keep staggering every creature in its arc (crowd
     control), with the buckler comparison then true only one creature at a time?
+16. **Tower shields from other mods** (decisions 36-39): every shield that cannot parry at all is a tower, creature-only
+    copies stay normal, bash damage from block armor. Excluding a tower that the default `Towers` names is silent (no
+    "listed and excluded" warning): fine?
 
 ### Unverified names and values, and how to check
 

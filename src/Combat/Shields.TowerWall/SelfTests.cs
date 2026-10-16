@@ -84,6 +84,7 @@ internal static partial class SelfTests
         SelfTest.Register(LockName, RunLock);
         SelfTest.Register(NgName, RunNg);
         SelfTest.Register(ToggleName, RunToggle);
+        RegisterThirdParty();
         RegisterMore();
 #endif
     }
@@ -111,6 +112,7 @@ internal static partial class SelfTests
         SelfTest.Unregister(LockName);
         SelfTest.Unregister(NgName);
         SelfTest.Unregister(ToggleName);
+        UnregisterThirdParty();
         UnregisterMore();
         SelfTestHooks.Clear();
         ServerRules.TestRules = null;
@@ -1138,7 +1140,9 @@ internal static partial class SelfTests
             // Every default tower: 2.0.1 values over its vanilla snapshot.
             var armor = new List<string>();
             var effects = new List<string>();
-            c.Check(TowerCatalog.Count == rules.Entries.Count, $"{TowerCatalog.Count} towers in the catalog, {rules.Entries.Count} in the default list");
+            c.Check(DefaultTowersKnown() && TowerCatalog.Count == rules.Entries.Count + TowerCatalog.Automatic.Count,
+                $"{TowerCatalog.Count} towers in the catalog: the {rules.Entries.Count} of the default list and {TowerCatalog.Automatic.Count} found automatically "
+                + $"({string.Join(", ", TowerCatalog.Automatic.ToArray())})");
             foreach (var e in rules.Entries)
             {
                 var go = db.GetItemPrefab(e.Prefab);
@@ -1345,6 +1349,28 @@ internal static partial class SelfTests
             }
             slow.Sort(StringComparer.Ordinal);
             SelfTest.Note(DataName, $"armor movement modifiers ({slow.Count}): {string.Join(", ", slow.ToArray())}");
+            // Me list every shield-ish item of this game, mod items too: data for auto tower pick.
+            var shields = new List<string>();
+            foreach (var go in db.m_items)
+            {
+                var drop = go != null ? go.GetComponent<ItemDrop>() : null;
+                var s = drop != null ? drop.m_itemData.m_shared : null;
+                if (s == null || (s.m_itemType != ItemType.Shield && s.m_skillType != Skills.SkillType.Blocking
+                                  && s.m_animationState != ItemDrop.ItemData.AnimationState.Shield))
+                {
+                    continue;
+                }
+                var snap = TowerCatalog.SnapshotOfPrefab(go);
+                var type = snap != null ? snap.ItemType : s.m_itemType;
+                var parry = snap != null ? snap.TimedBlockBonus : s.m_timedBlockBonus;
+                var move = snap != null ? snap.MovementModifier : s.m_movementModifier;
+                var block = snap != null ? snap.BlockPower : s.m_blockPower;
+                shields.Add($"{go.name} [{s.m_name}] type {type} anim {s.m_animationState} skill {s.m_skillType} block {F(block)} "
+                            + $"force {F(snap != null ? snap.DeflectionForce : s.m_deflectionForce)} parry {F(parry)} move {F(move)} "
+                            + $"weight {F(s.m_weight)} icons {(s.m_icons != null ? s.m_icons.Length : 0)}");
+            }
+            shields.Sort(StringComparer.Ordinal);
+            SelfTest.Note(DataName, $"shields ({shields.Count}): {string.Join(" | ", shields.ToArray())}");
             SelfTest.Note(DataName, $"training dummy prefab piece_TrainingDummy {(ZNetScene.instance.GetPrefab("piece_TrainingDummy") != null ? "exists" : "NOT found")}");
             c.Report();
         }
@@ -1383,12 +1409,15 @@ internal static partial class SelfTests
                 r.BashKnockback = 90f;
                 r.BashRange = 2.5f;
                 r.BashAngle = 120f;
+                r.AutoTowers = false;
+                r.ExcludedTowers = "ShieldWoodTower, ShieldGoldTower";
             });
             var pkg = new ZPackage();
             odd.Write(pkg);
             pkg.SetPos(0);
-            c.Check(TowerRules.TryRead(pkg, out var back, out var clamped) && !clamped && back.Key == odd.Key && back.Describe() == odd.Describe(),
-                "rules survive the wire unchanged (every field)");
+            c.Check(TowerRules.TryRead(pkg, out var back, out var clamped) && !clamped && back.Key == odd.Key && back.Describe() == odd.Describe()
+                    && !back.AutoTowers && back.IsExcluded("ShieldGoldTower") && back.Excluded.Count == 2,
+                "rules survive the wire unchanged (every field, AutoTowers and ExcludedTowers too)");
 
             var wild = TowerRules.Defaults().With(null);
             wild.BlockArmorMultiplier = 50f;       // written raw after the seal: what a broken server could send
@@ -1428,7 +1457,12 @@ internal static partial class SelfTests
             pkg.Write(1);
             pkg.Write("ShieldIronTower:12");
             pkg.SetPos(0);
-            c.Check(TowerRules.Layout == 2 && !TowerRules.TryRead(pkg, out _, out _), "rules of layout 1 (0.1.0 test builds before the bash speed and cooldown) refused");
+            c.Check(TowerRules.Layout == 3 && !TowerRules.TryRead(pkg, out _, out _), "rules of layout 1 (0.1.0 test builds before the bash speed and cooldown) refused");
+            pkg = new ZPackage();
+            pkg.Write(2);
+            pkg.Write(TowerRules.DefaultTowers);
+            pkg.SetPos(0);
+            c.Check(!TowerRules.TryRead(pkg, out _, out _), "rules of layout 2 (0.1.x, before AutoTowers and ExcludedTowers) refused");
             pkg = new ZPackage();
             pkg.Write(TowerRules.Layout);
             pkg.Write("ShieldIronTower");
@@ -1442,12 +1476,27 @@ internal static partial class SelfTests
             // Towers list parsing and the rules key.
             var problems = new List<string>();
             var entries = TowerRules.ParseTowers("ShieldWoodTower:6, ShieldBoneTower;X:abc\n:5, ShieldWoodTower:9, Y:500, Z:-3", problems);
-            var parsed = string.Join(", ", entries.Select(e => $"{e.Prefab}:{F(e.BashDamage)}").ToArray());
-            c.Check(parsed == "ShieldWoodTower:6, ShieldBoneTower:10, X:10, Y:200, Z:0" && problems.Count == 5,
-                $"Towers parsing: {parsed}; {problems.Count} problems ({string.Join(" / ", problems.ToArray())})");
+            var parsed = string.Join(", ", entries.Select(e => $"{e.Prefab}:{(e.FixedDamage ? F(e.BashDamage) : "armor")}").ToArray());
+            c.Check(parsed == "ShieldWoodTower:6, ShieldBoneTower:armor, X:armor, Y:200, Z:0" && problems.Count == 5,
+                $"Towers parsing (no number or a bad one = damage from block armor): {parsed}; {problems.Count} problems ({string.Join(" / ", problems.ToArray())})");
             var spaced = TowerRules.Defaults().With(r => r.Towers = "ShieldWoodTower:6,ShieldBoneTower:8, ShieldIronTower:12;ShieldSerpentscale:15\nShieldBlackmetalTower:20 ,ShieldFlametalTower:28,  ShieldGoldTower:32");
-            c.Check(spaced.Key == TowerRules.Defaults().Key && spaced.Describe().StartsWith("default tower list", StringComparison.Ordinal),
+            c.Check(spaced.Key == TowerRules.Defaults().Key && spaced.Describe().Contains("default tower list"),
                 "spaces and separators do not change the rules (same key: nothing to apply again)");
+            var excludedNames = TowerRules.ParseNames("A, B:5;A\n , C");
+            c.Check(string.Join(",", excludedNames) == "A,B,C", $"ExcludedTowers parsing: {string.Join(",", excludedNames)} (no duplicates, ':n' ignored)");
+            var both = TowerRules.Defaults().With(r => r.ExcludedTowers = "ShieldIronTower");
+            c.Check(both.ListProblems.Count == 0 && both.IsExcluded("ShieldIronTower"),
+                $"excluding a tower of the default list is no problem to report ({string.Join(" / ", both.ListProblems.ToArray())})");
+            c.Check(TowerRules.Defaults().With(r => r.AutoTowers = false).Key != TowerRules.Defaults().Key
+                    && both.Key != TowerRules.Defaults().Key,
+                "AutoTowers and ExcludedTowers change the key");
+
+            // Bash damage scale (design 2.0.2): the seven vanilla towers land on their default damage.
+            var scale = new[] { (10f, 6f), (32f, 8f), (52f, 12f), (60f, 15f), (104f, 20f), (140f, 28f), (158f, 32f),
+                (34f, 8.4f), (43f, 10.2f), (124f, 24.44f), (5f, 6f), (176f, 36f), (10000f, TowerRules.MaxBashDamage), (float.NaN, 6f) };
+            var scaled = string.Join(", ", scale.Select(p => $"{F(p.Item1)}->{F(TowerRules.ScaledBashDamage(p.Item1))}").ToArray());
+            c.Check(scale.All(p => Mathf.Abs(TowerRules.ScaledBashDamage(p.Item1) - p.Item2) < 0.01f),
+                $"bash damage from block armor: {scaled} (vanilla towers 6/8/12/15/20/28/32; Warfare Bronze 8.4, Chitin 10.2, Carapace 24.44)");
             c.Check(TowerRules.Defaults().With(r => r.BashStagger = 26f).Key != TowerRules.Defaults().Key
                     && TowerRules.Defaults().With(r => r.BashCooldown = 1f).Key != TowerRules.Defaults().Key
                     && TowerRules.Defaults().With(r => r.BashAnimationSpeed = 0.7f).Key != TowerRules.Defaults().Key
@@ -1596,7 +1645,7 @@ internal static partial class SelfTests
             c.Check(Near(SharedOf(IronTower).m_blockPower, snap.BlockPower * 4f), "and the prefab");
 
             // Towers validation: a sword refused, a missing name skipped, a parrying shield accepted without parry.
-            var mixed = TowerRules.Defaults().With(r => r.Towers = "ShieldIronTower:12, SwordIron:5, ShieldBanded:7, MC_NoSuchItem");
+            var mixed = TowerRules.Defaults().With(r => { r.Towers = "ShieldIronTower:12, SwordIron:5, ShieldBanded:7, MC_NoSuchItem"; r.AutoTowers = false; });
             yield return UseRules(mixed);
             var db = ObjectDB.instance;
             var banded = SharedOf("ShieldBanded");
@@ -1714,7 +1763,7 @@ internal static partial class SelfTests
 
             // Sword hidden next to a tower that is a vanilla shield, then the rules make it a tower again: FixHands
             // drop the hidden sword, so showing hands never drop the tower (design 2.1, decision 15).
-            var none = TowerRules.Defaults().With(r => r.Towers = "");
+            var none = TowerRules.Defaults().With(r => { r.Towers = ""; r.AutoTowers = false; });
             yield return UseRules(none);
             c.Check(tower.m_shared.m_itemType == ItemType.Shield, "empty tower list: the held copy is a vanilla shield again");
             p.EquipItem(sword);

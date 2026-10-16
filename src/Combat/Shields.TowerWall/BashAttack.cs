@@ -31,7 +31,7 @@ internal static class BashAttack
     private static bool _lastResortReported;
     private static HashSet<string> _attackTriggers;
     private static HashSet<string> _heldTriggers;
-    private static ObjectDB _triggersFor;
+    private static ContentPrint _triggersFor;
 
     // Bash of the applied rules, null = not built yet (no player seen) or no rules.
     internal static Attack Current => _attack != null && ReferenceEquals(_rules, TowerSync.Applied) ? _attack : null;
@@ -137,7 +137,7 @@ internal static class BashAttack
     }
 
     // Every trigger a player item fire (Attack.Start: name + chain level, or name + random, or name as is): the
-    // allowed Custom names. Built once per ObjectDB. Player items = items with an icon (creature attack items have
+    // allowed Custom names. Built again when content change (ContentPrint). Player items = items with an icon (creature attack items have
     // none), plus the player's unarmed attacks. Listed towers count with their vanilla attack.
     // Names of held (looping), aimed (bow draw), reloaded or attached attacks are left out, even when another item
     // fire them plainly: their clip wait for a button, a bool or a target the bash never give. A looping clip leave
@@ -146,7 +146,8 @@ internal static class BashAttack
     internal static HashSet<string> AttackTriggers()
     {
         var db = ObjectDB.instance;
-        if (_attackTriggers != null && ReferenceEquals(db, _triggersFor))
+        var print = ContentPrint.Now();
+        if (_attackTriggers != null && print.Equals(_triggersFor))
         {
             return _attackTriggers;
         }
@@ -177,7 +178,7 @@ internal static class BashAttack
         set.ExceptWith(held);
         _attackTriggers = set;
         _heldTriggers = held;
-        _triggersFor = db;
+        _triggersFor = print;
         return set;
     }
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0
+
+- Tower shields from other mods are found automatically: every shield that cannot parry at all is a tower shield
+  (new setting `AutoTowers`, on by default), for example Warfare's Bronze, Chitin and Carapace tower shields. Shields
+  a server sends after you join are picked up without a restart; changes Jotunn mods make to item data while the
+  game loads are taken into account. Copies that only creatures carry stay normal. The log lists the shields found.
+- New setting `ExcludedTowers`: shields that are never tower shields.
+- `Towers` now adds tower shields and sets their bash damage. A tower shield without a number (and every tower
+  shield found automatically) gets a bash damage from its block armor, on the same scale as the normal-game towers
+  (it used to be 10). The seven normal-game tower shields keep their values.
+- Multiplayer: the server's `AutoTowers` and `ExcludedTowers` are used for everyone. Players need this version
+  (network version 3).
+
 ## 0.1.1
 
 - Fixed a false warning, "The Towers setting names items this game does not have (MISSING), ignored: ...", that listed

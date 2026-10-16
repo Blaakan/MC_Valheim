@@ -4,7 +4,15 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
+**Build under test:** 0.2.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
+(2026-10-16) finds tower shields from other mods by their data (`AutoTowers`, `ExcludedTowers`, bash damage from block
+armor for towers without a number; rules layout 3, network version 3): T17 and T40 are reset, T50-T56 and M19 are new
+(section "0.2.0"). Verified on 2026-10-16 (Valheim 1.0.20, Warfare 1.9.4 and Jotunn 2.30.2 installed): built Debug and
+Release (no warning in this mod); smoke test passed (all 28 mods); framework test passed; in-world self-tests of this mod and
+the related mods' tower tests (`-Mod Shields.TowerWall -Only tower.,morale.x.tower-bash,sneak.x-tower,
+trinkets.block-fight,dual.others,moveset.x.towershield,spyglass.compat.towershield`) 60 of 61 passed, none failed,
+`tower.thirdparty` and `probe.content` included; multiplayer: every `tower.mp.*` test and the probes this list names
+passed. Earlier history: smoke
 test (`./tools/Test-Smoke.ps1`) passed 2026-09-30: loads, patches cleanly, JitCheck clean. In-world self-tests
 (`./tools/Test-InWorld.ps1 -Mod Shields.TowerWall`) passed 2026-09-30 in a full run with every MC mod (71 of 71
 tests): `tower.data`, `tower.rules`, `tower.hands`, `tower.slow`, `tower.block`, `tower.bash`, `tower.lock`,
@@ -237,13 +245,14 @@ to the hit, estimated from the clip data; T34).
   `ShieldGoldTower`, also one timed right as the `Greydwarf` hits, raises adrenaline by the normal block amount (2 at
   the default world adrenaline rate), never by a parry amount; the Greydwarf is never staggered by the block.
   *Automated: `tower.parry`.*
-- [x] **T40 Own Towers list:** set `Towers = ShieldIronTower:12, ShieldBanded:7, SwordIron:5, NoSuchItem`. Expected:
-  the log has one Warning for the sword ("The Towers setting names items that are not shields, ignored: SwordIron.
+- [x] **T40 Own Towers list:** set `AutoTowers = false` and
+  `Towers = ShieldIronTower:12, ShieldBanded:7, SwordIron:5, NoSuchItem`. Expected: the log has one Warning for the sword ("The Towers setting names items that are not shields, ignored: SwordIron.
   ..."), one for the unknown name ("... names items this game does not have (MISSING), ignored: NoSuchItem.") and one
   for the round shield ("... names shields that can parry: ShieldBanded. As tower shields they can no longer parry.").
   `ShieldBanded` is now two-handed, its tooltip says "Cannot parry" and lists 7 blunt, and a block timed right as a
   `Greydwarf` hits no longer staggers it. The tower shields left out of the list (`ShieldWoodTower`) are normal
-  shields again. Put the default list back. Expected: `ShieldBanded` is a round shield that parries again.
+  shields again. Put the default list back and `AutoTowers = true`. Expected: `ShieldBanded` is a round shield that
+  parries again.
   *Automated: `tower.rules`, `tower.warn`, `tower.parry`.*
 - [x] **T18 Live toggle:** hold a tower shield, then Esc → MC Mods → untick Tower Shield Wall. Expected: it becomes a
   one-handed shield in place (tooltip: no "Two-handed", normal block armor), you can add a sword, attack punches, the
@@ -324,13 +333,13 @@ to the hit, estimated from the clip data; T34).
   *Partly automated (`tower.mp.creature`, `tower.lock`); by hand: Two tower shield players bashing the same Draugr in
   turn (and the cross-game part until tower.mp.creature has passed once).*
 - [ ] **M14 Other network version refused:** build a copy with another network version (`dotnet build
-  src/Combat/Shields.TowerWall/MC.Combat.Shields.TowerWall.csproj -p:ModNetworkVersion=3 -p:DeployToGame=false`), copy
+  src/Combat/Shields.TowerWall/MC.Combat.Shields.TowerWall.csproj -p:ModNetworkVersion=4 -p:DeployToGame=false`), copy
   `src/Combat/Shields.TowerWall/bin/Debug/MC.Combat.Shields.TowerWall.dll` over the friend's copy (put the normal build
-  back afterwards: build again without `-p:ModNetworkVersion=3` and copy it the same way). The friend joins. Expected:
+  back afterwards: build again without `-p:ModNetworkVersion=4` and copy it the same way). The friend joins. Expected:
   refused ("Incompatible version") about a second after joining; the server log says "their game has another version
-  of the mod (network version 3, the server has 2)". With `AllowPlayersWithoutMod = true` they may play: their MC Mods
-  panel says the versions cannot talk to each other, and their tower shields are normal. (A friend still on the first
-  test build, network version 1, is refused the same way.)
+  of the mod (network version 4, the server has 3)". With `AllowPlayersWithoutMod = true` they may play: their MC Mods
+  panel says the versions cannot talk to each other, and their tower shields are normal. (A friend still on 0.1.x,
+  network version 2, is refused the same way.)
   *Partly automated (`tower.mp.join`, `tower.rules`); by hand: A real client built with another network version:
   refused on its screen; with AllowPlayersWithoutMod its panel text and its normal tower shields.*
 - [ ] **M15 Ally's spell:** PvP off. Player A holds block with `ShieldIronTower` facing player B; B casts the Staff of
@@ -438,3 +447,53 @@ turned off. Not run in the game yet.
   Instruments' `TESTING.md`). Expected: nothing swings by itself while it comes out; a click with it does what it did
   before (no punch); put it away again. Expected: still no punch by itself.
   *Automated: `tower.x.spyglass`, `tower.x.instrument`, `tower.input.spyglass`, `tower.input.instrument`.*
+
+## 0.2.0 — tower shields from other mods
+
+0.2.0 (2026-10-16) makes every shield that cannot parry at all a tower shield, also shields added by other mods
+(design 2.0.2): `AutoTowers` (on by default), `ExcludedTowers`, and a bash damage from block armor for towers without
+a number in `Towers`. The self-test `tower.thirdparty` uses the stand-in content mod of the test scripts
+(`tests/Probes/Core.Probe.Content`: shields added the way blaxxun ItemManager and Jotunn add them, and one added after
+the world loaded) and, when Warfare is installed, Warfare's real shields. Setup for the Warfare items: install Warfare
+(Therzie) 1.9.4; its shield prefabs: `ShieldBronzeTower_TW`, `ShieldChitinTower_TW`, `ShieldCarapaceTower_TW` (tower
+shields), `ShieldBronzeBanded_TW`, `ShieldChitin_TW` (round), `ShieldChitinBuckler_TW`, `ShieldSilverBuckler_TW`,
+`ShieldBlackmetalBuckler_TW` (bucklers), read from the game data on 2026-10-16.
+
+- [ ] **T50 Warfare's tower shields:** with Warfare installed, load a world while `./tools/Watch-Log.ps1 -Mine` runs.
+  Expected: the line "Tower shields: ...; found automatically: ShieldBronzeTower_TW, ShieldCarapaceTower_TW,
+  ShieldChitinTower_TW; left out as creature-only: FW_ShieldBlackmetalTower, SP_ShieldBlackmetalTower." Then
+  `spawn ShieldBronzeTower_TW 1 1 p` (and the Chitin and Carapace ones) and equip each with a sword in hand. Expected:
+  the sword is put away, the shield is two-handed, its tooltip says "Two-handed" and "Cannot parry" and lists a bash
+  of 8.4 (Bronze), 10.2 (Chitin) or 24.4 (Carapace) blunt; jogging is slow (as T05); a bash plays (as T12).
+  *Partly automated (`tower.thirdparty`); by hand: A real game with Warfare: the log line as read, the tooltip and
+  equipping as seen, one bash.*
+- [ ] **T51 Warfare's other shields stay normal:** `spawn ShieldBronzeBanded_TW 1 1 p`, `ShieldChitin_TW` and
+  `ShieldChitinBuckler_TW`. Expected: one-handed (with a sword), they parry as in the normal game.
+  *Partly automated (`tower.thirdparty`); by hand: A parry with one of them in a real game.*
+- [x] **T52 Shields added while the game loads or after joining:** no way to make one by hand: the self-test adds a
+  shield the way blaxxun ItemManager does, one whose data a Jotunn-style mod changes into tower data while the game
+  loads, and one a few seconds after the world loaded (like a server sending extra items). Expected: each becomes a
+  tower shield without a restart, with the bash damage of its block armor, and a round shield added the same way stays
+  normal.
+  *Automated: `tower.thirdparty`, `probe.content`.*
+- [x] **T53 Creature copies left out by their data:** in the line of T50 (also without Warfare), the creature copies
+  `FW_ShieldBlackmetalTower` and `SP_ShieldBlackmetalTower` are "left out as creature-only", and T17 still holds.
+  *Automated: `tower.thirdparty`, `tower.creature`.*
+- [ ] **T54 ExcludedTowers:** set `ExcludedTowers = ShieldIronTower` (with a `ShieldIronTower` in your inventory).
+  Expected: it is a normal one-handed shield at once (tooltip, equip with a sword); the other tower shields are
+  unchanged; the log says nothing about it. Clear the setting. Expected: two-handed again. With Warfare:
+  `ExcludedTowers = ShieldBronzeTower_TW` does the same to Warfare's Bronze tower shield.
+  *Partly automated (`tower.thirdparty` on a stand-in tower); by hand: The same with a vanilla or Warfare tower shield
+  in a real game.*
+- [ ] **T55 AutoTowers off:** set `AutoTowers = false`. Expected: the seven normal-game tower shields stay tower
+  shields (they are in `Towers`); Warfare's tower shields are normal shields; the log line says "only the ones named in
+  Towers (AutoTowers is off)". Set it back to true.
+  *Partly automated (`tower.thirdparty`); by hand: With Warfare installed, Warfare's tower shields as seen.*
+- [ ] **T56 Bash damage from block armor:** add `ShieldIronSquare` (no number) to `Towers`. Expected: the iron square
+  shield becomes a tower shield whose tooltip lists a bash of 8.6 blunt (block armor 35); with `ShieldIronSquare:12`
+  it lists 12. The seven normal-game towers keep 6 / 8 / 12 / 15 / 20 / 28 / 32.
+  *Partly automated (`tower.rules`, `tower.thirdparty`); by hand: The iron square shield's tooltip as read.*
+- [ ] **M19 Server's AutoTowers and ExcludedTowers:** the host sets `ExcludedTowers = ShieldBronzeTower_TW` (Warfare
+  on both games), then `AutoTowers = false`. Expected: for the client, Warfare's Bronze tower shield is a normal shield
+  after the first change, and every Warfare tower shield after the second; the client's own settings are not used.
+  *Partly automated (`tower.mp.rules` with the stand-in towers); by hand: With Warfare on a real server and client.*

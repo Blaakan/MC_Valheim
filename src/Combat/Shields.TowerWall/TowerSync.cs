@@ -8,7 +8,8 @@ namespace MC.Combat.ShieldsTowerWallMod;
 // each change; me wait Delay s after the last one (ConfigurationManager fire one change per key typed), compare the
 // rules key with the one me applied, then apply on main thread. Me also apply again when the ZNet object changed
 // (joined a server, started own world): rules in force switch there without a generation raise. ObjectDB postfix
-// force an apply (new item database: new catalog).
+// force an apply (new item database: new catalog). Content change after that (other mods' items registered late,
+// server-synced item editors: ContentPrint) = apply again on the next tick, so new shields become towers.
 // Apply = new catalog; running bash cancelled when its tower leave the list; bash rebuilt (fallback state reset);
 // ApplyAll (prefabs + live copies, null rules = vanilla); FixHands on local player; Braced updated.
 // Driven by ZNet.Update postfix (HasWork idle = one bool, one int compare, one reference compare), ObjectDB postfixes
@@ -21,12 +22,14 @@ internal static class TowerSync
     private static int _appliedGeneration;
     private static ZNet _appliedNet;
     private static ObjectDB _appliedDb;
+    private static ContentPrint _appliedPrint;
     private static string _appliedKey;       // key of rules applied; null = vanilla (nothing applied, or client waiting)
     private static TowerRules _applied;      // rules now written into items; null = vanilla
     private static string _problemsLogged;   // key whose Towers problems me already logged
 
     internal static bool HasWork =>
-        _active && (_appliedGeneration != ServerRules.Generation || !ReferenceEquals(_appliedNet, ZNet.instance));
+        _active && (_appliedGeneration != ServerRules.Generation || !ReferenceEquals(_appliedNet, ZNet.instance)
+                    || !_appliedPrint.Equals(ContentPrint.Now()));
 
     // True between Activate and Deactivate (self test tower.toggle put it back on when it turned it off).
     internal static bool Active => _active;
@@ -82,6 +85,7 @@ internal static class TowerSync
         _appliedKey = null;
         _appliedNet = null;
         _appliedDb = null;
+        _appliedPrint = default;
         _problemsLogged = null;
     }
 
@@ -102,10 +106,12 @@ internal static class TowerSync
         var rules = TowerRules.InForce;
         var key = rules != null ? rules.Key : null;
         var db = dbOverride != null ? dbOverride : ObjectDB.instance;
-        if (!force && key == _appliedKey && ReferenceEquals(db, _appliedDb))
+        var print = ContentPrint.Now();
+        if (!force && key == _appliedKey && ReferenceEquals(db, _appliedDb) && print.Equals(_appliedPrint))
         {
             return;
         }
+        _appliedPrint = print;
         _appliedKey = key;
         _appliedDb = db;
         _applied = rules;

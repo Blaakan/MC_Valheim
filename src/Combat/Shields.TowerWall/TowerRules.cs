@@ -17,16 +17,19 @@ internal enum BashAnimationKind
     Custom,       // BashCustomTrigger, checked at runtime (player attack trigger only)
 }
 
-// One line of the Towers list: prefab name + blunt damage of its bash.
+// One line of the Towers list: prefab name + blunt damage of its bash. FixedDamage false = no ":n" (or a bad number):
+// damage come from the tower's block armor (TowerRules.ScaledBashDamage), like an automatic tower.
 internal readonly struct TowerEntry
 {
     internal readonly string Prefab;
     internal readonly float BashDamage;
+    internal readonly bool FixedDamage;
 
-    internal TowerEntry(string prefab, float bashDamage)
+    internal TowerEntry(string prefab, float bashDamage, bool fixedDamage = true)
     {
         Prefab = prefab;
         BashDamage = bashDamage;
+        FixedDamage = fixedDamage;
     }
 }
 
@@ -56,12 +59,19 @@ internal sealed class TowerRules
     internal const float MinBashAngle = 10f;
     internal const float MaxBashAngle = 180f;
     internal const float MaxBashDamage = 200f;
-    internal const float DefaultBashDamage = 10f;       // Towers entry without ":n"
 
-    // Defaults (design 5). Config binding use them, self tests too.
+    // Defaults (design 5). Config binding use them, self tests too. AutoTowers (design 2.0.2): every shield that
+    // cannot parry at all is a tower, mods' shields too; Towers add more and set bash damage; ExcludedTowers win.
+    internal const bool DefaultAutoTowers = true;
     internal const string DefaultTowers =
         "ShieldWoodTower:6, ShieldBoneTower:8, ShieldIronTower:12, ShieldSerpentscale:15, ShieldBlackmetalTower:20, "
         + "ShieldFlametalTower:28, ShieldGoldTower:32";
+    internal const string DefaultExcludedTowers = "";
+
+    // Bash damage scale (design 2.0.2): vanilla towers' block armor at quality 1 -> their default damage (same seven
+    // numbers as DefaultTowers). Tower without ":n" get the point on this line for its own vanilla block armor.
+    private static readonly float[] ScaleArmor = { 10f, 32f, 52f, 60f, 104f, 140f, 158f };
+    private static readonly float[] ScaleDamage = { 6f, 8f, 12f, 15f, 20f, 28f, 32f };
     internal const float DefaultBlockArmorMultiplier = 2.5f;
     internal const int DefaultBlockForcePercent = 100;
     internal const int DefaultCarrySlowPercent = 30;
@@ -82,8 +92,9 @@ internal sealed class TowerRules
 
     // Wire: version, then every value in fixed order. Version bump = other layout (ModNetworkVersion too).
     // Layout 2 (2026-09-30): ShieldUp gone from the enum, BashAnimationSpeed and BashCooldown added,
-    // BashStaggerCooldown renamed BashStaggerLock.
-    internal const int Layout = 2;
+    // BashStaggerCooldown renamed BashStaggerLock. Layout 3 (2026-10-16): AutoTowers and ExcludedTowers at the end,
+    // Towers entry without ":n" = damage from block armor.
+    internal const int Layout = 3;
 
     // Animation names the config offer, enum order. Old name ShieldUp not in it: config list turn it into the first
     // one (ShieldPunch), no warning.
@@ -93,7 +104,9 @@ internal sealed class TowerRules
     private static string _defaultListKey;
 
     // Values. Set only before Seal (Own, TryRead, With); read-only after.
+    internal bool AutoTowers = DefaultAutoTowers;
     internal string Towers = DefaultTowers;
+    internal string ExcludedTowers = DefaultExcludedTowers;
     internal float BlockArmorMultiplier = DefaultBlockArmorMultiplier;
     internal int BlockForcePercent = DefaultBlockForcePercent;
     internal int CarrySlowPercent = DefaultCarrySlowPercent;
@@ -113,12 +126,41 @@ internal sealed class TowerRules
     internal float BashAngle = DefaultBashAngle;
 
     private TowerEntry[] _entries = Array.Empty<TowerEntry>();
+    private string[] _excluded = Array.Empty<string>();
+    private HashSet<string> _excludedSet = new HashSet<string>(StringComparer.Ordinal);
     private string[] _listProblems = Array.Empty<string>();
     private string _key = "";
 
     // Towers parsed (prefab + bash damage), in list order, no duplicates. Unknown prefabs still here: catalog check
     // them against ObjectDB.
     internal IReadOnlyList<TowerEntry> Entries => _entries;
+
+    // ExcludedTowers parsed (prefab names, list order, no duplicates). Never a tower, listed or automatic.
+    internal IReadOnlyList<string> Excluded => _excluded;
+
+    internal bool IsExcluded(string prefab) => prefab != null && _excludedSet.Contains(prefab);
+
+    // Bash damage of a tower whose entry has no ":n" (automatic towers too), from its vanilla block armor at
+    // quality 1: straight lines between the vanilla towers' points, flat below the first, last slope above the last
+    // (capped). Vanilla towers land exactly on their default damage.
+    internal static float ScaledBashDamage(float blockArmor)
+    {
+        if (float.IsNaN(blockArmor) || blockArmor <= ScaleArmor[0])
+        {
+            return ScaleDamage[0];
+        }
+        for (var i = 1; i < ScaleArmor.Length; i++)
+        {
+            if (blockArmor <= ScaleArmor[i])
+            {
+                var t = (blockArmor - ScaleArmor[i - 1]) / (ScaleArmor[i] - ScaleArmor[i - 1]);
+                return ScaleDamage[i - 1] + t * (ScaleDamage[i] - ScaleDamage[i - 1]);
+            }
+        }
+        var n = ScaleArmor.Length - 1;
+        var slope = (ScaleDamage[n] - ScaleDamage[n - 1]) / (ScaleArmor[n] - ScaleArmor[n - 1]);
+        return Mathf.Min(MaxBashDamage, ScaleDamage[n] + (blockArmor - ScaleArmor[n]) * slope);
+    }
 
     // What was wrong in the Towers text (bad number, duplicate...), for one log line. Empty = fine.
     internal IReadOnlyList<string> ListProblems => _listProblems;
@@ -147,7 +189,9 @@ internal sealed class TowerRules
 #endif
         var r = new TowerRules
         {
+            AutoTowers = Plugin.AutoTowers.Value,
             Towers = Plugin.Towers.Value,
+            ExcludedTowers = Plugin.ExcludedTowers.Value,
             BlockArmorMultiplier = Plugin.BlockArmorMultiplier.Value,
             BlockForcePercent = Plugin.BlockForcePercent.Value,
             CarrySlowPercent = Plugin.CarrySlowPercent.Value,
@@ -236,6 +280,8 @@ internal sealed class TowerRules
         pkg.Write(BashKnockback);
         pkg.Write(BashRange);
         pkg.Write(BashAngle);
+        pkg.Write(AutoTowers);
+        pkg.Write(ExcludedTowers ?? "");
     }
 
     // Never trust the wire: unknown layout or broken package = false (caller keep what it had); values outside the
@@ -270,6 +316,8 @@ internal sealed class TowerRules
                 BashKnockback = pkg.ReadSingle(),
                 BashRange = pkg.ReadSingle(),
                 BashAngle = pkg.ReadSingle(),
+                AutoTowers = pkg.ReadBool(),
+                ExcludedTowers = pkg.ReadString(),
             };
             clamped = r.Seal();
             rules = r;
@@ -286,6 +334,7 @@ internal sealed class TowerRules
     {
         var clamped = false;
         Towers ??= "";
+        ExcludedTowers ??= "";
         BashCustomTrigger = (BashCustomTrigger ?? "").Trim();
         BlockArmorMultiplier = Clamp(BlockArmorMultiplier, MinBlockArmorMultiplier, MaxBlockArmorMultiplier,
             DefaultBlockArmorMultiplier, ref clamped);
@@ -311,14 +360,18 @@ internal sealed class TowerRules
 
         var problems = new List<string>();
         _entries = ParseTowers(Towers, problems);
+        _excluded = ParseNames(ExcludedTowers);
+        // Excluded and listed: excluded win, no problem text (the default Towers name the seven vanilla towers, so
+        // excluding one of them is the plain way to keep it normal).
+        _excludedSet = new HashSet<string>(_excluded, StringComparer.Ordinal);
         _listProblems = problems.ToArray();
         _key = BuildKey();
         return clamped;
     }
 
-    // Pure: "Name:12, Other, Third:0.5" -> entries. Separators , ; and new lines. No ":n" = DefaultBashDamage. Bad or
-    // out-of-range number, empty name, duplicate = problem text (entry fixed or skipped). Case kept: prefab names are
-    // case-sensitive in ObjectDB.
+    // Pure: "Name:12, Other, Third:0.5" -> entries. Separators , ; and new lines. No ":n" = damage from block armor
+    // (FixedDamage false). Bad or out-of-range number, empty name, duplicate = problem text (entry fixed or skipped).
+    // Case kept: prefab names are case-sensitive in ObjectDB.
     internal static TowerEntry[] ParseTowers(string text, List<string> problems)
     {
         var list = new List<TowerEntry>();
@@ -334,23 +387,26 @@ internal sealed class TowerRules
                 continue;
             }
             var name = part;
-            var damage = DefaultBashDamage;
+            var damage = 0f;
+            var fixedDamage = false;
             var colon = part.IndexOf(':');
             if (colon >= 0)
             {
                 name = part.Substring(0, colon).Trim();
                 var number = part.Substring(colon + 1).Trim();
+                fixedDamage = true;
                 if (!float.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out damage)
                     || float.IsNaN(damage) || float.IsInfinity(damage))
                 {
-                    problems?.Add($"'{part}': '{number}' is not a number, so its bash deals {F(DefaultBashDamage)} damage");
-                    damage = DefaultBashDamage;
+                    problems?.Add($"'{part}': '{number}' is not a number, so its bash damage comes from its block armor");
+                    damage = 0f;
+                    fixedDamage = false;
                 }
                 else if (damage < 0f || damage > MaxBashDamage)
                 {
-                    var fixedDamage = Mathf.Clamp(damage, 0f, MaxBashDamage);
-                    problems?.Add($"'{part}': bash damage must be 0 to {F(MaxBashDamage)}, so {F(fixedDamage)} is used");
-                    damage = fixedDamage;
+                    var clampedDamage = Mathf.Clamp(damage, 0f, MaxBashDamage);
+                    problems?.Add($"'{part}': bash damage must be 0 to {F(MaxBashDamage)}, so {F(clampedDamage)} is used");
+                    damage = clampedDamage;
                 }
             }
             if (name.Length == 0)
@@ -372,7 +428,32 @@ internal sealed class TowerRules
                 problems?.Add($"{name} is listed more than once; the first entry is used");
                 continue;
             }
-            list.Add(new TowerEntry(name, damage));
+            list.Add(new TowerEntry(name, damage, fixedDamage));
+        }
+        return list.ToArray();
+    }
+
+    // Pure: "A, B; C" -> names, list order, no duplicates, empty parts skipped. A ":n" after a name is ignored (people
+    // copy lines from Towers).
+    internal static string[] ParseNames(string text)
+    {
+        var list = new List<string>();
+        if (string.IsNullOrEmpty(text))
+        {
+            return list.ToArray();
+        }
+        foreach (var raw in text.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var name = raw.Trim();
+            var colon = name.IndexOf(':');
+            if (colon >= 0)
+            {
+                name = name.Substring(0, colon).Trim();
+            }
+            if (name.Length > 0 && !list.Contains(name))
+            {
+                list.Add(name);
+            }
         }
         return list.ToArray();
     }
@@ -380,7 +461,7 @@ internal sealed class TowerRules
     // One log line (tower list long: only say whether it is the default one).
     internal string Describe()
     {
-        var sb = new StringBuilder();
+        var sb = new StringBuilder(AutoTowers ? "automatic towers, " : "no automatic towers, ");
         _defaultListKey ??= ListKey(ParseTowers(DefaultTowers, null), exact: true);
         if (ListKey(_entries, exact: true) == _defaultListKey)
         {
@@ -390,6 +471,10 @@ internal sealed class TowerRules
         {
             var shown = ListKey(_entries, exact: false).TrimEnd(',').Replace(",", ", ");
             sb.Append("tower list ").Append(_entries.Length == 0 ? "(empty)" : shown);
+        }
+        if (_excluded.Length > 0)
+        {
+            sb.Append(", excluded ").Append(string.Join(", ", _excluded));
         }
         sb.Append(", block armor x").Append(F(BlockArmorMultiplier))
             .Append(", block force ").Append(BlockForcePercent).Append('%')
@@ -416,7 +501,8 @@ internal sealed class TowerRules
 
     private string BuildKey()
     {
-        var sb = new StringBuilder(ListKey(_entries, exact: true));
+        var sb = new StringBuilder(AutoTowers ? "auto|" : "list|").Append(ListKey(_entries, exact: true));
+        sb.Append('|').Append(string.Join(",", _excluded));
         sb.Append('|').Append(R(BlockArmorMultiplier))
             .Append('|').Append(BlockForcePercent)
             .Append('|').Append(CarrySlowPercent)
@@ -437,13 +523,19 @@ internal sealed class TowerRules
         return sb.ToString();
     }
 
-    // "Name:dmg," per entry: same list whatever the spaces. Exact = full float text (key), else rounded (log).
+    // "Name:dmg," per entry ("Name," when damage come from block armor): same list whatever the spaces. Exact = full
+    // float text (key), else rounded (log).
     private static string ListKey(TowerEntry[] entries, bool exact)
     {
         var sb = new StringBuilder();
         foreach (var e in entries)
         {
-            sb.Append(e.Prefab).Append(':').Append(exact ? R(e.BashDamage) : F(e.BashDamage)).Append(',');
+            sb.Append(e.Prefab);
+            if (e.FixedDamage)
+            {
+                sb.Append(':').Append(exact ? R(e.BashDamage) : F(e.BashDamage));
+            }
+            sb.Append(',');
         }
         return sb.ToString();
     }

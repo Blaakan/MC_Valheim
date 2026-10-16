@@ -6,7 +6,9 @@ using MC.Shared;
 namespace MC.Combat.ShieldsTowerWallMod.Patches;
 
 // Me = item database hooks (design 2.0, 2.1, 6.3).
-//   Awake / CopyOtherDB postfix (Low: after other mods' item setup): database with items = new tower catalog, rules
+//   Awake / CopyOtherDB postfix (LatePriority: after every other mod's postfix, also Jotunn's OnItemsRegistered at
+//   priority 0 where Jotunn mods edit item data, so vanilla snapshots and the auto rule see edited data):
+//   database with items = new tower catalog, rules
 //   in force (vanilla while a client wait) written on prefabs and live copies (TowerSync). First pass with items
 //   (main menu: every plugin loaded and patched) = foreign shield mod warning. Main menu Awake has no items: skipped.
 //   GetAllCraftableWeapons postfix: towers out of the (cached) list, so "craft every weapon" achievement and craft
@@ -14,8 +16,11 @@ namespace MC.Combat.ShieldsTowerWallMod.Patches;
 [HarmonyPatch]
 internal static class ObjectDBPatches
 {
+    // Below Priority.Last (0): Harmony run higher first, so me run after postfixes at 0 too.
+    private const int LatePriority = -500;
+
     [HarmonyPostfix]
-    [HarmonyPriority(Priority.Low)]
+    [HarmonyPriority(LatePriority)]
     [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.Awake))]
     private static void Awake_Postfix(ObjectDB __instance)
     {
@@ -23,7 +28,7 @@ internal static class ObjectDBPatches
     }
 
     [HarmonyPostfix]
-    [HarmonyPriority(Priority.Low)]
+    [HarmonyPriority(LatePriority)]
     [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.CopyOtherDB))]
     private static void CopyOtherDB_Postfix(ObjectDB __instance)
     {

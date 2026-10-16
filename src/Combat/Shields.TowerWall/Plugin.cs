@@ -25,7 +25,9 @@ internal sealed partial class Plugin : ModPlugin
     private const string ServerWins = " In multiplayer the setting of the server (or host) is used for everyone.";
 
     internal static ConfigEntry<bool> AllowPlayersWithoutMod;
+    internal static ConfigEntry<bool> AutoTowers;
     internal static ConfigEntry<string> Towers;
+    internal static ConfigEntry<string> ExcludedTowers;
     internal static ConfigEntry<float> BlockArmorMultiplier;
     internal static ConfigEntry<int> BlockForcePercent;
     internal static ConfigEntry<int> CarrySlowPercent;
@@ -58,12 +60,21 @@ internal sealed partial class Plugin : ModPlugin
             null, new ConfigurationManagerAttributes { Order = 90 }));
 
         // Tower shields.
+        AutoTowers = Config.Bind(TowersSection, "AutoTowers", TowerRules.DefaultAutoTowers, new ConfigDescription(
+            "On: every shield that cannot parry at all (parry bonus 0) is a tower shield, also shields added by other "
+            + "mods, except copies only creatures carry. Off: only the shields named in Towers." + ServerWins,
+            null, new ConfigurationManagerAttributes { Order = 110 }));
         Towers = Config.Bind(TowersSection, "Towers", TowerRules.DefaultTowers, new ConfigDescription(
-            "Which shields are tower shields: comma-separated prefab names (the names the spawn command uses), each "
-            + "with the blunt damage of its bash after a colon (0 to 200; 10 when left out). Only shields are "
-            + "accepted; a shield that can parry loses its parry. Names the game does not know are reported in the "
-            + "log." + ServerWins,
+            "More tower shields, and the bash damage of each: comma-separated prefab names (the names the spawn "
+            + "command uses), each with the blunt damage of its bash after a colon (0 to 200). Without a number, the "
+            + "bash damage comes from the shield's block armor, on the same scale as the normal-game towers (this is "
+            + "also how shields found by AutoTowers get theirs). Only shields are accepted; a shield that can parry "
+            + "loses its parry. Names the game does not know are reported in the log." + ServerWins,
             null, new ConfigurationManagerAttributes { Order = 100 }));
+        ExcludedTowers = Config.Bind(TowersSection, "ExcludedTowers", TowerRules.DefaultExcludedTowers, new ConfigDescription(
+            "Shields that are never tower shields, even when AutoTowers finds them or Towers names them: "
+            + "comma-separated prefab names." + ServerWins,
+            null, new ConfigurationManagerAttributes { Order = 95 }));
         BlockArmorMultiplier = Config.Bind(TowersSection, "BlockArmorMultiplier", TowerRules.DefaultBlockArmorMultiplier,
             new ConfigDescription(
                 "Tower shield block armor is multiplied by this (also the armor gained per quality level)." + ServerWins,

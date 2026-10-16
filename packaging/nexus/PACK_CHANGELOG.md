@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3
+
+- Tower Shield Wall 0.2.0: tower shields from other mods are found automatically (every shield that cannot parry at
+  all, for example Warfare's Bronze, Chitin and Carapace tower shields), with a bash damage that follows their block
+  armor; new settings `AutoTowers` and `ExcludedTowers`.
+
 ## 0.4.2
 
 - Forge Idol Upgrades 0.2.0, for Valheim 1.0.20: the refinement roll is the game's own (the same result after

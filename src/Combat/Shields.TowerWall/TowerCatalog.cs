@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using MC.Shared;
 using UnityEngine;
@@ -68,24 +69,30 @@ internal sealed class TowerSnapshot
         && skill == Skills.SkillType.Blocking;
 }
 
-// One tower of the rules in force: list entry (bash damage) + its vanilla snapshot.
+// One tower of the rules in force: list entry (automatic tower = entry with no fixed damage) + its vanilla snapshot.
+// Bash damage = entry's ":n", else scaled from the snapshot's vanilla block armor.
 internal sealed class TowerInfo
 {
     internal readonly TowerEntry Entry;
     internal readonly TowerSnapshot Snapshot;
+    internal readonly bool Automatic;
+    internal readonly float BashDamage;
 
-    internal TowerInfo(TowerEntry entry, TowerSnapshot snapshot)
+    internal TowerInfo(TowerEntry entry, TowerSnapshot snapshot, bool automatic)
     {
         Entry = entry;
         Snapshot = snapshot;
+        Automatic = automatic;
+        BashDamage = entry.FixedDamage ? entry.BashDamage : TowerRules.ScaledBashDamage(snapshot.BlockPower);
     }
-
-    internal float BashDamage => Entry.BashDamage;
 }
 
-// Me = which items are tower shields right now (design 2.0, 7.1). Built from the rules TowerSync applied and the
-// current ObjectDB; checked against the vanilla snapshot: unknown name = MISSING, not a shield = refused, shield that
-// can parry = accepted but lose parry (one Warning each, once per rule set).
+// Me = which items are tower shields right now (design 2.0, 2.0.2, 7.1). Built from the rules TowerSync applied and
+// the current ObjectDB. Listed (Towers): checked against the vanilla snapshot: unknown name = MISSING, not a shield =
+// refused, shield that can parry = accepted but lose parry (one Warning each, once per rule set). Automatic
+// (AutoTowers): every other item whose vanilla data is shield data with parry bonus below 1, mods' items too, except
+// creature-only copies (no recipe and carried by a creature prefab, e.g. FW_/SP_ShieldBlackmetalTower). Excluded
+// names never. Vanilla data = snapshot when the prefab was a tower before, else live data (never written by me).
 // Item found by m_dropPrefab (every real item has it), or by prefab SharedData reference (prefab's own data in recipe
 // panels has no drop prefab). Never by item name: creature copies (FW_/SP_ShieldBlackmetalTower) share the name.
 // Hot paths (local player, per tick / per hit) use Held: cached verdict for the left item, recomputed only when the
@@ -105,6 +112,12 @@ internal static class TowerCatalog
 
     private static int _version;
     private static string _warnedKey;
+    private static string _toldKey;
+
+    // Last rebuild: automatic towers, and parry-0 shields left out as creature-only (self tests read them).
+    private static readonly List<string> AutoNames = new List<string>();
+    private static readonly List<string> CreatureOnlyNames = new List<string>();
+    private static int _undecided;
 
     // Held cache (local player only).
     private static ItemDrop.ItemData _heldItem;
@@ -119,6 +132,13 @@ internal static class TowerCatalog
     internal static IEnumerable<TowerSnapshot> Snapshots => SnapshotsByName.Values;
 
     internal static IEnumerable<TowerInfo> Towers => ByPrefab.Values;
+
+    internal static IReadOnlyList<string> Automatic => AutoNames;
+
+    internal static IReadOnlyList<string> CreatureOnly => CreatureOnlyNames;
+
+    // Recipe-less parry-0 shields not judged yet (no ZNetScene: main menu). The in-world rebuild judges them.
+    internal static int Undecided => _undecided;
 
     // The game's own item database? Not when empty (main menu first Awake), when another mod show its own copy with
     // only its items (seen 2026-10-07 with Jotunn-based mods: no Wood, no shield), or when the world close (item
@@ -135,6 +155,9 @@ internal static class TowerCatalog
         Bump();
         ByPrefab.Clear();
         ByShared.Clear();
+        AutoNames.Clear();
+        CreatureOnlyNames.Clear();
+        _undecided = 0;
         if (rules == null || !HasVanillaItems(db))
         {
             return;
@@ -144,6 +167,10 @@ internal static class TowerCatalog
         List<string> parry = null;
         foreach (var entry in rules.Entries)
         {
+            if (rules.IsExcluded(entry.Prefab))
+            {
+                continue;
+            }
             var go = db.GetItemPrefab(entry.Prefab);
             var drop = go != null ? go.GetComponent<ItemDrop>() : null;
             var shared = drop != null && drop.m_itemData != null ? drop.m_itemData.m_shared : null;
@@ -162,11 +189,169 @@ internal static class TowerCatalog
             {
                 (parry ??= new List<string>()).Add(entry.Prefab);
             }
-            var info = new TowerInfo(entry, snap);
+            var info = new TowerInfo(entry, snap, automatic: false);
             ByPrefab[go] = info;
             ByShared[shared] = info;
         }
+        if (rules.AutoTowers)
+        {
+            AddAutomatic(db, rules);
+        }
         WarnOnce(rules, missing, notShield, parry);
+        TellOnce(rules);
+    }
+
+    // AutoTowers pass: every not-yet-listed item whose vanilla data is a shield that cannot parry at all.
+    private static void AddAutomatic(ObjectDB db, TowerRules rules)
+    {
+        HashSet<GameObject> crafted = null;
+        HashSet<GameObject> carried = null;
+        foreach (var go in db.m_items)
+        {
+            if (go == null || ByPrefab.ContainsKey(go) || rules.IsExcluded(go.name))
+            {
+                continue;
+            }
+            var drop = go.GetComponent<ItemDrop>();
+            var shared = drop != null && drop.m_itemData != null ? drop.m_itemData.m_shared : null;
+            if (shared == null || !IsAutoTower(go, shared))
+            {
+                continue;
+            }
+            crafted ??= CraftedItems(db);
+            if (!crafted.Contains(go))
+            {
+                var scene = ZNetScene.instance;
+                if (scene == null)
+                {
+                    _undecided++;
+                    continue;
+                }
+                carried ??= CarriedItems(scene);
+                if (carried.Contains(go))
+                {
+                    CreatureOnlyNames.Add(go.name);
+                    continue;
+                }
+            }
+            var snap = SnapshotFor(go.name, go, shared);
+            if (snap == null || !snap.IsShield)
+            {
+                continue;
+            }
+            var info = new TowerInfo(new TowerEntry(go.name, 0f, fixedDamage: false), snap, automatic: true);
+            ByPrefab[go] = info;
+            ByShared[shared] = info;
+            AutoNames.Add(go.name);
+        }
+        AutoNames.Sort(StringComparer.Ordinal);
+        CreatureOnlyNames.Sort(StringComparer.Ordinal);
+    }
+
+    // The rule, on vanilla data: the snapshot when me wrote this prefab before (live data carry tower data), else the
+    // live data (never written). Parry bonus below 1 = no parry at all (vanilla towers 0; ShieldIronSquare 1 stays out,
+    // a parry needs above 1).
+    private static bool IsAutoTower(GameObject go, ItemDrop.ItemData.SharedData shared)
+    {
+        if (SnapshotsByName.TryGetValue(go.name, out var snap) && ReferenceEquals(snap.PrefabObject, go)
+            && ReferenceEquals(snap.PrefabShared, shared))
+        {
+            return snap.IsShield && snap.TimedBlockBonus < 1f;
+        }
+        return TowerSnapshot.IsShieldData(shared.m_itemType, shared.m_animationState, shared.m_skillType)
+               && shared.m_timedBlockBonus < 1f;
+    }
+
+    // Items some recipe makes (enabled or not: a disabled recipe still says players are meant to have it).
+    private static HashSet<GameObject> CraftedItems(ObjectDB db)
+    {
+        var set = new HashSet<GameObject>();
+        if (db.m_recipes == null)
+        {
+            return set;
+        }
+        foreach (var r in db.m_recipes)
+        {
+            if (r != null && r.m_item != null)
+            {
+                set.Add(r.m_item.gameObject);
+            }
+        }
+        return set;
+    }
+
+    // Item prefabs some creature prefab carries (Humanoid default and random gear).
+    private static HashSet<GameObject> CarriedItems(ZNetScene scene)
+    {
+        var set = new HashSet<GameObject>();
+        foreach (var prefab in scene.m_prefabs)
+        {
+            var h = prefab != null ? prefab.GetComponent<Humanoid>() : null;
+            if (h == null)
+            {
+                continue;
+            }
+            AddAll(set, h.m_defaultItems);
+            AddAll(set, h.m_randomWeapon);
+            AddAll(set, h.m_randomArmor);
+            AddAll(set, h.m_randomShield);
+            if (h.m_randomSets != null)
+            {
+                foreach (var s in h.m_randomSets)
+                {
+                    if (s != null)
+                    {
+                        AddAll(set, s.m_items);
+                    }
+                }
+            }
+            if (h.m_randomItems != null)
+            {
+                foreach (var r in h.m_randomItems)
+                {
+                    if (r != null && r.m_prefab != null)
+                    {
+                        set.Add(r.m_prefab);
+                    }
+                }
+            }
+        }
+        return set;
+    }
+
+    private static void AddAll(HashSet<GameObject> set, GameObject[] items)
+    {
+        if (items == null)
+        {
+            return;
+        }
+        foreach (var go in items)
+        {
+            if (go != null)
+            {
+                set.Add(go);
+            }
+        }
+    }
+
+    // One Info line when the automatic towers change (other mods' shields found: the player should see which).
+    private static void TellOnce(TowerRules rules)
+    {
+        var key = rules.Key + "#" + string.Join(",", AutoNames.ToArray()) + "#" + _undecided;
+        if (key == _toldKey)
+        {
+            return;
+        }
+        _toldKey = key;
+        if (!rules.AutoTowers)
+        {
+            Log.Info($"Tower shields: {ByPrefab.Count}, only the ones named in Towers (AutoTowers is off).");
+            return;
+        }
+        Log.Info($"Tower shields: {ByPrefab.Count}; found automatically: "
+                 + (AutoNames.Count == 0 ? "none" : string.Join(", ", AutoNames.ToArray()))
+                 + (CreatureOnlyNames.Count == 0 ? "" : $"; left out as creature-only: {string.Join(", ", CreatureOnlyNames.ToArray())}")
+                 + (_undecided == 0 ? "." : $"; {_undecided} more decided once a world loads."));
     }
 
     // Mod off: no tower (snapshots stay: process lifetime). Warnings said again after next turn on (like TowerSync's
@@ -179,6 +364,10 @@ internal static class TowerCatalog
         _heldItem = null;
         _heldInfo = null;
         _warnedKey = null;
+        _toldKey = null;
+        AutoNames.Clear();
+        CreatureOnlyNames.Clear();
+        _undecided = 0;
     }
 
     // Tower info of an item, null = not a tower of the applied rules. Dictionary lookups, no allocation.

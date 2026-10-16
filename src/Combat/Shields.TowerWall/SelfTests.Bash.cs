@@ -1343,7 +1343,7 @@ internal static partial class SelfTests
             // (1) The held tower leave the Towers list in the middle of a slowed bash (a settings edit or a server
             // push): the bash is cancelled before its hit, the tower is a normal shield in place.
             var slow = defaults.With(r => r.BashAnimationSpeed = 0.3f);
-            var dropped = slow.With(r => r.Towers = "");
+            var dropped = slow.With(r => { r.Towers = ""; r.AutoTowers = false; });
             yield return UseRules(slow);
             snap = SnapshotOf(IronTower);
             yield return FreshBash(p, tower);

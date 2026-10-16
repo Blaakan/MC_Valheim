@@ -654,7 +654,7 @@ internal static partial class SelfTests
             p.EquipItem(sword);
             p.EquipItem(tower);
             yield return Fixed;
-            c.Check(TowerCatalog.Count == TowerRules.Defaults().Entries.Count && Only(p, tower, left: true) && !sword.m_equipped,
+            c.Check(DefaultTowersKnown() && Only(p, tower, left: true) && !sword.m_equipped,
                 $"in the world every default tower shield is known ({TowerCatalog.Count}) and the Iron one takes both hands ({Hands(p)})");
             yield return FreshBash(p, tower);
             var s = new Swing();

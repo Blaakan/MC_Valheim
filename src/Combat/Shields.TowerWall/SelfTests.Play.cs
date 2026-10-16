@@ -804,8 +804,8 @@ internal static partial class SelfTests
             c.Check(Near(walk1, walk0, 0.05f) && Near(walk0, p.m_walkSpeed, 0.05f), $"walking speed does not change ({F(walk0)} -> {F(walk1)} m/s)");
             c.Check(crouched0 && crouched1 && Near(crouch1, crouch0, 0.05f), $"crouching speed does not change ({F(crouch0)} -> {F(crouch1)} m/s, crouched {crouched0}/{crouched1})");
 
-            // The same tower with vanilla data (empty Towers list): the "3.6 with a normal tower shield" of T05.
-            var none = TowerRules.Defaults().With(r => r.Towers = "");
+            // The same tower with vanilla data (empty Towers list, AutoTowers off): the "3.6 with a normal tower shield" of T05.
+            var none = TowerRules.Defaults().With(r => { r.Towers = ""; r.AutoTowers = false; });
             yield return UseRules(none);
             p.UpdateModifiers();
             yield return Go(false);
@@ -1202,8 +1202,8 @@ internal static partial class SelfTests
             {
                 c.Check(Near(lost, 6.9f, 0.4f) && Near(used, 4.1f, 0.3f), $"that is about 7 damage and 4 stamina ({F(lost)}, {F(used)})");
             }
-            // The same shield with the normal game's data (empty Towers list): about 17 and 8.
-            yield return UseRules(TowerRules.Defaults().With(r => r.Towers = ""));
+            // The same shield with the normal game's data (empty Towers list, AutoTowers off): about 17 and 8.
+            yield return UseRules(TowerRules.Defaults().With(r => { r.Towers = ""; r.AutoTowers = false; }));
             yield return Ready(p, p.GetMaxStamina());
             SetSkill(p, Skills.SkillType.Blocking, 0f);
             blow = Expect(p, iron, 60f);

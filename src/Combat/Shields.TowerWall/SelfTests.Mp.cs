@@ -216,6 +216,12 @@ internal static partial class SelfTests
                 case "AllowPlayersWithoutMod":
                     Plugin.AllowPlayersWithoutMod.Value = value == "true";
                     break;
+                case "AutoTowers":
+                    Plugin.AutoTowers.Value = value == "true";
+                    break;
+                case "ExcludedTowers":
+                    Plugin.ExcludedTowers.Value = value;
+                    break;
                 default:
                     return $"unknown setting '{name}'";
             }
@@ -227,7 +233,7 @@ internal static partial class SelfTests
     {
         foreach (var entry in new ConfigEntryBase[]
                  {
-                     Plugin.Towers, Plugin.BlockArmorMultiplier, Plugin.BlockForcePercent, Plugin.CarrySlowPercent, Plugin.BraceSlowPercent,
+                     Plugin.AutoTowers, Plugin.Towers, Plugin.ExcludedTowers, Plugin.BlockArmorMultiplier, Plugin.BlockForcePercent, Plugin.CarrySlowPercent, Plugin.BraceSlowPercent,
                      Plugin.BraceStaggerResistPercent, Plugin.BraceKnockbackResistPercent, Plugin.BlockUnblockableAttacks, Plugin.BashAnimation,
                      Plugin.BashCustomTrigger, Plugin.BashAnimationSpeed, Plugin.BashStamina, Plugin.BashCooldown, Plugin.BashStagger,
                      Plugin.BashStaggerLock, Plugin.BashKnockback, Plugin.BashRange, Plugin.BashAngle, Plugin.AllowPlayersWithoutMod,
@@ -822,6 +828,29 @@ internal static partial class SelfTests
             else
             {
                 c.Check(false, "could not add SwordIron and ShieldBanded");
+            }
+
+            // TESTING M19: the server's AutoTowers and ExcludedTowers decide here too (stand-in towers of the content
+            // probe, on both sides).
+            if (SelfTestContent.Loaded)
+            {
+                var db = ObjectDB.instance;
+                yield return Ask($"set|ExcludedTowers={SelfTestContent.TowerShield}", a);
+                key = a["own"];
+                yield return Until(() => TowerSync.AppliedKey == key, 8f);
+                c.Check(TowerSync.AppliedKey == key && TowerCatalog.TowerOfPrefab(db.GetItemPrefab(SelfTestContent.TowerShield)) == null
+                        && TowerCatalog.TowerOfPrefab(db.GetItemPrefab(SelfTestContent.LateEditTower)) != null,
+                    "the server's ExcludedTowers is used: the excluded stand-in tower is a normal shield here, the other stand-in tower stays one");
+                yield return Ask("set|AutoTowers=false", a);
+                key = a["own"];
+                yield return Until(() => TowerSync.AppliedKey == key, 8f);
+                c.Check(TowerSync.AppliedKey == key && TowerCatalog.TowerOfPrefab(db.GetItemPrefab(SelfTestContent.LateEditTower)) == null
+                        && TowerCatalog.Automatic.Count == 0,
+                    $"the server's AutoTowers off is used: no tower found automatically here ({TowerCatalog.Automatic.Count})");
+            }
+            else
+            {
+                c.Check(false, "the stand-in content mod is not loaded on this client");
             }
             yield return ServerDefaults(a);
             c.Check(a.Ok && TowerSync.AppliedKey == defaultsKey, "server settings back to the defaults, the client follows");
