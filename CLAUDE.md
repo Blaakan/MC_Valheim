@@ -90,7 +90,9 @@ dist/                     packaged zips (git-ignored)
 | List mods | `./tools/Get-Mods.ps1 \| Format-Table` |
 
 If the game is running, deploy fails with a "file locked" warning: close the game first. **While the user is
-testing in-game, build with `-p:DeployToGame=false`** so the DLL under test doesn't change under them.
+testing in-game, build with `-p:DeployToGame=false`** so the DLL under test doesn't change under them. **Every run
+leaves the game folder as it found it** (mod builds and `MC.*.cfg`; how: backlog workflow steps 1 and 7), also runs
+outside that workflow.
 Tool scripts must stay ASCII-only (Windows PowerShell 5.1 reads BOM-less scripts as ANSI); build non-ASCII
 characters at runtime (`[char]0x2014`).
 
@@ -152,8 +154,10 @@ behaviours. One pause: **nothing is committed, pushed or posted until the user s
 commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no feature branch, no pull request).
 
 1. **Understand.** First run `git status` and `git log --oneline origin/main..HEAD`: if the tree is dirty or commits
-   are waiting to be pushed, tell the user and ask whether they belong to this run. Read the idea's section in
-   `docs/backlog.md` and `docs/research/existing-mods-*.md`, its notes in `docs/game/<chapter>.md`, the `.ref` code
+   are waiting to be pushed, tell the user and ask whether they belong to this run. Note the game folder's start state
+   for step 7: the deployed build id (`[MC:ready] ... build <hash>` in `BepInEx/LogOutput.log`) and a copy of
+   `BepInEx/config/MC.*.cfg` (the first `Test-InWorld.ps1` run's `config-backup` folder is one). Read the idea's
+   section in `docs/backlog.md` and `docs/research/existing-mods-*.md`, its notes in `docs/game/<chapter>.md`, the `.ref` code
    of every method involved (callers, guards, messages), and the MC mods that patch the same methods or touch the same
    items/state. Look at how existing mods hook it (GitHub source, Thunderstore "source" pages) and for compatibility
    traps (other mods patching the same methods). Number the expected behaviours: they become the design doc's Goal
@@ -196,8 +200,12 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
    origin (public repo) and open the public issue 'In-game tests: <ModName> <Version>'". Wait for an explicit OK. On
    change requests: apply, re-verify, pause again.
 7. **Commit and push** after the OK: stage this run's files by path (never `git add -A`), caveman commit message(s),
-   no Claude credit (in commits and in the issue), `git push origin main`. Then rebuild (`dotnet build
-   ValheimMods.slnx`) so the deployed DLL's build id is the pushed commit, not `<hash>+dirty`. Then re-run
+   no Claude credit (in commits and in the issue), `git push origin main`. Then put the game folder back as it was
+   when the run started (user rule, 2026-10-16: it is their play setup, e.g. the versions their server accepts; they
+   deploy the new build themselves when they test): build the start commit in a temporary `git worktree` (copy
+   `Local.props` in) with `dotnet build ValheimMods.slnx -c Debug`, which deploys it, and copy back every
+   `BepInEx/config/MC.*.cfg` whose bytes differ from the start copy (a new build rewrites its config with new keys
+   the first time the game runs). Only with the game closed; if it is running, ask the user to close it. Then re-run
    `./tools/Update-Backlog.ps1` and give the user its list of sheet cells to change (never edit the sheet yourself).
 8. **Test list as a GitHub issue**, after the push so the commit and file paths resolve on GitHub:
    `gh issue create --repo Blaakan/MC_Valheim --title "In-game tests: <ModName> <Version>" --body-file <scratch file>`.
