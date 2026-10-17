@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 fixed two things found by the self-tests on 0.1.0: reeling on the right side in a fight came in stop-and-go and
 stalled about a metre from the catch (T25), and a fish out of the water still fought (T26). T25 and T26 were reset and
 T28 is new; the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod
@@ -231,3 +231,19 @@ one back afterwards. Stamina items need `god` off only where they say so (god mo
   where you pulled it in (on the shore or in the shallows); the filter rules apply when you walk over it.
   *Partly automated (`fishing.swim`); by hand: Walking over the fish afterwards with Loot Pickup Filter rules set: the
   filter decides whether it is picked up.*
+
+## 0.1.2 — the refusal screen names the mod
+
+0.1.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
+under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
+needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
+connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Farming.Fishing.Fight` passed, the screen named this
+mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+
+- [ ] **M07 Refusal screen names the mod:** on a server with Fishing Fight, turn Fishing Fight off in Esc > MC Mods while you
+  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Fishing Fight: it is turned
+  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
+  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
+  join: you stay in.
+  *Partly automated (`probe.mp.off.MC.Farming.Fishing.Fight`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
+  window, and a game with another version of the mod than the server's (the line names both versions).*

@@ -13,7 +13,8 @@ namespace MC.Core.ProbeWorldMod;
 //   probe.mp.baseline = joined the dedicated server, server probe answer hello with same scenario, every MC mod in the
 //                       state the scenario want (modded: Both mods active on both sides; vanilla-server: Both mods
 //                       ServerMissing, Client mods active; open-server: player without MC mods stay in);
-//   probe.mp.refused  = vanilla-client: server refused the player without mods ("Incompatible version").
+//   probe.mp.refused  = vanilla-client: server refused the player without mods ("Incompatible version"); the error
+//                       screen lists those mods under "MC mods:" (RefusalNotes; the stand-in content mod runs the framework).
 internal static class MpTests
 {
     internal const string Baseline = "probe.mp.baseline";
@@ -225,6 +226,7 @@ internal static class MpTests
                 else
                 {
                     SelfTest.Note(n, $"turned off while in: refused after {after:F1} s ({status})");
+                    yield return ScreenNamesMod(n, f.Name, "turned off while in", problems);
                     // Join again with the mod still off: hello says "off", server refuse again.
                     t0 = Time.realtimeSinceStartup;
                     yield return MenuDriver.Rejoin(timings);
@@ -250,6 +252,7 @@ internal static class MpTests
                     else
                     {
                         SelfTest.Note(n, $"joined with it off: refused {after:F1} s after the join ({status})");
+                        yield return ScreenNamesMod(n, f.Name, "joined with it off", problems);
                     }
                 }
             }
@@ -282,6 +285,32 @@ internal static class MpTests
         else
         {
             SelfTest.Fail(n, string.Join("; ", problems));
+        }
+    }
+
+    // Refusal screen (RefusalNotes): the main menu's error panel lists this mod under "MC mods:" with the server's
+    // "turned off" line. The panel fills in when the menu starts (FejdStartup.ShowConnectError): wait for it.
+    private static IEnumerator ScreenNamesMod(string test, string mod, string when, List<string> problems)
+    {
+        var until = Time.realtimeSinceStartup + 5f;
+        string text = "";
+        while (Time.realtimeSinceStartup < until)
+        {
+            var fs = FejdStartup.instance;
+            text = fs != null && fs.m_connectionFailedPanel != null && fs.m_connectionFailedPanel.activeInHierarchy
+                ? fs.m_connectionFailedError.text ?? "" : "";
+            if (text.Contains(RefusalNotes.Header))
+            {
+                break;
+            }
+            yield return null;
+        }
+        SelfTest.Note(test, $"{when}: error screen '{text.Replace("\n", " / ")}'");
+        var line = $"- {mod}: ";
+        var at = text.IndexOf(line, System.StringComparison.Ordinal);
+        if (!text.Contains(RefusalNotes.Header) || at < 0 || text.IndexOf("turned off", at, System.StringComparison.Ordinal) < 0)
+        {
+            problems.Add($"{when}: the error screen does not name {mod} as turned off under '{RefusalNotes.Header}'");
         }
     }
 
@@ -336,7 +365,21 @@ internal static class MpTests
         var popup = FejdStartup.instance != null && FejdStartup.instance.m_connectionFailedPanel != null
                     && FejdStartup.instance.m_connectionFailedPanel.activeInHierarchy;
         var text = popup ? FejdStartup.instance.m_connectionFailedError.text : "";
-        SelfTest.Note(N, $"menu error panel shown {popup}, text '{text}'");
+        SelfTest.Note(N, $"menu error panel shown {popup}, text '{text.Replace("\n", " / ")}'");
+        // This client has no refusing MC mod, but the stand-in content mod runs the framework: the screen lists each
+        // mod whose server line came before the connection closed, as one this game does not have (RefusalNotes).
+        var missing = 0;
+        foreach (var l in text.Split('\n'))
+        {
+            if (l.StartsWith("- ", StringComparison.Ordinal) && l.Contains("your game does not have it"))
+            {
+                missing++;
+            }
+        }
+        if (!popup || !text.Contains(RefusalNotes.Header) || missing == 0)
+        {
+            problems.Add($"the error screen does not list the mods this game lacks under '{RefusalNotes.Header}' ({missing} line(s))");
+        }
         if (problems.Count == 0)
         {
             SelfTest.Pass(N, $"refused after {_refusedAfter:F1} s with {_status} (spawned first {_spawnedFirst}); the server log names each mod that refused");

@@ -12,10 +12,60 @@ namespace MC.Core.ProbeWorldMod;
 //                    view and of inventory (InventoryGui.Show(null)), inventory closed again.
 //   probe.runner   = SafeRunner itself: nested enumerators, WaitForSeconds, WaitForSecondsRealtime, WaitUntil work;
 //                    a throw is caught; a never-ending test is stopped at timeout and its finally block runs.
+//   probe.refusal  = RefusalNotes (framework): the "MC mods:" block a refused player sees, sorted by mod, server line
+//                    wins over what the game knew, once only, empty when nothing is wrong. Single player only.
 internal static class ProbeTests
 {
     internal const string Baseline = "probe.baseline";
     internal const string Runner = "probe.runner";
+    internal const string Refusal = "probe.refusal";
+
+    internal static IEnumerator RunRefusalCheck()
+    {
+        const string T = Refusal;
+        var problems = new System.Collections.Generic.List<string>();
+        RefusalNotes.ResetForTest();
+        try
+        {
+            if (RefusalNotes.AddTo("Incompatible version") != "Incompatible version")
+            {
+                problems.Add("no notes, yet the text changed");
+            }
+            RefusalNotes.SetKnown("Mod B", "known b");
+            RefusalNotes.SetKnown("Mod A", "known a");
+            RefusalNotes.OnServerLine(null, "Mod A\tsent a");
+            RefusalNotes.OnServerLine(null, "Mod C\tsent c");
+            RefusalNotes.OnServerLine(null, "a line without a tab");
+            var text = RefusalNotes.AddTo("Incompatible version");
+            const string want = "Incompatible version\n\nMC mods:\n- Mod A: sent a\n- Mod B: known b\n- Mod C: sent c";
+            if (text != want)
+            {
+                problems.Add($"text '{text.Replace("\n", "/")}', expected '{want.Replace("\n", "/")}'");
+            }
+            if (RefusalNotes.AddTo(text) != text)
+            {
+                problems.Add("the block was added a second time");
+            }
+            RefusalNotes.SetKnown("Mod B", null);
+            if (RefusalNotes.AddTo("x").Contains("Mod B"))
+            {
+                problems.Add("a removed known line is still shown");
+            }
+        }
+        finally
+        {
+            RefusalNotes.ResetForTest();
+        }
+        if (problems.Count == 0)
+        {
+            SelfTest.Pass(T, "refusal notes: sorted by mod, the server's line wins, added once, removed lines gone");
+        }
+        else
+        {
+            SelfTest.Fail(T, string.Join("; ", problems.ToArray()));
+        }
+        yield break;
+    }
 
     internal static IEnumerator RunBaseline()
     {

@@ -2,7 +2,7 @@
   <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
   <PropertyGroup>
     <ModName>Breeding Star Inheritance</ModName>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <ModScope>Revamp</ModScope>
     <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
     <ModIdea>Breeding revamp</ModIdea>

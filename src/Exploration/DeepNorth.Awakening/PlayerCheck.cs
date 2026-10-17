@@ -167,7 +167,7 @@ internal static class PlayerCheck
         Log.Warning($"Refused {Who(peer)}: {Problem(peer)}. This server requires {ModInfo.Name} on every player "
                     + "(everyone plays the same awakened Deep North). Their game shows \"Incompatible version\". "
                     + "To let such players in, set AllowPlayersWithoutMod = true.");
-        peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorVersion);
+        NetworkGate.Refuse(peer); // reason line for their error screen, then Error ErrorVersion
         if (!ZNet.PeersToDisconnectAfterKick.ContainsKey(peer))
         {
             ZNet.PeersToDisconnectAfterKick[peer] = Time.time + DisconnectDelay;

@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1. Build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1). Build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 (2026-10-08) fixes the sneak attack on a sleeping afraid creature that faces you, which the mod took away (T35, reset
 to `[ ]`). Also on 2026-10-08, a change of this list only (no mod code): T04's second half now says what the mod does
 (a second kill of the same boss shows no rank-up message; the message comes with the kill that raises the boss rank),
@@ -472,3 +472,19 @@ Needs a second player (P2). "P1 rank 8" = `ForceBossRank = 8` on P1's game (Debu
   `morale.mp.server-log`, `morale.mp.refused-log`, `probe.relog.MC.Combat.Creatures.Morale`,
   `probe.quit.MC.Combat.Creatures.Morale`, `probe.disabled.MC.Combat.Creatures.Morale`); by hand: The log of a
   hands-on session (the steps that are still done by hand).*
+
+## 0.1.2 — the refusal screen names the mod
+
+0.1.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
+under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
+needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
+connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Combat.Creatures.Morale` passed, the screen named this
+mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+
+- [ ] **M15 Refusal screen names the mod:** on a server with Creature Morale, turn Creature Morale off in Esc > MC Mods while you
+  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Creature Morale: it is turned
+  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
+  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
+  join: you stay in.
+  *Partly automated (`probe.mp.off.MC.Combat.Creatures.Morale`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
+  window, and a game with another version of the mod than the server's (the line names both versions).*

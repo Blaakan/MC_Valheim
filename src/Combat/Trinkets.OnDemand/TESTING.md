@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.2.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
+**Build under test:** 0.2.1 (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
 changed one rule: another player counts like a creature while PvP is on for both players (0.1.0 said other players
 never count, yet counted a perfect dodge of their attack). M10 is reworded and open again, M11 and M12 are new; no
 other item changed. On 0.2.0 (2026-10-13, game 1.0.17, every MC mod loaded): smoke test (`./tools/Test-Smoke.ps1 -Mod Trinkets`) passed; in-world
@@ -326,3 +326,19 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
   effect starts, then starts over; the bar is empty after each), the game does not freeze and logs no error; the
   up-front adrenaline is not added (the bar is full at that moment).
   *Automated: `trinkets.full-bar`.*
+
+## 0.2.1 — the refusal screen names the mod
+
+0.2.1 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
+under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
+needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
+connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Combat.Trinkets.OnDemand` passed, the screen named this
+mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+
+- [ ] **M13 Refusal screen names the mod:** on a server with Trinkets on Demand, turn Trinkets on Demand off in Esc > MC Mods while you
+  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Trinkets on Demand: it is turned
+  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
+  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
+  join: you stay in.
+  *Partly automated (`probe.mp.off.MC.Combat.Trinkets.OnDemand`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
+  window, and a game with another version of the mod than the server's (the line names both versions).*

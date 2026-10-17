@@ -249,7 +249,8 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   rules. `ModSide=Both`, the server refuses players without the mod after a short grace and sends its gameplay
   settings to every player (copy Swim Dive's `PlayerCheck`, `ServerRules`, `<X>Rules` and `Patches/ZNetPatches.cs`,
   which check `NetworkGate.PeerCompatible` and re-check on `PeerStateChanged`; every Both mod with a player check
-  does since Breeding Star Inheritance 0.2.0 and Switchable Lights 0.2.0; `AllowPlayersWithoutMod`, default false). Only pure UI/QoL helpers that change nothing for others stay client-side. Either way the code stays
+  does since Breeding Star Inheritance 0.2.0 and Switchable Lights 0.2.0; `AllowPlayersWithoutMod`, default false;
+  refuse with `NetworkGate.Refuse(peer)`, never a bare `Error` rpc, so the refused player's screen names the mod). Only pure UI/QoL helpers that change nothing for others stay client-side. Either way the code stays
   multiplayer-compatible: say in `ModMultiplayerNotes` who needs it and why, and think through hand-offs (an
   item/structure touched by the mod reaching a player without it must behave sanely).
 - Features toggle live: patches are applied only while the feature is Active (enabled + deps active + server ok),

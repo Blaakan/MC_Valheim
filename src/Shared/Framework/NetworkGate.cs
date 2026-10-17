@@ -16,6 +16,8 @@ namespace MC.Shared;
 //                                                                            copies send no last field = unknown)
 //   server -> client  "<guid>.HelloAck"   "1|on|<netVersion>|<version>"      (or "1|off|..." when server copy not Active)
 //   client -> server  "<guid>.HelloState" "on" | "off"                       (client side ready changed while connected)
+//   server -> client  "MC.Framework.Refused" "<mod name>\t<line>"            (Refuse, just before the Error rpc: the
+//                                                                            player's MC mods show it, RefusalNotes)
 // Server mod code ask PeerCompatible (has mod, same network version, side not off) to refuse players.
 // Server also re-send HelloAck to all peers when its copy turn on/off, so clients follow live.
 // ZRpc keep order on one connection, and server send its PeerInfo only after ours, so first ack arrive before
@@ -76,6 +78,10 @@ internal static class NetworkGate
             h.Patch(Target(nameof(ZNet.OnNewConnection)), postfix: new HarmonyMethod(self, nameof(OnNewConnection)));
             h.Patch(Target(nameof(ZNet.RPC_PeerInfo)), postfix: new HarmonyMethod(self, nameof(OnPeerInfo)));
             h.Patch(Target(nameof(ZNet.Disconnect)), postfix: new HarmonyMethod(self, nameof(OnDisconnect)));
+            if (info.NeedsServer)
+            {
+                RefusalNotes.InstallOnce(h);
+            }
         }
         catch
         {
@@ -166,6 +172,7 @@ internal static class NetworkGate
             _sentReady = ready;
             _serverRpc.Invoke(StateRpc, ready ? "on" : "off");
             Log.Info($"Told the server that {_info.Name} is now {(ready ? "on" : "off")} on this game.");
+            UpdateKnownNote();
         }
         catch (Exception e)
         {
@@ -215,6 +222,75 @@ internal static class NetworkGate
             return $"has another version of the mod (network version {net}, the server has {_info.NetworkVersion})";
         }
         return PeerReady(peer) == false ? "has the mod turned off" : null;
+    }
+
+    // Server, a Both mod's PlayerCheck: refuse this player. First one line for their error screen (RefusalNotes: their
+    // MC mods list it under "MC mods:"), then the vanilla Error rpc (ErrorVersion, "Incompatible version"). Same
+    // connection keep order, so the line arrive first.
+    public static void Refuse(ZNetPeer peer)
+    {
+        if (peer?.m_rpc == null)
+        {
+            return;
+        }
+        try
+        {
+            peer.m_rpc.Invoke(RefusalNotes.Rpc, _info.Name + "\t" + RefusalText(peer));
+        }
+        catch (Exception e)
+        {
+            PatchGuard.Report("NetworkGate.Refuse", e);
+        }
+        peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorVersion);
+    }
+
+    // Server: the refused player's line, what is wrong and what to do (user-facing).
+    private static string RefusalText(ZNetPeer peer)
+    {
+        if (!PeerHasMod(peer))
+        {
+            return $"this server requires it (version {_info.Version}) and your game does not have it. Install it.";
+        }
+        if (PeerNetworkVersion(peer) != _info.NetworkVersion)
+        {
+            return $"the server has version {_info.Version} and your game {PeerVersion(peer)}, and they cannot play "
+                   + $"together. Install version {_info.Version}.";
+        }
+        if (PeerReady(peer) == false)
+        {
+            return "it is turned off (or not working) in your game, and this server requires it. Turn it on in Esc > "
+                   + "MC Mods and join again.";
+        }
+        return "this server requires it, and your game cannot play with the server's version.";
+    }
+
+    // Server: mod version the player's copy said in hello ("?" = unknown).
+    private static string PeerVersion(ZNetPeer peer)
+    {
+        if (peer?.m_rpc == null || !ClientHellos.TryGetValue(peer.m_rpc, out var hello) || hello == null)
+        {
+            return "?";
+        }
+        var parts = hello.Split('|');
+        return parts.Length >= 3 && parts[0] == Protocol && parts[2].Length > 0 ? parts[2] : "?";
+    }
+
+    // Client: what this game knows could get it refused by this mod (RefusalNotes, shown only on a refusal screen):
+    // a server copy that cannot talk to ours, or ours off while the server's is on. Nothing wrong = line removed.
+    private static void UpdateKnownNote()
+    {
+        string line = null;
+        if (_server == ServerCheck.Present && _serverNetVersion != _info.NetworkVersion)
+        {
+            line = $"the server has version {_serverVersion} and your game {_info.Version}, and they cannot play "
+                   + $"together. Install version {_serverVersion}.";
+        }
+        else if (_server == ServerCheck.Present && !_isLocalReady())
+        {
+            line = "it is turned off (or not working) in your game while the server has it on. Turn it on in Esc > "
+                   + "MC Mods and join again.";
+        }
+        RefusalNotes.SetKnown(_info.Name, line);
     }
 
     private static string HelloPayload() =>
@@ -280,9 +356,12 @@ internal static class NetworkGate
                 _server = ServerCheck.Pending;
                 _serverVersion = "";
                 _serverNetVersion = 0;
+                RefusalNotes.NewConnection(peer.m_rpc);
+                peer.m_rpc.Register<string>(RefusalNotes.Rpc, RefusalNotes.OnServerLine);
                 peer.m_rpc.Register<string>(AckRpc, (rpc, ack) =>
                 {
                     ParseAck(ack);
+                    UpdateKnownNote();
                     WorldChanged();
                 });
                 _serverRpc = peer.m_rpc;

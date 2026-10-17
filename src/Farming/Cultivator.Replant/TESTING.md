@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 fixed the grow time of young transplants while the mod is off (T39: they kept the grow time of the last rules in force
 instead of the player's own GrowTimeMultiplier, and a change of that setting while the mod was off never reached
 them): T39 is reset to `[ ]`, T40 and M14 are new. 0.1.1 also keeps a transplant refused away from an Ancient Root and
@@ -449,3 +449,19 @@ changed one back afterwards.
   *Partly automated (`replant.mp.allowed`, `replant.mp.offgrow`); by hand: Two real players: the host plants it and
   walks away so that only the friend's game, with the mod turned off, runs the area (here one client plants it, turns
   the mod off and runs it).*
+
+## 0.1.2 — the refusal screen names the mod
+
+0.1.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
+under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
+needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
+connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Farming.Cultivator.Replant` passed, the screen named this
+mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+
+- [ ] **M15 Refusal screen names the mod:** on a server with Cultivator Replant, turn Cultivator Replant off in Esc > MC Mods while you
+  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Cultivator Replant: it is turned
+  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
+  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
+  join: you stay in.
+  *Partly automated (`probe.mp.off.MC.Farming.Cultivator.Replant`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
+  window, and a game with another version of the mod than the server's (the line names both versions).*

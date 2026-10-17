@@ -226,6 +226,7 @@ internal static class ProbeDriver
         {
             new KeyValuePair<string, Func<IEnumerator>>(ProbeTests.Baseline, ProbeTests.RunBaseline),
             new KeyValuePair<string, Func<IEnumerator>>(ProbeTests.Runner, ProbeTests.RunRunnerCheck),
+            new KeyValuePair<string, Func<IEnumerator>>(ProbeTests.Refusal, ProbeTests.RunRefusalCheck),
         };
         var registered = SelfTest.GetTests();
         lock (registered)

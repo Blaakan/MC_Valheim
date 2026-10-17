@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 fixed the storm-wave bug of T32 (in a storm, holding Crouch and Jump at the surface got the swimmer counted as under
 water, held under the rising wave and drained): T32 is reset to `[ ]` and T34 is new; the self-tests ran on 0.1.1 on
 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): all of this mod's tests passed
@@ -273,3 +273,19 @@ one back afterwards. Stamina items need `god` off only where they say so.
   speed (its bonus speeds up surface swimming only); Jump under water never jumps.
   *Partly automated (`dive.logic`); by hand: Everything with ImpactfulSkills installed: the log line, diving works,
   the drain follows its reduced swim drain, the dive speed stays the normal swim speed, Jump under water never jumps.*
+
+## 0.1.2 — the refusal screen names the mod
+
+0.1.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
+under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
+needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
+connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Exploration.Swimming.Dive` passed, the screen named this
+mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+
+- [ ] **M10 Refusal screen names the mod:** on a server with Swim Dive, turn Swim Dive off in Esc > MC Mods while you
+  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Swim Dive: it is turned
+  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
+  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
+  join: you stay in.
+  *Partly automated (`probe.mp.off.MC.Exploration.Swimming.Dive`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
+  window, and a game with another version of the mod than the server's (the line names both versions).*

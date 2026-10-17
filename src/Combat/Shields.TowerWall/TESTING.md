@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.2.0, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
+**Build under test:** 0.2.1 (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
 (2026-10-16) finds tower shields from other mods by their data (`AutoTowers`, `ExcludedTowers`, bash damage from block
 armor for towers without a number; rules layout 3, network version 3): T17 and T40 are reset, T50-T56 and M19 are new
 (section "0.2.0"). Verified on 2026-10-16 (Valheim 1.0.20, Warfare 1.9.4 and Jotunn 2.30.2 installed): built Debug and
@@ -497,3 +497,19 @@ shields), `ShieldBronzeBanded_TW`, `ShieldChitin_TW` (round), `ShieldChitinBuckl
   on both games), then `AutoTowers = false`. Expected: for the client, Warfare's Bronze tower shield is a normal shield
   after the first change, and every Warfare tower shield after the second; the client's own settings are not used.
   *Partly automated (`tower.mp.rules` with the stand-in towers); by hand: With Warfare on a real server and client.*
+
+## 0.2.1 — the refusal screen names the mod
+
+0.2.1 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
+under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
+needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
+connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Combat.Shields.TowerWall` passed, the screen named this
+mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+
+- [ ] **M20 Refusal screen names the mod:** on a server with Tower Shield Wall, turn Tower Shield Wall off in Esc > MC Mods while you
+  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Tower Shield Wall: it is turned
+  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
+  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
+  join: you stay in.
+  *Partly automated (`probe.mp.off.MC.Combat.Shields.TowerWall`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
+  window, and a game with another version of the mod than the server's (the line names both versions).*

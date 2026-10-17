@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 fixed the wind icon of M13 (at the helm of a ship simulated by a game without the mod, the HUD wind icon showed the
 Sailing bonus although the ship did not get it): M13 is reset to `[ ]` and M14 is new. 0.1.1 also changed the sail
 response (T19: when the wind shifted while the sail was still filling, the sail's pull went about 0.5% past its normal
@@ -299,3 +299,19 @@ lines.
   Expected: Info "<name> is installed: it …" once per session (again after the mod is turned off and on); both skills
   level up; `raiseskill sailing 5` raises this mod's Sailing (and maybe theirs); no errors. Note the plugin GUIDs from
   the Debug "Loaded plugins" line.
+
+## 0.1.2 — the refusal screen names the mod
+
+0.1.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
+under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
+needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
+connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Exploration.Sailing.Skill` passed, the screen named this
+mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+
+- [ ] **M15 Refusal screen names the mod:** on a server with Sailing Skill, turn Sailing Skill off in Esc > MC Mods while you
+  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Sailing Skill: it is turned
+  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
+  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
+  join: you stay in.
+  *Partly automated (`probe.mp.off.MC.Exploration.Sailing.Skill`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
+  window, and a game with another version of the mod than the server's (the line names both versions).*

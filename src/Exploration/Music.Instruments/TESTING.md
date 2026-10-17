@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.4.1, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.4.1
+**Build under test:** 0.4.2 (the refusal screen names the mod, section "0.4.2"; before that 0.4.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.4.1
 fixes false recipe warnings when leaving a server without the mod (new M20; `music.badrecipe` checks it on a stand-in
 item database; run 2026-10-08 on game 1.0.17: in-world self-tests 52 of 52 with `music.play` and
 `music.freeplay.keys` on a second run alone, multiplayer scenarios all passed, and no Music Instruments line after
@@ -431,3 +431,19 @@ config folder). The friend's own songs folder should not have these files.
   instruments); back at the menu the MC Mods panel shows the mod active again. The same after leaving a server that had
   the mod turned off.
   *Automated: `music.badrecipe`, `music.mp.vanilla.leave`, `music.mp.leave.off`.*
+
+## 0.4.2 — the refusal screen names the mod
+
+0.4.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
+under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
+needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
+connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Exploration.Music.Instruments` passed, the screen named this
+mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+
+- [ ] **M21 Refusal screen names the mod:** on a server with Music Instruments, turn Music Instruments off in Esc > MC Mods while you
+  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Music Instruments: it is turned
+  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
+  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
+  join: you stay in.
+  *Partly automated (`probe.mp.off.MC.Exploration.Music.Instruments`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
+  window, and a game with another version of the mod than the server's (the line names both versions).*

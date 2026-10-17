@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2
+
+- When a server refuses you because of this mod, the "Incompatible version" screen now says so: it lists
+  Deep North Awakening under "MC mods:" with the reason (your game does not have it, has another version, or has it turned
+  off) and what to do. With Jotunn installed, its mod compatibility window shows the same lines. A server with
+  this version also sends its reason, so the screen names the mod even when your game does not have it (as
+  long as you have another MC mod).
+
 ## 0.1.1
 
 - Fixed: after Kall, lowering ClearKillsMin or ClearKillsMax to or below the Jotun kills an area already had left the

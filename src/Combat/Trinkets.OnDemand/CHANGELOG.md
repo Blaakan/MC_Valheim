@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1
+
+- When a server refuses you because of this mod, the "Incompatible version" screen now says so: it lists
+  Trinkets on Demand under "MC mods:" with the reason (your game does not have it, has another version, or has it turned
+  off) and what to do. With Jotunn installed, its mod compatibility window shows the same lines. A server with
+  this version also sends its reason, so the screen names the mod even when your game does not have it (as
+  long as you have another MC mod).
+
 ## 0.2.0
 
 - Other players count like creatures: while PvP is on for you and for the other player, hitting them, being hit by

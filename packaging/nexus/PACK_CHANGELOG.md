@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.4
+
+- When a server refuses you because of an MC mod, the "Incompatible version" screen now lists that mod under
+  "MC mods:" with the reason (your game does not have it, has another version, or has it turned off) and what to do;
+  with Jotunn installed, its mod compatibility window shows the same lines. In every mod a server can refuse you for:
+  Switchable Lights 0.2.1, Creature Morale 0.1.2, Tower Shield Wall 0.2.1, Sneak Ambush 0.1.2, Trinkets on Demand
+  0.2.1, Dual Wielding 0.1.1, Weapon Moveset 0.1.1, Forge Idol Upgrades 0.2.1, Deep North Awakening 0.1.2, Music
+  Instruments 0.4.2, Sailing Skill 0.1.2, Swim Dive 0.1.2, Spyglass 0.1.2, Breeding Star Inheritance 0.2.1,
+  Cultivator Replant 0.1.2, Fishing Fight 0.1.2.
+
 ## 0.4.3
 
 - Tower Shield Wall 0.2.0: tower shields from other mods are found automatically (every shield that cannot parry at

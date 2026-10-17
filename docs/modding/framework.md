@@ -197,6 +197,16 @@ What the framework does with them:
   before this check says nothing, and counts as compatible), and subscribe to `NetworkGate.PeerStateChanged` to
   check a player again when they turn the mod on or off. Gameplay mods use this to refuse players whose game would
   not play by the server's rules (see the `PlayerCheck` of the Combat mods).
+- **The refusal screen names the mod** (`RefusalNotes`). A `PlayerCheck` refuses with `NetworkGate.Refuse(peer)`:
+  it first sends the player one line ("this server requires it and your game does not have it", "the server has
+  version 0.1.0 and your game 0.2.0 ...", "it is turned off ... in your game"), then the game's own "Incompatible
+  version" error (vanilla's version error carries no mod name). The player's game also notes what it saw itself when
+  it joined: a server copy whose network version cannot talk to its own, or its own copy turned off while the
+  server's is on, so an older server that sends no line still gets explained. When the error screen opens, one patch
+  (the first MC mod that loads installs it) adds an "MC mods:" block with one line per mod, the server's line first.
+  Jotunn's mod compatibility window copies that error text under "Failed connection", so the block shows there too.
+  A player with no MC mod at all sees only the game's text. The notes are kept per connection in an AppDomain slot
+  shared by every MC mod.
 - **SinglePlayer**: switches itself off while other players are fully connected (players still logging in or being
   rejected don't count).
 

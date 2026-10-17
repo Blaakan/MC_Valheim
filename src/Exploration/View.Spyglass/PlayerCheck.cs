@@ -175,7 +175,7 @@ internal static class PlayerCheck
                     + "To let such players in, set AllowPlayersWithoutMod = true.");
         // Vanilla client: RPC_Error set connection status, Game.FixedUpdate log out, main menu show the text. Me cut
         // socket only DisconnectDelay s later (vanilla kick use 1 s): client read Error first, even on slow loading.
-        peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorVersion);
+        NetworkGate.Refuse(peer); // reason line for their error screen, then Error ErrorVersion
         if (!ZNet.PeersToDisconnectAfterKick.ContainsKey(peer))
         {
             ZNet.PeersToDisconnectAfterKick[peer] = Time.time + DisconnectDelay;

@@ -90,6 +90,15 @@ is installed, every test that says "Esc → MC Mods" is done in its window inste
 - [ ] **N06 Dedicated server loads a Both mod:** install BepInEx and Sleep Through the Day on a dedicated server
   (`valheim_server.exe`, updated to the same game version as the clients): the server log shows the mod's
   `[MC:ready]` line and "Activated", and no error from the MC Mods panel (the server has no screen).
+- [ ] **N09 The refusal screen names the mod** (2026-10-16): get refused by a server with a Combat mod in three ways:
+  (a) the mod turned off in your game, (b) another version of the mod than the server's (build one with another
+  `ModNetworkVersion`, as in the mod's network version item), (c) a game without that mod but with another MC mod.
+  Expected each time: the "Incompatible version" screen ends with "MC mods:" and one line for that mod, saying what
+  is wrong ((a) turned off, (b) both versions, (c) your game does not have it) and what to do; with Jotunn installed
+  the same lines show in its mod compatibility window under "Failed connection". On an older server (MC mods before
+  2026-10-16) case (b) still shows, from what your own game saw. A game with no MC mod sees only the game's text.
+  *Partly automated (`probe.refusal`, `probe.mp.refused`, `probe.mp.off.<GUID>`); by hand: The screens as seen, with
+  and without Jotunn, and case (b) with a real build of another network version.*
 
 ## In-world self-test harness (`tools/Test-InWorld.ps1`, world probe 0.1.0)
 
