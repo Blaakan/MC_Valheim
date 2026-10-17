@@ -6,6 +6,11 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
 **Build under test:** 1.0.0 (first release), build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the MC Mods panel. The history below lists the earlier builds.
 
+**Automated checks (2026-10-17):** 12 of 12 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+
 **Builds:**
 - *Draft* — deployed 2026-09-28 (built from `645be49` + local changes). The one being tested first. T01–T17, M01–M05.
 - *v0.2* (still version 0.1.0) — **deployed 2026-09-28 evening**, build id = the git commit shown in the `[MC:ready]`

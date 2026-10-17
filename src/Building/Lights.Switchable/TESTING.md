@@ -18,11 +18,10 @@ tests on 0.1.0: all 23 items of that version were ticked by hand in the test iss
 2026-10-07). The ticks of the items that 0.2.0 did not change are kept here (T01 to T15, M01 to M04, M07, C01); M05 and
 M06 were ticked on 0.1.0 too, and are open again because 0.2.0 changed what they check.
 
-**Automated checks (2026-10-15):** 2 of 2 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
-"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
-still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-17):** 3 of 3 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`), then
 `nocost` to build without materials (it does not affect fire fuel: refuelling always takes the item).
@@ -105,10 +104,10 @@ Unless a test says otherwise, both players have the mod turned on and `AllowPlay
   `<name> (<id>) does not have the mod; AllowPlayersWithoutMod is on, so they may play, ...`). Setting it back to
   `false` while they are online refuses them about a second later; a player with the mod turned on stays.
   (unverified: the menu message is read from the game code, not seen in game yet)
-  *Partly automated (`probe.mp.refused`, `scenario:open-server`); by hand: Read the host's log for this mod's own
-  line "Refused <name>: does not have the mod ..." (several mods refuse the same player and only the first one writes
-  it); set AllowPlayersWithoutMod back to false while the player without the mod is online: refused about a second
-  later, a player with the mod stays.*
+  *Partly automated (`probe.mp.refused`, `scenario:open-server`); by hand: Read the host's log for this mod's own line
+  "Refused <name>: does not have the mod ..." (several mods refuse the same player and only the first one writes it);
+  set AllowPlayersWithoutMod back to false while the player without the mod is online: refused about a second later, a
+  player with the mod stays.*
 - [x] **M07 Server list for everyone:** the host removes `piece_walltorch` from its `Lights`; the friend keeps the
   default list. Expected: the friend's log shows `Using the server's light list: ...` once; for both players a sconce
   shows the vanilla hover and burns resin, torches still switch. The host puts the default list back: the friend's log

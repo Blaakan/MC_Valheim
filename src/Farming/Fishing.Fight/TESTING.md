@@ -17,12 +17,11 @@ side switch, catch, loss at 0 stamina). An earlier run failed one check (the rig
 dragged the float, fixed by allowing 1 m of drag in a fight). The full suite of every MC mod passed apart from that
 check. No hands-on in-game test yet.
 
-**Automated checks (2026-10-15):** 22 of 26 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`; failing:
-`fishing.phases`, `fishing.exits`, `fishing.toggle`, `fishing.swim`. An item ending in "Automated: ..." is checked in
-full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part;
-"FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-17):** 26 of 27 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`; failing: `fishing.wrong-bait`. An item ending in "Automated: ..." is checked in full by the named
+self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated
+test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina. Gear: `spawn FishingRod`,

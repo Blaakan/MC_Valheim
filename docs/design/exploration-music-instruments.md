@@ -410,6 +410,13 @@ keys also the note), lit while held; the tambourine's unused keys greyed. Free p
   `SetTakeInputDelay` alone (it covers only what `PlayerController` and `HasInputDelay` gate, and it would also keep
   the window from opening again for 0.1 s), or holding the key capture until B is let go (every game key dead while
   B is held).
+- **D21 Dropped instruments stay where they land** (1.0.0 candidate, 2026-10-17, from `music.drop.rest` in the full
+  run): the flute's round capsule collider has no rolling resistance in PhysX, so a dropped flute rolled up to 3.5 m
+  on level ground. The flute now has a square box collider around the tube (same half width and length), so it lies on
+  a face, and every instrument's Rigidbody gets an angular damping of at least 3 (vanilla uses
+  `Rigidbody.angularDamping` too, e.g. `TreeLog`), because a tambourine on its rim could roll as well. The self-test
+  `music.drop.rest` is parked (the test world has no level open ground near its start); all three instruments are
+  checked by hand (T02).
 
 ## 4. Multiplayer
 

@@ -213,6 +213,9 @@ stance and dual moves.
   and the stance is a single weapon's; then the main weapon comes back and the pair is whole again.
 - **Bombs, tankards and other one-handed items that are not weapons** put both weapons away when you equip them (the
   game's rule for one-handed items). Equip your weapons again afterwards.
+- **Known issue, crossed swords after a bed:** if the crossed pair on your back is set up while you lie in a bed (for
+  example you change the sheath setting in bed, or you see another player in bed), the X can stay wider than usual
+  after you get up. Draw and put away the weapons to cross them again.
 - **Both weapons wear**, each by its own hits. A pair weighs and slows you down like both weapons together (a sword and
   an axe slow you about as much as a sword and a round shield), as in the game.
 - **Gamepad:** the main-hand key and the swap key are keyboard or mouse only for now. With a controller, a second

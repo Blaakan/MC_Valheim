@@ -27,11 +27,10 @@ without deploying): close the game and run `dotnet build ValheimMods.slnx` befor
 change's build id in the MC Mods panel, and ConfigurationManager's `Display` section has no `ShowOnNameplates` setting
 (an older build still has it).
 
-**Automated checks (2026-10-15):** 54 of 54 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
-tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
-by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
-that fails.
+**Automated checks (2026-10-17):** 55 of 55 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** use a Debug build (`dotnet build ValheimMods.slnx` deploys it to the game). It adds the setting
 `ForceBossRank` (section `[Debug]` of `BepInEx/config/MC.Combat.Creatures.Morale.cfg`, applied while the game runs):
@@ -509,4 +508,4 @@ code yet.
   of another version (build it with `dotnet build src/Combat/Creatures.Morale/MC.Combat.Creatures.Morale.csproj
   -p:ModNetworkVersion=99 -p:Version=0.0.9 -p:DeployToGame=false`, copy that DLL over your game's copy, put the normal
   build back afterwards): "- Creature Morale: the server has version X and your game 0.0.9, and they cannot play
-  together. Install version X."*
+  together. Install version X.".*

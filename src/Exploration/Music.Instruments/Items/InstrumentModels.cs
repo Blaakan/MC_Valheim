@@ -61,6 +61,8 @@ internal static class InstrumentModels
     private const float FluteTip = 0.29f;
     private const float FluteHead = 0.013f;
     private const int FluteSegments = 24;
+    // Half side of the flute's square collider (tube radius 10.6 to 13 mm, bands 13.9 mm).
+    private const float FluteColliderHalf = 0.0135f;
 
     // Lyre outline (half widths): soundbox full width up to LyreBellyZ, going thin to the arm waist at LyreWaistZ,
     // then out again to the yoke width at LyreFlareZ. Height, half thickness, corner radii, rounded edge, engraved band.
@@ -1127,11 +1129,12 @@ internal static class InstrumentModels
         {
             case InstrumentKind.Flute:
             {
-                var capsule = go.AddComponent<CapsuleCollider>();
-                capsule.direction = 2; // along Z
-                capsule.radius = 0.0135f;
-                capsule.height = FluteTip - FluteFoot;
-                capsule.center = new Vector3(0f, 0f, (FluteTip + FluteFoot) * 0.5f);
+                // Square box round the tube, not round capsule: round body roll metres on level ground (PhysX have
+                // no rolling resistance). Box side = tube width, so flute lie on a face at its own height; corners
+                // stick out 5 mm, nobody see.
+                var box = go.AddComponent<BoxCollider>();
+                box.size = new Vector3(FluteColliderHalf * 2f, FluteColliderHalf * 2f, FluteTip - FluteFoot);
+                box.center = new Vector3(0f, 0f, (FluteTip + FluteFoot) * 0.5f);
                 break;
             }
             case InstrumentKind.Lyre:

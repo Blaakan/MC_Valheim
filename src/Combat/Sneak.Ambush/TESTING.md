@@ -19,11 +19,11 @@ the other installed mods, one of them Jotunn-based): in-world self-tests 33 of 3
 `sneak.smoke-late` on a second run alone), multiplayer scenarios all passed; the log has no Sneak Ambush line at the
 main menu, and none after "ZNet OnDestroy" in the client log of the server-without-mods scenario (five before).
 
-**Automated checks (2026-10-15):** 65 of 65 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
-tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
-by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
-that fails.
+**Automated checks (2026-10-17):** 64 of 66 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`; failing: `sneak.smoke-reveal`, `sneak.mp.unload`. An item ending in "Automated: ..." is checked in full by
+the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part; "FAILED:
+automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `die` kills you (with `god` off), `heal` refills health and stamina,
@@ -456,4 +456,4 @@ yet.
   need to have), on a server where Sneak Ambush is the only mod that refuses it: "- Sneak Ambush: this server requires
   it (version X) and your game does not have it. Install it." (X = the server's version); and M16's copy of another
   version (built with `-p:Version=0.0.9`): "- Sneak Ambush: the server has version X and your game 0.0.9, and they
-  cannot play together. Install version X."*
+  cannot play together. Install version X.".*

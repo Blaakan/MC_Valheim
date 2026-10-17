@@ -25,11 +25,12 @@ after Kall; the target reached: cleared, "The Jotun Retreat" shown, no storm, no
 `dn.map` (map scanned; awake area purple, sleeping one not; own colours back with ShowAreas off, at stage 0 and while
 waiting for the server's rules) and `dn.morkhalla`. No hands-on in-game test yet.
 
-**Automated checks (2026-10-15):** 39 of 39 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
-"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
-still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-17):** 34 of 40 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`; failing: `dn.areas.return`, `dn.storm`, `dn.storm.leave`, `dn.kallreturn`, `dn.x.morale`,
+`dn.x.morale.nature`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by
+them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that
+fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive, `killall` removes nearby creatures, `goto <x> <z>` (whole numbers) teleports you (the Deep North is

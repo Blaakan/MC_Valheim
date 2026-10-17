@@ -24,12 +24,11 @@ new `horizons.near` and `horizons.boost`, run together with the Spyglass mod's t
 hands-on in-game test yet. The standalone Distant Horizons was tested in game by its author (2026-09-21 to 09-28);
 this port changes its life cycle, so everything below is pending.
 
-**Automated checks (2026-10-15):** 5 of 5 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`; 32 more named here
-have no result on that code yet (not run since their test or the mod changed, parked, or only in a later run). An item
-ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly
-automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-17):** 36 of 37 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`; failing: `horizons.attach-cover`. An item ending in "Automated: ..." is checked in full by the named
+self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated
+test" names the self-test that fails.
 
 **Setup:** use a **test character and a test world**. Enable the console (game settings, Gameplay, or the
 `-console` launch option: Steam > Properties > Launch Options), press F5 → `devcommands` (confirm cheats if asked).

@@ -40,9 +40,10 @@ namespace MC.UX.AutoPickupFilterMod;
 //   SelfTests.Mp.cs      lootfilter.mp.filter (M01, M04), lootfilter.mp.handoff (M02), lootfilter.mp.remote-harvest
 //                         (M05). Mod is client only: it never load on the dedicated server, so no server step.
 // Me never write config: settings forced in memory with TestHooks (then the entry's real change handlers are run with
-// RaiseChanged), mouse / key / controller played with TestHooks, feature turned off with TestHooks.ForceOff. Rig put
-// back filter data of the character, inventory, equipment, known items, skills, auto pickup switch, the player's
-// place and look, and destroy every spawned thing and new item drop.
+// RaiseChanged), mouse / key / controller played with TestHooks, feature turned off with TestHooks.ForceOff. Rig empty
+// the bag at test start (earlier tests of other mods leave stacks there) and put back filter data of the character,
+// inventory, equipment, known items, skills, auto pickup switch, the player's place and look, and destroy every
+// spawned thing and new item drop.
 internal static partial class SelfTests
 {
     [Conditional("DEBUG")]
@@ -366,7 +367,8 @@ internal static partial class SelfTests
     // ---------------------------------------------------------------- rig
 
     // Me = what the tests change on the player and the world. Made at test start (neutral settings, clean filter of a
-    // never-used character, auto pickup on, message and log taps on). Restore (finally, no yield) put all back.
+    // never-used character, auto pickup on, message and log taps on, empty bag). Restore (finally, no yield) put all
+    // back.
     private sealed class Rig
     {
         private struct Slot
@@ -377,6 +379,16 @@ internal static partial class SelfTests
             internal float Durability;
         }
 
+        // Humanoid's equip slots, hands first: me put back in this order (torch beside one-hand weapon go left).
+        private const int WornSlots = 9;
+
+        private static readonly string[] WornNames =
+        {
+            "right hand", "left hand", "chest", "legs", "helmet", "shoulders", "utility", "trinket", "ammo",
+        };
+
+        private static string NameOf(ItemDrop.ItemData item) => item != null ? item.m_shared.m_name : "nothing";
+
         internal readonly Player Player;
         internal readonly Vector3 Origin;
         internal readonly Vector3 Forward;
@@ -386,10 +398,10 @@ internal static partial class SelfTests
         private readonly Quaternion _rotation;
         private readonly float _pitch;
         private readonly Quaternion _yaw;
-        private readonly ItemDrop.ItemData _right;
-        private readonly ItemDrop.ItemData _left;
+        private readonly ItemDrop.ItemData[] _worn = new ItemDrop.ItemData[WornSlots];
+        private readonly ItemDrop.ItemData _hiddenLeft;
+        private readonly ItemDrop.ItemData _hiddenRight;
         private readonly List<Slot> _inventory = new List<Slot>();
-        private readonly HashSet<ItemDrop.ItemData> _inventorySet = new HashSet<ItemDrop.ItemData>();
         private readonly HashSet<ItemDrop> _drops;
         private readonly List<GameObject> _spawned = new List<GameObject>();
         private readonly bool _autoPickup;
@@ -424,12 +436,15 @@ internal static partial class SelfTests
             Right = Vector3.Cross(Vector3.up, Forward);
             _pitch = player.m_lookPitch;
             _yaw = player.m_lookYaw;
-            _right = player.GetRightItem();
-            _left = player.GetLeftItem();
+            for (var i = 0; i < WornSlots; i++)
+            {
+                _worn[i] = WornAt(i);
+            }
+            _hiddenLeft = player.m_hiddenLeftItem;
+            _hiddenRight = player.m_hiddenRightItem;
             foreach (var item in player.GetInventory().GetAllItems())
             {
                 _inventory.Add(new Slot { Item = item, Stack = item.m_stack, Pos = item.m_gridPos, Durability = item.m_durability });
-                _inventorySet.Add(item);
             }
             _drops = new HashSet<ItemDrop>(ItemDrop.s_instances);
             _autoPickup = Player.m_enableAutoPickup;
@@ -484,6 +499,19 @@ internal static partial class SelfTests
             Player.m_enableAutoPickup = true;
             TapMessages();
             BepInEx.Logging.Logger.Listeners.Add(Logs);
+
+            // Me empty bag first, so game no merge test item into old stack. Last thing here: nothing after me can
+            // throw before the test's try, so its finally (Restore) always put the bag back.
+            try
+            {
+                EmptyBag();
+            }
+            catch (Exception e)
+            {
+                SelfTest.Note(_name, $"emptying the inventory at test start failed, it was put back at once: {e.Message}");
+                Try("inventory put back", PutBagBack);
+                Try("equipment put back", PutWornBack);
+            }
         }
 
         internal Inventory Inv => Player.GetInventory();
@@ -491,9 +519,166 @@ internal static partial class SelfTests
         // New PatchGuard reports since the test began (a patch body of this mod threw).
         internal int NewGuardReports => GuardCount() - _guardCount;
 
-        internal ItemDrop.ItemData Give(string prefab, int stack = 1, int quality = 1)
+        internal ItemDrop.ItemData Give(string prefab, int stack = 1, int quality = 1) =>
+            InBag(Inv.AddItem(prefab, stack, quality, 0, 0L, "", false), prefab, stack);
+
+        // Same, in that slot.
+        internal ItemDrop.ItemData GiveAt(string prefab, int stack, Vector2i pos) =>
+            InBag(Inv.AddItem(prefab, stack, 1, 0, 0L, "", pos, false), prefab, stack);
+
+        // Game AddItem top up a stack already in bag (FindFreeStackItem), or drop item on ground when no room, and
+        // still give back the new item: that one sit in no slot, m_gridPos (0,0). Every look at "its" slot then hit
+        // what sit in slot (0,0). Me stop the test right there and say why.
+        private ItemDrop.ItemData InBag(ItemDrop.ItemData item, string prefab, int stack)
         {
-            return Inv.AddItem(prefab, stack, quality, 0, 0L, "", false);
+            if (item == null)
+            {
+                throw new InvalidOperationException($"giving {stack} {prefab}: the game gave back no item (unknown item, or no free slot)");
+            }
+            if (!Inv.ContainsItem(item))
+            {
+                var holder = Inv.GetAllItems().FirstOrDefault(i => i.m_shared.m_name == item.m_shared.m_name);
+                var where = holder != null
+                    ? $"it went onto the {holder.m_stack}/{holder.m_shared.m_maxStackSize} stack already at slot ({holder.m_gridPos.x},{holder.m_gridPos.y})"
+                    : "no stack of it is in the inventory either (dropped on the ground for lack of room?)";
+                throw new InvalidOperationException($"giving {stack} {prefab}: the item the game gave back is not in the inventory ({where}); "
+                                                    + "every slot check on it would look at slot (0,0)");
+            }
+            return item;
+        }
+
+        // Equip slot i (order of WornSlots). Fields are protected in Humanoid: publicized game dll let me read them.
+        private ItemDrop.ItemData WornAt(int i)
+        {
+            switch (i)
+            {
+                case 0: return Player.m_rightItem;
+                case 1: return Player.m_leftItem;
+                case 2: return Player.m_chestItem;
+                case 3: return Player.m_legItem;
+                case 4: return Player.m_helmetItem;
+                case 5: return Player.m_shoulderItem;
+                case 6: return Player.m_utilityItem;
+                case 7: return Player.m_trinketItem;
+                default: return Player.m_ammoItem;
+            }
+        }
+
+        private void SetWorn(int i, ItemDrop.ItemData item)
+        {
+            switch (i)
+            {
+                case 0: Player.m_rightItem = item; break;
+                case 1: Player.m_leftItem = item; break;
+                case 2: Player.m_chestItem = item; break;
+                case 3: Player.m_legItem = item; break;
+                case 4: Player.m_helmetItem = item; break;
+                case 5: Player.m_shoulderItem = item; break;
+                case 6: Player.m_utilityItem = item; break;
+                case 7: Player.m_trinketItem = item; break;
+                default: Player.m_ammoItem = item; break;
+            }
+        }
+
+        // Take off everything (game path, so other mods' equip patches see it), then take every item out of the
+        // bag's list. Me keep them in _inventory with their slot.
+        private void EmptyBag()
+        {
+            for (var i = 0; i < WornSlots; i++)
+            {
+                Player.UnequipItem(_worn[i], false);
+            }
+            // Weapon put on the back (HideHandItems): UnequipItem forget it too.
+            Player.UnequipItem(_hiddenLeft, false);
+            Player.UnequipItem(_hiddenRight, false);
+            var inv = Inv;
+            inv.m_inventory.Clear();
+            inv.Changed();
+        }
+
+        // Old items straight back in the bag's list at their old slot. Not AddItem: it would merge stacks (two Resin
+        // stacks become one) and could pick another slot. What the test left in the bag go away (only ItemData).
+        private void PutBagBack()
+        {
+            var inv = Inv;
+            try
+            {
+                // Me take off what the test put on first: its items leave with the bag.
+                Player.UnequipAllItems();
+                Player.UnequipItem(Player.m_hiddenLeftItem, false);
+                Player.UnequipItem(Player.m_hiddenRightItem, false);
+            }
+            finally
+            {
+                // Bag come back even when a take-off above threw (Try note it).
+                inv.m_inventory.Clear();
+                foreach (var slot in _inventory)
+                {
+                    slot.Item.m_stack = slot.Stack;
+                    slot.Item.m_durability = slot.Durability;
+                    slot.Item.m_gridPos = slot.Pos;
+                    inv.m_inventory.Add(slot.Item);
+                }
+                inv.Changed();
+            }
+        }
+
+        // Put on again what was on, hands first. Game say no (in attack, dodge, swimming, broken item): me set the
+        // old slot straight, so the character leave the test like it came.
+        private void PutWornBack()
+        {
+            var inv = Inv;
+            for (var i = 0; i < WornSlots; i++)
+            {
+                var item = _worn[i];
+                if (item != null && inv.ContainsItem(item) && !Player.IsItemEquiped(item))
+                {
+                    try
+                    {
+                        Player.EquipItem(item, false);
+                    }
+                    catch (Exception e)
+                    {
+                        // Slot set straight below.
+                        SelfTest.Note(_name, $"equipping {item.m_shared.m_name} again threw: {e.Message}");
+                    }
+                }
+            }
+            var forced = new List<string>();
+            for (var i = 0; i < WornSlots; i++)
+            {
+                var item = _worn[i];
+                if (item != null && inv.ContainsItem(item) && !Player.IsItemEquiped(item) && WornAt(i) == null)
+                {
+                    SetWorn(i, item);
+                    item.m_equipped = true;
+                    forced.Add(item.m_shared.m_name);
+                }
+            }
+            if (forced.Count > 0)
+            {
+                Player.SetupEquipment();
+                SelfTest.Note(_name, $"the game refused to equip {string.Join(", ", forced.ToArray())} again (attack, dodge or swim?): put back in its slot directly");
+            }
+            // Other mod's equip rule (dual wield...) can put an item in another hand: me only say so, no fight.
+            var off = new List<string>();
+            for (var i = 0; i < WornSlots; i++)
+            {
+                if (WornAt(i) != _worn[i])
+                {
+                    off.Add($"{WornNames[i]} holds {NameOf(WornAt(i))}, had {NameOf(_worn[i])}");
+                }
+            }
+            if (off.Count > 0)
+            {
+                SelfTest.Note(_name, "equipment not as before the test: " + string.Join("; ", off.ToArray()));
+            }
+            Player.m_hiddenLeftItem = _hiddenLeft != null && inv.ContainsItem(_hiddenLeft) && !Player.IsItemEquiped(_hiddenLeft) ? _hiddenLeft : null;
+            Player.m_hiddenRightItem = _hiddenRight != null && inv.ContainsItem(_hiddenRight) && !Player.IsItemEquiped(_hiddenRight) ? _hiddenRight : null;
+            if (Player.m_visEquipment != null)
+            {
+                Player.SetupVisEquipment(Player.m_visEquipment, false);
+            }
         }
 
         // Point on the ground: f metres ahead of where the test began, r metres to the right.
@@ -504,13 +689,18 @@ internal static partial class SelfTests
             return p;
         }
 
-        internal float GroundAt(Vector3 p)
+        internal float GroundAt(Vector3 p) => GroundAt(p, out _);
+
+        // on = what the ray hit (null = no hit, height from ZoneSystem).
+        internal float GroundAt(Vector3 p, out Collider on)
         {
             var mask = LayerMask.GetMask("terrain", "static_solid", "Default", "piece");
             if (Physics.Raycast(new Vector3(p.x, Origin.y + 3f, p.z), Vector3.down, out var hit, 12f, mask, QueryTriggerInteraction.Ignore))
             {
+                on = hit.collider;
                 return hit.point.y;
             }
+            on = null;
             return ZoneSystem.instance != null ? ZoneSystem.instance.GetGroundHeight(p) : p.y;
         }
 
@@ -707,44 +897,8 @@ internal static partial class SelfTests
             Try("auto pickup", () => Player.m_enableAutoPickup = _autoPickup);
             Try("world rates", () => Game.m_resourceRate = _resourceRate);
             Try("no cost", () => Player.m_noPlacementCost = _noCost);
-            Try("inventory", () =>
-            {
-                var inv = Inv;
-                foreach (var item in inv.GetAllItems().ToArray())
-                {
-                    if (_inventorySet.Contains(item))
-                    {
-                        continue;
-                    }
-                    if (Player.IsItemEquiped(item))
-                    {
-                        Player.UnequipItem(item, false);
-                    }
-                    inv.RemoveItem(item);
-                }
-                foreach (var slot in _inventory)
-                {
-                    slot.Item.m_stack = slot.Stack;
-                    slot.Item.m_durability = slot.Durability;
-                    if (!inv.ContainsItem(slot.Item))
-                    {
-                        inv.AddItem(slot.Item, slot.Pos);
-                    }
-                    else
-                    {
-                        slot.Item.m_gridPos = slot.Pos;
-                    }
-                }
-                inv.Changed();
-                if (_right != null && inv.ContainsItem(_right) && !Player.IsItemEquiped(_right))
-                {
-                    Player.EquipItem(_right, false);
-                }
-                if (_left != null && inv.ContainsItem(_left) && !Player.IsItemEquiped(_left))
-                {
-                    Player.EquipItem(_left, false);
-                }
-            });
+            Try("inventory", PutBagBack);
+            Try("equipment", PutWornBack);
             Try("known items", () =>
             {
                 Reset(Player.m_knownMaterial, _material);
@@ -825,14 +979,92 @@ internal static partial class SelfTests
 
     private static int StackTotal(IEnumerable<ItemDrop> drops) => drops.Where(Alive).Sum(d => d.m_itemData.m_stack);
 
-    // Wait until every drop is gone (picked up) or time is up.
-    private static IEnumerator WaitGone(IList<ItemDrop> drops, float seconds)
+    // Wait until every drop is gone (picked up) or time is up. watch = write down what auto pickup could see.
+    private static IEnumerator WaitGone(IList<ItemDrop> drops, float seconds, PickupWatch watch = null)
     {
         var end = Time.time + seconds;
         while (Time.time < end && AliveCount(drops) > 0)
         {
+            watch?.Look(drops);
             yield return null;
         }
+    }
+
+    // What the game's auto pickup (Player.AutoPickup) could see of each drop while a test waited or walked: closest the
+    // pickup point (player + 1 m up) came, where the player stood for it. Explain = one line per drop still on the
+    // ground, for a NOTE: so a miss say if it was reach, the filter, or a vanilla gate.
+    private sealed class PickupWatch
+    {
+        private readonly Player _player;
+        private readonly Dictionary<ItemDrop, float> _closest = new Dictionary<ItemDrop, float>();
+        private readonly Dictionary<ItemDrop, string> _stood = new Dictionary<ItemDrop, string>();
+
+        internal PickupWatch(Player player) => _player = player;
+
+        internal void Look(IList<ItemDrop> drops)
+        {
+            if (_player == null)
+            {
+                return;
+            }
+            var point = _player.transform.position + Vector3.up;
+            foreach (var drop in drops)
+            {
+                if (!Alive(drop))
+                {
+                    continue;
+                }
+                var d = Vector3.Distance(drop.transform.position, point);
+                if (!_closest.TryGetValue(drop, out var best) || d < best)
+                {
+                    _closest[drop] = d;
+                }
+            }
+        }
+
+        internal void StoodFor(ItemDrop drop, Vector3 at, Collider on)
+        {
+            _stood[drop] = $"{F(at)} on {What(on)}";
+        }
+
+        // Note text only: a throw here must never end the test before its checks.
+        internal string Explain(Rig rig, IEnumerable<ItemDrop> drops)
+        {
+            try
+            {
+                return ExplainNow(rig, drops);
+            }
+            catch (Exception e)
+            {
+                return "could not look at them: " + e.Message;
+            }
+        }
+
+        private string ExplainNow(Rig rig, IEnumerable<ItemDrop> drops)
+        {
+            var point = _player.transform.position + Vector3.up;
+            var notItems = ~LayerMask.GetMask("item");
+            var lines = new List<string>();
+            foreach (var drop in drops.Where(Alive))
+            {
+                var p = drop.transform.position;
+                var under = Physics.Raycast(p + Vector3.up * 0.5f, Vector3.down, out var hit, 3f, notItems, QueryTriggerInteraction.Ignore)
+                    ? $"{What(hit.collider)}, its top at y {F(hit.point.y)}"
+                    : "nothing within 2.5 m";
+                var inside = Physics.OverlapSphere(p, 0.05f, notItems, QueryTriggerInteraction.Ignore).Select(What).ToArray();
+                lines.Add($"{(drop.m_itemData.m_dropPrefab != null ? drop.m_itemData.m_dropPrefab.name : drop.name)} x{drop.m_itemData.m_stack} at {F(p)}: "
+                          + $"{F(Vector3.Distance(p, point))} m from the pickup point now (range {F(_player.m_autoPickupRange)}), "
+                          + $"closest {(_closest.TryGetValue(drop, out var best) ? F(best) + " m" : "never measured")}; "
+                          + $"player put at {(_stood.TryGetValue(drop, out var stood) ? stood : "nowhere (never walked to it)")}; "
+                          + $"under it {under}; inside {(inside.Length == 0 ? "nothing" : string.Join(", ", inside))}; "
+                          + $"tagged {HarvestGrace.IsTagged(drop)}, filter skips {FilterState.Blocks(drop)}, m_autoPickup {drop.m_autoPickup}, "
+                          + $"owned {drop.CanPickup(false)}, in tar {drop.InTar()}, room {rig.Inv.CanAddItem(drop.m_itemData)}");
+            }
+            return string.Join(" | ", lines.ToArray());
+        }
+
+        private static string What(Collider c) =>
+            c == null ? "nothing (height from ZoneSystem)" : $"{c.transform.root.name}/{c.name} [{LayerMask.LayerToName(c.gameObject.layer)}]";
     }
 
     // Wait until a new item drop is born (after "since"), then two frames more so the whole batch is here.
@@ -850,8 +1082,8 @@ internal static partial class SelfTests
     }
 
     // Player walk over each drop still on the ground (one step each), up to seconds. Drops the filter let through are
-    // picked on the way.
-    private static IEnumerator WalkOver(Rig rig, IList<ItemDrop> drops, float seconds)
+    // picked on the way. watch = write down where the player stood and what auto pickup could see.
+    private static IEnumerator WalkOver(Rig rig, IList<ItemDrop> drops, float seconds, PickupWatch watch = null)
     {
         var end = Time.time + seconds;
         while (Time.time < end)
@@ -870,9 +1102,16 @@ internal static partial class SelfTests
                 break;
             }
             var p = next.transform.position;
-            p.y = rig.GroundAt(p);
+            p.y = rig.GroundAt(p, out var on);
             rig.MoveTo(p);
-            yield return new WaitForSeconds(0.35f);
+            watch?.StoodFor(next, p, on);
+            // 0.35 s step, frame by frame (same as WaitForSeconds in the probe's runner) so the watch see each frame.
+            var step = Time.time + 0.35f;
+            while (Time.time < step)
+            {
+                watch?.Look(drops);
+                yield return null;
+            }
         }
         rig.MoveTo(rig.Origin);
         yield return null;

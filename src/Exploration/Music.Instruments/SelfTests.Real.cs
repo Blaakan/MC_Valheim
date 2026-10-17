@@ -12,7 +12,9 @@ namespace MC.Exploration.MusicInstrumentsMod;
 
 // Debug build only. Self tests that do the real thing where an older test took a shortcut or left a look or a
 // listen to a person (same class as SelfTests.cs). One small test per thing:
-//   music.drop.rest      T02  a dropped flute (round) comes to rest and stays near where it landed
+//   music.drop.rest      T02  a dropped flute comes to rest and stays near where it landed: four throws (north, east,
+//                             south, west) from one level open place, so where an earlier test left the player does
+//                             not count
 //   music.rhythm.drawn   T08  the picture on screen: each falling note is drawn in its lane's colour where the game
 //                             has it, lower a moment later, in every one of the four lanes; the hit line crosses the
 //                             four lanes (pixels read back)
@@ -34,93 +36,309 @@ internal static partial class SelfTests
 
     // ---------- music.drop.rest (T02) ----------
 
+    // Four throws from one place, one per heading: the ground each throw reach is part of the result, so me pick that
+    // place (level open ground near the player) instead of taking wherever an earlier test left the player.
+    private static readonly float[] DropHeadings = { 0f, 90f, 180f, 270f };
+    // Lane = strip a throw can reach: thrown about 5 m ahead, plus a roll long enough to fail the test.
+    private const float DropLaneLength = 8f;
+    private const float DropLaneHalf = 2f;
+    // Spots looked at within this far of the player, every DropSpotStep m; ground read every DropMapStep m. Start area of
+    // test world is stone circle in forest: 24 m found no place (run 2026-10-17), so me look far.
+    private const float DropSearch = 64f;
+    private const float DropSpotStep = 4f;
+    private const float DropMapStep = 1f;
+    // Level enough: most rise from one ground point to the next (about 14 degrees) and over one lane (about 10 degrees).
+    private const float DropStepRise = 0.25f;
+    private const float DropLaneRise = 1.5f;
+    // A throw that lies still this long has come to rest; one still moving this long after landing fails.
+    private const float DropRestSeconds = 1.5f;
+    private const float DropRestLimit = 12f;
+
+    // Ground heights round a spot, one ray from high above per point. Open = the ray hit terrain (not rock, tree,
+    // building or anything else solid) above the water.
+    private sealed class GroundMap
+    {
+        private readonly float _x0;
+        private readonly float _z0;
+        private readonly float _step;
+        private readonly int _size;
+        private readonly float[] _height;
+        private readonly bool[] _open;
+
+        internal GroundMap(Vector3 centre, float half, float step)
+        {
+            _step = step;
+            _size = Mathf.CeilToInt(half * 2f / step) + 1;
+            _x0 = centre.x - half;
+            _z0 = centre.z - half;
+            _height = new float[_size * _size];
+            _open = new bool[_size * _size];
+            var zone = ZoneSystem.instance;
+            var terrain = LayerMask.NameToLayer("terrain");
+            var top = centre.y + 80f;
+            for (var i = 0; i < _size; i++)
+            {
+                for (var j = 0; j < _size; j++)
+                {
+                    var k = i * _size + j;
+                    var from = new Vector3(_x0 + i * step, top, _z0 + j * step);
+                    if (Physics.Raycast(from, Vector3.down, out var hit, 200f, zone.m_solidRayMask))
+                    {
+                        _height[k] = hit.point.y;
+                        _open[k] = hit.collider != null && hit.collider.gameObject.layer == terrain && hit.point.y > zone.m_waterLevel + 0.5f;
+                    }
+                }
+            }
+        }
+
+        // Nearest ground point; false = not open there (or outside the map).
+        internal bool At(Vector3 p, out float height)
+        {
+            var i = Mathf.RoundToInt((p.x - _x0) / _step);
+            var j = Mathf.RoundToInt((p.z - _z0) / _step);
+            height = 0f;
+            if (i < 0 || j < 0 || i >= _size || j >= _size || !_open[i * _size + j])
+            {
+                return false;
+            }
+            height = _height[i * _size + j];
+            return true;
+        }
+    }
+
+    // How the four lanes from a spot look: 0 = level and open (rise = worst lane), 1 = something in the way, 2 = too
+    // steep.
+    private static int DropLanes(GroundMap map, Vector3 spot, out float rise)
+    {
+        rise = 0f;
+        foreach (var yaw in DropHeadings)
+        {
+            var ahead = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
+            var side = Vector3.Cross(Vector3.up, ahead);
+            var low = float.MaxValue;
+            var high = float.MinValue;
+            for (var s = -DropLaneHalf; s <= DropLaneHalf + 0.01f; s += DropMapStep)
+            {
+                var last = float.NaN;
+                // From behind the player's feet to the lane's end.
+                for (var t = -1f; t <= DropLaneLength + 0.01f; t += DropMapStep)
+                {
+                    if (!map.At(spot + ahead * t + side * s, out var h))
+                    {
+                        return 1;
+                    }
+                    if (!float.IsNaN(last) && Mathf.Abs(h - last) > DropStepRise)
+                    {
+                        return 2;
+                    }
+                    last = h;
+                    low = Mathf.Min(low, h);
+                    high = Mathf.Max(high, h);
+                }
+            }
+            if (high - low > DropLaneRise)
+            {
+                return 2;
+            }
+            rise = Mathf.Max(rise, high - low);
+        }
+        return 0;
+    }
+
+    // Nearest spot to 'near' whose four lanes are level open ground. Place = on the ground there.
+    private static bool FindDropPlace(Vector3 near, out Vector3 place, out string detail)
+    {
+        var map = new GroundMap(near, DropSearch + DropLaneLength + DropLaneHalf + 1f, DropMapStep);
+        var spots = new List<Vector3>();
+        for (var dx = -DropSearch; dx <= DropSearch + 0.01f; dx += DropSpotStep)
+        {
+            for (var dz = -DropSearch; dz <= DropSearch + 0.01f; dz += DropSpotStep)
+            {
+                if (dx * dx + dz * dz <= DropSearch * DropSearch + 0.01f)
+                {
+                    spots.Add(new Vector3(near.x + dx, near.y, near.z + dz));
+                }
+            }
+        }
+        spots.Sort((a, b) => Flat(a, near).CompareTo(Flat(b, near)));
+        var blocked = 0;
+        var steep = 0;
+        foreach (var spot in spots)
+        {
+            var how = DropLanes(map, spot, out var rise);
+            if (how == 0 && map.At(spot, out var ground))
+            {
+                place = new Vector3(spot.x, ground, spot.z);
+                detail = $"{F(Flat(spot, near))} m from where the player stood, ground rises at most {F(rise)} m along a throw's lane; "
+                         + $"{blocked} nearer spots had something in the way, {steep} were too steep";
+                return true;
+            }
+            if (how == 1)
+            {
+                blocked++;
+            }
+            else
+            {
+                steep++;
+            }
+        }
+        place = near;
+        detail = $"none of {spots.Count} spots within {F(DropSearch)} m has level open ground {F(DropLaneLength)} m out in the four "
+                 + $"headings ({blocked} with rock, tree, building or water in the way, {steep} too steep)";
+        return false;
+    }
+
+    private static void Face(Player player, Rig rig, float yaw)
+    {
+        var turn = Quaternion.Euler(0f, yaw, 0f);
+        rig.Look(yaw, 0f);
+        player.transform.rotation = turn;
+        if (player.m_body != null)
+        {
+            player.m_body.rotation = turn;
+        }
+    }
+
+    private static HashSet<ItemDrop> FluteDrops()
+    {
+        var set = new HashSet<ItemDrop>();
+        foreach (var d in ItemDrop.s_instances)
+        {
+            if (d != null && InstrumentContent.KindOf(d.m_itemData) == InstrumentKind.Flute)
+            {
+                set.Add(d);
+            }
+        }
+        return set;
+    }
+
     private static IEnumerator RunDropRest()
     {
         var c = new Checks(DropRestName);
         var player = Player.m_localPlayer;
-        if (player == null || ZoneSystem.instance == null)
+        if (player == null || ZoneSystem.instance == null || ZNetScene.instance == null)
         {
             SelfTest.Fail(DropRestName, "no player");
             yield break;
         }
         var rig = new Rig(player);
         var x = new Extra(player);
+        var rotation = player.transform.rotation;
         try
         {
             rig.TakeControls();
-            var item = rig.Give(InstrumentContent.ItemName(InstrumentKind.Flute));
-            if (!c.Check(item != null && player.DropItem(player.GetInventory(), item, 1), "a flute dropped through the game"))
+            var stood = player.transform.position;
+            if (!c.Check(FindDropPlace(stood, out var place, out var where), "level open ground for the throws near the player: " + where))
             {
                 c.Report();
                 yield break;
             }
-            yield return Frames(2);
-            ItemDrop drop = null;
-            foreach (var d in ItemDrop.s_instances)
+            c.Note($"throws from {F(place)}: {where}");
+            var noted = false;
+            foreach (var yaw in DropHeadings)
             {
-                if (d != null && InstrumentContent.KindOf(d.m_itemData) == InstrumentKind.Flute
-                    && (d.transform.position - player.transform.position).magnitude < 12f)
+                var label = $"thrown toward {F(yaw)} degrees";
+                PutPlayer(player, place + Vector3.up * 0.1f);
+                Face(player, rig, yaw);
+                yield return new WaitForSeconds(0.4f);
+                var facing = player.transform.eulerAngles.y;
+                if (Mathf.Abs(Mathf.DeltaAngle(facing, yaw)) > 5f || Flat(player.transform.position, place) > 0.5f)
                 {
-                    drop = d;
+                    c.Note($"{label}: the player faces {F(facing)} degrees, stands {F(Flat(player.transform.position, place))} m from the place");
                 }
-            }
-            if (!c.Check(drop != null, "the flute is an object in the world"))
-            {
-                c.Report();
-                yield break;
-            }
-            rig.Spawned(drop.gameObject);
-            var body = drop.GetComponent<Rigidbody>();
-            // It is thrown a little: where it lies once it has landed is where the rolling starts.
-            yield return new WaitForSeconds(1.5f);
-            if (!c.Check(drop != null, "still there after landing"))
-            {
-                c.Report();
-                yield break;
-            }
-            var landed = drop.transform.position;
-            var began = Time.time;
-            var restSince = -1f;
-            var rested = false;
-            var speed = 0f;
-            while (drop != null && Time.time - began < 60f)
-            {
-                speed = body == null || body.IsSleeping() ? 0f : body.linearVelocity.magnitude;
-                if (speed < 0.02f)
+                var before = FluteDrops();
+                var item = rig.Give(InstrumentContent.ItemName(InstrumentKind.Flute));
+                if (!c.Check(item != null && player.DropItem(player.GetInventory(), item, 1), label + ": a flute dropped through the game"))
                 {
-                    if (restSince < 0f)
+                    continue;
+                }
+                yield return Frames(2);
+                ItemDrop drop = null;
+                foreach (var d in FluteDrops())
+                {
+                    if (!before.Contains(d))
                     {
-                        restSince = Time.time;
-                    }
-                    if (Time.time - restSince > 1.5f)
-                    {
-                        rested = true;
-                        break;
+                        drop = d;
                     }
                 }
-                else
+                if (!c.Check(drop != null, label + ": the flute is an object in the world"))
                 {
-                    restSince = -1f;
+                    continue;
                 }
-                yield return null;
+                rig.Spawned(drop.gameObject);
+                var body = drop.GetComponent<Rigidbody>();
+                if (!noted)
+                {
+                    noted = true;
+                    var collider = drop.GetComponentInChildren<Collider>();
+                    c.Note($"flute body: mass {(body != null ? F(body.mass) : "-")}, damping {(body != null ? F(body.linearDamping) : "-")} linear, "
+                           + $"{(body != null ? F(body.angularDamping) : "-")} angular; collider {(collider != null ? collider.GetType().Name : "none")}");
+                }
+                // It is thrown a little: where it lies once it has landed is where the rolling starts.
+                yield return new WaitForSeconds(1.5f);
+                if (!c.Check(drop != null, label + ": still there after landing"))
+                {
+                    continue;
+                }
+                var landed = drop.transform.position;
+                var began = Time.time;
+                var restSince = -1f;
+                var rested = false;
+                var speed = 0f;
+                while (drop != null && Time.time - began < DropRestLimit)
+                {
+                    var still = body == null || body.IsSleeping();
+                    speed = still ? 0f : body.linearVelocity.magnitude;
+                    if (still || (speed < 0.02f && body.angularVelocity.magnitude < 0.5f))
+                    {
+                        if (restSince < 0f)
+                        {
+                            restSince = Time.time;
+                        }
+                        if (Time.time - restSince > DropRestSeconds)
+                        {
+                            rested = true;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        restSince = -1f;
+                    }
+                    yield return null;
+                }
+                if (!c.Check(drop != null, label + ": the flute was not lost while it lay there"))
+                {
+                    continue;
+                }
+                var end = drop.transform.position;
+                var rolled = Flat(end, landed);
+                var slope = SolidBelow(landed) - SolidBelow(end);
+                var ground = ZoneSystem.instance.GetGroundHeight(end);
+                c.Note($"{label}: landed at {F(landed)}, lies at {F(end)} after {F(Time.time - began)} s: {F(rolled)} m away, ground "
+                       + $"{F(slope)} m lower there, {F(Flat(end, place))} m from the place, speed {F(speed)} m/s");
+                c.Check(rested, $"{label}: the flute comes to rest within {F(DropRestLimit)} s of landing (speed now {F(speed)} m/s)");
+                c.Check(rolled < 2f, $"{label}: it does not roll away: {F(rolled)} m from where it landed");
+                c.Check(end.y > ground - 0.3f && end.y < ground + 0.5f, $"{label}: it lies on the ground, not under it ({F(end.y - ground)} m)");
+                ZNetScene.instance.Destroy(drop.gameObject);
+                yield return Frames(2);
             }
-            if (!c.Check(drop != null, "the flute was not lost while it lay there"))
-            {
-                c.Report();
-                yield break;
-            }
-            var end = drop.transform.position;
-            var rolled = Flat(end, landed);
-            var slope = SolidBelow(landed) - SolidBelow(end);
-            c.Note($"flute landed at {F(landed)}, lies at {F(end)} after {F(Time.time - began)} s: {F(rolled)} m away, ground {F(slope)} m lower there, speed {F(speed)} m/s");
-            c.Check(rested, $"the dropped flute comes to rest within a minute (speed now {F(speed)} m/s)");
-            c.Check(rolled < 2f, $"it does not roll away: {F(rolled)} m from where it landed");
-            c.Check((end - player.transform.position).magnitude < 6f && end.y > ZoneSystem.instance.GetGroundHeight(end) - 0.3f,
-                "it lies where the player can still pick it up, not under the ground");
             c.Report();
         }
         finally
         {
+            try
+            {
+                player.transform.rotation = rotation;
+                if (player.m_body != null)
+                {
+                    player.m_body.rotation = rotation;
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Warning($"Self test clean-up (facing) failed: {e.Message}");
+            }
             x.Restore();
             rig.Restore();
         }

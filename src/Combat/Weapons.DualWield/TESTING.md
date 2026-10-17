@@ -28,11 +28,11 @@ setting `KnifePairBlock`, network version 2): smoke test passed, and the in-worl
 passed (`./tools/Test-InWorld.ps1 -Mod Weapons.DualWield -Only dual.data,dual.block`). Every item below is still to
 test.
 
-**Automated checks (2026-10-15):** 58 of 58 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
-tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
-by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
-that fails.
+**Automated checks (2026-10-17):** 56 of 59 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`; failing: `dual.elements`, `dual.sheath`, `dual.disabled.pair`. An item ending in "Automated: ..." is
+checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand
+part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (it does not change stamina costs), `ghost` makes creatures ignore you, `heal` refills health and
@@ -253,6 +253,9 @@ version matters for M18: with only another network version, the refusal line wou
   then true while lying, then get up: the back pair is crossed within a moment of standing, the knives are one per
   hip. Note what looks wrong (blades through the body, the legs or the ground, the crossing point, the angle of the
   knives, a knife floating off the hip, a weapon floating off the back).
+  Known issue (2026-10-17, 1.0.0 candidate, self-test `dual.sheath`): the bed step fails: a back pair set up while
+  lying stays a wider X after getting up (README "Good to know"; draw and put away the weapons to fix it). A fix is
+  planned after the release.
   *Partly automated (`dual.visuals`, `dual.sheath`, `dual.real.swim-sheath`); by hand: Look at each sheathed pair from
   behind, the front and both sides, standing, walking, running (and while swimming) for what a program cannot judge:
   blades through the body, the legs or the ground, a weapon floating off the back or the hip, how the X and the knives
@@ -388,6 +391,9 @@ version matters for M18: with only another network version, the refusal line wou
   overlapping, and placed again at once when turned back on. The other player lies in a bed with the sword pair
   sheathed; the observer sets `CrossSheathedPair` false, then true: once that player gets up, crossed within a moment.
   A player without the mod sees both pairs overlapping (the game's placement).
+  Known issue (2026-10-17, 1.0.0 candidate, self-test `dual.sheath`): the bed step fails: a back pair set up while
+  lying stays a wider X after getting up (README "Good to know"; draw and put away the weapons to fix it). A fix is
+  planned after the release.
   *Partly automated (`dual.mp.seen`, `dual.visuals`, `dual.sheath`); by hand: A second player looking at the sheathed
   sword pair and knife pair, with the setting and the mod toggled on the observer's game.*
 
@@ -441,8 +447,8 @@ version matters for M18: with only another network version, the refusal line wou
   cannot run in your game, and this server requires it. Turn it on in Esc > MC Mods (or F1 when a configuration
   manager is installed; its status there says what stops it) and join again.", and that status is the "Inactive: <its
   plugin name> also handles dual wielding" line above.
-  *Partly automated (`dual.data`); by hand: Install Smoothbrain DualWield, then RustyMods DualWielder, read the log and
-  the panel, and join a server with the mod to read each refusal screen.*
+  *Partly automated (`dual.data`); by hand: Install Smoothbrain DualWield, then RustyMods DualWielder, read the log
+  and the panel, and join a server with the mod to read each refusal screen.*
 - [x] **X09 Creature Kill and Tame Counts (MC):** kill a `Greyling` with a sword + axe pair (let an off-hand hit land
   the kill). Expected: the kill counts under melee in its line of the Compendium's Player Statistics.
   *Automated: `dual.kills`, `dual.x.kills-page`.*

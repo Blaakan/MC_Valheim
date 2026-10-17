@@ -14,11 +14,10 @@ patches cleanly, JitCheck clean). In-world self-tests (`./tools/Test-InWorld.ps1
 depth, no sideways movement, drain while still, free at the surface, camera, fog and surface from below). No hands-on
 in-game test yet.
 
-**Automated checks (2026-10-15):** 36 of 36 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
-"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
-still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-17):** 37 of 37 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina, `killall` removes nearby creatures.

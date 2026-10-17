@@ -333,7 +333,8 @@ internal static partial class SelfTests
                     c.Check(Mathf.Abs(b.xMin - first.xMin) <= 1.5f, "6 rows: button still on the first slot's left edge");
                     c.Check(b.yMax <= Screen.height && b.xMin >= 0f, "6 rows: button on screen");
                 }
-                var stone = inv.AddItem("Stone", 3, 1, 0, 0L, "", new Vector2i(0, 5), false);
+                // GiveAt stop the test when the game put it on another Stone stack (then it sit in no slot).
+                var stone = rig.GiveAt("Stone", 3, new Vector2i(0, 5));
                 FilterState.SetMode(FilterMode.SkipIgnored);
                 FilterState.Toggle(FilterState.Ignored, "Stone");
                 yield return Frames(3);
@@ -595,9 +596,9 @@ internal static partial class SelfTests
                 c.Report();
                 yield break;
             }
-            var spear = inv.AddItem("SpearFlint", 1, 1, 0, 0L, "", new Vector2i(free[0], 0), false);
-            var ore = inv.AddItem("CopperOre", 2, 1, 0, 0L, "", new Vector2i(free[1], 0), false);
-            var arrows = inv.AddItem("ArrowWood", 20, 1, 0, 0L, "", new Vector2i(free[2], 0), false);
+            var spear = rig.GiveAt("SpearFlint", 1, new Vector2i(free[0], 0));
+            var ore = rig.GiveAt("CopperOre", 2, new Vector2i(free[1], 0));
+            var arrows = rig.GiveAt("ArrowWood", 20, new Vector2i(free[2], 0));
             if (!c.Check(spear != null && ore != null && arrows != null, "SpearFlint, CopperOre and ArrowWood given"))
             {
                 c.Report();

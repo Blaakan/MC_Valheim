@@ -45,10 +45,9 @@ commit `c34ad72`): all six of this mod's multiplayer self-tests passed, `forge.m
 `forge.mp.tiers` and `forge.mp.items` in the `modded` scenario, `forge.mp.vanilla-server` and `forge.mp.handoff` in
 the `vanilla-server` scenario.
 
-**Automated checks (2026-10-15):** 49 of 49 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
-tree of commit `9afc663`; 7 more named here have no result on that code yet (not run since their test or the mod
-changed, parked, or only in a later run). An item ending in "Automated: ..." is checked in full by the named
+**Automated checks (2026-10-17):** 56 of 57 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`; failing: `forge.refine.station-tag`. An item ending in "Automated: ..." is checked in full by the named
 self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated
 test" names the self-test that fails.
 

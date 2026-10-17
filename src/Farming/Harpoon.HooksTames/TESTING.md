@@ -8,11 +8,10 @@ Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 MC Mods panel. Smoke test passed 2026-09-29 (loads, patches cleanly, JitCheck clean: 171 methods, 0 failures). No
 in-game test yet.
 
-**Automated checks (2026-10-15):** 30 of 30 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
-"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
-still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-17):** 30 of 30 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** press F5 for the console → `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`);
 use a test character. `spawn <Name>` puts the object 2 m in front of you, so walk to where you want a creature first.

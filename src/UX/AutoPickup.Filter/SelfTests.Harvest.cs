@@ -52,10 +52,19 @@ internal static partial class SelfTests
         c.Check(drops.All(FilterState.ListBlocks), $"{what}: the lists alone would skip these items ({string.Join(", ", totals.Keys.Select(L).ToArray())})");
         c.Check(tagged == drops.Count, $"{what}: every dropped item counts as harvested by hand ({tagged} of {drops.Count})");
         c.Check(!drops.Any(d => HoverOf(d).Contains(SkipLineAny)), $"{what}: none shows 'Auto pickup skips this'");
-        yield return WaitGone(drops, 3f);
+        var watch = new PickupWatch(rig.Player);
+        yield return WaitGone(drops, 3f, watch);
+        var leftAtStart = AliveCount(drops);
+        if (leftAtStart > 0)
+        {
+            yield return WalkOver(rig, drops, 6f, watch);
+        }
+        // Miss here come and go (sap collector, lootfilter.stations): me say what auto pickup saw, check stay same.
         if (AliveCount(drops) > 0)
         {
-            yield return WalkOver(rig, drops, 6f);
+            c.Note($"{what}: {drops.Count - AliveCount(drops)} of {drops.Count} picked up ({leftAtStart} left after 3 s at the start spot, "
+                   + $"then the player walked over them); auto pickup on {Player.m_enableAutoPickup}, mode {FilterState.Mode}, "
+                   + $"ExemptHarvest {Plugin.ExemptHarvestOn}. Still on the ground: {watch.Explain(rig, drops)}");
         }
         c.Check(AliveCount(drops) == 0, $"{what}: all {drops.Count} item(s) picked up ({AliveCount(drops)} left)");
         c.Check(totals.All(p => inv.CountItems(p.Key, -1, false) == before[p.Key] + p.Value), $"{what}: they are in the inventory");

@@ -481,6 +481,20 @@ internal static partial class SelfTests
         return list;
     }
 
+    // Wood in an inventory, every stack.
+    private static int WoodIn(Inventory inventory)
+    {
+        var n = 0;
+        foreach (var item in inventory.GetAllItems())
+        {
+            if (item.m_dropPrefab != null && item.m_dropPrefab.name == InstrumentContent.VanillaWoodName)
+            {
+                n += item.m_stack;
+            }
+        }
+        return n;
+    }
+
     private static void PutPlayer(Player player, Vector3 position)
     {
         player.transform.position = position;
@@ -602,9 +616,14 @@ internal static partial class SelfTests
             SongShare.ServerSettingsChanged();
             old.m_shownTutorials.Add("death");
             changed = true;
+            // Wood counted before and after: the character may carry Wood already (loot an earlier test of the run
+            // picked up); the game stack ours on it.
+            var woodBefore = WoodIn(old.GetInventory());
             var flute = old.GetInventory().AddItem(InstrumentContent.ItemName(InstrumentKind.Flute), 1, 1, 0, 0L, "", false);
             var wood = old.GetInventory().AddItem("Wood", 3, 1, 0, 0L, "", false);
-            if (!c.Check(flute != null && wood != null && old.EquipItem(flute, false), "a flute in the hand and some wood in the inventory"))
+            var woodCarried = WoodIn(old.GetInventory());
+            if (!c.Check(flute != null && wood != null && woodCarried == woodBefore + 3 && old.EquipItem(flute, false),
+                    $"a flute in the hand and some wood in the inventory (wood {woodBefore} before, {woodCarried} now)"))
             {
                 c.Report();
                 yield break;
@@ -763,7 +782,6 @@ internal static partial class SelfTests
             var container = grave != null ? grave.GetComponent<Container>() : null;
             var inside = container != null ? container.GetInventory() : null;
             var fluteInside = 0;
-            var woodInside = 0;
             if (inside != null)
             {
                 foreach (var item in inside.GetAllItems())
@@ -772,15 +790,12 @@ internal static partial class SelfTests
                     {
                         fluteInside++;
                     }
-                    else if (item.m_dropPrefab != null && item.m_dropPrefab.name == "Wood")
-                    {
-                        woodInside += item.m_stack;
-                    }
                 }
             }
-            c.Check(graves.Count == 1 && inside != null && fluteInside == 1 && woodInside == 3 && inside.NrOfItems() == items,
-                $"the instrument is in the tombstone with the other items ({graves.Count} tombstone(s), flute {fluteInside}, wood {woodInside}, "
-                + $"{(inside != null ? inside.NrOfItems() : 0)} of {items} items)");
+            var woodInside = inside != null ? WoodIn(inside) : 0;
+            c.Check(graves.Count == 1 && inside != null && fluteInside == 1 && woodInside == woodCarried && inside.NrOfItems() == items,
+                $"the instrument is in the tombstone with the other items ({graves.Count} tombstone(s), flute {fluteInside}, wood {woodInside} "
+                + $"of {woodCarried} carried, {(inside != null ? inside.NrOfItems() : 0)} of {items} items)");
             c.Check(CountKind(now, InstrumentKind.Flute) == 0, "and not on the new body");
             if (grave != null)
             {

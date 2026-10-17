@@ -13,11 +13,10 @@ in-game test yet.
 `csearch.bug.tankard` is back in `csearch.tools`. The smoke test and the self-tests ran on 0.1.1 on 2026-10-13 (game
 1.0.17, every MC mod loaded): all of this mod's tests passed.
 
-**Automated checks (2026-10-15):** 34 of 34 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
-tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
-by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
-that fails.
+**Automated checks (2026-10-17):** 34 of 34 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** use a **test character and a test world** (cheats mark the character). Press F5 for the console →
 `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). Type `nocost`, build a roofed shed

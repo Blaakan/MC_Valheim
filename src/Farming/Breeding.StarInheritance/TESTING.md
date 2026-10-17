@@ -18,11 +18,10 @@ player (join check, server settings for everyone): Debug and Release build witho
 the same code: `breeding.rule`, `breeding.farmer`, `breeding.birth`, `breeding.egg` and `breeding.network` (17/17
 tests of the run). No hands-on in-game test yet; the multiplayer items need two players.
 
-**Automated checks (2026-10-15):** 35 of 35 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
-"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
-still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-17):** 36 of 36 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** use a test character and a test world. Debug logging on (`./tools/Setup.ps1 -DevBepInExConfig`), F5 →
 `devcommands` (then `confirmcheats` if asked). Keep `./tools/Watch-Log.ps1 -Mine` open: every birth writes one Debug

@@ -13,11 +13,10 @@ server (`./tools/Test-Multiplayer.ps1 -Scenario modded,vanilla-server -Only trin
 passed. History, on 0.1.0: smoke test passed 2026-10-01; the in-world self-tests of that day gave the measured values
 below (their NOTE lines). No hands-on in-game test yet.
 
-**Automated checks (2026-10-15):** 55 of 55 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
-tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
-by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
-that fails.
+**Automated checks (2026-10-17):** 56 of 56 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off; turn it off for the items where you take hits), `heal` refills health,
@@ -362,4 +361,4 @@ code yet.
   does not need to have), on a server where Trinkets on Demand is the only mod that refuses it: "- Trinkets on Demand:
   this server requires it (version X) and your game does not have it. Install it." (X = the server's version); and
   M08's copy of another version (built with `-p:Version=0.0.9`): "- Trinkets on Demand: the server has version X and
-  your game 0.0.9, and they cannot play together. Install version X."*
+  your game 0.0.9, and they cannot play together. Install version X.".*

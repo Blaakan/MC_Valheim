@@ -38,11 +38,10 @@ itself): T37 is reset, T42 and C11 are new, and T13 now says a Troll takes two t
 holds every kept-press check) and the smoke test ran on this change on 2026-10-13 (game 1.0.17, every MC mod loaded):
 all of this mod's tests passed, `tower.group` on a second run alone.
 
-**Automated checks (2026-10-15):** 55 of 55 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
-tree of commit `9afc663`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked
-by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test
-that fails.
+**Automated checks (2026-10-17):** 58 of 58 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). Give
 yourself items with `spawn <name> <amount> <quality> p` (`p` puts it straight into your inventory:
@@ -237,7 +236,7 @@ to the hit, estimated from the clip data; T34).
   instead. Expected: nothing swings by itself, no punch and no sword swing: the press was waiting for the next bash
   only. (A press made less than half a second before the switch may still start an attack, as in the normal game.)
   *Automated: `tower.press`.*
-- [ ] **T38 Tower shield leaves the list mid-bash:** on a server, the host makes every setting change of this item
+- [x] **T38 Tower shield leaves the list mid-bash:** on a server, the host makes every setting change of this item
   (the server's settings apply to everyone, so a change in a client's own config does nothing). Set
   `AutoTowers = false` first (with it on, `ShieldIronTower` stays a tower shield without being in `Towers`: AutoTowers
   finds it by its data) and `BashAnimationSpeed = 0.3` (a slow swing). Bash a `Troll` and, during the swing, remove
@@ -498,8 +497,7 @@ on 2026-10-16.
   lower than before. Clear the setting. Expected: two-handed again, and the Info line with N back up. With Warfare:
   `ExcludedTowers = ShieldBronzeTower_TW` does the same to Warfare's Bronze tower shield (it also leaves the line's
   "found automatically" list).
-  *Partly automated (`tower.thirdparty` on a stand-in tower); by hand: The same with a vanilla or Warfare tower shield
-  in a real game.*
+  *Partly automated (`tower.thirdparty`); by hand: The same with a vanilla or Warfare tower shield in a real game.*
 - [ ] **T55 AutoTowers off:** set `AutoTowers = false`. Expected: the seven normal-game tower shields stay tower
   shields (they are in `Towers`); Warfare's tower shields are normal shields; the log line says "only the ones named in
   Towers (AutoTowers is off)". Set it back to true.
@@ -512,7 +510,7 @@ on 2026-10-16.
 - [ ] **M19 Server's AutoTowers and ExcludedTowers:** the host sets `ExcludedTowers = ShieldBronzeTower_TW` (Warfare
   on both games), then `AutoTowers = false`. Expected: for the client, Warfare's Bronze tower shield is a normal shield
   after the first change, and every Warfare tower shield after the second; the client's own settings are not used.
-  *Partly automated (`tower.mp.rules` with the stand-in towers); by hand: With Warfare on a real server and client.*
+  *Partly automated (`tower.mp.rules`); by hand: With Warfare on a real server and client.*
 
 ## 0.2.1 — the refusal screen names the mod
 

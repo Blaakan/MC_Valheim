@@ -5,7 +5,13 @@ When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
 **Build under test:** 1.0.0 (first release; before that 0.4.3) (B on a gamepad closes the song window without making the character jump: T22 reset;
-not run in game yet), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Before that
+not run in game yet), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). In the 1.0.0
+candidate a dropped Wooden Flute no longer rolls away on level ground (a square collider instead of a round one, and
+more angular damping on every dropped instrument: T02 reset), and the self-tests `music.death.*` (Wood counted against
+what the character already carried) no longer depend on what earlier tests of a full run left behind: they passed on
+2026-10-17 with the 1.0.0 candidate, with every other Music test (119 of 120 in world, every multiplayer test).
+`music.drop.rest` is parked: the test world has no level open ground near its start (none within 64 m), so the flute
+not rolling is checked by hand in T02. Before that
 0.4.2 (the refusal screen names the mod, section "0.4.2") and 0.4.1. 0.4.1
 fixes false recipe warnings when leaving a server without the mod (new M20; `music.badrecipe` checks it on a stand-in
 item database; run 2026-10-08 on game 1.0.17: in-world self-tests 52 of 52 with `music.play` and
@@ -74,13 +80,13 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   *Automated: `music.recipes`.*
 - [ ] **T02 Models and icons (G6):** hold each instrument (third person), then drop each on the ground. Expected: a
   wooden flute with finger holes, a silver lyre with strings, a tambourine with a skin and jingles, sized like real
-  instruments in the hand; dropped ones lie on the ground, can be picked up, and look the same; the inventory icons
-  match the models.
+  instruments in the hand; dropped ones lie on the ground where they land (no rolling away), can be picked up, and
+  look the same; the inventory icons match the models.
   *Partly automated (`music.drop`, `music.item`, `music.export`, `music.drop.rest`); by hand: Look at them: a wooden
   flute with finger holes, a silver lyre with strings, a tambourine with a skin and jingles, sized like real
   instruments in the hand, the same when dropped, and inventory icons that match the models (screenshots of
-  music.item, PNG files of music.export). The rolling is no longer a by-hand check. Note: the flute's collider is a
-  capsule with no extra damping, so music.drop.rest may fail on sloping ground; that would be the mod, not the test.*
+  music.item, PNG files of music.export), and that each dropped instrument, the flute included, stays where it lands
+  on level ground (`music.drop.rest` is parked: the test world has no level open ground near its start).*
 - [x] **T03 Tools:** equip a torch, then an instrument. Expected: both hands taken (the torch is put away); a weapon or
   torch puts the instrument away; R hangs it at the hip like the hammer.
   *Automated: `music.hands`.*

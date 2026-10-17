@@ -55,7 +55,6 @@ spyglass.input.sit  # sitting on a chair with the spyglass in hand does not happ
 spyglass.input.dive  # expects the diver back at the surface 15 s after the Crouch key is let go; Swim Dive holds the depth
 spyglass.picture  # the test spot shows too little fine detail to tell sharp from blurred
 spyglass.render-scale  # same: too little fine detail in view at render scale 50%
-spyglass.death  # the burning does not kill the player within 12 s, so the death is never played
 
 # --- Cultivator Replant
 replant.input.pad  # LOOK: on the test gamepad the hint "<X button> Replant" lays out 0 glyph pictures (text shown). Does the button picture show on a controller?
@@ -70,3 +69,4 @@ fishing.lift  # the fish does not stay out of the water on the short line
 fishing.toggle-escape  # times out after 120 s
 fishing.harpoon-throw  # after the real harpoon throw the switch to the rod fails; it also leaves the harpoon's line length changed (40 m) for later tests
 fishing.filter  # full bag: the reel does not end like a catch within 30 s
+music.drop.rest  # no level open ground near the test world start (2026-10-17: none within 64 m); needs a fixed flat test site

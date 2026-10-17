@@ -31,7 +31,8 @@
     Leave the game running in the world after the tests. When you close it, the probe and the run's saves are
     removed and the mod config files put back as before the run.
 .PARAMETER TimeoutSec
-    Whole run, from launch to the DONE line (world generation included).
+    Whole run, from launch to the DONE line (world generation included). Default 900 s, or 18000 s for a run
+    without -Only (every test, about 3 hours). A long -Only list may need more than 900 s: give it.
 .PARAMETER TestTimeoutSec
     Per-test timeout inside the game.
 .PARAMETER NoBuild
@@ -79,6 +80,9 @@ $skipCfgNames = @($probeCfgName, "$contentGuid.cfg")
 $probeTests = @('probe.baseline', 'probe.runner', 'probe.content')
 # Me split -Only like the probe do (comma inside one string = two pieces).
 $filters = @(((@($Only) | Where-Object { $_ }) -join ',') -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+# Run without -Only = every test (about 3 h): 900 s default far too short (run 2026-10-17 stopped after 15 min). Me give
+# it 5 h unless caller said a timeout.
+if (-not $PSBoundParameters.ContainsKey('TimeoutSec') -and $filters.Count -eq 0) { $TimeoutSec = 18000 }
 
 if (Get-ValheimProcess) { Write-Fail 'Valheim is running. Close it first (the test needs a fresh log and its own save folder).'; exit 1 }
 if (-not (Get-Process -Name 'steam' -ErrorAction SilentlyContinue)) { Write-Fail 'Steam is not running. Start Steam and log in first: the game needs it.'; exit 1 }

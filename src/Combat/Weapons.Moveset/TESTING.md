@@ -23,11 +23,11 @@ weapon type's first roll attack to flow; their NOTE lines give the copy's cost).
 3cda33b+dirty, before the roll flow): the user reported the stop between the roll and the roll attack, which this
 build removes.
 
-**Automated checks (2026-10-15):** 49 of 49 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
-"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
-still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-17):** 49 of 50 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`; failing: `moveset.ledge`. An item ending in "Automated: ..." is checked in full by the named self-tests and
+is ticked by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the
+self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (it does not change stamina costs), `ghost` makes creatures ignore you, `heal` refills health and

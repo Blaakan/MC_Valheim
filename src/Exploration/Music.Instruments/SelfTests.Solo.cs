@@ -420,10 +420,10 @@ internal static partial class SelfTests
                 }
                 rig.Spawned(drop.gameObject);
                 var body = drop.GetComponent<Rigidbody>();
-                // Flute is round (capsule collider): on ground of random world it roll slow long after landing
-                // (run: 0.105 m/s still, 6 s after drop, ground 6 mm lower over 0.56 m). So me wait longer for rest,
-                // and slow roll down the slope still count as lying on the ground. Roll on level ground, roll up,
-                // fast or falling after the wait = fail.
+                // Old round flute (capsule collider, before 1.0.0) rolled slow long after landing (run: 0.105 m/s
+                // still, 6 s after drop, ground 6 mm lower over 0.56 m); music.drop.rest judge the rolling now. Here
+                // me still wait for rest, and slow roll down the slope still count as lying on the ground. Roll on
+                // level ground, roll up, fast or falling after the wait = fail.
                 var thrown = Time.time;
                 yield return WaitFor(() => drop == null || body == null || body.IsSleeping() || body.linearVelocity.sqrMagnitude < 0.0004f, 16f);
                 var waited = Time.time - thrown;

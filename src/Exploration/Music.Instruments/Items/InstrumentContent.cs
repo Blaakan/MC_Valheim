@@ -26,6 +26,9 @@ internal static class InstrumentContent
     internal const string EffectName = "SE_MC_Music";
     private const float RebuildDelay = 0.5f;
     internal const float RebuildDelaySeconds = RebuildDelay;
+    // Angular damping of a dropped instrument's body (Unity default 0.05): a flute or a tambourine on its rim stop
+    // rolling soon after it land.
+    internal const float DroppedAngularDamping = 3f;
 
     internal const string Controls =
         "[<color=yellow><b>$KEY_Attack</b></color>] Songs   [<color=yellow><b>$KEY_Block</b></color>] Stop";
@@ -454,6 +457,12 @@ internal static class InstrumentContent
                 // Collider on the item layer (pickup, physics). The game switch colliders off in the hand copy
                 // (VisEquipment.CleanupInstance).
                 InstrumentModels.AddCollider(def.Kind, model, itemLayer);
+                // Dropped instrument settle where it land: spin die out fast (knife copy body, ours alone).
+                var body = item.GetComponent<Rigidbody>();
+                if (body != null)
+                {
+                    body.angularDamping = Mathf.Max(body.angularDamping, DroppedAngularDamping);
+                }
 
                 shared.m_name = def.DisplayName;
                 shared.m_description = def.Description;

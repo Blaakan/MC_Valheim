@@ -41,12 +41,10 @@ to see on screen, only wasted work). New item T28; no existing item was reset. T
 also turns EdgeBlur on again while looking. The self-tests ran on the three 0.1.1 fixes together on 2026-10-13 (game
 1.0.17, in-world and with a dedicated server, every MC mod loaded): all of this mod's tests passed.
 
-**Automated checks (2026-10-15):** 51 of 52 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`; failing:
-`spyglass.mp.server`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by
-them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that
-fails.
+**Automated checks (2026-10-17):** 54 of 54 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina, `killall` removes nearby creatures.
@@ -193,13 +191,12 @@ changed one back afterwards.
   only limits the view, it does not change the zoom you picked. If you used the wheel while the limit was 3, the zoom
   it reached is kept instead.
   *Automated: `spyglass.zoom-pick`, `spyglass.wheel`.*
-- [ ] **T26 Death while looking:** `god` off, low health; stand in a fire, raise the spyglass while burning and die
+- [x] **T26 Death while looking:** `god` off, low health; stand in a fire, raise the spyglass while burning and die
   from the burning without lowering it. Expected: at death the normal death view comes back at once: the camera looks
   at your body from the normal third-person spot behind you (where it would be without the spyglass; not from inside
   your head), with no round view, blur, dark ring, cleared fog or missing body, and it stays out of your head until
   you respawn; the log has no error; after you respawn the view is normal and the spyglass is down (it is on the
-  tombstone); once picked up again it can be raised. Its self-test `spyglass.death` is parked
-  (`tests/parked-selftests.txt`) until a run shows it passes: until then it ticks nothing (section "0.1.3").
+  tombstone); once picked up again it can be raised.
   *Automated: `spyglass.death`.*
 - [x] **T27 Click while it comes down:** raise, left click to lower, and click again before it is fully down.
   Expected: it goes back up from where it was (the camera and the round view do not jump), and the next click lowers
@@ -315,9 +312,9 @@ lists a mod that did not refuse the player. Not run again on this code yet.
   Install it." With Jotunn on the server and on your game, Jotunn's window shows these lines under "Failed
   Connection:"; with Jotunn only on your game, the vanilla panel shows them.
   *Partly automated (`probe.mp.off.MC.Exploration.View.Spyglass`, `probe.refusal`); by hand: The screen as seen, with
-  Jotunn on the server and on your game, and with Jotunn only on your game; the other-version copy from the Setup
-  (the line names both versions); and the game without Spyglass but with another MC mod made to run on both the
-  server and the players (the line the server sends for a missing mod).*
+  Jotunn on the server and on your game, and with Jotunn only on your game; the other-version copy from the Setup (the
+  line names both versions); and the game without Spyglass but with another MC mod made to run on both the server and
+  the players (the line the server sends for a missing mod).*
 
 ## 0.1.3 — the death camera
 
@@ -328,9 +325,8 @@ body is there, the game only turns the camera toward it and never moves it. T26 
 removed self-test `spyglass.bug.death-camera` is back in `spyglass.death`, which now also checks that on the first
 frame drawn dead the camera looks at the body (within the camera shake of that frame) from behind where the eye
 looked, that it is out of the head on every frame until the respawn, and that it is close to the third-person
-distance it had before the raise (the test does not turn the player). `spyglass.death` is parked
+distance it had before the raise (the test does not turn the player). `spyglass.death` was parked
 (`tests/parked-selftests.txt`, since 2026-10-13: in those runs the fire did not kill the player in the first death of
-a run, while the same death played in the bug test right after it), so it ticks nothing until it passes a run of its
-own (`./tools/Test-InWorld.ps1 -Mod View.Spyglass -Only spyglass.death`) and comes off that list. Its set-up now dries
+a run); it passed on the 1.0.0 release candidate (2026-10-17, commit ec1b7dc) and came off that list. Its set-up now dries
 the player before the fire and holds the low health until the fire kills (possible causes, not confirmed). 0.1.3 is
 built (Debug and Release) but not run in the game yet: no smoke test, in-world or multiplayer run on it.
