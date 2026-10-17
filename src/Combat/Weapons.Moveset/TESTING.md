@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.1.1) (the refusal screen names the mod, section "0.1.1"; before that 0.1.0) with the roll flow (user feedback of 2026-09-30: the roll attack flows out of the roll;
+**Build under test:** 0.1.1 (the refusal screen names the mod, section "0.1.1"; before that 0.1.0) with the roll flow (user feedback of 2026-09-30: the roll attack flows out of the roll;
 network version 2), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). The build before
 the roll flow passed the smoke test (`./tools/Test-Smoke.ps1`, 2026-09-30: loads, patches cleanly, JitCheck clean) and
 the in-world self-tests (`./tools/Test-InWorld.ps1 -Mod Weapons.Moveset`, 2026-09-30, a full run with every MC mod, 71

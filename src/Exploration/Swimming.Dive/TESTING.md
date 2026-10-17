@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.1.2) (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 fixed the storm-wave bug of T32 (in a storm, holding Crouch and Jump at the surface got the swimmer counted as under
 water, held under the rising wave and drained): T32 is reset to `[ ]` and T34 is new; the self-tests ran on 0.1.1 on
 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded): all of this mod's tests passed

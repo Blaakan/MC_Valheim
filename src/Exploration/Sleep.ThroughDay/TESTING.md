@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.1.2), build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+**Build under test:** 0.1.2, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
 Mods panel). 0.1.2 carries the framework's refusal screen (when a server refuses the player because of another MC mod,
 the "Incompatible version" screen lists that mod under "MC mods:"; Sleep is enough on its own and the server does not
 need to have it; framework item N09): M12 is new; sleeping is unchanged, so no other item is reset. Built without

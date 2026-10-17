@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.1.2) (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 fixed the wind icon of M13 (at the helm of a ship simulated by a game without the mod, the HUD wind icon showed the
 Sailing bonus although the ship did not get it): M13 is reset to `[ ]` and M14 is new. 0.1.1 also changed the sail
 response (T19: when the wind shifted while the sail was still filling, the sail's pull went about 0.5% past its normal

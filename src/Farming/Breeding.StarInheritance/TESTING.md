@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.2.1) (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+**Build under test:** 0.2.1 (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
 Mods panel). 0.2.0 changes who the server refuses: also a player who has the mod turned off or has another version of
 it, when joining and about a second after turning it off while connected (M02, M03, M07, M08, M14 and T18 were
 reworded and reset to `[ ]`, M17 to M19 are new), and it fixes the log of a client whose copy is turned off while the

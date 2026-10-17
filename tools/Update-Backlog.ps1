@@ -56,7 +56,8 @@ foreach ($r in $rows) {
     if (-not $r.l -and $res) { $r.l = $res.userLink }
 }
 
-# Me find mods that implement an idea: <ModIdea> in csproj. Tag nexus/<GUID>/v<ver> = that version released.
+# Me find mods that implement an idea: <ModIdea> in csproj. Tag nexus/<GUID>/v<ver> = that version released; a pack
+# tag nexus/pack/v* listing the mod at a version = released too (mod shipped only in pack, no own page yet).
 # PS 5.1 + Stop make git stderr (no repo, no git) a crash: me ask softly, no tag = nothing released.
 $tags = @()
 $eap = $ErrorActionPreference
@@ -70,6 +71,7 @@ try {
 } finally {
     $ErrorActionPreference = $eap
 }
+$packReleased = @(Get-PackReleasedMods $root)
 $modsByIdea = @{}
 foreach ($p in Get-ModProjects) {
     $x = [xml](Get-Content $p.FullName -Raw)
@@ -80,8 +82,9 @@ foreach ($p in Get-ModProjects) {
     if ($ideas.Count -gt 0) {
         $rel = ($p.DirectoryName.Substring($root.Length + 1)) -replace '\\', '/'
         $guid = $p.BaseName
-        $released = @($tags | Where-Object { $_ -like "nexus/$guid/v*" }).Count -gt 0
-        $current = $tags -contains "nexus/$guid/v$($pg.Version)"
+        $inPack = @($packReleased | Where-Object { $_.Guid -eq $guid })
+        $released = @($tags | Where-Object { $_ -like "nexus/$guid/v*" }).Count -gt 0 -or $inPack.Count -gt 0
+        $current = $tags -contains "nexus/$guid/v$($pg.Version)" -or @($inPack | Where-Object { $_.Version -eq $pg.Version }).Count -gt 0
         $text = if ($current) { 'released' } elseif ($released) { 'new version in development' } else { 'in development' }
         foreach ($idea in $ideas) {
             $modsByIdea[(Norm $idea)] = [pscustomobject]@{

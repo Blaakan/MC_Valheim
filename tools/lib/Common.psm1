@@ -224,16 +224,51 @@ function Split-ModIdea([string]$Text) {
 }
 
 # Me check version of a release not tagged yet. $Released = versions already released (from tags).
-# No release yet = must be 1.0.0. Else must be above highest one. Me give problem text, or $null when fine.
+# No release yet = must be 0.9.0 (public preview) or 1.0.0 (user decision 2026-10-17). Else must be above highest one.
+# Me give problem text, or $null when fine.
 function Get-ReleaseVersionProblem([string]$Version, [string[]]$Released) {
     if ($Version -notmatch '^\d+\.\d+\.\d+$') { return "version '$Version' is not x.y.z" }
     $old = @($Released | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | ForEach-Object { [version]$_ } | Sort-Object -Descending)
     if ($old.Count -eq 0) {
-        if ([version]$Version -ne [version]'1.0.0') { return "first release must be 1.0.0, not $Version" }
+        if ([version]$Version -ne [version]'1.0.0' -and [version]$Version -ne [version]'0.9.0') { return "first release must be 0.9.0 (public preview) or 1.0.0, not $Version" }
         return $null
     }
     if ([version]$Version -le $old[0]) { return "version $Version is not above the last release ($($old[0]))" }
     $null
+}
+
+# Me read pack tag message "<pack name> <ver> (Nexus): MC.A.B 0.1.0, MC.C.D 0.2.1" (Package-Mod write it).
+# Me give hashtable guid -> version of every mod in that pack. Other text = empty table.
+function ConvertFrom-PackTagMessage([string]$Message) {
+    $mods = @{}
+    $i = "$Message".IndexOf('(Nexus):')
+    if ($i -lt 0) { return $mods }
+    foreach ($m in [regex]::Matches($Message.Substring($i + 8), '(?<g>[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+) (?<v>\d+\.\d+\.\d+)')) {
+        $mods[$m.Groups['g'].Value] = $m.Groups['v'].Value
+    }
+    $mods
+}
+
+# Me list mods released inside a pack: one object (Tag, Guid, Version) per pack tag nexus/pack/v* and mod in it.
+# Mod shipped only in pack (no own page yet) = released at that version too. No git, no tag = empty list.
+function Get-PackReleasedMods([string]$Root) {
+    $lines = @()
+    $eap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        if (Get-Command git -ErrorAction SilentlyContinue) {
+            $lines = @(& git -C $Root for-each-ref 'refs/tags/nexus/pack' --format='%(refname:short)%09%(contents:subject)' 2>$null | Where-Object { $_ -is [string] })
+        }
+    } catch { $lines = @() } finally { $ErrorActionPreference = $eap }
+    $out = @()
+    foreach ($l in $lines) {
+        $tab = $l.IndexOf("`t")
+        if ($tab -lt 0) { continue }
+        $tag = $l.Substring(0, $tab)
+        $mods = ConvertFrom-PackTagMessage $l.Substring($tab + 1)
+        foreach ($g in $mods.Keys) { $out += [pscustomobject]@{ Tag = $tag; Guid = $g; Version = $mods[$g] } }
+    }
+    $out
 }
 
 # Me turn mod on in BepInEx cfg text: "Enabled = false" inside [General] become "Enabled = true", rest byte same.

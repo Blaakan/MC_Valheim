@@ -1,9 +1,5 @@
 # Changelog
 
-## 1.0.0
-
-- First release.
-
 ## 0.1.3
 
 - Fixed the death camera after dying with the spyglass at your eye. The camera stayed inside your character's head

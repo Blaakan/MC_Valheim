@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.2.1) (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.1
+**Build under test:** 0.2.1 (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.1
 was corrected on 2026-10-17 (screen texts, no line left from an earlier connection, `AutoTowers` description; built
 Debug and Release with no warning, not deployed and not run in the game yet). The same day T38 was reworded and reset
 (with `AutoTowers` on, a vanilla tower shield taken out of `Towers` stays a tower shield, so T38 turns `AutoTowers` off

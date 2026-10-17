@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.1.3) (the death camera fix, section "0.1.3"; before that 0.1.2, the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
+**Build under test:** 0.1.3 (the death camera fix, section "0.1.3"; before that 0.1.2, the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
 test (`./tools/Test-Smoke.ps1 -Mod Spyglass`) passed 2026-10-02 (loads, patches cleanly, JitCheck clean). In-world
 self-tests (`./tools/Test-InWorld.ps1 -Mod View.Spyglass`) passed 2026-10-02, with Distant Horizons on:
 `spyglass.network`, `spyglass.item` (registration, recipe, tool taking both hands, no punch, dropped copy),
@@ -327,6 +327,6 @@ frame drawn dead the camera looks at the body (within the camera shake of that f
 looked, that it is out of the head on every frame until the respawn, and that it is close to the third-person
 distance it had before the raise (the test does not turn the player). `spyglass.death` was parked
 (`tests/parked-selftests.txt`, since 2026-10-13: in those runs the fire did not kill the player in the first death of
-a run); it passed on the 1.0.0 release candidate (2026-10-17, commit ec1b7dc) and came off that list. Its set-up now dries
+a run); it passed on the release candidate (2026-10-17, commit ec1b7dc) and came off that list. Its set-up now dries
 the player before the fire and holds the low health until the fire kills (possible causes, not confirmed). 0.1.3 is
 built (Debug and Release) but not run in the game yet: no smoke test, in-world or multiplayer run on it.

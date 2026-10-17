@@ -75,12 +75,22 @@ Check 'null gives no idea' (@(Split-ModIdea $null).Count -eq 0)
 
 Write-Step 'Release version'
 Check 'first release 1.0.0 accepted' ($null -eq (Get-ReleaseVersionProblem '1.0.0' @()))
+Check 'first release 0.9.0 (public preview) accepted' ($null -eq (Get-ReleaseVersionProblem '0.9.0' @()))
+Check 'first release 0.9.1 refused' ($null -ne (Get-ReleaseVersionProblem '0.9.1' @()))
+Check '1.0.0 after the 0.9.0 preview accepted' ($null -eq (Get-ReleaseVersionProblem '1.0.0' @('0.9.0')))
 Check 'first release 0.3.0 refused' ($null -ne (Get-ReleaseVersionProblem '0.3.0' @()))
 Check 'first release 1.1.0 refused' ($null -ne (Get-ReleaseVersionProblem '1.1.0' $null))
 Check 'later release above the last accepted' ($null -eq (Get-ReleaseVersionProblem '1.2.0' @('1.0.0', '1.1.0')))
 Check 'versions compare as numbers' ($null -eq (Get-ReleaseVersionProblem '1.10.0' @('1.9.0')))
 Check 'later release below the last refused' ($null -ne (Get-ReleaseVersionProblem '1.1.0' @('1.0.0', '1.2.0')))
 Check 'not x.y.z refused' ($null -ne (Get-ReleaseVersionProblem '1.0' @()))
+
+Write-Step 'Pack tag message (mods released inside the pack)'
+$pm = ConvertFrom-PackTagMessage 'MC Valheim - All Mods 0.9.0 (Nexus): MC.Building.Lights.Switchable 0.2.1, MC.Combat.Crossbow.StaysLoaded 0.1.0'
+Same 'every mod read with its version' ((@($pm.Keys | Sort-Object | ForEach-Object { "$_=$($pm[$_])" })) -join '|') 'MC.Building.Lights.Switchable=0.2.1|MC.Combat.Crossbow.StaysLoaded=0.1.0'
+Check 'pack name and pack version not read as a mod' ($pm.Count -eq 2)
+Check 'message without mod list gives nothing' ((ConvertFrom-PackTagMessage 'some other tag text 1.0.0').Count -eq 0)
+Check 'empty message gives nothing' ((ConvertFrom-PackTagMessage '').Count -eq 0)
 
 Write-Step 'Mods left out of the release (ModShip, Package-Mod skip)'
 function ShipMod([string]$Guid, [string]$Ship, [string]$Note = '', [string[]]$Requires = @()) {

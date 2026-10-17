@@ -1,9 +1,5 @@
 # Changelog
 
-## 1.0.0
-
-- First release.
-
 ## 0.2.1
 
 - When a server refuses you because of this mod, the "Incompatible version" screen now says why: under "MC mods:" it

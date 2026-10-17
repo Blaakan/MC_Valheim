@@ -1,17 +1,20 @@
 # Changelog
 
-## 1.0.0
+## 0.9.0
 
-First release. The pack holds 27 mods, each at its first release, 1.0.0:
+First public release. The pack holds 27 mods, each at its own version:
 
-- Building: Switchable Lights.
-- Combat: Creature Morale, Crossbow Stays Loaded, Dual Wielding, Sneak Ambush, Tower Shield Wall, Trinkets on Demand,
-  Weapon Moveset.
-- Crafting: Batch Station Feeding, Forge Idol Upgrades, One Click Repair All.
-- Exploration: Creature Kill and Tame Counts, Deep North Awakening, Distant Horizons, Encyclopedia, Music Instruments,
-  Sailing Skill, Sleep Through the Day, Spyglass, Swim Dive.
-- Farming: Breeding Star Inheritance, Cultivator Replant, Fishing Fight, Harpoon Hooks Tames.
-- UX: Crafting Search and Sort, Loot Pickup Filter, Sort Chest.
+- Building: Switchable Lights 0.2.1.
+- Combat: Creature Morale 0.1.2, Crossbow Stays Loaded 0.1.0, Dual Wielding 0.1.1, Sneak Ambush 0.1.2, Tower Shield
+  Wall 0.2.1, Trinkets on Demand 0.2.1, Weapon Moveset 0.1.1.
+- Crafting: Batch Station Feeding 0.1.1, Forge Idol Upgrades 0.2.1, One Click Repair All 0.1.0.
+- Exploration: Creature Kill and Tame Counts 0.1.1, Deep North Awakening 0.1.2, Distant Horizons 0.1.1, Encyclopedia
+  0.1.1, Music Instruments 0.4.4, Sailing Skill 0.1.2, Sleep Through the Day 0.1.2, Spyglass 0.1.3, Swim Dive 0.1.2.
+- Farming: Breeding Star Inheritance 0.2.1, Cultivator Replant 0.1.2, Fishing Fight 0.1.2, Harpoon Hooks Tames 0.1.0.
+- UX: Crafting Search and Sort 0.1.1, Loot Pickup Filter 0.1.1, Sort Chest 0.1.1.
+
+Also new since 0.4.5: Music Instruments 0.4.4, dropped instruments stay where they land (the flute no longer rolls
+away on level ground).
 
 Cheated Tag Remover is not in the pack: Valheim 1.0.20 changed how the game tags cheated objects and items, and the
 mod waits for a rework.

@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.2.1) (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
+**Build under test:** 0.2.1 (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
 changed one rule: another player counts like a creature while PvP is on for both players (0.1.0 said other players
 never count, yet counted a perfect dodge of their attack). M10 is reworded and open again, M11 and M12 are new; no
 other item changed. On 0.2.0 (2026-10-13, game 1.0.17, every MC mod loaded): smoke test (`./tools/Test-Smoke.ps1 -Mod Trinkets`) passed; in-world

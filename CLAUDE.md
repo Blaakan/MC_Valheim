@@ -47,7 +47,8 @@ docs/research/            existing-mod surveys + idea-research.json (data behind
 docs/modding/             framework.md (how toggles/deps/multiplayer work), toolchain-research.md
 docs/publishing/          nexus.md: how to publish (page fields, AI tags, pack rules, Vortex behaviour)
 docs/testing/             cross-cutting test lists (publishing.md: install tests for the Nexus zips)
-packaging/nexus/          pack.json, PACK_CHANGELOG.md, install.md (shared install text), pages.json (page URLs)
+packaging/nexus/          pack.json, PACK_CHANGELOG.md, install.md (shared install text), pages.json (page URLs),
+                          about.md (how the mods are made: on every page), images/pack/ (optional pack pictures: thumbnail, header, gallery)
 docs/design/              one design doc per mod (decisions, edge cases, open questions)
 .ref/decompiled/          decompiled game source (git-ignored, nested local git = one commit per game version)
 dist/                     packaged zips (git-ignored)
@@ -295,24 +296,29 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   TESTING.md, design doc), and `src/Shared` changes that change nothing in a mod's behaviour, keep the version. The
   pack follows the same rule: a mod added or a mod's version raised = a higher `pack.json` version with a new
   `PACK_CHANGELOG.md` entry. **The first release of a mod or of the pack is 1.0.0** (a `## 1.0.0` entry "First
-  release."; the 0.x entries stay below it as the pre-release history). After that, the first change after a release
-  raises the version and later changes join that unreleased version's entry. `Package-Mod.ps1 -Release` refuses a
-  first release that is not 1.0.0 and a version that is not above the last released one.
+  release."; the 0.x entries stay below it as the pre-release history), **or 0.9.0 for a public preview** (user
+  decision 2026-10-17: the pack went out alone as 0.9.0, "First public release.", without pictures, its mods at their
+  own 0.x versions; pack 1.0.0 follows with the user's pictures and reviewed page). A mod shipped only inside the pack
+  counts as released at its version (the pack tag lists it): its first change after that raises its version too.
+  After a release, the first change raises the version and later changes join that unreleased version's entry.
+  `Package-Mod.ps1 -Release` refuses a first release that is not 0.9.0 or 1.0.0 (pack, or a mod's own page) and a
+  version that is not above the last released one.
 - **Publishing target: Nexus Mods only (for now)**: each mod as its own page + one "all mods" pack page
   (`packaging/nexus/`: `pack.json`, `PACK_CHANGELOG.md`, shared `install.md`, `pages.json` with page URLs).
   Thunderstore packaging still exists behind `Package-Mod.ps1 -Thunderstore`.
 - Release flow: all `TESTING.md` items pass (or release with `-AllowPending`, which lists the untested ones on the
-  page sheet); set the release version + CHANGELOG entry (first release: 1.0.0, see "Versions"; pack: `pack.json`
+  page sheet); set the release version + CHANGELOG entry (first release: 1.0.0 or a 0.9.0 preview, see "Versions"; pack: `pack.json`
   version + PACK_CHANGELOG); commit; `./tools/Package-Mod.ps1 -Release` (refuses a dirty tree, an already-released
-  version, a first release that is not 1.0.0, a version not above the last release, failed tests; tags
+  version, a first release that is not 0.9.0 or 1.0.0, a version not above the last release, failed tests; tags
   `nexus/<GUID>/v<ver>` and `nexus/pack/v<ver>` locally; skips every `ModShip=false` mod, printing why: no page
   files, no tag, not in the pack, which must hold every other mod; refuses a shipped mod whose `ModRequires` names
   a skipped one); then follow each `dist/nexus/.../nexus-page.md`
   (step-by-step guide: `docs/publishing/nexus.md`). After a first upload, save the page URL in `packaging/nexus/pages.json`.
-  **The pack can go first** (user decision 2026-10-17: 1.0 publishes only the pack page, single mod pages later):
-  `-Release` still tags and writes page files for every shipped mod (a later single page uploads that same version),
-  and the pack's texts send Vortex users to single pages only once every packed mod has a URL in `pages.json`
-  (until then: manual install only).
+  **The pack can go first** (user decision 2026-10-17: pack 0.9.0, then 1.0.0, publish only the pack page, single mod
+  pages later): `./tools/Package-Mod.ps1 -Release -PackOnly [-AllowPending]` checks and packs every shipped mod at
+  its own version but writes no page files and no tag for single mods (a mod's own page later needs 1.0.0), and the
+  pack's texts send Vortex users to single pages only once every packed mod has a URL in `pages.json` (until then:
+  manual install only).
   After tagging, run `./tools/Update-Backlog.ps1` and commit `docs/backlog.md` (the backlog shows "released" from the
   tag, also for a mod that is so far only in the pack; the sheet Status stays `Implemented`).
   **Nexus AI tags for every page: "AI Assisted" + "AI Media"** (AI Assisted needs visible evidence of human-led development on the page), and untested AI mods count as spam: tag every

@@ -13,17 +13,24 @@
     Nothing is uploaded: create/update the Nexus pages by hand with these files (docs/publishing/nexus.md).
     A mod marked <ModShip>false</ModShip> in its csproj (reason in <ModShipNote>) is not shipped: no page files, no
     tag, not in the pack; the run prints that it was skipped and why.
-    The pack can be published before the single mods (1.0: pack page only). Its description, README, file description
+    The pack can be published before the single mods (-PackOnly). Its description, README, file description
     and Vortex line send Vortex users to the single mod pages only once every packed mod has a URL in
     packaging/nexus/pages.json; until then they say manual install only.
+    A mod released only inside a pack (listed in a nexus/pack/v* tag) counts as released at that version: if its
+    code changed since that tag, -Release asks for a new <Version>.
 .PARAMETER Mod
     Only package mods whose project name contains one of these strings (no pack then: the pack always holds
     every shipped mod). Without -Mod: every shipped mod + the pack.
 .PARAMETER Release
     Release gate: clean git tree, CHANGELOG entry, no failed test, no untested item (unless -AllowPending), valid
-    names for Nexus. A first release (no nexus/<Guid>/v* tag; pack: no nexus/pack/v* tag) must be 1.0.0, a later
+    names for Nexus. A first release (no nexus/<Guid>/v* tag; pack: no nexus/pack/v* tag) must be 0.9.0 (public
+    preview) or 1.0.0, a later
     one above the last released version. A mod already released (git tag nexus/<Guid>/v<Version>) must be unchanged since that tag: then
     it is reused in the pack and not re-tagged; if it changed, bump its <Version>. On success, tags locally.
+.PARAMETER PackOnly
+    Release (or dry run) the all-mods pack alone: every shipped mod is built, checked (CHANGELOG entry for its
+    version, tests, Nexus fields) and packed at its own version, but gets no page files and no tag of its own, and the
+    first-release version rule (0.9.0 or 1.0.0) applies to the pack only. Not with -Mod.
 .PARAMETER AllowPending
     With -Release: allow untested items (mod TESTING.md + framework src/Shared/TESTING.md); they are listed.
 .PARAMETER Thunderstore
@@ -32,9 +39,10 @@
     ./tools/Package-Mod.ps1                        # everything, as a dry run
     ./tools/Package-Mod.ps1 -Mod Crossbow
     ./tools/Package-Mod.ps1 -Release -AllowPending # real release, some tests untested
+    ./tools/Package-Mod.ps1 -Release -PackOnly -AllowPending # pack page only, mods keep their versions
 #>
 [CmdletBinding()]
-param([string[]]$Mod, [switch]$Release, [switch]$AllowPending, [switch]$Thunderstore)
+param([string[]]$Mod, [switch]$Release, [switch]$AllowPending, [switch]$PackOnly, [switch]$Thunderstore)
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'lib\Common.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'lib\BBCode.psm1') -Force
@@ -48,6 +56,7 @@ $author = Get-ModAuthor
 $collection = Get-ModCollectionFolder
 $dot = [char]0x00B7
 $buildPack = -not $Mod
+if ($PackOnly -and $Mod) { Write-Fail '-PackOnly packs every shipped mod: drop -Mod'; exit 1 }
 
 $allProjects = @(Get-ModProjects)
 $projects = @(Get-ModProjects $Mod)
@@ -66,6 +75,12 @@ $toPack = @($ship.Shipped | Where-Object { $matchedGuids -contains $_.Guid } | F
 if ($toPack.Count -eq 0) { Write-Fail 'every matched mod is marked not shipped (ModShip false): nothing to package'; exit 1 }
 $pages = [IO.File]::ReadAllText((Join-Path $nexusDir 'pages.json')) | ConvertFrom-Json
 $installTemplate = [IO.File]::ReadAllText((Join-Path $nexusDir 'install.md'), [Text.Encoding]::UTF8)
+# How the mods are made (packaging/nexus/about.md): on every page description and in the pack README, before install.
+# Nexus keep the AI Assisted tag only with visible human-led development on the page.
+$aboutPath = Join-Path $nexusDir 'about.md'
+$aboutText = if (Test-Path $aboutPath) { ([IO.File]::ReadAllText($aboutPath, [Text.Encoding]::UTF8) -replace "`r", '').Trim() } else { '' }
+# Pack images chosen by hand (packaging/nexus/images/pack: thumbnail.png, header.png, gallery/*) win over placeholders.
+$packImages = Join-Path $nexusDir 'images\pack'
 
 # Nexus Valheim categories (2026): Armour, Audio, Character Appearance, Construction, Gameplay, Miscellaneous,
 # Models and Textures, User Interface, Utilities, Visuals and Graphics, Weapons, World Saves. Me suggest closest.
@@ -105,6 +120,9 @@ $installTests = @()
 $docsTesting = Join-Path $root 'docs\testing'
 if (Test-Path $docsTesting) { foreach ($f in Get-ChildItem $docsTesting -Filter '*.md') { $installTests += @(Get-TestItems $f.FullName | Where-Object { $_.Mark -ne 'x' -and $_.Mark -ne '-' }) } }
 if ($installTests.Count) { Write-Warn2 "$($installTests.Count) install/publishing test(s) not done (docs/testing): listed on the sheets" }
+
+# Mods already shipped inside a pack (pack tag message list them): that pack tag = their release of that version.
+$packReleasedMods = @(Get-PackReleasedMods $root)
 
 $failed = 0
 $packaged = New-Object System.Collections.Generic.List[object]
@@ -204,6 +222,8 @@ foreach ($p in $toPack) {
     $tag = "nexus/$guid/v$version"
     $released = Test-TagExists $tag
     $reused = $false
+    $packTagOfMod = $null
+    if (-not $released) { $packTagOfMod = @($packReleasedMods | Where-Object { $_.Guid -eq $guid -and $_.Version -eq $version } | ForEach-Object { $_.Tag }) | Select-Object -Last 1 }
 
     # Me check package bits before zip.
     $problems = @(Test-NexusFields $props.ModName $props.ModDescription $version $fileDescription)
@@ -213,7 +233,7 @@ foreach ($p in $toPack) {
     $testing = Join-Path $dir 'TESTING.md'
     $icon = Join-Path $dir 'icon.png'
     if (-not (Test-TagName $tag)) { $problems += "version '$version' gives an invalid git tag name ($tag)" }
-    if ($Release -and -not $released) {
+    if ($Release -and -not $released -and -not $PackOnly) {
         $vp = Get-ReleaseVersionProblem $version (Get-ReleasedVersions "nexus/$guid/v")
         if ($vp) { $problems += "$($vp): set <Version> and its CHANGELOG entry" }
     }
@@ -248,6 +268,10 @@ foreach ($p in $toPack) {
         elseif ($Release) { $reused = $true; $warnings += "$version already released ($tag) and unchanged: reused in the pack, not re-tagged, page files not rebuilt" }
         else { $warnings += "$version already released ($tag)$(if ($changed) { ' and its code changed since' }): dry run writes to $version-dev, released files untouched" }
     }
+    elseif ($packTagOfMod -and (Test-ChangedSince $packTagOfMod $dir)) {
+        $msg = "version $version was released in the pack ($packTagOfMod) but its code changed since: bump <Version> and add a CHANGELOG entry"
+        if ($Release) { $problems += $msg } else { $warnings += $msg }
+    }
     $warnings | ForEach-Object { Write-Warn2 $_ }
     if ($problems) { $problems | ForEach-Object { Write-Fail $_ }; $failed++; continue }
 
@@ -272,8 +296,9 @@ foreach ($p in $toPack) {
     if (Test-Path $contentDir) { Copy-Item (Join-Path $contentDir '*') $modDir -Recurse }
     $packaged.Add([pscustomobject]@{ Props = $props; ModDir = $modDir; Pending = $pendingTests.Count })
 
-    # Reused (released, unchanged) mods: only staged for the pack, no page files.
-    if ($reused) { continue }
+    # Reused (released, unchanged) mods, and every mod with -PackOnly: only staged for the pack, no page files, no tag.
+    if ($PackOnly) { Write-Ok "staged for the pack at $version (-PackOnly: no own page files, no own tag)" }
+    if ($reused -or $PackOnly) { continue }
     $outName = if (-not $Release -and $released) { "$version-dev" } else { $version }
     $out = Join-Path $dist "nexus\$guid\$outName"
     Reset-StageDir $out
@@ -282,6 +307,7 @@ foreach ($p in $toPack) {
 
     # Description: README (install section swapped, title dropped: page show the name) + link to the pack.
     $descMd = $readmeText
+    if ($aboutText) { $descMd = $descMd.TrimEnd() + "`n`n" + $aboutText + "`n" }
     if ($pages.pack) { $descMd += "`n## All MC mods`n`nWant every MC mod at once? Get the [all-mods pack]($($pages.pack)).`n" }
     [IO.File]::WriteAllText((Join-Path $out 'description.bbcode.txt'), (ConvertTo-NexusBBCode $descMd -DropTitle), $utf8)
 
@@ -403,7 +429,7 @@ if ($buildPack) {
     $packChanges = Get-ChangelogSection (Join-Path $nexusDir 'PACK_CHANGELOG.md') $packVersion
     $packTag = "nexus/pack/v$packVersion"
     $packReleased = Test-TagExists $packTag
-    # Pack can go first (1.0 = pack page only). Me send Vortex users to single pages only when every packed mod has
+    # Pack can go first (-PackOnly). Me send Vortex users to single pages only when every packed mod has
     # its page URL in pages.json; before that, texts say manual install and point nowhere else.
     $noPage = @($packaged | Where-Object { -not ($pages.mods.PSObject.Properties[$_.Props.ModGuid] -and [string]$pages.mods.($_.Props.ModGuid)) })
     $singlePages = $noPage.Count -eq 0
@@ -450,6 +476,7 @@ if ($buildPack) {
     $md.Add('')
     $packTree = "$collection/`n        README.md`n        <Category>/`n          <one folder per mod>/"
     $anyServer = @($mods | Where-Object { $_.Props.ModSide -ne 'Client' }).Count -gt 0
+    if ($aboutText) { $md.Add($aboutText); $md.Add('') }
     $md.Add((Expand-Install @{
         BEPINEX_LINK = $pages.bepinex; FOLDER = "BepInEx/plugins/$collection/"; CONFIG = 'MC.*.cfg'; WHAT = 'the mods are'; TREE = $packTree
         VORTEX = $(if ($singlePages) { '**Vortex:** this pack is for manual installation only (Vortex would install only one of the mods from it). With Vortex, install the individual mods from their own pages instead. Do not mix both ways.' }
@@ -473,8 +500,14 @@ if ($buildPack) {
     $zipName = "$($packInfo.fileBaseName)-$packVersion.zip"
     New-ZipFromDirectory $stage (Join-Path $out $zipName)
     [IO.File]::WriteAllText((Join-Path $out 'description.bbcode.txt'), (ConvertTo-NexusBBCode $packReadme -DropTitle), $utf8)
-    New-ModThumbnail -Path (Join-Path $out 'thumbnail.png') -Category 'Core' -FeatureId 'MC.Valheim' -Label 'All Mods'
-    New-ModHeader -Path (Join-Path $out 'header.png') -Category 'Core' -Label "MC Valheim  $dot  All Mods"
+    if (Test-Path (Join-Path $packImages 'thumbnail.png')) { Copy-Item (Join-Path $packImages 'thumbnail.png') $out }
+    else { New-ModThumbnail -Path (Join-Path $out 'thumbnail.png') -Category 'Core' -FeatureId 'MC.Valheim' -Label 'All Mods' }
+    if (Test-Path (Join-Path $packImages 'header.png')) { Copy-Item (Join-Path $packImages 'header.png') $out }
+    else { New-ModHeader -Path (Join-Path $out 'header.png') -Category 'Core' -Label "MC Valheim  $dot  All Mods" }
+    if (Test-Path (Join-Path $packImages 'gallery')) {
+        New-Item -ItemType Directory -Force (Join-Path $out 'gallery') | Out-Null
+        Copy-Item (Join-Path $packImages 'gallery\*') (Join-Path $out 'gallery')
+    }
 
     $noPageGuids = @($noPage | ForEach-Object { $_.Props.ModGuid })
     $contents = ($mods | ForEach-Object { "| $($_.Props.ModName) | $($_.Props.Version) | $($_.Props.ModCategory) | $(if ($_.Pending) { "$($_.Pending) untested" } else { 'all tested' }) | $(if ($noPageGuids -contains $_.Props.ModGuid) { 'not yet' } else { 'yes' }) |" }) -join "`n"
@@ -513,7 +546,7 @@ $pagesNote
 
 | Field | Value |
 |---|---|
-| Gallery | thumbnail.png (set as thumbnail; 16:9 placeholder) + in-game screenshots if you have them |
+| Gallery | $(if (Test-Path (Join-Path $packImages 'gallery')) { 'thumbnail.png (set as thumbnail) + every image in gallery/ (in-game screenshots with captions, from packaging/nexus/images/pack)' } else { 'thumbnail.png (set as thumbnail; 16:9 placeholder) + in-game screenshots if you have them' }) |
 | Header (optional) | header.png |
 | Requirements | BepInExPack_Valheim ($($pages.bepinex)), minimum version 5.4.2350 |
 $permissions

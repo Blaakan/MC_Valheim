@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.1.2) (the refusal screen names the mod, section "0.1.2"; before that 0.1.1). Build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1). Build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 (2026-10-08) fixes the sneak attack on a sleeping afraid creature that faces you, which the mod took away (T35, reset
 to `[ ]`). Also on 2026-10-08, a change of this list only (no mod code): T04's second half now says what the mod does
 (a second kill of the same boss shows no rank-up message; the message comes with the kill that raises the boss rank),

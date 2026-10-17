@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.1.1) (the refusal screen names the mod, section "0.1.1"; before that 0.1.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
+**Build under test:** 0.1.1 (the refusal screen names the mod, section "0.1.1"; before that 0.1.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
 test (`./tools/Test-Smoke.ps1`) passed 2026-09-30: loads, patches cleanly, JitCheck clean. In-world self-tests
 (`./tools/Test-InWorld.ps1 -Mod Weapons.DualWield`) passed 2026-09-30 in a full run with every MC mod (71 of 71
 tests): `dual.data`, `dual.equip`, `dual.keep`, `dual.attack`, `dual.damage`, `dual.fields`, `dual.visuals`. Their
@@ -253,7 +253,7 @@ version matters for M18: with only another network version, the refusal line wou
   then true while lying, then get up: the back pair is crossed within a moment of standing, the knives are one per
   hip. Note what looks wrong (blades through the body, the legs or the ground, the crossing point, the angle of the
   knives, a knife floating off the hip, a weapon floating off the back).
-  Known issue (2026-10-17, 1.0.0 candidate, self-test `dual.sheath`): the bed step fails: a back pair set up while
+  Known issue (2026-10-17, release candidate, self-test `dual.sheath`): the bed step fails: a back pair set up while
   lying stays a wider X after getting up (README "Good to know"; draw and put away the weapons to fix it). A fix is
   planned after the release.
   *Partly automated (`dual.visuals`, `dual.sheath`, `dual.real.swim-sheath`); by hand: Look at each sheathed pair from
@@ -391,7 +391,7 @@ version matters for M18: with only another network version, the refusal line wou
   overlapping, and placed again at once when turned back on. The other player lies in a bed with the sword pair
   sheathed; the observer sets `CrossSheathedPair` false, then true: once that player gets up, crossed within a moment.
   A player without the mod sees both pairs overlapping (the game's placement).
-  Known issue (2026-10-17, 1.0.0 candidate, self-test `dual.sheath`): the bed step fails: a back pair set up while
+  Known issue (2026-10-17, release candidate, self-test `dual.sheath`): the bed step fails: a back pair set up while
   lying stays a wider X after getting up (README "Good to know"; draw and put away the weapons to fix it). A fix is
   planned after the release.
   *Partly automated (`dual.mp.seen`, `dual.visuals`, `dual.sheath`); by hand: A second player looking at the sheathed

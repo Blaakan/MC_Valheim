@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.0.0
+## 0.4.4
 
-- First release.
+- Dropped instruments stay where they land: the flute no longer rolls away on level ground.
 
 ## 0.4.3
 

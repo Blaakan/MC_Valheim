@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.1.0), build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+**Build under test:** 0.1.0, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
 MC Mods panel. Smoke test passed 2026-09-28 (loads, patches, JitCheck clean). No in-game test yet.
 
 **Automated checks (2026-10-17):** 20 of 20 self-tests named in this list's notes passed in real game runs on Valheim

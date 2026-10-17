@@ -4,15 +4,14 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.4.3) (B on a gamepad closes the song window without making the character jump: T22 reset;
-not run in game yet), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). In the 1.0.0
-candidate a dropped Wooden Flute no longer rolls away on level ground (a square collider instead of a round one, and
+**Build under test:** 0.4.4, build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.4.4: a
+dropped Wooden Flute no longer rolls away on level ground (a square collider instead of a round one, and
 more angular damping on every dropped instrument: T02 reset), and the self-tests `music.death.*` (Wood counted against
 what the character already carried) no longer depend on what earlier tests of a full run left behind: they passed on
-2026-10-17 with the 1.0.0 candidate, with every other Music test (119 of 120 in world, every multiplayer test).
+2026-10-17 with the release candidate, with every other Music test (119 of 120 in world, every multiplayer test).
 `music.drop.rest` is parked: the test world has no level open ground near its start (none within 64 m), so the flute
-not rolling is checked by hand in T02. Before that
-0.4.2 (the refusal screen names the mod, section "0.4.2") and 0.4.1. 0.4.1
+not rolling is checked by hand in T02. 0.4.3: B on a gamepad closes the song window without making the character jump
+(T22 reset; it passed in the same runs). Before that 0.4.2 (the refusal screen names the mod, section "0.4.2") and 0.4.1. 0.4.1
 fixes false recipe warnings when leaving a server without the mod (new M20; `music.badrecipe` checks it on a stand-in
 item database; run 2026-10-08 on game 1.0.17: in-world self-tests 52 of 52 with `music.play` and
 `music.freeplay.keys` on a second run alone, multiplayer scenarios all passed, and no Music Instruments line after

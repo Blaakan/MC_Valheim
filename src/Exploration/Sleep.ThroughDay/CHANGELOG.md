@@ -1,9 +1,5 @@
 # Changelog
 
-## 1.0.0
-
-- First release.
-
 ## 0.1.2
 
 - When a server refuses you because of another MC mod (your game does not have it, has another version, or has it

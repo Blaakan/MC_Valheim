@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 1.0.0 (first release; before that 0.1.2) (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 fixed two things found by the self-tests on 0.1.0: reeling on the right side in a fight came in stop-and-go and
 stalled about a metre from the catch (T25), and a fish out of the water still fought (T26). T25 and T26 were reset and
 T28 is new; the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod
