@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     Regression tests for the tooling itself (no game needed): every script parses and is ASCII, the Markdown ->
-    Nexus BBCode converter handles known edge cases, the TESTING.md parser, changelog formatting, the ModIdea split, the release version rule.
+    Nexus BBCode converter handles known edge cases, the TESTING.md parser, changelog formatting, the ModIdea split, the release version rule,
+    mods left out of the release (ModShip).
     Run after changing anything in tools/. Exit code 0 = pass.
 #>
 [CmdletBinding()]
@@ -80,6 +81,38 @@ Check 'later release above the last accepted' ($null -eq (Get-ReleaseVersionProb
 Check 'versions compare as numbers' ($null -eq (Get-ReleaseVersionProblem '1.10.0' @('1.9.0')))
 Check 'later release below the last refused' ($null -ne (Get-ReleaseVersionProblem '1.1.0' @('1.0.0', '1.2.0')))
 Check 'not x.y.z refused' ($null -ne (Get-ReleaseVersionProblem '1.0' @()))
+
+Write-Step 'Mods left out of the release (ModShip, Package-Mod skip)'
+function ShipMod([string]$Guid, [string]$Ship, [string]$Note = '', [string[]]$Requires = @()) {
+    [pscustomobject]@{ Guid = $Guid; Name = $Guid; Ship = $Ship; ShipNote = $Note; Requires = $Requires }
+}
+$s = Split-ShippedMods @((ShipMod 'MC.UX.A.One' ''), (ShipMod 'MC.UX.B.Two' 'false' 'Needs a rework.'), (ShipMod 'MC.UX.C.Three' 'True' '' @('MC.UX.A.One')), (ShipMod 'MC.UX.D.Four' 'FALSE' 'Later.'))
+Same 'no ModShip or true (any case) = shipped' ((@($s.Shipped) | ForEach-Object { $_.Guid }) -join '|') 'MC.UX.A.One|MC.UX.C.Three'
+Same 'ModShip false (any case) = skipped' ((@($s.Skipped) | ForEach-Object { $_.Guid }) -join '|') 'MC.UX.B.Two|MC.UX.D.Four'
+Check 'valid marks give no problem' (@($s.Problems).Count -eq 0) "got: $(@($s.Problems) -join '; ')"
+$s = Split-ShippedMods @((ShipMod 'MC.UX.B.Two' 'false' '  '))
+Check 'false without a note is a problem' (@($s.Problems).Count -eq 1 -and @($s.Problems)[0] -match 'ModShipNote')
+$s = Split-ShippedMods @((ShipMod 'MC.UX.B.Two' 'no' 'x'))
+Check 'value not true/false is a problem, mod in neither list' (@($s.Problems).Count -eq 1 -and @($s.Shipped).Count -eq 0 -and @($s.Skipped).Count -eq 0)
+$s = Split-ShippedMods @((ShipMod 'MC.UX.A.One' '' '' @('MC.UX.B.Two')), (ShipMod 'MC.UX.B.Two' 'false' 'Later.'))
+Check 'shipped mod requiring a skipped mod is a problem' (@($s.Problems).Count -eq 1 -and @($s.Problems)[0] -match 'requires MC\.UX\.B\.Two')
+$s = Split-ShippedMods @()
+Check 'empty list gives empty lists' (@($s.Shipped).Count -eq 0 -and @($s.Skipped).Count -eq 0 -and @($s.Problems).Count -eq 0)
+$shipDir = Join-Path ([IO.Path]::GetTempPath()) ("mc-ship-" + [guid]::NewGuid().ToString('N'))
+[void][IO.Directory]::CreateDirectory($shipDir)
+try {
+    $csproj = Join-Path $shipDir 'MC.UX.Fake.Left.csproj'
+    [IO.File]::WriteAllText($csproj, "<Project Sdk=`"Microsoft.NET.Sdk`">${nl}  <PropertyGroup>${nl}    <ModName>Fake Left</ModName>${nl}    <ModRequires>MC.A.B.C; MC.D.E.F</ModRequires>${nl}    <ModShip> false </ModShip>${nl}    <ModShipNote>Needs a rework.</ModShipNote>${nl}  </PropertyGroup>${nl}</Project>")
+    $si = Get-ModShipInfo (Get-Item $csproj)
+    Check 'csproj ModShip read and trimmed' ($si.Ship -eq 'false' -and $si.ShipNote -eq 'Needs a rework.' -and $si.Guid -eq 'MC.UX.Fake.Left' -and $si.Name -eq 'Fake Left')
+    Same 'csproj ModRequires split' (@($si.Requires) -join '|') 'MC.A.B.C|MC.D.E.F'
+    [IO.File]::WriteAllText($csproj, "<Project>${nl}  <PropertyGroup>${nl}    <ModName>Fake</ModName>${nl}  </PropertyGroup>${nl}</Project>")
+    $si = Get-ModShipInfo (Get-Item $csproj)
+    Check 'csproj without ModShip = shipped' ($si.Ship -eq '' -and @((Split-ShippedMods @($si)).Shipped).Count -eq 1)
+} finally { Remove-Item $shipDir -Recurse -Force }
+$real = Split-ShippedMods @(Get-ModProjects | ForEach-Object { Get-ModShipInfo $_ })
+Check 'repo mods: every ModShip mark valid' (@($real.Problems).Count -eq 0) "got: $(@($real.Problems) -join '; ')"
+Check 'repo mods: shipped + skipped = all mods' ((@($real.Shipped).Count + @($real.Skipped).Count) -eq @(Get-ModProjects).Count)
 
 Write-Step 'Turn mod on in its config'
 $crlf = "`r`n"

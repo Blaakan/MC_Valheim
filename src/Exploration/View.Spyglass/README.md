@@ -33,7 +33,9 @@ far land, trees and buildings. Aim with the mouse; you stand still while looking
   cannot walk, run, jump, dodge, crouch, attack or block; your body turns to face where you look.
 - **It lowers by itself** when you are hit (fire, poison, smoke and drowning damage do not count), staggered or
   knocked back, when you open the inventory, the map, the menu or the chat, and at once (without the animation) when
-  you put it away, sit down, take a ship's helm, start swimming, die or teleport.
+  you put it away, sit down, take a ship's helm, start swimming, die or teleport. When you die with it raised, the
+  normal death view comes back at once: the camera looks at your body from the normal third-person spot behind you
+  (where it would be without the spyglass).
 - **Other players see you** hold the spyglass to your eye (if they have the mod too).
 
 ### How far you see
@@ -95,10 +97,22 @@ mod, spyglasses dropped on the ground can be deleted.
 - **Players who cannot play by the server's rules are refused** about a second after they join; their game shows
   "Incompatible version". This covers a player without the mod, a player whose version of the mod cannot talk to the
   server's, and a player who has it turned off. A player who turns it off while connected is refused about a second
-  later. With AllowPlayersWithoutMod = true they may play, but their game does not know the spyglass: they cannot see
-  or pick up a dropped one, they see an empty right hand when you hold one, and a spyglass in a chest does not show
-  for them, so when they take or add an item in that chest it is saved without the spyglass, which is then lost for
-  everyone. Keep spyglasses out of chests such players use.
+  later. Below "Incompatible version" the screen lists Spyglass under "MC mods:" with the reason and what to do:
+  install it, install the server's version (the line names both versions), or turn it on in Esc > MC Mods (F1 when a
+  configuration manager is installed) and join again. The server sends that line, so the screen names the mod even
+  when the player's game does not have it. This needs at least one MC mod in the player's game that is made to run on
+  both the server and the players (any mod a server can refuse a player for, or Sleep Through the Day); the server
+  does not need to have that mod. A game whose MC mods are all client-side shows only "Incompatible version". When a
+  server refuses a player for several MC mods, the screen names the first one that refused them; once that one is
+  fixed, the next join names the next one. When the server sends no line (a refusal that is not about an MC mod, or a
+  server with an older version of the MC mods), the screen lists what the player's own game noticed while connected:
+  an MC mod turned off while the server has it on, or a server copy whose version cannot play with theirs. That may
+  not be why they were refused. With Jotunn on the server and on the player's game, Jotunn's window shows the same
+  lines under "Failed Connection:"; with Jotunn only on the player's game, the vanilla panel shows them. With
+  AllowPlayersWithoutMod = true, players without the mod may play, but their game does not know the spyglass: they
+  cannot see or pick up a dropped one, they see an empty right hand when you hold one, and a spyglass in a chest does
+  not show for them, so when they take or add an item in that chest it is saved without the spyglass, which is then
+  lost for everyone. Keep spyglasses out of chests such players use.
 - **On a server without the mod** the mod turns itself off for you (the spyglass stays down, no recipe), and a
   spyglass you drop on the ground there can be deleted by the server.
 - **The server's settings apply to everyone** (your game logs "Using the server's rules"): the recipe, the strongest

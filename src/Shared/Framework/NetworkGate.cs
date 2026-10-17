@@ -17,7 +17,7 @@ namespace MC.Shared;
 //   server -> client  "<guid>.HelloAck"   "1|on|<netVersion>|<version>"      (or "1|off|..." when server copy not Active)
 //   client -> server  "<guid>.HelloState" "on" | "off"                       (client side ready changed while connected)
 //   server -> client  "MC.Framework.Refused" "<mod name>\t<line>"            (Refuse, just before the Error rpc: the
-//                                                                            player's MC mods show it, RefusalNotes)
+//                                                                            player's Both MC mods show it, RefusalNotes)
 // Server mod code ask PeerCompatible (has mod, same network version, side not off) to refuse players.
 // Server also re-send HelloAck to all peers when its copy turn on/off, so clients follow live.
 // ZRpc keep order on one connection, and server send its PeerInfo only after ours, so first ack arrive before
@@ -225,7 +225,7 @@ internal static class NetworkGate
     }
 
     // Server, a Both mod's PlayerCheck: refuse this player. First one line for their error screen (RefusalNotes: their
-    // MC mods list it under "MC mods:"), then the vanilla Error rpc (ErrorVersion, "Incompatible version"). Same
+    // Both MC mods list it under "MC mods:"), then the vanilla Error rpc (ErrorVersion, "Incompatible version"). Same
     // connection keep order, so the line arrive first.
     public static void Refuse(ZNetPeer peer)
     {
@@ -258,8 +258,10 @@ internal static class NetworkGate
         }
         if (PeerReady(peer) == false)
         {
-            return "it is turned off (or not working) in your game, and this server requires it. Turn it on in Esc > "
-                   + "MC Mods and join again.";
+            // Server cannot know if a configuration manager hide the player's MC Mods button: me name both places.
+            return "it is turned off or cannot run in your game, and this server requires it. Turn it on in Esc > "
+                   + "MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) "
+                   + "and join again.";
         }
         return "this server requires it, and your game cannot play with the server's version.";
     }
@@ -287,8 +289,10 @@ internal static class NetworkGate
         }
         else if (_server == ServerCheck.Present && !_isLocalReady())
         {
-            line = "it is turned off (or not working) in your game while the server has it on. Turn it on in Esc > "
-                   + "MC Mods and join again.";
+            var cm = FeaturePanel.ConfigManagerName();
+            var where = cm == null ? "Esc > MC Mods" : $"F1 ({cm}), its General > Enabled";
+            line = $"it is turned off or cannot run in your game while the server has it on. Turn it on in {where} "
+                   + "(its status there says what stops it) and join again.";
         }
         RefusalNotes.SetKnown(_info.Name, line);
     }

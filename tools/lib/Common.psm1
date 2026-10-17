@@ -177,6 +177,47 @@ function Get-CsprojProp([string]$Path, [string]$Name) {
     if ($n) { $n.InnerText.Trim() } else { '' }
 }
 
+# Me read ship mark of a mod from csproj xml (fast, no msbuild). <ModShip>false</ModShip> + <ModShipNote>why</ModShipNote>
+# = mod stay out of release: no own page, no tag, not in pack. No ModShip (or true) = shipped.
+function Get-ModShipInfo([IO.FileInfo]$Project) {
+    $x = [xml](Get-Content $Project.FullName -Raw)
+    $read = { param($n) $node = $x.SelectSingleNode("/Project/PropertyGroup/$n"); if ($node) { $node.InnerText.Trim() } else { '' } }
+    [pscustomobject]@{
+        Guid     = $Project.BaseName
+        Name     = & $read 'ModName'
+        Ship     = & $read 'ModShip'
+        ShipNote = & $read 'ModShipNote'
+        Requires = @((& $read 'ModRequires') -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        Project  = $Project
+    }
+}
+
+# Me sort mods into shipped and left out. $Mods = objects like Get-ModShipInfo give (Guid, Ship, ShipNote, Requires).
+# Ship '' or true = shipped, false = left out (case no matter, like MSBuild). Me give Shipped, Skipped, Problems:
+# bad ModShip value (mod in neither list), left out with no note, shipped mod that need a left-out mod.
+function Split-ShippedMods([object[]]$Mods) {
+    $shipped = New-Object System.Collections.Generic.List[object]
+    $skipped = New-Object System.Collections.Generic.List[object]
+    $problems = New-Object System.Collections.Generic.List[string]
+    foreach ($m in $Mods) {
+        if ($null -eq $m) { continue }
+        $v = "$($m.Ship)".Trim()
+        if ($v -eq '' -or $v -eq 'true') { $shipped.Add($m) }
+        elseif ($v -eq 'false') {
+            $skipped.Add($m)
+            if (-not "$($m.ShipNote)".Trim()) { $problems.Add("$($m.Guid): ModShip is false but ModShipNote is empty (say why it is left out)") }
+        }
+        else { $problems.Add("$($m.Guid): ModShip must be true or false (got '$v')") }
+    }
+    $left = @($skipped | ForEach-Object { $_.Guid })
+    foreach ($m in $shipped) {
+        foreach ($r in @($m.Requires)) {
+            if ($left -contains $r) { $problems.Add("$($m.Guid) requires $r, which is not shipped (ModShip false): ship both or neither") }
+        }
+    }
+    [pscustomobject]@{ Shipped = $shipped.ToArray(); Skipped = $skipped.ToArray(); Problems = $problems.ToArray() }
+}
+
 # Me split <ModIdea> text: one mod can build many sheet ideas, 'A;B'. Me trim each, drop empty. Empty text = no idea.
 function Split-ModIdea([string]$Text) {
     @("$Text" -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })

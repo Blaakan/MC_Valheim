@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.2.1 (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
+**Build under test:** 1.0.0 (first release; before that 0.2.1) (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
 changed one rule: another player counts like a creature while PvP is on for both players (0.1.0 said other players
 never count, yet counted a perfect dodge of their attack). M10 is reworded and open again, M11 and M12 are new; no
 other item changed. On 0.2.0 (2026-10-13, game 1.0.17, every MC mod loaded): smoke test (`./tools/Test-Smoke.ps1 -Mod Trinkets`) passed; in-world
@@ -246,15 +246,16 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
   (MC_Valheim_MP\20261007-212850\each-off\server\BepInEx\LogOutput.log, line 615, right after "Odev turned Trinkets on
   Demand off on their game.", and again at line 662), so reading those lines is all that is left.*
 - [ ] **M08 Other network version:** build a copy with another network version (`dotnet build
-  src/Combat/Trinkets.OnDemand/MC.Combat.Trinkets.OnDemand.csproj -p:ModNetworkVersion=2 -p:DeployToGame=false`), copy
-  that DLL over a second player's copy (put the normal build back afterwards), and join a server with network version
-  1. Expected: refused about a second after joining; the server log says "has another version of the mod (network
-  version 2, the server has 1)". With `AllowPlayersWithoutMod = true` they stay, and their MC Mods panel says the
-  versions cannot talk to each other; their bar works as in the normal game.
+  src/Combat/Trinkets.OnDemand/MC.Combat.Trinkets.OnDemand.csproj -p:ModNetworkVersion=2 -p:Version=0.0.9
+  -p:DeployToGame=false`; the other version number lets M13's screen line name two different versions), copy that DLL
+  over a second player's copy (put the normal build back afterwards), and join a server with network version 1.
+  Expected: refused about a second after joining; the server log says "has another version of the mod (network version
+  2, the server has 1)". With `AllowPlayersWithoutMod = true` they stay, and their MC Mods panel says the versions
+  cannot talk to each other; their bar works as in the normal game.
   *Partly automated (`trinkets.mp.other-version`, `trinkets.network`); by hand: A real second build (DLL built with
-  -p:ModNetworkVersion=2) joining from the start: the test sends that copy's hello and the server's answer by hand
-  from the normal build, so the join-time check (hello before the player is in) and a really different DLL are not
-  exercised.*
+  -p:ModNetworkVersion=2 -p:Version=0.0.9) joining from the start: the test sends that copy's hello and the server's
+  answer by hand from the normal build, so the join-time check (hello before the player is in) and a really different
+  DLL are not exercised.*
 - [x] **M09 Dedicated server:** a dedicated server with the mod and one player. Do T02, T08 and T17 there. Expected:
   the same results as in single player (everything runs on the player's game); no error in the server's log.
   *Automated: `trinkets.mp.fight`, `trinkets.mp.full-bar`, `trinkets.mp.server-log`.*
@@ -329,16 +330,36 @@ Sneak Ambush turned off in the MC Mods panel (or not installed): afraid or smoke
 
 ## 0.2.1 — the refusal screen names the mod
 
-0.2.1 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
-under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
-needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
-connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Combat.Trinkets.OnDemand` passed, the screen named this
-mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+0.2.1 (2026-10-16, refined 2026-10-17): when a server refuses you because of this mod, the "Incompatible version"
+screen lists it under "MC mods:" with the reason and what to do (framework `RefusalNotes`,
+`docs/modding/framework.md`, "Who needs to install it, and multiplayer"). The server sends the line just before its
+refusal. The block needs at least one MC mod on the refused game that is made to run on both the server and the
+players (any mod a server can refuse you for, or Sleep Through the Day); the server does not need to have that mod. A
+game whose MC mods are all client-side shows only "Incompatible version". When a server refuses a player for several
+MC mods, the screen names the first one that refused them; once that one is fixed, the next join names the next one.
+When the server sent a line, the block shows only the server's lines. When the server sends no line (a refusal that is
+not about an MC mod, or a server with an older version of the MC mods), the screen lists what the player's own game
+noticed while connected: an MC mod turned off while the server has it on, or a server copy whose version cannot play
+with theirs. That may not be why they were refused. With Jotunn on the server and on the player's game, Jotunn's
+window shows the same lines under "Failed Connection:"; with Jotunn only on the player's game, the vanilla panel shows
+them. Run on 2026-10-17 (dedicated test server), on the first version of this change:
+`probe.mp.off.MC.Combat.Trinkets.OnDemand` passed, the screen named this mod both times (turned off while in, joining
+with it off); `probe.refusal` passed. The framework changed after that run (only the server's lines when it sent any,
+no line left over from an earlier connection, new wording of the "turned off" line), and both tests now check more
+(`probe.mp.off.MC.Combat.Trinkets.OnDemand` also fails when the screen lists another mod): they have not run on this
+code yet.
 
-- [ ] **M13 Refusal screen names the mod:** on a server with Trinkets on Demand, turn Trinkets on Demand off in Esc > MC Mods while you
-  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Trinkets on Demand: it is turned
-  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
-  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
-  join: you stay in.
-  *Partly automated (`probe.mp.off.MC.Combat.Trinkets.OnDemand`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
-  window, and a game with another version of the mod than the server's (the line names both versions).*
+- [ ] **M13 Refusal screen names the mod:** on a server with Trinkets on Demand, turn Trinkets on Demand off while you
+  are in (Esc > MC Mods, or F1 when a configuration manager is installed). Expected: you go back to the menu, and the
+  "Incompatible version" screen ends with "MC mods:" and one line, "- Trinkets on Demand: it is turned off or cannot
+  run in your game, and this server requires it. Turn it on in Esc > MC Mods (or F1 when a configuration manager is
+  installed; its status there says what stops it) and join again." (no line for any other mod). Join again with it
+  off: the same. Turn it on and join: you stay in. With Jotunn on the server and on your game, Jotunn's window shows
+  the line under "Failed Connection:"; with Jotunn only on your game, the vanilla panel shows it.
+  *Partly automated (`probe.mp.off.MC.Combat.Trinkets.OnDemand`, `probe.refusal`); by hand: The screen as seen, with
+  Jotunn on the server and on your game, and with Jotunn only on your game; a game without Trinkets on Demand but with
+  another MC mod made to run on both the server and the players (for example Sleep Through the Day, which the server
+  does not need to have), on a server where Trinkets on Demand is the only mod that refuses it: "- Trinkets on Demand:
+  this server requires it (version X) and your game does not have it. Install it." (X = the server's version); and
+  M08's copy of another version (built with `-p:Version=0.0.9`): "- Trinkets on Demand: the server has version X and
+  your game 0.0.9, and they cannot play together. Install version X."*

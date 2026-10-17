@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+- First release.
+
 ## 0.1.1
 
 - Tankards are listed under Other again, as the README says. In the current game version a tankard is a one-handed

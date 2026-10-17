@@ -8,12 +8,17 @@
       <Guid>/<Version>/nexus-page.md            every page/file field to fill in, test status, upload checklist
       <Guid>/<Version>/thumbnail.png            gallery image + thumbnail (1920x1080, placeholder)
       <Guid>/<Version>/header.png               page header (1300x372, placeholder)
-      _Pack/<PackVersion>/...                   same for the pack: EVERY mod in one zip (packaging/nexus/pack.json)
+      _Pack/<PackVersion>/...                   same for the pack: EVERY shipped mod in one zip (packaging/nexus/pack.json)
     A dry run of an already-released version writes to <Version>-dev instead, never over released files.
     Nothing is uploaded: create/update the Nexus pages by hand with these files (docs/publishing/nexus.md).
+    A mod marked <ModShip>false</ModShip> in its csproj (reason in <ModShipNote>) is not shipped: no page files, no
+    tag, not in the pack; the run prints that it was skipped and why.
+    The pack can be published before the single mods (1.0: pack page only). Its description, README, file description
+    and Vortex line send Vortex users to the single mod pages only once every packed mod has a URL in
+    packaging/nexus/pages.json; until then they say manual install only.
 .PARAMETER Mod
     Only package mods whose project name contains one of these strings (no pack then: the pack always holds
-    every mod). Without -Mod: every mod + the pack.
+    every shipped mod). Without -Mod: every shipped mod + the pack.
 .PARAMETER Release
     Release gate: clean git tree, CHANGELOG entry, no failed test, no untested item (unless -AllowPending), valid
     names for Nexus. A first release (no nexus/<Guid>/v* tag; pack: no nexus/pack/v* tag) must be 1.0.0, a later
@@ -48,6 +53,17 @@ $allProjects = @(Get-ModProjects)
 $projects = @(Get-ModProjects $Mod)
 if ($projects.Count -eq 0) { Write-Fail 'No mod projects matched.'; exit 1 }
 Assert-ModRequiresAcyclic
+
+# Me keep mods marked <ModShip>false</ModShip> out: no own page, no tag, not in pack. Me say which and why.
+$ship = Split-ShippedMods @($allProjects | ForEach-Object { Get-ModShipInfo $_ })
+if ($ship.Problems.Count) { $ship.Problems | ForEach-Object { Write-Fail $_ }; Write-Fail 'fix ModShip / ModShipNote in the csproj: nothing packaged'; exit 1 }
+$matchedGuids = @($projects | ForEach-Object { $_.BaseName })
+foreach ($s in @($ship.Skipped | Where-Object { $matchedGuids -contains $_.Guid })) {
+    Write-Warn2 "skipped $($s.Name) ($($s.Guid)): not shipped (ModShip false), so no page files, no tag, not in the pack. Why: $($s.ShipNote)"
+}
+$shippedProjects = @($ship.Shipped | ForEach-Object { $_.Project })
+$toPack = @($ship.Shipped | Where-Object { $matchedGuids -contains $_.Guid } | ForEach-Object { $_.Project })
+if ($toPack.Count -eq 0) { Write-Fail 'every matched mod is marked not shipped (ModShip false): nothing to package'; exit 1 }
 $pages = [IO.File]::ReadAllText((Join-Path $nexusDir 'pages.json')) | ConvertFrom-Json
 $installTemplate = [IO.File]::ReadAllText((Join-Path $nexusDir 'install.md'), [Text.Encoding]::UTF8)
 
@@ -175,7 +191,6 @@ $serverText = @'
 **Dedicated server / host:** this mod must also be installed where the world runs. For a dedicated server, install BepInExPack_Valheim in the dedicated server folder (the one with `valheim_server.exe`), then extract this same zip there. To check it loaded, look for the mod's name in `BepInEx/LogOutput.log` in that folder (the MC Mods button only shows your own game's mods).
 '@
 
-$toPack = if ($buildPack) { $allProjects } else { $projects }
 foreach ($p in $toPack) {
     Write-Step "Nexus package: $($p.BaseName)"
     & dotnet build $p.FullName -c Release -nologo -v q -p:DeployToGame=false | Out-Null
@@ -382,13 +397,21 @@ if ($failed) { Write-Fail "$failed mod(s) not packaged: nothing tagged"; exit 1 
 $packTag = $null
 if ($buildPack) {
     Write-Step 'Nexus package: all-mods pack'
-    if ($packaged.Count -ne $allProjects.Count) { Write-Fail "pack would hold $($packaged.Count) of $($allProjects.Count) mods: refusing"; exit 1 }
+    if ($packaged.Count -ne $shippedProjects.Count) { Write-Fail "pack would hold $($packaged.Count) of $($shippedProjects.Count) shipped mods: refusing"; exit 1 }
     $packInfo = [IO.File]::ReadAllText((Join-Path $nexusDir 'pack.json')) | ConvertFrom-Json
     $packVersion = $packInfo.version
     $packChanges = Get-ChangelogSection (Join-Path $nexusDir 'PACK_CHANGELOG.md') $packVersion
     $packTag = "nexus/pack/v$packVersion"
     $packReleased = Test-TagExists $packTag
-    $packFileDescription = "Every MC mod. Manual install: extract into your Valheim folder (creates BepInEx/plugins/$collection/). Vortex users: install the single mods instead."
+    # Pack can go first (1.0 = pack page only). Me send Vortex users to single pages only when every packed mod has
+    # its page URL in pages.json; before that, texts say manual install and point nowhere else.
+    $noPage = @($packaged | Where-Object { -not ($pages.mods.PSObject.Properties[$_.Props.ModGuid] -and [string]$pages.mods.($_.Props.ModGuid)) })
+    $singlePages = $noPage.Count -eq 0
+    $packFileDescription = if ($singlePages) {
+        "Every MC mod. Manual install: extract into your Valheim folder (creates BepInEx/plugins/$collection/). Vortex users: install the single mods instead."
+    } else {
+        "Every MC mod. Manual install only: extract into your Valheim folder (creates BepInEx/plugins/$collection/). Not for Vortex: it would install only one of the mods."
+    }
     $packProblems = @(Test-NexusFields $packInfo.name $packInfo.summary $packVersion $packFileDescription)
     if (-not (Test-TagName $packTag)) { $packProblems += "pack version '$packVersion' gives an invalid git tag name ($packTag): fix packaging/nexus/pack.json" }
     if (-not $packChanges) { $packProblems += "packaging/nexus/PACK_CHANGELOG.md has no '## $packVersion' entry" }
@@ -409,7 +432,7 @@ if ($buildPack) {
     $md = New-Object System.Collections.Generic.List[string]
     $md.Add("# $($packInfo.name)")
     $md.Add('')
-    $md.Add("$($packInfo.summary) A convenience bundle of our own mods: the same files as the individual downloads.")
+    $md.Add("$($packInfo.summary) A convenience bundle of our own mods$(if ($singlePages) { ': the same files as the individual downloads.' } else { '.' })")
     $md.Add('')
     $md.Add('## Pick what you want')
     $md.Add('')
@@ -429,7 +452,8 @@ if ($buildPack) {
     $anyServer = @($mods | Where-Object { $_.Props.ModSide -ne 'Client' }).Count -gt 0
     $md.Add((Expand-Install @{
         BEPINEX_LINK = $pages.bepinex; FOLDER = "BepInEx/plugins/$collection/"; CONFIG = 'MC.*.cfg'; WHAT = 'the mods are'; TREE = $packTree
-        VORTEX = '**Vortex:** this pack is for manual installation only (Vortex would install only one of the mods from it). With Vortex, install the individual mods from their own pages instead. Do not mix both ways.'
+        VORTEX = $(if ($singlePages) { '**Vortex:** this pack is for manual installation only (Vortex would install only one of the mods from it). With Vortex, install the individual mods from their own pages instead. Do not mix both ways.' }
+                   else { '**Vortex:** this pack is for manual installation only (Vortex would install only one of the mods from it). Install it by hand with the steps above.' })
         SERVER = $(if ($anyServer) { $serverText.Trim() -replace 'this mod must', 'some of these mods must' -replace 'this same zip', 'this same pack' } else { '' })
         UPDATE = "Delete the ``BepInEx/plugins/$collection`` folder, then extract the new pack."
     }).Trim())
@@ -452,12 +476,27 @@ if ($buildPack) {
     New-ModThumbnail -Path (Join-Path $out 'thumbnail.png') -Category 'Core' -FeatureId 'MC.Valheim' -Label 'All Mods'
     New-ModHeader -Path (Join-Path $out 'header.png') -Category 'Core' -Label "MC Valheim  $dot  All Mods"
 
-    $contents = ($mods | ForEach-Object { "| $($_.Props.ModName) | $($_.Props.Version) | $($_.Props.ModCategory) | $(if ($_.Pending) { "$($_.Pending) untested" } else { 'all tested' }) |" }) -join "`n"
+    $noPageGuids = @($noPage | ForEach-Object { $_.Props.ModGuid })
+    $contents = ($mods | ForEach-Object { "| $($_.Props.ModName) | $($_.Props.Version) | $($_.Props.ModCategory) | $(if ($_.Pending) { "$($_.Pending) untested" } else { 'all tested' }) | $(if ($noPageGuids -contains $_.Props.ModGuid) { 'not yet' } else { 'yes' }) |" }) -join "`n"
+    $withPage = $packaged.Count - $noPage.Count
+    $pagesNote = if ($singlePages) {
+        "Single mod pages: every included mod has one (packaging/nexus/pages.json), so the pack texts tell Vortex users to install the single mods."
+    } else {
+        "Single mod pages: $withPage of $($packaged.Count) included mods have one (packaging/nexus/pages.json). The pack can go first: until every included mod has a page URL there, the description, README, file description and Vortex line say manual install only and send nobody to single pages. The next package after the last URL is saved switches to the single-page wording by itself."
+    }
+    $pageCheck = if ($singlePages) { "`n- [ ] Every included mod's own page has the version listed under Contents" }
+                 elseif ($withPage -gt 0) { "`n- [ ] Included mods that have their own page: it has the version listed under Contents (the others can get a page later)" }
+                 else { '' }
+    $leftOut = if ($ship.Skipped.Count) {
+        "`n`nLeft out of this pack (ModShip false in the csproj; not in the zip, not in the description):`n`n" + (($ship.Skipped | ForEach-Object { "- $($_.Name) ($($_.Guid)): $($_.ShipNote)" }) -join "`n")
+    } else { '' }
     $packDryNote = if (-not $Release -and $packReleased) { "`n**DRY RUN of an already-released pack (build $buildId): do not upload.**`n" } elseif ($buildId -match 'dirty') { "`n**Dry run from uncommitted changes (build $buildId): do not upload; commit and run with -Release.**`n" } else { '' }
     $sheet = @"
 # Nexus page: $($packInfo.name) $packVersion
 $packDryNote
 $(if ($pages.pack) { "Existing page: $($pages.pack) -> upload a new version of the main file." } else { 'No page yet: create a new mod page (Valheim), then put its URL in packaging/nexus/pages.json "pack".' })
+
+$pagesNote
 
 ## Page (General step)
 
@@ -495,17 +534,16 @@ $permissions
 
 ## Contents
 
-| Mod | Version | Category | Tests |
-|---|---|---|---|
-$contents
+| Mod | Version | Category | Tests | Own page |
+|---|---|---|---|---|
+$contents$leftOut
 
 ## Changelog for $packVersion (paste: one line = one Nexus entry)
 
 $(Format-NexusChangelog $packChanges)
 
 ## Checklist
-
-- [ ] Every included mod published first (its page and version exist)
+$pageCheck
 - [ ] Page fields filled, description pasted in source mode, AI tags set
 - [ ] thumbnail.png set as thumbnail
 - [ ] File uploaded, version $packVersion, category Main, mod manager download OFF, requirements popup ON

@@ -9,9 +9,10 @@ in-world run on 2026-10-16 (Valheim 1.0.20) with Warfare, Jotunn and other mods 
 User decisions (2026-10-16): mods detect content by its game data, never by a table of vanilla names; name lists stay
 as add/exclude overrides; mods rebuild their lists when content changes after the world loads; a stand-in content mod
 (`tests/Probes/Core.Probe.Content`) plus checks on real installed mods (Warfare) prove it. Tower Shield Wall's rule:
-every shield with parry bonus 0 is a tower shield; creature-only copies (carried by a creature, no recipe) stay
-normal; a tower without a bash damage in `Towers` gets one scaled by its block armor. Crossbow Stays Loaded will keep
-the load of every reload weapon without eitr cost (replaces the 2026-09-28 choice "modded reload weapons by name").
+every shield with parry bonus 0 is a tower shield (built as a parry bonus below 1, so the iron square shield, parry
+bonus 1, is left out); creature-only copies (carried by a creature, no recipe) stay normal; a tower without a bash
+damage in `Towers` gets one scaled by its block armor. Crossbow Stays Loaded will keep the load of every reload weapon
+without eitr cost (replaces the 2026-09-28 choice "modded reload weapons by name").
 Order of work: Tower Shield Wall and the test kit first; the other mods follow in waves the user approves.
 
 ## How content mods register content

@@ -120,7 +120,7 @@ ConfigurationManager, or by editing the file (the game picks up the change while
 |---|---|---|---|
 | General | Enabled | `true` | Turn the feature on or off. Takes effect immediately. |
 | General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
-| General | AllowPlayersWithoutMod | `false` | Server (or host) only. Off: a player whose game does not run this mod (not installed, turned off, or a version that cannot talk to this one) is refused about a second after joining, or after turning it off while connected; their game shows "Incompatible version" and the server log says why. On: such players may play (with a warning in the server log); they play without this mod's rules (a player running another dual wield mod may still dual wield with that mod), and they see other players' pairs normally. |
+| General | AllowPlayersWithoutMod | `false` | Server (or host) only. Off: a player whose game does not run this mod (not installed, turned off, or a version that cannot talk to this one) is refused about a second after joining, or after turning it off while connected; their game shows "Incompatible version" (with a line that names this mod, the reason and what to do when their game has an MC mod made to run on both the server and the players; see Multiplayer), and the server log says why. On: such players may play (with a warning in the server log); they play without this mod's rules (a player running another dual wield mod may still dual wield with that mod), and they see other players' pairs normally. |
 | Controls | MainHandKey | `LeftAlt` | Hold this key while you equip a one-handed weapon (hotbar, inventory or radial menu) to put it in your main hand the normal game way instead of pairing it. The weapon in your off hand is put away. `None` = off. A keyboard key or mouse button (no gamepad button yet). Each player's own setting. |
 | Controls | SwapHandsKey | `H` | Press this key while dual wielding to swap your weapons between your hands. The swap is an equip like any other: it takes as long as equipping a weapon, plays the game's equip animation and then the draw animation of the hide key. You cannot attack meanwhile (hold the attack button to swing as soon as the swap and its draw animation allow). It does not start while you sprint, and a dodge, a jump or a sprint cancels it. Your next attack starts the combo from its first swing. `None` = off. A keyboard key or mouse button (no gamepad button yet). Each player's own setting. |
 | Combat | OffHandDamage | `100` | Damage of the hits struck by your off-hand weapon, in percent of that weapon's normal damage (10 to 200). 100 = full damage, like the game's own dual weapons. |
@@ -154,6 +154,24 @@ stance and dual moves.
   and the reason. The server (or host) can let them in with AllowPlayersWithoutMod = true: the server log then warns,
   and they play without this mod's rules (a player running another dual wield mod may still dual wield with that
   mod, by its own rules).
+- **The refusal screen says why.** When a server refuses you, your game's "Incompatible version" screen lists
+  "MC mods:" with a line for the mod that refused you, the reason and what to do:
+  - turned off, or kept off by another dual wield mod: "- Dual Wielding: it is turned off or cannot run in your game,
+    and this server requires it. Turn it on in Esc > MC Mods (or F1 when a configuration manager is installed; its
+    status there says what stops it) and join again." The status names the other dual wield mod when there is one;
+  - another version: "- Dual Wielding: the server has version X and your game Y, and they cannot play together.
+    Install version X.";
+  - not installed: "- Dual Wielding: this server requires it (version X) and your game does not have it. Install it."
+
+  This needs at least one MC mod in your game that is made to run on both the server and the players (any mod a
+  server can refuse you for, or Sleep Through the Day); the server does not need to have that mod. A game whose MC
+  mods are all client-side shows only "Incompatible version". When a server refuses you for several MC mods, the
+  screen names the first one that refused you; once that one is fixed, the next join names the next one. When the
+  server sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the
+  screen lists what your own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with yours. That may not be why you were refused. With Jotunn on the server
+  and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on your game,
+  the vanilla panel shows them.
 - **Turning the mod off while you play** on such a server puts your off-hand weapon away and disconnects you about a
   second later (unless the server allows players without the mod). Turned back on within that second, you stay.
 - **The server's settings apply to everyone** (your log says "Using the server's dual wielding rules: …"): the Combat
@@ -227,6 +245,13 @@ weapon (see Good to know).
   **Smoothbrain DualWield** (and Goo's Combat Overhaul's dual wielding, which needs it): this mod does not load, and
   the BepInEx log says why. **DualWielder** (RustyMods), **DualWieldCore** (Ketanol) and **DualMastery** (balrond): this
   mod stays off, and the MC Mods panel and the log name the other mod. Either way, a server with this mod refuses that game.
+  With DualWielder, DualWieldCore or DualMastery, the refusal screen says "- Dual Wielding: it is turned off or cannot
+  run in your game, and this server requires it. Turn it on in Esc > MC Mods (or F1 when a configuration manager is
+  installed; its status there says what stops it) and join again." That status names the other mod: remove one of the
+  two. With Smoothbrain DualWield, Dual Wielding is not loaded at all, so the server sees a game without it: the screen
+  says "this server requires it (version X) and your game does not have it. Install it." (only when that game has
+  another MC mod made to run on both the server and the players; see Multiplayer), and the BepInEx log says why Dual
+  Wielding was not loaded: remove one of the two.
   **Valheim Ascended** has its own off-hand slot: do not use both.
 - **Weapon Moveset** (MC): its jump and roll attacks work with pairs, using the dual axe or dual knife animations. With
   its default animations, the dual axe jump attack (the fourth swing) strikes main hand then off hand, the dual knife

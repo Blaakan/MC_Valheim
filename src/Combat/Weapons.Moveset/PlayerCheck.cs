@@ -16,15 +16,18 @@ internal enum JoinVerdict : byte
 
 // Me = server (dedicated or host) refuse players whose game would not fight by the server's moves: no mod, other
 // network version, or mod turned off on their game (MC rule: mod that change combat is required on every player).
-// Copy of MC Forge Idol Upgrades' check with two changes (design section 4): verdict = NetworkGate.PeerCompatible
-// (Forge still ask PeerHasMod), and a player who turn the mod on or off while connected (NetworkGate.PeerStateChanged,
-// from their HelloState) get checked again after same grace. Same contract as the sibling combat mods: every check
-// decide with PeerCompatible, log PeerProblem, re-check on PeerStateChanged: player refused by all for same reasons.
+// Copy of MC Forge Idol Upgrades' check with two changes (design section 4; Forge copy have both too since
+// 2026-09-30): verdict = NetworkGate.PeerCompatible, and a player who turn the mod on or off while connected
+// (NetworkGate.PeerStateChanged, from their HelloState) get checked again after same grace. Same contract as the
+// sibling combat mods: every check decide with PeerCompatible, log PeerProblem, re-check on PeerStateChanged: player
+// refused by all for same reasons.
 // Host own player is not a peer, single player has none: me never touch them.
 // Flow: ZNet.RPC_PeerInfo postfix on server, peer ready (m_uid set) = fully in -> me wait Grace s (our hello always
 // come before PeerInfo on same connection, so grace only safety) -> PeerCompatible. Not compatible and setting off ->
-// vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version", go back to menu, like vanilla version
-// check) + peer in vanilla kick list (ZNet.Update disconnect it DisconnectDelay s later). Me check early and cut late:
+// NetworkGate.Refuse: one reason line first (framework rpc MC.Framework.Refused, their Both MC mods show it under
+// "MC mods:"), then vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version", back to menu, like
+// vanilla version check) + peer in vanilla kick list (ZNet.Update disconnect it DisconnectDelay s later). Peer already
+// in kick list = Skip, so only first MC mod that refuse send its line. Me check early and cut late:
 // refused game sit on loading screen (long frames); if socket close before it read Error, vanilla UpdatePeers drop
 // the Error and menu say "Disconnected". Many seconds = many frames to read it and log out alone.
 // Timer = ZNet.Update postfix: empty list = one compare.

@@ -1012,6 +1012,41 @@ internal static class Performance
         ZInput.ResetButtonStatus("JoyAttack");
     }
 
+    // Gamepad button that closed the window (B) is game button too: jump on default layout (dodge, radial close, build
+    // menu on other layouts). ZInput keep one state per game button, so forget only "JoyButtonB" = "JoyJump" still
+    // hold the press, and PlayerController.FixedUpdate read it in a physics step after we let keys go (was 1 jump in 6
+    // closes). Me forget press on every game button bound to same control: held B do nothing until pressed again.
+    internal static void ForgetPadButton(string name)
+    {
+        var input = ZInput.instance;
+        if (input == null)
+        {
+            return;
+        }
+        var pressed = input.GetButtonDef(name);
+        if (pressed == null)
+        {
+            return;
+        }
+        var path = BoundPath(pressed);
+        pressed.ResetState();
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+        foreach (var button in input.m_buttons.Values)
+        {
+            if (!ReferenceEquals(button, pressed) && BoundPath(button) == path)
+            {
+                button.ResetState();
+            }
+        }
+    }
+
+    // Control a game button sit on now (player rebinds and swapped face buttons count), null = no binding.
+    private static string BoundPath(ZInput.ButtonDef button) =>
+        button != null && button.ButtonAction != null && button.ButtonAction.bindings.Count > 0 ? button.GetActionPath() : null;
+
     // ---------- checks ----------
 
     internal static bool CanStart(Player player, out string error)

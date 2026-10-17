@@ -60,11 +60,25 @@ refuel it. On a server without the mod it turns itself off.
 - **Players whose game does not run the mod are refused.** This covers a player without the mod, a player who has it
   turned off (`Enabled = false`, or unticked in the MC Mods panel) and a player whose version of the mod cannot talk
   to the server's. About a second after such a player has joined, the server refuses them: their game goes back to the
-  main menu with the game's own message "Incompatible version" (the game cannot show a mod name there). A player who
-  turns the mod off while connected is refused the same way about a second later; turning it back on within that
-  second keeps them in. The server's log names the player and says why. To let them play anyway, set
+  main menu with the game's own message "Incompatible version", with the mod and the reason listed below it (next
+  point). A player who turns the mod off while connected is refused the same way about a second later; turning it
+  back on within that second keeps them in. The server's log names the player and says why. To let them play anyway, set
   `AllowPlayersWithoutMod = true` on the server. Setting it back to `false` refuses the ones who are online about a
   second later.
+- **The refusal screen names the mod.** Below "Incompatible version", the screen lists Switchable Lights under "MC
+  mods:" with the reason and what to do: the game does not have it (install it; the line names the server's version),
+  has another version that cannot play with the server's (install the server's version; the line names both
+  versions), or has it turned off or cannot run it (turn it on in Esc > MC Mods, or with F1 when a configuration
+  manager is installed, and join again). The server sends this line, so it shows even when your game does not have
+  this mod. This needs at least one MC mod in your game that is made to run on both the server and the players (any
+  mod a server can refuse you for, or Sleep Through the Day); the server does not need to have that mod. A game whose
+  MC mods are all client-side shows only "Incompatible version". When a server refuses you for several MC mods, the
+  screen names the first one that refused you; once that one is fixed, the next join names the next one. When the
+  server sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the
+  screen lists what your own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with yours. That may not be why you were refused. With Jotunn on the server
+  and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on your game,
+  the vanilla panel shows them.
 - **Players without the mod, or with it turned off** (when allowed in) see exactly the same lights: on is a full
   light, off is an empty one. They can refuel an off light with the usual fuel, which turns it on for everybody. They
   cannot switch a light off, except the resin candle, which works as in vanilla for them (E switches it on or off; it

@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 1.0.0 (first release; before that 0.1.2) (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 fixed the wind icon of M13 (at the helm of a ship simulated by a game without the mod, the HUD wind icon showed the
 Sailing bonus although the ship did not get it): M13 is reset to `[ ]` and M14 is new. 0.1.1 also changed the sail
 response (T19: when the wind shifted while the sail was still filling, the sail's pull went about 0.5% past its normal
@@ -244,11 +244,14 @@ lines.
   dedicated server's log of the each-off run (or a hand test): the Warning 'Refused <player>: has the mod turned off.
   ...' from Sailing Skill, once for turning it off while in and once for joining with it off. No test reads that line
   (the client is already thrown out); it is the first statement of the refusal the probe saw happen.*
-- [ ] **M10 Other network version:** build a copy with another network version (`dotnet build
-  src/Exploration/Sailing.Skill/MC.Exploration.Sailing.Skill.csproj -p:ModNetworkVersion=2 -p:DeployToGame=false`), copy
-  that DLL over a second player's copy (put the normal build back afterwards), and join a server with network version
-  1. Expected: refused about a second after joining; the server log says "has another version of the mod (network
-  version 2, the server has 1)".
+- [ ] **M10 Other network version:** build a copy with another network version and another release version (`dotnet
+  build src/Exploration/Sailing.Skill/MC.Exploration.Sailing.Skill.csproj -p:ModNetworkVersion=2 -p:Version=0.0.9
+  -p:DeployToGame=false`), copy `src/Exploration/Sailing.Skill/bin/Debug/MC.Exploration.Sailing.Skill.dll` over a
+  second player's copy in `BepInEx/plugins/MC_Valheim/Exploration/MC.Exploration.Sailing.Skill/` (put the normal build
+  back afterwards: build again without `-p:ModNetworkVersion=2 -p:Version=0.0.9` and copy it the same way), and join a
+  server with network version 1. Expected: refused about a second after joining; the server log says "has another
+  version of the mod (network version 2, the server has 1)". (The other release version is for M15: with only another
+  network version, the refusal line would name the same version twice.)
   *Partly automated (`sailing.mp.other-version`, `sailing.mp.join`, `sailing.network`); by hand: A DLL really built
   with -p:ModNetworkVersion=2 joining: the test sends that copy's hello while already connected, so the build property
   ending up in the hello and the refusal at the very moment of joining are not exercised. Everything the item expects
@@ -302,16 +305,33 @@ lines.
 
 ## 0.1.2 — the refusal screen names the mod
 
-0.1.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
-under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
-needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
-connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Exploration.Sailing.Skill` passed, the screen named this
-mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+0.1.2 (2026-10-16, screen fixes 2026-10-17): when a server refuses you because of this mod, the "Incompatible version"
+screen lists it under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`,
+"Who needs to install it, and multiplayer"). This needs at least one MC mod in the refused game that is made to run on
+both the server and the players (any mod a server can refuse you for, this one included, or Sleep Through the Day);
+the server does not need to have that mod. A game whose MC mods are all client-side shows only "Incompatible
+version". When a server refuses a game for several MC mods, the screen names the first one that refused it; once that
+one is fixed, the next join names the next one. When the server sends no line (a refusal that is not about an MC mod,
+or a server with an older version of the MC mods), the screen lists what the refused game noticed while connected: an
+MC mod turned off while the server has it on, or a server copy whose version cannot play with its own; that may not
+be why it was refused. With Jotunn on the server and on the refused game, Jotunn's window shows the same lines under
+"Failed Connection:"; with Jotunn only on the refused game, the vanilla panel shows them. Run on 2026-10-17 (dedicated
+test server), on the code before the screen fixes: `probe.mp.off.MC.Exploration.Sailing.Skill` passed, the screen
+named only this mod both times (turned off while in, joining with it off), with the line's old wording;
+`probe.refusal` passed. The screen fixes of 2026-10-17 (new wording of the "turned off" line, only the server's lines
+when it sent any, notes cleared for each new connection; `probe.mp.off.<GUID>` now also fails when the screen lists a
+mod that did not refuse, and `probe.refusal` checks the new rules) have not run yet.
 
-- [ ] **M15 Refusal screen names the mod:** on a server with Sailing Skill, turn Sailing Skill off in Esc > MC Mods while you
-  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Sailing Skill: it is turned
-  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
-  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
-  join: you stay in.
-  *Partly automated (`probe.mp.off.MC.Exploration.Sailing.Skill`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
-  window, and a game with another version of the mod than the server's (the line names both versions).*
+- [ ] **M15 Refusal screen names the mod:** on a server with Sailing Skill, turn Sailing Skill off in Esc > MC Mods
+  while you are in. Expected: you go back to the menu, and the "Incompatible version" screen lists under "MC mods:"
+  only "- Sailing Skill: it is turned off or cannot run in your game, and this server requires it. Turn it on in
+  Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and join again."
+  (With Jotunn on the server and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with
+  Jotunn only on your game, the vanilla panel shows them.) Join again with it off: the same. Turn it on and join: you
+  stay in. Join with the other-version build of M10 (network version 2, version 0.0.9). Expected: "- Sailing Skill:
+  the server has version <the server's version> and your game 0.0.9, and they cannot play together. Install version
+  <the server's version>." Remove Sailing Skill from that game (keep every other MC mod the server has, at least one
+  of them made to run on both the server and the players, such as Swim Dive), and join. Expected: "- Sailing Skill:
+  this server requires it (version <the server's version>) and your game does not have it. Install it."
+  *Partly automated (`probe.mp.off.MC.Exploration.Sailing.Skill`, `probe.refusal`); by hand: The screen as seen, also
+  inside Jotunn's window, the other-version line with M10's build, and the line for a game without the mod.*

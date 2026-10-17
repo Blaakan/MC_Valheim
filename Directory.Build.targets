@@ -11,6 +11,9 @@
     <ModMultiplayer Condition="'$(ModMultiplayer)' == ''">Compatible</ModMultiplayer>
     <!-- Bump when RPC names/payloads or ZDO keys/format change (Both mods: client and server must match). -->
     <ModNetworkVersion Condition="'$(ModNetworkVersion)' == ''">1</ModNetworkVersion>
+    <!-- ModShip false = tools/Package-Mod.ps1 leave mod out of release (no page, no tag, not in pack). ModShipNote say why.
+         MSBuild no trim property text, tools do: me compare ModShip.Trim() everywhere so " false " mean same to both. -->
+    <ModShip Condition="'$(ModShip.Trim())' == ''">true</ModShip>
     <DeployToGame Condition="'$(DeployToGame)' == '' and '$(Configuration)' == 'Debug'">true</DeployToGame>
     <DeployToGame Condition="'$(DeployToGame)' == ''">false</DeployToGame>
     <!-- Deploy into other BepInEx folder (test trees of tools/Test-Multiplayer.ps1): -p:DeployBepInExDir=<dir>\BepInEx\.
@@ -70,6 +73,10 @@
            Text="ModRequires entry '%(_ModRequireCheck.Identity)' is not a mod GUID. Separate GUIDs with ';'." />
     <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ModPackageName)', '^[A-Za-z0-9_]+$'))"
            Text="ModPackageName '$(ModPackageName)' must match [A-Za-z0-9_]+ (Thunderstore rule)." />
+    <Error Condition="'$(ModShip.Trim())' != 'true' and '$(ModShip.Trim())' != 'false'"
+           Text="ModShip must be true or false (got '$(ModShip)'); leave it out to ship the mod." />
+    <Error Condition="'$(ModShip.Trim())' == 'false' and '$(ModShipNote.Trim().Length)' == '0'"
+           Text="ModShip is false: say why the mod is left out of the release in &lt;ModShipNote&gt; (tools/Package-Mod.ps1 prints it)." />
   </Target>
 
   <!-- Me stamp build with git commit (+dirty) so test reports point at exact code. No git = "local". -->

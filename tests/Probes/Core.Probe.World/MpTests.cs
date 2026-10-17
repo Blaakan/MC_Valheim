@@ -312,6 +312,23 @@ internal static class MpTests
         {
             problems.Add($"{when}: the error screen does not name {mod} as turned off under '{RefusalNotes.Header}'");
         }
+        // Only the mod that refused: run 2026-10-17 showed a line of another mod left from the connection before.
+        var others = new List<string>();
+        var block = text.IndexOf(RefusalNotes.Header, System.StringComparison.Ordinal);
+        if (block >= 0)
+        {
+            foreach (var l in text.Substring(block).Split('\n'))
+            {
+                if (l.StartsWith("- ", System.StringComparison.Ordinal) && !l.StartsWith(line, System.StringComparison.Ordinal))
+                {
+                    others.Add(l.Length > 60 ? l.Substring(0, 60) + "..." : l);
+                }
+            }
+        }
+        if (others.Count > 0)
+        {
+            problems.Add($"{when}: the error screen also lists mods that did not refuse this game: {string.Join(" | ", others.ToArray())}");
+        }
     }
 
     // Vanilla-client setup: after join, wait until the game is back at the main menu (refused) or 120 s pass.

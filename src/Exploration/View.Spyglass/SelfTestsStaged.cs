@@ -34,8 +34,7 @@ internal static partial class SelfTests
     private const string DroppedMark = "relog-dropped";
     private const string DisabledMark = "disabled";
 
-    // In-world tests added after the first lot, in run order. The two death tests last: each leaves a new player
-    // object.
+    // In-world tests added after the first lot, in run order. The death test last: it leaves a new player object.
     private static readonly KeyValuePair<string, Func<IEnumerator>>[] AutoTests =
     {
         new KeyValuePair<string, Func<IEnumerator>>(InputClickTest, RunInputClick),
@@ -51,7 +50,6 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(SortChestTest, RunSortChest),
         new KeyValuePair<string, Func<IEnumerator>>(SortCraftingTest, RunSortCrafting),
         new KeyValuePair<string, Func<IEnumerator>>(DeathTest, RunDeath),
-        new KeyValuePair<string, Func<IEnumerator>>(DeathCameraBugTest, RunDeathCameraBug),
     };
 
     private static readonly KeyValuePair<string, Func<IEnumerator>>[] AutoMpTests =

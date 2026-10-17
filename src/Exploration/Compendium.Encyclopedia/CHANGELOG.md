@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+- First release.
+
 ## 0.1.1
 
 - Fixed: when the Encyclopedia window cannot be built (a UI mod replaced or changed the Valheim Compendium), turning

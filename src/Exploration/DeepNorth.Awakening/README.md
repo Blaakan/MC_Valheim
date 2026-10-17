@@ -153,6 +153,19 @@ how many Malicious Ice were broken in the global key mc_dn_stones.
 - **Players who cannot play by the server's rules are refused** about a second after they join; their game shows
   "Incompatible version". This covers a player without the mod, with another version of it, or with it turned off. The
   server (or host) can let such players in with AllowPlayersWithoutMod = true; the server log names each of them.
+- **The refused player's screen says why.** Under "Incompatible version" it lists the mod under "MC mods:" with the
+  reason and what to do: "this server requires it (version X) and your game does not have it", "the server has version
+  X and your game Y, and they cannot play together", or "it is turned off or cannot run in your game" (turn it on in
+  Esc > MC Mods, or with F1 when a configuration manager is installed; its status there says what stops it). The list
+  needs at least one MC mod in the player's game that is made to run on both the server and the players (any mod a
+  server can refuse them for, Deep North Awakening included, or Sleep Through the Day); the server does not need to
+  have that mod. A game whose MC mods are all client-side, or that has none, shows only "Incompatible version". When a
+  server refuses a player for several MC mods, the screen names the first one that refused them; once that one is
+  fixed, the next join names the next one. When the server sends no line (a refusal that is not about an MC mod, or a
+  server with an older version of the MC mods), the screen lists what the player's own game noticed while connected:
+  an MC mod turned off while the server has it on, or a server copy whose version cannot play with theirs. That may
+  not be why they were refused. With Jotunn on the server and on the player's game, Jotunn's window shows the same
+  lines under "Failed Connection:"; with Jotunn only on the player's game, the vanilla panel shows them.
 - **The server counts the Malicious Ice** and decides the stage, the messages and the invasions, whoever broke it.
 - **The server's settings apply to everyone** (your game logs "Using the server's rules"). Until they arrive after you
   join, your game runs the Deep North like the normal game.

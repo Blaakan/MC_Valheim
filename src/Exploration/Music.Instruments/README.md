@@ -24,7 +24,8 @@ mini-game whose good performances give everyone nearby extra comfort.
   - **Play**: the song plays by itself. You can walk while you play (no running, jumping or dodging). **Repeat** plays
     it again and again. Attack or Block stops it. It keeps playing behind the pause menu, like the game's music.
   - **Perform**: play it yourself in the rhythm game (below).
-  - **Close**, Esc or the gamepad B button closes the window.
+  - **Close**, Esc or the gamepad B button closes the window. The press that closes it does nothing else in the game
+    (B is also the jump button on the default controller layout: closing the window with it never makes you jump).
 - **Free play** (the window's first entry): play the keyboard like a piano. The bottom letter row Z X C V B N M is
   the lower octave's white keys (C to B) with its black keys on the row above (S D, then G H J, where a piano has
   them); the top letter row Q W E R T Y U I O P is the upper octave's white keys with its black keys on the number row
@@ -91,7 +92,8 @@ Turn the mod off in the MC Mods panel (or set Enabled = false) at any time: the 
 hidden and clicking with an instrument does nothing. Your instruments stay in your inventory. A Music effect already
 running keeps its icon until it ends but adds no comfort while the mod is off. In multiplayer the server refuses
 players who turn it off (unless its AllowPlayersWithoutMod setting is on): your game returns to the menu with
-"Incompatible version" about a second later.
+"Incompatible version" about a second later, and lists Music Instruments under "MC mods:" with where to turn it back
+on (see Multiplayer).
 
 ## Configuration
 
@@ -150,6 +152,19 @@ without the mod, instruments dropped on the ground can be deleted.
   instrument in a chest does not show for them (when they take or add an item in that chest it is saved without it,
   and it is lost for everyone), and they hear no music. Keep instruments out of chests such players use. A player with the
   mod turned off or another version of it sees and keeps instruments, but hears no music and gets no comfort bonus.
+- **The refused player's screen says why.** Under "Incompatible version" it lists the mod under "MC mods:" with the
+  reason and what to do: "this server requires it (version X) and your game does not have it", "the server has
+  version X and your game Y, and they cannot play together", or "it is turned off or cannot run in your game" (turn
+  it on in Esc > MC Mods, or with F1 when a configuration manager is installed; its status there says what stops
+  it). This needs at least one MC mod in your game that is made to run on both the server and the players (any mod a
+  server can refuse you for, or Sleep Through the Day); the server does not need to have that mod. A game whose MC
+  mods are all client-side shows only "Incompatible version". When a server refuses you for several MC mods, the
+  screen names the first one that refused you; once that one is fixed, the next join names the next one. When the
+  server sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the
+  screen lists what your own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with yours. That may not be why you were refused. With Jotunn on the server
+  and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on your game,
+  the vanilla panel shows them.
 - **On a server without the mod** the mod turns itself off for you (no recipes, no playing), and an instrument you drop
   on the ground there can be deleted by the server.
 - **The server's settings apply to everyone** (your game logs "Using the server's rules"): the recipes, the comfort

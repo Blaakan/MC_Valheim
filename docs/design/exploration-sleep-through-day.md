@@ -8,7 +8,7 @@
 | Side | Both: the server (or the host) and every player install it (3.9); multiplayer Compatible; network version 1 (no RPC and no ZDO key of its own). **The first Both mod in the repo** (3.9, M10) |
 | Sheet idea | `Sleep through the day` |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim` in `.ref/`; English strings checked in the installed 1.0.16 localization table (`valheim_Data/resources.assets`); bed and fire prefab names checked in `StreamingAssets/SoftRef/manifest_extended`; the sources of BedRules (including its config defaults), Sleepover, SkipSleep, AFKManager and Seasons read on GitHub (2026-09-29) |
-| Status | Implemented (0.1.0; fix version 0.1.1, see "Changes in 0.1.1" in section 5), build OK, smoke test passed (before the review fixes; to re-run); in-world self-tests to re-run after the review fixes (first run: 2 of 4 failed on a wrong message expectation, fixed); in-game tests pending |
+| Status | Implemented (0.1.0; fix version 0.1.1, see "Changes in 0.1.1" in section 5; 0.1.2 (2026-10-17) carries the framework's refusal screen, see "Changes in 0.1.2": builds without warnings, M12 not run in game yet), build OK, smoke test passed (before the review fixes; to re-run); in-world self-tests to re-run after the review fixes (first run: 2 of 4 failed on a wrong message expectation, fixed); in-game tests pending |
 
 ## Goal
 
@@ -494,7 +494,11 @@ where the server runs and are read only through `Plugin.ReadDaySettings` (Debug 
   (static; cleared on use, at every `SetSleeping` call and in `OnDeactivated`).
 - Network: no RPC and no ZDO key of its own; `ModNetworkVersion` 1. Traffic: the framework handshake
   (`<GUID>.Hello`/`HelloAck`) and one extra vanilla `NetTime` message per sleep end (every 2 s while a dream cinematic
-  holds the stop).
+  holds the stop). Since 0.1.2 the framework (Both mods only) also registers, on the player's game, the shared rpc
+  `MC.Framework.Refused` (string `<mod name>\t<line>`, server → client) on every server connection, and the first Both
+  mod that loads patches `FejdStartup.ShowConnectError` once per game session (`RefusalNotes`), whatever this mod's
+  state (framework patches have their own Harmony id). Sleep never sends that line itself (no player check), and a
+  game without a listener ignores the rpc, so it needs no network version change. See "Changes in 0.1.2".
 
 ### 3.9 Multiplayer and hand-off
 
@@ -529,6 +533,7 @@ installed yet.
 | Server **without** the mod + a player with it | The mod is inactive on that player's game ("Inactive: the server does not have this mod..."): vanilla beds, no player stuck in bed. |
 | Server has the mod turned off | Players' copies go inactive and follow the server live (framework). |
 | A player has it turned off, the server on | That player cannot lie down in the morning: blocks morning sleeps like a player without the mod. |
+| A server refuses the player because of another MC mod (0.1.2) | Sleep never refuses anyone, but it is a mod made to run on both the server and the players, so the player's "Incompatible version" screen lists the refusing mod under "MC mods:" even when Sleep is the player's only MC mod; the server does not need to have Sleep. Several refusing mods: the screen names the first one that refused; once that one is fixed, the next join names the next one. No line from the server (a refusal that is not about an MC mod, or a server with older MC mods): the screen lists what the player's own game noticed while connected, which may not be why they were refused (Sleep turned off while the server has it on gets a line too). Framework rules: `docs/modding/framework.md`, "Who needs to install it, and multiplayer", the refusal screen item (M12). |
 | Partial/vote sleep mod on the server | A mod that hooks `EverybodyIsTryingToSleep` (SkipSleep, AFKManager) applies to day sleep too; players not in bed get the sleep screen, as that mod does at night. Others: **unverified** (3.11). |
 
 The mod changes shared world state (the time), but only the way vanilla sleep does: on the server, through the vanilla
@@ -614,7 +619,7 @@ or time state.
 
 | File | Responsibility |
 |---|---|
-| `MC.Exploration.Sleep.ThroughDay.csproj` | Metadata: `ModName` Sleep Through the Day, `Version` 0.1.1, `ModScope` QoL, `<ModIdea>Sleep through the day</ModIdea>`, `ModSide` Both, `ModMultiplayer` Compatible, `ModMultiplayerNotes` (3.9), `ModNetworkVersion` 1, `ModDescription`. |
+| `MC.Exploration.Sleep.ThroughDay.csproj` | Metadata: `ModName` Sleep Through the Day, `Version` 0.1.2, `ModScope` QoL, `<ModIdea>Sleep through the day</ModIdea>`, `ModSide` Both, `ModMultiplayer` Compatible, `ModMultiplayerNotes` (3.9), `ModNetworkVersion` 1, `ModDescription`. |
 | `Plugin.cs` | `BindConfig` (`WakeUpHour`, `IncludeAfternoon`, `WakeUpMessage`); `ReadDaySettings` (the one reader of `WakeUpHour`/`IncludeAfternoon`, with the Debug test overrides); `OnActivated`: register the Debug self-tests; `OnDeactivated`: `WakeMessage.Reset()`, `DaySleep.Reset()`, unregister and clean up the self-tests. |
 | `Patches/EnvManPatches.cs` | `CalculateCanSleep` postfix. |
 | `Patches/GamePatches.cs` | `UpdateSleeping` prefix (state, final time) and postfix. |
@@ -856,6 +861,24 @@ The ones marked **(to confirm with the user)** change what the player sees or pi
   and one that starts at 18:05 is a night sleep.
 - No change to the server part, the settings, the patches or the network (network version 1).
 
+### Changes in 0.1.2
+
+- **Refusal screen** (2026-10-17, framework `NetworkGate.Refuse` and `RefusalNotes`, framework item N09): the shared
+  framework code every Both mod carries now explains a refusal on the player's game. Sleep has no player check and
+  never refuses anyone, but as a Both mod its copy listens for the server's one line (`MC.Framework.Refused`) on every
+  server connection and can install the `FejdStartup.ShowConnectError` postfix that adds the "MC mods:" block to the
+  "Incompatible version" screen. So a player whose only MC mod is Sleep sees which other MC mod refused them, also when
+  the server does not have Sleep and when Sleep is turned off (the server's lines win over what the player's game
+  noted). With only client-side MC mods, or none, the player sees only "Incompatible version". With Jotunn on the
+  server and on the player's game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only
+  on the player's game, the vanilla panel shows them.
+- Known side effect: when a server sends no line (a refusal that is not about an MC mod, or a server with older MC
+  mods) and Sleep is turned off on the player's game while the server has it on, the block lists Sleep as turned off
+  (the framework's own note), although Sleep never refuses anyone. The framework says such lines may not be why the
+  player was refused.
+- **Tests**: M12 (new). Nothing else in the mod changed: no setting, no patch of its own, network version 1, so no
+  other item is reset.
+
 ### Added beyond the request
 
 `WakeUpHour`, `IncludeAfternoon` and `WakeUpMessage` settings; retargeting daytime sleeps started by other mods, and
@@ -962,6 +985,7 @@ Multiplayer (M01, M05, M07, M08 and M10 also tick framework tests N02-N05 in `sr
 | M09 | A player has it off, the host on: that player blocks morning sleep |
 | M10 | Dedicated server (mandatory), first updated to 1.0.16: loads on `valheim_server.exe` (`[MC:ready]`, `Activated.`, clean log); server's `WakeUpHour = 20` and `IncludeAfternoon = true` apply to both players (morning and afternoon → 20:00) |
 | M11 | Optional: host + remote player, host `WakeUpHour` 23 and a dream video (`cinematicsleep`): a wake-up held past midnight still counts as a day sleep |
+| M12 | (0.1.2) Server with Sleep and Swim Dive, player with Sleep only: the "Incompatible version" screen lists only Swim Dive under "MC mods:" (also in Jotunn's "Failed Connection:" window with Jotunn on both sides; the vanilla panel with Jotunn only on the player's game); the same with Sleep turned off on the player's game (the server's line wins) and with a server without Sleep; a player with no MC mod sees only "Incompatible version" |
 
 Cross-mod:
 
@@ -976,4 +1000,4 @@ Cross-mod:
 Goal coverage: goal 1 → T01, T07, T09, T10, T17, M01; goal 2 → T01, T02, T04, T06, T11, T12, T17, M01, M02, M10; goal 3
 → T02-T09, T17, M01, M03-M09; goal 4 → T13-T15, M08; decision 1 (default) → T03, T04, T06, T17, M02, M04, M05; hand-off →
 M05, M06; clean log → T16; framework Both paths → M01, M05, M07, M08, M10; wake-up message in vanilla's place (D3) →
-T01, T09, T12, T17, X01; late wake-up after a dream (3.6) → M11.
+T01, T09, T12, T17, X01; late wake-up after a dream (3.6) → M11; refusal screen for other MC mods (0.1.2) → M12.

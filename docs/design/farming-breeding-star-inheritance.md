@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. A birth is decided by the game that simulates the parent (1.11), so the server refuses players whose game does not run the mod: not installed, turned off, or another network version (setting `AllowPlayersWithoutMod` to let them in), and sends its breeding settings to everyone (3.9, decisions 10, 22-27). The user's review (2026-09-29): the vanilla 50/50 rule must never apply; server-only was asked about and rejected (decision 22). |
 | Sheet idea | `Breeding revamp` |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim` in `.ref/`; the dedicated server's own `assembly_valheim` (installed `valheim_server`, `Game` and `ZNet` decompiled to a scratch folder, 2026-09-29) for 1.11; prefab names checked in the installed game's `StreamingAssets/SoftRef/manifest_extended` and English names in the `resources.assets` localization table (2026-09-29); per-species breeding facts from valheim.weirdgloop.org (2026-09-29); sources of Star Level System 1.18.1, AllTameable and FeedLikeGrandma read on GitHub (2026-09-29); HarmonyX 2.9.0 in the installed `BepInEx/core` |
-| Status | Implemented (0.2.0: the join check now also refuses a player whose copy is turned off or has another network version, when joining and live, decision 27 and 3.9.1; and the client's log stays silent while its copy is off, 3.9.2 step 3). The client-only build passed the build, the smoke test and the in-world self-tests (2026-09-29); the server-and-client build (join check, settings sync) builds in Debug and Release, smoke test, in-world self-tests and in-game tests pending |
+| Status | Implemented (0.2.1: the refused player's "Incompatible version" screen names the mod and the reason, through the framework's `NetworkGate.Refuse`, decision 28 and 3.9.1 step 4. 0.2.0: the join check now also refuses a player whose copy is turned off or has another network version, when joining and live, decision 27 and 3.9.1; and the client's log stays silent while its copy is off, 3.9.2 step 3). The server-and-client build (join check, settings sync) passed the smoke test and the in-world self-tests on 0.1.0 (build `1254c75`, 2026-09-29); the self-tests passed on 0.2.0 (2026-10-13, game 1.0.17, in-world and with a dedicated server) and in the automated checks of 2026-10-15 (35 of 35); `probe.mp.off.MC.Farming.Breeding.StarInheritance` passed on 0.2.1 (2026-10-17, before the framework's screen fixes; its first screen also listed a Spyglass line left over from an earlier connection, see TESTING.md). In-game tests: the multiplayer items that 0.2.0 and 0.2.1 changed or added, M15 and the optional X04 are pending; every other item is ticked, by hand or by the self-tests |
 
 "Breeding" and not "Procreation" in the GUID: it is the player's word. "StarInheritance" names what changes (how stars pass
 from parents to babies), so a later breeding mod (for example "Breeding.OneBabyPerPair") gets its own GUID.
@@ -590,6 +590,7 @@ cached for the rule itself. The ranges are enforced by BepInEx (`AcceptableValue
 | `<GUID>.Hello` / `<GUID>.HelloAck` | client ↔ server | framework (`NetworkGate`, protocol 1 with the network version) | at connect, and when the server's copy turns on or off |
 | `MC.Farming.Breeding.StarInheritance.SettingsRequest` | client → server | `string` `"1"` (protocol) | the client's `RPC_PeerInfo` (right after the handshake), and when the client's copy turns on while connected |
 | `MC.Farming.Breeding.StarInheritance.Settings` | server → client | `string` with six fields separated by a vertical bar: protocol `1`, ChanceAtFarming0, ChanceAtFarming100, ChanceWithoutFarmer, FarmerRange, MaxStars (defaults: `1\|15\|50\|10\|60\|2`); floats in invariant culture, format `R` (exact round trip) | the answer to a request; to every ready player with the mod when the server's settings change and when the server's copy turns on |
+| `MC.Framework.Refused` (framework, since 0.2.1) | server → client | `string` `"<mod name>\t<line>"`: the reason and what to do, in English | the join check refuses a player (3.9.1 step 4), just before `Error`; the player's MC mods that are made to run on both the server and the players listen for it (the server does not need to have them) and show the line on the error screen (`RefusalNotes`) |
 | `Error` (vanilla) | server → client | `int` 3 (`ErrorVersion`) | the join check refuses a player (3.9) |
 
 Nothing new is saved: the received settings live in memory for the current `ZNet` session only, and the join check
@@ -641,13 +642,25 @@ host's own player (not a peer).
    reason: the animals their game simulates breed the vanilla way); off → **refuse**. The reason comes from
    `NetworkGate.PeerProblem(peer)`: "does not have the mod", "has the mod turned off" or "has another version of the
    mod (network version n, the server has m)".
-4. **Refuse** the vanilla way: Warning naming the player (name and platform id) and the reason; `peer.m_rpc.Invoke(
-   "Error", (int)ZNet.ConnectionStatus.ErrorVersion)`; the peer goes into vanilla's
+4. **Refuse** through the framework (`NetworkGate.Refuse(peer)`, since 0.2.1; decision 28): Warning naming the
+   player (name and platform id) and the reason; `NetworkGate.Refuse` first sends `MC.Framework.Refused` with one
+   line for the player's screen (missing: "this server requires it (version X) and your game does not have it.
+   Install it."; other version: "the server has version X and your game Y, and they cannot play together. Install
+   version X."; turned off: "it is turned off or cannot run in your game, and this server requires it. Turn it on in
+   Esc > MC Mods (or F1 when a configuration manager is installed; ...) and join again."), then the vanilla
+   `peer.m_rpc.Invoke("Error", (int)ZNet.ConnectionStatus.ErrorVersion)`; the peer goes into vanilla's
    `ZNet.PeersToDisconnectAfterKick` with `Time.time + 4 s` (`DisconnectDelay`), so vanilla's own `ZNet.Update`
    disconnects it after the message left (the vanilla kick path, 1.14, with a longer delay: see below). The client
-   logs out and its main menu shows "Incompatible version". This is the same for a player on the loading screen and
-   for one who is playing (a player who turned the mod off while in): the client's `Game.FixedUpdate` logs out as
-   soon as the connection status is an error.
+   logs out and its main menu shows "Incompatible version". When the player's game has at least one MC mod that is
+   made to run on both the server and the players (this one, any other mod a server can refuse it for, or Sleep
+   Through the Day; the server does not need to have that mod), the framework's `RefusalNotes` add an "MC mods:"
+   block with the server's line; a game whose MC mods are all client-side shows only "Incompatible version". With
+   Jotunn on the server and on the player's game, Jotunn's window shows the same lines under "Failed Connection:";
+   with Jotunn only on the player's game, the vanilla panel shows them. A peer already in the kick list is skipped
+   (step 3), so only the first MC mod that refuses a player sends its line; once that one is fixed, the next join
+   names the next one. This is the same for a player on the loading screen and for one who is playing (a player who
+   turned the mod off while in): the client's `Game.FixedUpdate` logs out as soon as the connection status is an
+   error.
 5. **Cancel and re-check:** `OnDeactivated` clears the list and stops listening (a pending check is cancelled; a
    refusal already sent still completes, through vanilla's list). `OnActivated` schedules every ready peer (the server
    turned on later with players online). `AllowPlayersWithoutMod` switched to `false` schedules every ready peer too.
@@ -923,7 +936,7 @@ These lines are how every test reads the partner level, the farmer, the chance a
 | Feature turned off with a pregnant animal | n/a | Vanilla birth; stale record ignored later |
 | Exception in vanilla birth code | n/a | Parent level restored by the finalizer |
 | Game quit with the mod on | n/a | `OnDeactivated` runs; guarded withdraw skips the write when `ZNet` or the player is gone; no error |
-| Player without the mod joins a server with the mod | Plays | Refused about 1 s after getting in: vanilla `Error(3)` ("Incompatible version" in their menu), disconnected 4 s later through vanilla's kick list; Warning with name and platform id in the server log |
+| Player without the mod joins a server with the mod | Plays | Refused about 1 s after getting in: the framework's reason line, then vanilla `Error(3)` ("Incompatible version" in their menu, with "MC mods: - Breeding Star Inheritance: this server requires it ..." when their game has another MC mod that is made to run on both the server and the players), disconnected 4 s later through vanilla's kick list; Warning with name and platform id in the server log |
 | Same, `AllowPlayersWithoutMod` on | Plays | Plays; Warning in the server log; their simulated births are vanilla, they are never farmers |
 | `AllowPlayersWithoutMod` switched from on to off with such players online | n/a | Every ready player is checked again: those whose game does not run the mod (not installed, turned off, another network version) are refused about 1 s later |
 | `AllowPlayersWithoutMod` switched from off to on | n/a | Nobody is checked again; a refusal already sent still completes |
@@ -1110,6 +1123,25 @@ request or change what the player sees.
     changed, so the network version stays 1. The mod's own multiplayer self-tests that turned the client's copy off
     (`breeding.mp.off-stays`, `breeding.mp.off-push`) now switch the server's `AllowPlayersWithoutMod` on first; the
     refusal itself is proven by the probe's `probe.mp.off.<GUID>` test (scenario `each-off`).
+28. **The refusal screen names the mod** (0.2.1, framework change for every MC mod that refuses players, 2026-10-16;
+    framework fixes 2026-10-17). Vanilla's `ErrorVersion` carries no mod name, so a refused player could not tell
+    which mod to install or turn on. `PlayerCheck.Refuse` now calls `NetworkGate.Refuse(peer)`, which sends one
+    reason line (`MC.Framework.Refused`, 3.8 table) before the same vanilla `Error(3)`; decision 23's path is
+    otherwise unchanged (same message, same kick list and delays). The player's game shows the line under "MC mods:"
+    on the "Incompatible version" screen when it has at least one MC mod that is made to run on both the server and
+    the players (any mod a server can refuse it for, or Sleep Through the Day; the server does not need to have that
+    mod). Vanilla games ignore the unknown RPC, and a game whose MC mods are all client-side shows only "Incompatible
+    version". With Jotunn on the server and on the player's game, Jotunn's window shows the same lines under "Failed
+    Connection:"; with Jotunn only on the player's game, the vanilla panel shows them. When the server sent a line,
+    the block shows only the server's lines. When it sends no line (a refusal that is not about an MC mod, or a
+    server with an older version of the MC mods), the block lists what the player's own game noticed while connected
+    (an MC mod turned off while the server has it on, or a server copy whose version cannot play with theirs), which
+    may not be why they were refused. Only the first MC mod that refuses a player sends its line (the others skip a
+    peer already in the kick list); once that one is fixed, the next join names the next one. The notes are kept per
+    connection, told by the `ZRpc` object (the 2026-10-17 run showed a Spyglass line from an earlier connection on
+    this mod's screen while the framework still told connections apart by hash). No RPC, payload or ZDO key of this
+    mod changed: the network version stays 1. Details: `docs/modding/framework.md`, "Who needs to install it, and
+    multiplayer".
 
 Other implementation details that differ from the first version of this design (all technical, no behaviour change
 the player sees):
@@ -1258,11 +1290,12 @@ both games; B gets Farming by `raiseskill` in a single-player world before joini
 | M13 | 3.9.1 step 3 (optional) | B without the mod closes its game the moment the loading screen appears, two or three times (a race with the 1 s check): each time A's log has either nothing from this mod or the `Refused` line, never an error. Turning the mod off during the 1 s wait (step 5, cancel) is too short to test by hand. |
 | M14 | 3.9.2 step 1, 3.9.1 step 1 (optional) | Password host; B joins with `Enabled = false` and turns it on in its config file at the password prompt: not refused; once in, Active, B's server settings line with A's values, births end with `server settings`; no error. |
 | M17 | Decision 27 | Defaults; B, connected with the mod on, turns it off: B's withdraw line, about 1 s later back at the main menu with "Incompatible version"; A's log: the framework's "turned ... off on their game" line and the `Refused` Warning with the reason "has the mod turned off". B turns it on in the main menu and joins again: stays. |
-| M18 | Decision 27 | Defaults; B joins with `Enabled = false`: refused as M07, without the framework's "connected without" Warning, reason "has the mod turned off". (Another network version is refused the same way; only version 1 exists, so it cannot be tested yet.) |
+| M18 | Decision 27 | Defaults; B joins with `Enabled = false`: refused as M07, without the framework's "connected without" Warning, reason "has the mod turned off". (Another network version is refused the same way: a test build with `-p:ModNetworkVersion=99 -p:Version=0.0.9`, see `TESTING.md` M20.) |
 | M19 | Decision 27 | `AllowPlayersWithoutMod = true`: B joins with the mod off and stays (Warning with the reason); B turns it on while connected: Active, settings line, A's Debug "allowed" line; off again: stays, Warning again; A sets the setting back to `false` while B has it off: B refused about 1 s later. |
 
-M15 (a birth decided on another game than the conception) and M16 (the server's settings arriving while a client's
-copy is off) were added after this table was written and are described in `TESTING.md` only.
+M15 (a birth decided on another game than the conception), M16 (the server's settings arriving while a client's
+copy is off) and M20 (the refusal screen names the mod, decision 28) were added after this table was written and are
+described in `TESTING.md` only.
 
 Cross-mod:
 

@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Swim dive` |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` and `assembly_utils` in `.ref/` (Character, Player, PlayerController, GameCamera, WaterVolume, Floating, EnvMan, SEMan, SE_Stats, ZInput, Humanoid); research briefs of 2026-10-01 (swim physics and input, under-water visuals, framework patterns); sources of BetterDiving (Apache-2.0), Dive In and UnderTheSea (GPL-3.0, read for ideas only), Crystal's Underwater, Aegir, Improved Swimming and ImpactfulSkills read on GitHub (2026-10-01); prefab values measured by the in-world self-tests (2026-10-01) |
-| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (`dive.network`, `dive.logic`, `dive.pending`, `dive.dive`; an earlier run failed one `dive.dive` check, Crouch + Jump held at the surface drained after a wave, fixed by D24); not yet tested by hand in game. v0.1.1 (2026-10-08): storm-wave fix (D25) after the storm-wave self-test failed on 0.1.0; builds in Debug and Release, self-tests not run on it yet |
+| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (`dive.network`, `dive.logic`, `dive.pending`, `dive.dive`; an earlier run failed one `dive.dive` check, Crouch + Jump held at the surface drained after a wave, fixed by D24); not yet tested by hand in game. v0.1.1 (2026-10-08): storm-wave fix (D25) after the storm-wave self-test failed on 0.1.0; its self-tests passed on 2026-10-13 (game 1.0.17, in-world and with a dedicated server). v0.1.2 (2026-10-16): the join check refuses through `NetworkGate.Refuse`, so the refused player's "Incompatible version" screen names the mod, the reason and what to do (section 4.3); the framework fix of 2026-10-17 (only the server's lines when it sent any, no line left from an earlier connection, new line texts) belongs to the same version and has not been run in game yet (TESTING.md M10, M11) |
 
 ## Goal
 
@@ -347,6 +347,9 @@ fly, local player present. Held while the local player is teleporting.
 
 - `MC.Exploration.Swimming.Dive.SettingsRequest` (int layout, client → server) and
   `MC.Exploration.Swimming.Dive.Settings` (ZPackage `DiveRules` layout 1, server → client).
+- Framework RPC `MC.Framework.Refused` (string `<mod name>\t<line>`, server → client, since 0.1.2): sent by
+  `NetworkGate.Refuse` just before the vanilla `Error` RPC when the join check refuses a player (section 4.3). A game
+  without a listener ignores it, so it needs no network version change.
 - No other RPC, no ZDO key, no prefab, nothing saved. `ModNetworkVersion` 1 (bump with the rules layout).
 
 ### 4.3 Server settings and join check
@@ -359,7 +362,20 @@ fly, local player present. Held while the local player is teleporting.
 - Pending: a client of a server uses `DiveRules.Pending` (no dive) until the server's rules arrive; rules belong to
   the `ZNet` session they came on.
 - `PlayerCheck` (verbatim copy): refuse after 1 s grace players whose game is not `PeerCompatible` (no mod, off, other
-  network version) with vanilla "Incompatible version", unless `AllowPlayersWithoutMod`.
+  network version), unless `AllowPlayersWithoutMod`. Since 0.1.2 the refusal goes through `NetworkGate.Refuse(peer)`:
+  first the reason line for the player's screen (`MC.Framework.Refused`: missing, other version with both version
+  numbers, or turned off / cannot run, each with what to do), then vanilla `Error(ErrorVersion)` ("Incompatible
+  version"). The player's game adds an "MC mods:" block to that screen (framework `RefusalNotes`) when it has at least
+  one Both MC mod, which the server does not need to have; a game whose MC mods are all client-side shows only
+  "Incompatible version". The block shows the server's lines when it sent any. When it sent none (a refusal that is
+  not about an MC mod, or a server with an older version of the MC mods), it shows what the player's own game noted
+  while connected (any MC mod turned off while the server's is on, or a server copy whose network version cannot talk
+  to its own), which may not be why it was refused. Only the first MC mod that refuses a player sends its line (the
+  other checks skip a player already being kicked), so when a server refuses a player for several MC mods, the screen
+  names the first one that refused them; once that one is fixed, the next join names the next one. With Jotunn on the
+  server and on the player's game, Jotunn's window shows the block under "Failed Connection:"; with Jotunn only on the
+  player's game, the vanilla panel does. Details: `docs/modding/framework.md`, "Who needs to install it, and
+  multiplayer".
 - `ModMultiplayerNotes`: "Install it on the server (or the host) and on every player's game. Diving changes what
   players can do in water, so the server refuses players who do not have the mod, have it turned off or have another
   version of it (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the
@@ -539,7 +555,9 @@ Crouch a moment before Jump and short taps of Crouch in a storm).
 ### Multiplayer
 
 M01 server rules, M02 refused / allowed, M03 how others see a diver (hand-off), M04 other version / turned off, M05
-server without the mod, M06 two divers, M07 host, M08 creature owned by another game.
+server without the mod, M06 two divers, M07 host, M08 creature owned by another game, M09 server turns the mod off
+while a player is under water. Added with 0.1.2: M10 the refusal screen names the mod (turned off, other version,
+missing), M11 only the mod that refused is listed.
 
 ### Cross-mod
 
@@ -633,3 +651,9 @@ on, Exponential; live dive: 1.6 m/s average descent, 6 stamina per second while 
   diver deep (a deep tick there now fails). T32 reset, T34 new. Not run in game yet. Not changed and seen on the way:
   a dive that starts with Crouch and Jump pays one physics tick of swim drain (about 0.12 stamina), because the own
   speed starts from the body's speed and counts as moving for that one tick.
+- Refusal screen (0.1.2, 2026-10-16; framework fix 2026-10-17): `PlayerCheck.Refuse` calls `NetworkGate.Refuse`
+  instead of sending the vanilla `Error` RPC itself (section 4.3). Nothing else in the mod changed: no setting, no
+  network change, network version still 1. Tests: M10 (turned off; other version: a test copy built with
+  `-p:ModNetworkVersion=99 -p:Version=0.0.9`, so the line names two different versions; missing: a game without the
+  mod that keeps another Both MC mod) and M11 (a mod the server lets in is not listed when another mod refuses);
+  `probe.mp.off.MC.Exploration.Swimming.Dive` and `probe.refusal` check the turned-off line and the block.

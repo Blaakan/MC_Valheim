@@ -5,10 +5,10 @@
 | Mod | Tower Shield Wall |
 | GUID / project | `MC.Combat.Shields.TowerWall` (`src/Combat/Shields.TowerWall/`, root namespace `MC.Combat.ShieldsTowerWallMod`, package `ShieldsTowerWall`) |
 | Category / scope | Combat / Revamp |
-| Side | Both: the server (or host) and every player install it (user rule for mods that change the experience); multiplayer Compatible; network version 3 (own RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, rules layout 3 since 0.2.0, plus the framework's `<guid>.Hello` / `<guid>.HelloAck` / `<guid>.HelloState`); no ZDO keys |
+| Side | Both: the server (or host) and every player install it (user rule for mods that change the experience); multiplayer Compatible; network version 3 (own RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, rules layout 3 since 0.2.0, plus the framework's `<guid>.Hello` / `<guid>.HelloAck` / `<guid>.HelloState` and, since 0.2.1, its refusal line `MC.Framework.Refused`); no ZDO keys |
 | Sheet idea | `Better tower shields` (`<ModIdea>` in the csproj) |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim` in `.ref/`; item, animator, creature and status-effect data dumped at runtime from a real world (Debug DataDump self-test, 2026-09-29); other shield mods' sources and pages read on 2026-09-29 (CaptainValheim, SecondaryAttacks, ReliableBlock and ReliableBlockRebuilt, Combat Adjustments, WeaponArts, ShieldMeBruh on GitHub; Goo's Combat Overhaul, ZenCombat, ShieldBash, Make Tower Shields Great Again on Thunderstore); design reviewed against `.ref` on 2026-09-30, and aligned the same day with this run's shared changes (`NetworkGate` peer state, `ItemKinds` shield rule); the user's feedback after the first in-game test (build `3cda33b+dirty`) applied on 2026-09-30, with the runtime facts of that day's in-world run (all self-tests passed; their NOTE lines) |
-| Status | Implemented (v0.2.0 code: tower shields from other mods by their data, 2.0.2 and decisions 36-39), in-game testing; bash reworked after the first in-game test (decisions 30-34, stage 8 of section 10), then reviewed (decision 35, stage 9). Section 10 holds the implementation notes; its short list of deviations closes the section |
+| Status | Implemented (v0.2.1: a refused player's "Incompatible version" screen names the mod, the reason and what to do, through the framework's `NetworkGate.Refuse` (4); v0.2.0: tower shields from other mods by their data, 2.0.2 and decisions 36-39), in-game testing; bash reworked after the first in-game test (decisions 30-34, stage 8 of section 10), then reviewed (decision 35, stage 9). Section 10 holds the implementation notes; its short list of deviations closes the section |
 
 ## Goal
 
@@ -1195,23 +1195,30 @@ Goal). Decision 35: from the review of that change (stage 9).
 | Back-slot look | the observer's game, from its own ObjectDB prefab |
 | Join check, settings | the server (dedicated or host) |
 
-**RPCs** (network version 2). The mod's own two are a copy of MC Forge Idol Upgrades' `ServerRules` and only carry
+**RPCs** (network version 3). The mod's own two are a copy of MC Forge Idol Upgrades' `ServerRules` and only carry
 the rules sync:
 
 - client → server `MC.Combat.Shields.TowerWall.SettingsRequest` (int layout) after the handshake
   (`ZNet.RPC_PeerInfo` postfix) and when the client's copy turns on while connected;
-- server → client `MC.Combat.Shields.TowerWall.Settings` (`ZPackage`, layout 2): `Towers` (string),
-  `BlockArmorMultiplier`, `BlockForcePercent`, `CarrySlowPercent`, `BraceSlowPercent`, `BraceStaggerResistPercent`,
-  `BraceKnockbackResistPercent`, `BlockUnblockableAttacks`, `BashAnimation` (int: 0 ShieldPunch, 1 OtherPunch, 2 Kick,
-  3 Custom), `BashCustomTrigger` (string), `BashAnimationSpeed`, `BashStamina`, `BashCooldown`, `BashStagger`,
-  `BashStaggerLock`, `BashKnockback`, `BashRange`, `BashAngle`; sent as the answer, again to every ready player with
-  the mod 0.5 s after the server's last settings change and when its copy turns on. Layout 1 (the first test builds:
-  with `ShieldUp`, without the speed and the cooldown) is refused as an unknown layout; the network version rose with
-  it, so such a build is refused at join (below) instead of waiting for rules it cannot read.
+- server → client `MC.Combat.Shields.TowerWall.Settings` (`ZPackage`, layout 3): the layout number (int), `Towers`
+  (string), `BlockArmorMultiplier`, `BlockForcePercent`, `CarrySlowPercent`, `BraceSlowPercent`,
+  `BraceStaggerResistPercent`, `BraceKnockbackResistPercent`, `BlockUnblockableAttacks`, `BashAnimation` (int:
+  0 ShieldPunch, 1 OtherPunch, 2 Kick, 3 Custom), `BashCustomTrigger` (string), `BashAnimationSpeed`, `BashStamina`,
+  `BashCooldown`, `BashStagger`, `BashStaggerLock`, `BashKnockback`, `BashRange`, `BashAngle`, then `AutoTowers`
+  (bool) and `ExcludedTowers` (string), the two appended in layout 3 (0.2.0, 2.0.2); sent as the answer, again to
+  every ready player with the mod 0.5 s after the server's last settings change and when its copy turns on. Layout 1
+  (the first test builds: with `ShieldUp`, without the speed and the cooldown) and layout 2 (0.1.x: without
+  `AutoTowers` and `ExcludedTowers`) are refused as unknown layouts; the network version rose with each, so such a
+  build is refused at join (below) instead of waiting for rules it cannot read.
 - Framework handshake (`NetworkGate`, shared by every Both mod, not written by this mod): client → server
   `<guid>.Hello` (network version, release version, and whether the client's own copy is on), server → client
   `<guid>.HelloAck` (the server's state, again whenever it changes), client → server `<guid>.HelloState` (`on` / `off`,
   when the client's copy turns on or off while connected). The join check reads it (below).
+- Framework refusal line (`NetworkGate.Refuse`, since 0.2.1, not written by this mod): server → client
+  `MC.Framework.Refused` (string `"<mod name>\t<line>"`: what is wrong and what to do), sent just before vanilla's
+  `Error` RPC when the join check refuses a player (below). Every Both MC mod on the player's game registers a handler
+  for it (`RefusalNotes`; the notes live in one slot shared by every copy); a game without one ignores it (vanilla
+  drops an RPC it has no handler for), so it is not part of the network version.
 - The client refuses an unknown layout (keeps the last good rules; with none yet, it stays pending, below), clamps
   values to the config ranges (Warning), and uses the server's rules only for that `ZNet` session. Single player, host
   and dedicated server use their own config.
@@ -1230,7 +1237,8 @@ the rules sync:
 - **Rules sync**: tower data is written into items, so a change of the rules in force must be pushed into them. The
   generation counter (2.0) is raised on every change; `TowerSync` applies it 0.5 s after the last change (2.0).
 - **ZDO keys: none.** Nothing is stored on items, creatures or the player.
-- `ModNetworkVersion` 2 (bump when the RPC names or the `Settings` layout change; 1 until layout 2, 2026-09-30).
+- `ModNetworkVersion` 3 (bump when the RPC names or the `Settings` layout change; 1 until layout 2, 2026-09-30; 2
+  until layout 3, 0.2.0, 2026-10-16).
 
 **Server settings list**: every setting except `Enabled` (framework) and `AllowPlayersWithoutMod` (read by the
 server only).
@@ -1238,17 +1246,32 @@ server only).
 **Join check** (`PlayerCheck`, copy of Forge Idol Upgrades' check, with the verdict taken from the framework): the
 server (dedicated or host, while its copy is active) waits 1 s after a peer is ready, then asks
 `NetworkGate.PeerCompatible(peer)`: the player has the mod, the same `ModNetworkVersion`, and has not turned it off on
-their game (a copy that failed to start counts as off). A player who is not compatible is refused: vanilla `Error` RPC
-with `ErrorVersion` (their game shows "Incompatible version"; disconnected 4 s later through vanilla's kick list),
+their game (a copy that failed to start counts as off). A player who is not compatible is refused through
+`NetworkGate.Refuse(peer)` (since 0.2.1; before, a bare vanilla `Error` RPC): first the framework's
+`MC.Framework.Refused` line ("this server requires it (version X) and your game does not have it. Install it.", "the
+server has version X and your game Y, and they cannot play together. Install version X.", or "it is turned off or
+cannot run in your game, and this server requires it. Turn it on in Esc > MC Mods (or F1 when a configuration manager
+is installed; ...) and join again."), then vanilla's `Error` RPC with `ErrorVersion` (their game shows "Incompatible
+version", with "MC mods:" and that line below it); the peer is disconnected 4 s later through vanilla's kick list,
 and the server log names the reason from `NetworkGate.PeerProblem(peer)` ("does not have the mod", "has another
-version of the mod (network version n, the server has 2)", "has the mod turned off"). With `AllowPlayersWithoutMod`
-on, such a player is let in with a Warning naming the same reason. `PlayerCheck.Start` subscribes to
-`NetworkGate.PeerStateChanged` and `Stop` unsubscribes; the handler calls `Schedule(peer)` with the same 1 s grace, so
-a player who turns the mod off while connected is refused about a second later (and one who turns it back on within
-that second is not). Never the host's own player (not a peer). When the server's own copy turns on again,
-`PlayerCheck.Start` checks every connected player after the grace. A client whose copy went inactive only because the
-server's copy was off still reports "on" (the framework reports the client's own state, not the network verdict), so
-it is not refused when the server's copy comes back.
+version of the mod (network version n, the server has 3)", "has the mod turned off"). The "MC mods:" block needs at
+least one MC mod in the player's game that is made to run on both the server and the players (any mod a server can
+refuse them for, or Sleep Through the Day: the copies that register the line's handler and patch the error screen);
+the server does not need to have that mod. A game whose MC mods are all client-side shows only "Incompatible
+version". With Jotunn on the server and on the player's game, Jotunn's window shows the same lines under
+"Failed Connection:"; with Jotunn only on the player's game, the vanilla panel shows them. The kick list also makes
+every other refusing MC mod skip that peer, so when a server refuses a player for several MC mods, the screen names
+the first one that refused them; once that one is fixed, the next join names the next one. A server line wins on the
+player's screen. When the server sends no line (a refusal that is not about an MC mod, or a server with an older
+version of the MC mods), the screen lists what the player's own game noticed while connected: an MC mod turned off
+while the server has it on, or a server copy whose version cannot play with theirs; that may not be why they were
+refused. With `AllowPlayersWithoutMod` on, such a player is let in with a Warning naming the same reason.
+`PlayerCheck.Start` subscribes to `NetworkGate.PeerStateChanged` and `Stop` unsubscribes; the handler calls
+`Schedule(peer)` with the same 1 s grace, so a player who turns the mod off while connected is refused about a second
+later (and one who turns it back on within that second is not). Never the host's own player (not a peer). When the
+server's own copy turns on again, `PlayerCheck.Start` checks every connected player after the grace. A client whose
+copy went inactive only because the server's copy was off still reports "on" (the framework reports the client's own
+state, not the network verdict), so it is not refused when the server's copy comes back.
 
 **Hand-off and mixed cases:**
 
@@ -1283,7 +1306,7 @@ in multiplayer the server's (or host's) value is used by everyone (4).
 | General | Enabled | `true` | on/off | framework | Turn the mod on or off. Takes effect immediately. |
 | General | Status | — | — | — | Written by the mod: whether it is active, and if not, why. |
 | General | AllowPlayersWithoutMod | `false` | on/off | server only | Used only by the server (or the host). Off: a player whose game does not have this mod, has it turned off, or has a version that cannot talk to the server's, is refused about a second after joining, or after turning it off ("Incompatible version"), so everyone plays with the same tower shields. On: such players may play; for them tower shields are normal. |
-| Tower shields | AutoTowers | `true` | on/off | yes | On: every shield that cannot parry at all (parry bonus 0) is a tower shield, also shields added by other mods, except copies only creatures carry. Off: only the shields named in Towers (0.2.0, 2.0.2). |
+| Tower shields | AutoTowers | `true` | on/off | yes | On: every shield with a parry bonus below 1 (it cannot parry at all; the normal game's tower shields have 0) is a tower shield, also shields added by other mods, except copies only creatures carry. The iron square shield (parry bonus 1) is left out: add it to Towers if you want it. Off: only the shields named in Towers (0.2.0, 2.0.2; wording made exact in 0.2.1). |
 | Tower shields | Towers | `ShieldWoodTower:6, ShieldBoneTower:8, ShieldIronTower:12, ShieldSerpentscale:15, ShieldBlackmetalTower:20, ShieldFlametalTower:28, ShieldGoldTower:32` | shield prefab names; bash damage 0-200 | yes | More tower shields and the bash damage of each (prefab names, as used by the spawn command), each with the blunt damage of its bash after a colon; without a number (and for shields found by AutoTowers) the damage comes from the shield's block armor on the vanilla towers' scale (0.2.0; 10 before). Only shields are accepted; a shield that can parry loses its parry. |
 | Tower shields | ExcludedTowers | (empty) | shield prefab names | yes | Shields that are never tower shields, even when AutoTowers finds them or Towers names them (0.2.0). |
 | Tower shields | BlockArmorMultiplier | `2.5` | 1-10 | yes | Tower shield block armor is multiplied by this (also the armor gained per quality level). |
@@ -1426,7 +1449,7 @@ later): the plugins below when present (`BepInEx.Bootstrap.Chainloader.PluginInf
 ### 7.1 Files
 
 - `MC.Combat.Shields.TowerWall.csproj`: add `<ModIdea>Better tower shields</ModIdea>`,
-  `<ModNetworkVersion>2</ModNetworkVersion>` (1 until the rules layout 2), the sentences of 4 in
+  `<ModNetworkVersion>3</ModNetworkVersion>` (1 until the rules layout 2, 2 until layout 3 in 0.2.0), the sentences of 4 in
   `ModMultiplayerNotes`.
 - `Plugin.cs`: config binding (5); `SettingChanged` on any rule → `ServerRules.OwnChanged()`; an
   `Application.quitting` flag; `OnActivated` / `OnDeactivated` (7.3).
@@ -1668,11 +1691,11 @@ names what stands in the lane in its NOTE.
   is unchanged 1 s later, animator speed 1. Mid-swing: after the attack state is reached (the swing slowed, before the
   hit), deactivate → the animator speed is the clip's own again at once, no hit, speed 1 after the clip. (The internal
   functions `OnActivated` / `OnDeactivated` use; the real switch is an in-game test.)
-- **`tower.rules`**: rules wire round trip (layout 2, the new fields too); clamping of out-of-range values; unknown
-  layout and layout 1 refused; `BashAnimation` offers exactly ShieldPunch, OtherPunch, Kick, Custom (default
-  ShieldPunch), its own clamp turns `ShieldUp` into `ShieldPunch`, `kick` into `Kick` and ` CUSTOM ` into `Custom`, and
-  an unknown name is no name (pure lookup: the clamp would log its Warning); a changed cooldown, speed or lock changes
-  the rules key;
+- **`tower.rules`**: rules wire round trip (layout 3: the bash speed, cooldown and stagger lock, `AutoTowers` and
+  `ExcludedTowers` too); clamping of out-of-range values; unknown layouts, layout 1 and layout 2 refused;
+  `BashAnimation` offers exactly ShieldPunch, OtherPunch, Kick, Custom (default ShieldPunch), its own clamp turns
+  `ShieldUp` into `ShieldPunch`, `kick` into `Kick` and ` CUSTOM ` into `Custom`, and an unknown name is no name (pure
+  lookup: the clamp would log its Warning); a changed cooldown, speed or lock changes the rules key;
   single player never takes rules from a peer; the generation rises on a different received rule set, not on an
   identical one, and on an own change only while not using the server's; a `TestRules` change reaches a tower's block
   armor about 0.5 s later;
@@ -1850,7 +1873,8 @@ unverified.
 - M13 **Two tower players (G6)**: A and B both bash the same `Draugr` in turn: it is not kept staggered (the 8 s lock
   limit applies to both).
 - M14 **Other network version refused (G8)**: build a copy with another network version (`dotnet build
-  src/Combat/Shields.TowerWall -p:ModNetworkVersion=4 -p:DeployToGame=false`, then rebuild without the override) and
+  src/Combat/Shields.TowerWall -p:ModNetworkVersion=4 -p:Version=0.0.9 -p:DeployToGame=false`, then rebuild without
+  the overrides; the other version number lets the refusal line name two different versions) and
   give its DLL to the friend: they are refused ("Incompatible version") about a second after joining, and the server
   log says they have another version of the mod (network version 4, the server has 3). With
   `AllowPlayersWithoutMod = true` they may play: their MC Mods panel says the versions cannot talk to each other, and
@@ -1911,7 +1935,7 @@ unverified.
 15. **One heavy stagger per bash** (decision 35): in a group, only the creature you face is staggered by a bash; the
     others take its damage and push. Fine, or should the tower keep staggering every creature in its arc (crowd
     control), with the buckler comparison then true only one creature at a time?
-16. **Tower shields from other mods** (decisions 36-39): every shield that cannot parry at all is a tower, creature-only
+16. **Tower shields from other mods** (decisions 36-39): every shield with a parry bonus below 1 is a tower, creature-only
     copies stay normal, bash damage from block armor. Excluding a tower that the default `Towers` names is silent (no
     "listed and excluded" warning): fine?
 

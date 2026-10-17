@@ -34,6 +34,11 @@ foreach ($f in $files) {
 
     Write-Host ''
     Write-Host "$title  ($($f.FullName.Substring($root.Length + 1)))" -ForegroundColor Cyan
+    # Me say when mod next to this TESTING.md is left out of release: its tests do not hold up the release.
+    foreach ($cs in @(Get-ChildItem $f.DirectoryName -Filter '*.csproj' -File)) {
+        $si = Get-ModShipInfo $cs
+        if ($si.Ship -eq 'false') { Write-Host "  Not shipped (ModShip false, not a release gate): $($si.ShipNote)" -ForegroundColor Yellow }
+    }
     $lastSection = $null
     foreach ($it in $shown) {
         if ($it.Section -ne $lastSection) { Write-Host "  [$($it.Section)]"; $lastSection = $it.Section }

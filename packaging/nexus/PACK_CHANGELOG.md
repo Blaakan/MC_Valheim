@@ -1,20 +1,50 @@
 # Changelog
 
+## 1.0.0
+
+First release. The pack holds 27 mods, each at its first release, 1.0.0:
+
+- Building: Switchable Lights.
+- Combat: Creature Morale, Crossbow Stays Loaded, Dual Wielding, Sneak Ambush, Tower Shield Wall, Trinkets on Demand,
+  Weapon Moveset.
+- Crafting: Batch Station Feeding, Forge Idol Upgrades, One Click Repair All.
+- Exploration: Creature Kill and Tame Counts, Deep North Awakening, Distant Horizons, Encyclopedia, Music Instruments,
+  Sailing Skill, Sleep Through the Day, Spyglass, Swim Dive.
+- Farming: Breeding Star Inheritance, Cultivator Replant, Fishing Fight, Harpoon Hooks Tames.
+- UX: Crafting Search and Sort, Loot Pickup Filter, Sort Chest.
+
+Cheated Tag Remover is not in the pack: Valheim 1.0.20 changed how the game tags cheated objects and items, and the
+mod waits for a rework.
+
+## 0.4.5
+
+- The refusal screen (0.4.4) no longer keeps a line from an earlier connection, and when the server says why it
+  refused you, the screen shows only the server's line (a mod the server let in is no longer listed). The "turned off"
+  line also says where to turn the mod on when a configuration manager hides the MC Mods button (F1). In every mod a
+  server can refuse you for, and in Sleep Through the Day 0.1.2, which never gets you refused but shows this screen for
+  the other mods.
+- Music Instruments 0.4.3: closing the song window with B on a controller no longer makes the character jump.
+- Spyglass 0.1.3: dying with the spyglass raised shows the normal death view at once.
+
 ## 0.4.4
 
 - When a server refuses you because of an MC mod, the "Incompatible version" screen now lists that mod under
-  "MC mods:" with the reason (your game does not have it, has another version, or has it turned off) and what to do;
-  with Jotunn installed, its mod compatibility window shows the same lines. In every mod a server can refuse you for:
-  Switchable Lights 0.2.1, Creature Morale 0.1.2, Tower Shield Wall 0.2.1, Sneak Ambush 0.1.2, Trinkets on Demand
-  0.2.1, Dual Wielding 0.1.1, Weapon Moveset 0.1.1, Forge Idol Upgrades 0.2.1, Deep North Awakening 0.1.2, Music
-  Instruments 0.4.2, Sailing Skill 0.1.2, Swim Dive 0.1.2, Spyglass 0.1.2, Breeding Star Inheritance 0.2.1,
-  Cultivator Replant 0.1.2, Fishing Fight 0.1.2.
+  "MC mods:" with the reason (your game does not have it, has another version, or has it turned off) and what to do.
+  With Jotunn on the server and on your game, Jotunn's "Failed Connection:" window shows the same lines. The screen
+  names the first mod that refused you: once that one is fixed, the next join names the next one. Your game needs at
+  least one MC mod made to run on both the server and the players (any mod a server can refuse you for, or Sleep
+  Through the Day); the server does not need to have that mod. With only client-side MC mods you see the game's own
+  text. In every mod a server can refuse you for: Switchable Lights 0.2.1, Creature Morale 0.1.2, Tower Shield Wall
+  0.2.1, Sneak Ambush 0.1.2, Trinkets on Demand 0.2.1, Dual Wielding 0.1.1, Weapon Moveset 0.1.1, Forge Idol Upgrades
+  0.2.1, Deep North Awakening 0.1.2, Music Instruments 0.4.2, Sailing Skill 0.1.2, Swim Dive 0.1.2, Spyglass 0.1.2,
+  Breeding Star Inheritance 0.2.1, Cultivator Replant 0.1.2, Fishing Fight 0.1.2.
 
 ## 0.4.3
 
-- Tower Shield Wall 0.2.0: tower shields from other mods are found automatically (every shield that cannot parry at
-  all, for example Warfare's Bronze, Chitin and Carapace tower shields), with a bash damage that follows their block
-  armor; new settings `AutoTowers` and `ExcludedTowers`.
+- Tower Shield Wall 0.2.0: tower shields from other mods are found automatically (every shield with a parry bonus
+  below 1, so it cannot parry at all, for example Warfare's Bronze, Chitin and Carapace tower shields; the iron square
+  shield, parry bonus 1, is left out), with a bash damage that follows their block armor; new settings `AutoTowers`
+  and `ExcludedTowers`.
 
 ## 0.4.2
 

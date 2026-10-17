@@ -8,9 +8,10 @@
 | Side | Both: the server (or the host) and every player install it, the server refuses players without it, with it turned off or with another network version (3.6); multiplayer Compatible; network version 1 (RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, no ZDO key of its own) |
 | Sheet idea | `Torches ON/OFF only, no fuel` |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` in `.ref/`; every `Fireplace` prefab dumped at runtime (Unity 6000.0.75f1) on 2026-09-29; dedicated-server code read in the local 1.0.15 server build; other mods' sources read on GitHub (2026-09-29) |
-| Status | Implemented (0.2.0). In-world self-tests passed on 0.1.0 (`lights.torch`, `lights.candle`, `lights.campfire`) and have not been run on 0.2.0 yet; in-game tests pending |
+| Status | Implemented (0.2.1). In-world self-tests (`lights.torch`, `lights.candle`, `lights.campfire`) passed on 0.1.0 and on 0.2.0 (2026-10-13, game 1.0.17); the multiplayer probe `probe.mp.off.MC.Building.Lights.Switchable` passed on 0.2.0 (2026-10-16) and on 0.2.1 (2026-10-17, before the framework's screen fixes); the 0.1.0 hands-on tests passed (issue #12); the in-game items that 0.2.0 and 0.2.1 changed or added are pending |
 | Changes after the first pause (user, 2026-09-29) | required on the server and every player (refusal + server list); braziers and every fire that can cook removed from the lights (decision 2) |
 | 0.2.0 (user decision, 2026-10-08) | player check upgraded to Swim Dive's: a player who has the mod turned off, or another network version of it, is refused too, also when they turn it off while connected (decision 7) |
+| 0.2.1 (framework change, 2026-10-16; fixes 2026-10-17) | the refused player's "Incompatible version" screen names the mod and the reason: the refusal goes through `NetworkGate.Refuse` (3.6, decision 8) |
 
 ## Goal
 
@@ -174,8 +175,11 @@ simulates lights (1.4); its job is to check players and hand out its list:
 - **Player check** (`PlayerCheck`, since 0.2.0 a copy of Swim Dive's; 0.1.0 used the older copy of MC Breeding's,
   which only looked at whether the mod was installed): the server (dedicated or host) waits 1 s after a player is
   ready, then refuses a player whose copy is not compatible (`NetworkGate.PeerCompatible`: the game answered the
-  framework handshake, with the same network version, and its own side is not turned off) with the vanilla "Error"
-  RPC and ErrorVersion: their game shows "Incompatible version"; the socket is closed 4 s later. The log line carries
+  framework handshake, with the same network version, and its own side is not turned off) through
+  `NetworkGate.Refuse` (since 0.2.1, decision 8): the framework RPC `MC.Framework.Refused` (server to client,
+  `"<mod name>\t<line>"`: what is wrong and what to do) and then the vanilla "Error" RPC with ErrorVersion: their game
+  shows "Incompatible version", with an "MC mods:" block holding that line when their game has at least one MC mod
+  made to run on both the server and the players (decision 8); the socket is closed 4 s later. The log line carries
   the framework's reason (`NetworkGate.PeerProblem`: does not have the mod, has another version, has it turned off).
   **Live re-check:** `PlayerCheck.Start` subscribes to `NetworkGate.PeerStateChanged` (unsubscribed in `Stop`); when a
   connected player turns the mod off or on, that player is scheduled again with the same 1 s grace, so turning it off
@@ -220,8 +224,9 @@ start burning and off lights take fuel. On: flags applied to loaded lights at on
   skipped), and a peer that never answered the handshake is not compatible and gets a reason.
 - The refusal itself needs two games: the generic multiplayer probes (`./tools/Test-Multiplayer.ps1`) cover it
   (`probe.mp.refused`: a player without mods; `probe.mp.off.MC.Building.Lights.Switchable`: turned off while in,
-  then joining with it off; scenario `open-server`: `AllowPlayersWithoutMod` lets a player without mods in). The mod
-  has no multiplayer self-test of its own.
+  then joining with it off, each time with the error screen listing this mod, and no other, as turned off under "MC
+  mods:"; scenario `open-server`: `AllowPlayersWithoutMod` lets a player without mods in). The mod has no multiplayer
+  self-test of its own.
 
 ## 4. Edge cases
 
@@ -256,6 +261,25 @@ start burning and off lights take fuel. On: flags applied to loaded lights at on
    went out for everyone. The check is now Swim Dive's (3.6): not compatible = no mod, turned off, or another network
    version; checked at the join and again whenever a player's state changes. `AllowPlayersWithoutMod` (default false)
    still lets all of them stay. No RPC or ZDO format changed: the network version stays 1.
+8. **The refusal screen names the mod** (0.2.1, framework change for every MC mod that refuses players, 2026-10-16;
+   framework fixes 2026-10-17). Vanilla's ErrorVersion carries no mod name, so a refused player could not tell which
+   mod to install or turn on. `PlayerCheck.Refuse` calls `NetworkGate.Refuse(peer)`: one reason line through
+   `MC.Framework.Refused` (missing: "this server requires it (version X) and your game does not have it. Install
+   it."; other version: "the server has version X and your game Y, and they cannot play together. Install version
+   X."; turned off: "it is turned off or cannot run in your game, and this server requires it. Turn it on in Esc > MC
+   Mods (or F1 when a configuration manager is installed; ...) and join again."), then the same vanilla Error and
+   4 s disconnect as before. The player's game shows the line under "MC mods:" on the "Incompatible version" screen
+   when it has at least one MC mod that is made to run on both the server and the players (any mod a server can
+   refuse it for, or Sleep Through the Day; the server does not need to have that mod). Vanilla games ignore the
+   unknown RPC, and a game whose MC mods are all client-side shows only "Incompatible version". With Jotunn on the
+   server and on the player's game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only
+   on the player's game, the vanilla panel shows them. When the server sent a line, the block shows only the server's
+   lines. When it sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC
+   mods), the block lists what the player's own game noticed while connected (an MC mod turned off while the server
+   has it on, or a server copy whose version cannot play with theirs), which may not be why they were refused.
+   The check skips a peer already in the kick list, so only the first MC mod that refuses a player sends its line;
+   once that one is fixed, the next join names the next one. No RPC or ZDO format of this mod changed: the network
+   version stays 1. Details: `docs/modding/framework.md`, "Who needs to install it, and multiplayer".
 
 ### Added beyond the request
 

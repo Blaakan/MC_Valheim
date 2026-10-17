@@ -5,10 +5,10 @@
 | Mod | Deep North Awakening |
 | GUID / project | `MC.Exploration.DeepNorth.Awakening` (`src/Exploration/DeepNorth.Awakening/`, root namespace `MC.Exploration.DeepNorthAwakeningMod`, package `DeepNorthAwakening`) |
 | Category / scope | Exploration / New |
-| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
+| Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 2. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Deep North revamp` |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` in `.ref/` (PersistentEventSystem, TriggerPersistentEventOnDestroy, Destructible, SpawnSystem, BaseAI, Character, EnvMan, ZoneSystem, ZDOMan, ZRoutedRpc, MessageHud, Terminal, Minimap, WorldGenerator, AltBiomeWorldData); the 1.0.16 asset bundles decoded on 2026-10-01 (the `jotun_invasion` event, `BlackIce_Start`, `BlackIce_Core`, `_SpawnList_DeepNorth`, creature factions); the Valheim wiki and valheim.gaming.tools (2026-10-01); sources of Expand World Data, Spawn That, DropNSpawn, StarLevelSystem, ServersideQoL and World Advancement Progression on GitHub (2026-10-01) |
-| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (all 9 `dn.*` tests; an earlier run failed the live part of `dn.hostility` because the test spawned the two creatures back to back, fixed in the test); two adversarial review rounds (19 + 2 confirmed findings, all fixed); not yet tested by hand in game |
+| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (all 9 `dn.*` tests; an earlier run failed the live part of `dn.hostility` because the test spawned the two creatures back to back, fixed in the test); two adversarial review rounds (19 + 2 confirmed findings, all fixed); not yet tested by hand in game. v0.1.1: the lowered kill target clears an area by itself (D22); the smoke test and its self-tests passed on 2026-10-13 (game 1.0.17, in-world and with a dedicated server; `dn.kallreturn` on a second run alone). v0.1.2 (2026-10-16): the join check refuses through `NetworkGate.Refuse`, so the refused player's "Incompatible version" screen names the mod, the reason and what to do (section 4.3); the framework fix of 2026-10-17 (only the server's lines when it sent any, no line left from an earlier connection, new line texts) belongs to the same version and has not been run in game yet (TESTING.md M11, M12) |
 
 ## Goal
 
@@ -473,12 +473,29 @@ server's console and log).
   `mcdnBand_NatureBand1`).
 - Global key `mc_dn_stones <n>`.
 - Network version 2 (1 = the first build, which followed each area Jotun). Bump on any change to the above.
+- Framework RPC `MC.Framework.Refused` (string `<mod name>\t<line>`, server → client, since 0.1.2): sent by
+  `NetworkGate.Refuse` just before the vanilla `Error` RPC when the join check refuses a player (section 4.3). A game
+  without a listener ignores it, so it needs no network version change.
 
 ### 4.3 Server settings and join check
 
 Copy of Swim Dive: `PlayerCheck` (refuse after 1 s grace unless `AllowPlayersWithoutMod`), `ServerRules` (send
 `AwakeningRules` to every compatible player; a client waiting for them behaves like vanilla: no spawns, no storm, no
 hostility, no trigger skip), `Patches/ZNetPatches.cs`.
+
+Since 0.1.2 the refusal goes through `NetworkGate.Refuse(peer)`: first the reason line for the player's screen
+(`MC.Framework.Refused`: missing, other version with both version numbers, or turned off / cannot run, each with what
+to do), then vanilla `Error(ErrorVersion)` ("Incompatible version"). The player's game adds an "MC mods:" block to
+that screen (framework `RefusalNotes`) when it has at least one Both MC mod, which the server does not need to have; a
+game whose MC mods are all client-side shows only "Incompatible version". The block shows the server's lines when it
+sent any. When it sent none (a refusal that is not about an MC mod, or a server with an older version of the MC mods),
+it shows what the player's own game noted while connected (any MC mod turned off while the server's is on, or a server
+copy whose network version cannot talk to its own), which may not be why it was refused. Only the first MC mod that
+refuses a player sends its line (the other checks skip a player already being kicked), so when a server refuses a
+player for several MC mods, the screen names the first one that refused them; once that one is fixed, the next join
+names the next one. With Jotunn on the server and on the player's game, Jotunn's window shows the block under "Failed
+Connection:"; with Jotunn only on the player's game, the vanilla panel does. Details: `docs/modding/framework.md`,
+"Who needs to install it, and multiplayer".
 
 ### 4.4 Hand-off cases
 
@@ -621,7 +638,9 @@ Setup: devcommands; `spawn` names `BlackIce_Start` (checked in the asset bundles
 `deepnorth_stones`; `pevents list`; `listkeys`. Single player: G1-G11 and E1-E3 one by one; live toggle;
 `Enabled = false` + restart; clean log. Multiplayer: dedicated server with two players; a stone broken by a client;
 a player without the mod refused; AllowPlayersWithoutMod on with a stone broken by that player; area lists to a player
-who joins after Kall; two players entering one area after Kall get one set of Jotun. Cross-mod: Morale (Jotun not afraid), Sneak (area creatures).
+who joins after Kall; two players entering one area after Kall get one set of Jotun; since 0.1.2 the refusal screen
+names the mod (turned off, other version, missing: M11) and lists only the mod that refused (M12). Cross-mod: Morale
+(Jotun not afraid), Sneak (area creatures).
 
 ## 9. Open questions and unverified
 
@@ -650,4 +669,4 @@ who joins after Kall; two players entering one area after Kall get one set of Jo
 
 - How the blizzard looks while a vanilla invasion's own weather is near: invasion weather wins (priority); check in
   game near an invasion that reaches the Deep North border (rare: invasions never start in the Deep North).
-- Multiplayer behaviour (dedicated server, clients, AllowPlayersWithoutMod): TESTING.md M01-M07.
+- Multiplayer behaviour (dedicated server, clients, AllowPlayersWithoutMod): the open M items of TESTING.md (M01-M12).

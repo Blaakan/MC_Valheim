@@ -1,19 +1,33 @@
 # Changelog
 
+## 1.0.0
+
+- First release.
+
 ## 0.2.1
 
-- When a server refuses you because of this mod, the "Incompatible version" screen now says so: it lists
-  Tower Shield Wall under "MC mods:" with the reason (your game does not have it, has another version, or has it turned
-  off) and what to do. With Jotunn installed, its mod compatibility window shows the same lines. A server with
-  this version also sends its reason, so the screen names the mod even when your game does not have it (as
-  long as you have another MC mod).
+- When a server refuses you because of this mod, the "Incompatible version" screen now says so: it lists Tower Shield
+  Wall under "MC mods:" with the reason (your game does not have it, has another version, or has it turned off or
+  cannot run it) and what to do. With Jotunn on the server and on your game, Jotunn's window shows the same lines
+  under "Failed Connection:"; with Jotunn only on your game, the vanilla panel shows them. A server with this version
+  sends its reason, so the screen names the mod even when your game does not have it. This needs at least one MC mod
+  in your game that is made to run on both the server and the players (any mod a server can refuse you for, or Sleep
+  Through the Day); the server does not need to have that mod. A game whose MC mods are all client-side shows only
+  "Incompatible version". When a server refuses you for several MC mods, the screen names the first one that refused
+  you; once that one is fixed, the next join names the next one. When the server sends no line (a refusal that is not
+  about an MC mod, or a server with an older version of the MC mods), the screen lists what your own game noticed
+  while connected: an MC mod turned off while the server has it on, or a server copy whose version cannot play with
+  yours. That may not be why you were refused.
+- The `AutoTowers` description now says exactly which shields it takes: those with a parry bonus below 1 (the iron
+  square shield, parry bonus 1, is left out, as before).
 
 ## 0.2.0
 
-- Tower shields from other mods are found automatically: every shield that cannot parry at all is a tower shield
-  (new setting `AutoTowers`, on by default), for example Warfare's Bronze, Chitin and Carapace tower shields. Shields
-  a server sends after you join are picked up without a restart; changes Jotunn mods make to item data while the
-  game loads are taken into account. Copies that only creatures carry stay normal. The log lists the shields found.
+- Tower shields from other mods are found automatically: every shield with a parry bonus below 1 (it cannot parry at
+  all) is a tower shield (new setting `AutoTowers`, on by default), for example Warfare's Bronze, Chitin and Carapace
+  tower shields. Shields a server sends after you join are picked up without a restart; changes Jotunn mods make to
+  item data while the game loads are taken into account. Copies that only creatures carry stay normal. The log lists
+  the shields found.
 - New setting `ExcludedTowers`: shields that are never tower shields.
 - `Towers` now adds tower shields and sets their bash damage. A tower shield without a number (and every tower
   shield found automatically) gets a bash damage from its block armor, on the same scale as the normal-game towers

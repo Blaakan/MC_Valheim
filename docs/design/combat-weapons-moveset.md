@@ -8,7 +8,7 @@
 | Side | **Both**: the server (or the host) and every player install it; multiplayer Compatible; network version 2 (RPCs `<GUID>.Settings` / `<GUID>.SettingsRequest`, rules layout 2). Every move runs on the attacker's own game (section 4), so the mod is technically client-side; it ships as Both because it changes combat (house rule): the server refuses players without it, with another network version, or with it turned off on their game (the framework's `NetworkGate.PeerCompatible`), and sends its settings to everyone. |
 | Sheet idea | `Weapon revamp` (this mod covers the jump attack and the roll attack; the parry attack and the "more dynamic moveset" line stay under Later) |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` in `.ref/`; player Animator (layers, every parameter, every clip with its length and animation events), every weapon's `SharedData` and `Attack` fields, and the creature and Player prefab values dumped at runtime in a real world on 2026-09-29 (temporary `DataDump.cs` self-test); BepInEx 5 `AcceptableValueList<T>.Clamp` and `ConfigEntry<T>.Value` decompiled from the installed `BepInEx.dll`; other mods read on Thunderstore and GitHub on 2026-09-29; sibling design docs (Dual Wielding, Tower Shield Wall, Sneak Ambush, Creature Morale) read on 2026-09-30 |
-| Status | Implemented (v0.1.0 code), in-game testing (design: adversarial review applied 2026-09-30; aligned on 2026-09-30 with the framework's join-check API and with the cross review of the five combat designs; user feedback after the first in-game test applied 2026-09-30: the roll attack flows out of the roll, Decisions 21-26, with the review fixes of section 10 stage 9; deviations in section 10) |
+| Status | Implemented (v0.1.0 code), in-game testing (design: adversarial review applied 2026-09-30; aligned on 2026-09-30 with the framework's join-check API and with the cross review of the five combat designs; user feedback after the first in-game test applied 2026-09-30: the roll attack flows out of the roll, Decisions 21-26, with the review fixes of section 10 stage 9; deviations in section 10); v0.1.1 (2026-10-16, framework screen fixes 2026-10-17): the join check refuses through `NetworkGate.Refuse`, so the refused player's error screen names the mod, the reason and what to do when their game has an MC mod made to run on both the server and the players (section 4) |
 
 ## Goal
 
@@ -1059,7 +1059,8 @@ its clip. The user's rule is that every roll attack flows out of the roll, the f
 | `<GUID>.HelloState` | client → server | framework (`NetworkGate`): `"on"` / `"off"` | when the client's own copy turns on or off while connected (panel, config, a failed start); the server raises `NetworkGate.PeerStateChanged` |
 | `MC.Combat.Weapons.Moveset.SettingsRequest` | client → server | `int` layout (2) | the client's `RPC_PeerInfo`, and when the client's copy turns on while connected |
 | `MC.Combat.Weapons.Moveset.Settings` | server → client | `ZPackage` `MoveRules` layout 2: `int` layout, `bool` JumpAttack, `bool` RollAttack, `float` Cooldown, 5 `float` (Jump Damage, Stagger, Push, Stamina, AimAngle), 7 `float` (Roll Damage, Stagger, Push, Stamina, Window, FlowStart, FlowBlend), `int` family count (12), 12 `string` jump triggers, 12 `string` roll triggers (family order of table 2.2) | the answer to a request; to every ready player with the mod when the server's settings change (0.5 s after the last change, so a slider drag sends once) and at once when its copy turns on |
-| `Error` (vanilla) | server → client | `int` 3 (`ErrorVersion`) | the join check refuses a player |
+| `MC.Framework.Refused` (framework, since 0.1.1; one name shared by every MC mod) | server → client | `string` `"<mod name>\t<line>"`: the reason and what to do, for the refused player's screen (`RefusalNotes`, registered per connection by every Both MC mod on the player's game; vanilla games ignore it) | `NetworkGate.Refuse`, just before `Error`, when the join check refuses a player |
+| `Error` (vanilla) | server → client | `int` 3 (`ErrorVersion`) | the join check refuses a player (`NetworkGate.Refuse`, right after `MC.Framework.Refused`) |
 
 - **ZDO keys:** none. Nothing is stored on items, players or the world.
 - **`ModNetworkVersion` 2** (1 until the roll flow added two numbers to the rules, Decision 25). Bump when an RPC name or the `MoveRules` layout changes.
@@ -1076,8 +1077,16 @@ its clip. The user's rule is that every roll attack flows out of the roll, the f
   `ZNet.RPC_PeerInfo` postfix schedules a ready peer 1 s later (grace); at the deadline the verdict is
   `NetworkGate.PeerCompatible(peer)`: the player has the mod, the same `ModNetworkVersion`, and has not turned it off on
   their game (their hello and `HelloState` say whether their copy is on; a copy that says nothing counts as on).
-  Not compatible, with `AllowPlayersWithoutMod` off → vanilla `Error(ErrorVersion)` ("Incompatible version" on their
-  side), disconnect 4 s later through vanilla's kick list; on → let in with a Warning. Both log lines name
+  Not compatible, with `AllowPlayersWithoutMod` off → `NetworkGate.Refuse(peer)` (since 0.1.1): the reason line
+  `MC.Framework.Refused`, then vanilla `Error(ErrorVersion)` ("Incompatible version" on their side; when their game
+  has at least one MC mod made to run on both the server and the players, whether or not the server has that mod, the
+  screen adds an "MC mods:" block with the server's line: "this server requires it (version X) and your game does not
+  have it. Install it.", "the server has version X and your game Y, and they cannot play together. Install version
+  X.", or "it is turned off or cannot run in your game, and this server requires it. Turn it on in Esc > MC Mods (or
+  F1 when a configuration manager is installed; its status there says what stops it) and join again."; only the first
+  MC mod that refuses sends its line: when a server refuses a player for several MC mods, the screen names the first
+  one that refused them, and once that one is fixed, the next join names the next one), disconnect 4 s later through
+  vanilla's kick list; on → let in with a Warning. Both log lines name
   `NetworkGate.PeerProblem(peer)` (2.8). `PlayerCheck.Start` subscribes to `NetworkGate.PeerStateChanged` and
   `PlayerCheck.Stop` unsubscribes; the handler calls `Schedule(peer)` with the same 1 s grace, so **a player who turns
   the mod off while connected is refused about a second later** unless `AllowPlayersWithoutMod` is on (a player who
@@ -1218,7 +1227,7 @@ of the other MC mods'.
 | `MoveEdit.cs` | `Apply(Attack clone, Humanoid character, ItemDrop.ItemData weapon, MoveKind kind, string trigger, MoveRules rules)`: the stamina fallback and the edits of 2.5, and the Debug line. |
 | `MoveRules.cs` | Snapshot of every synced setting; `Own()`, `Write`, `TryRead` (layout, family count, clamping), `Describe`. |
 | `ServerRules.cs` | Copy of Forge Idol Upgrades' (`Current`, `Start/Stop`, `OwnChanged`, request/answer, Debug `TestRules`), changed so a connected client gets "no rules" (moves off) instead of its own config until the server's rules arrive (Decision 20), and logs Info on each changed set of received rules. |
-| `PlayerCheck.cs` | Copy of Forge Idol Upgrades' join check (grace, queue, `Error(ErrorVersion)`, kick list; texts adapted), with two changes (4): the verdict is `NetworkGate.PeerCompatible(peer)` and the log reason `NetworkGate.PeerProblem(peer)` (Forge's copy still decides with `PeerHasMod`), and `Start` / `Stop` subscribe to and unsubscribe from `NetworkGate.PeerStateChanged`, whose handler calls `Schedule(peer)` inside its own `try` / `PatchGuard.Report`. The pure `Decide` takes `compatible` in place of `hasMod`. |
+| `PlayerCheck.cs` | Copy of Forge Idol Upgrades' join check (grace, queue, `Error(ErrorVersion)` through `NetworkGate.Refuse` since 0.1.1, kick list; texts adapted), with two changes (4; Forge's copy has made both too since 2026-09-30): the verdict is `NetworkGate.PeerCompatible(peer)` and the log reason `NetworkGate.PeerProblem(peer)`, and `Start` / `Stop` subscribe to and unsubscribe from `NetworkGate.PeerStateChanged`, whose handler calls `Schedule(peer)` inside its own `try` / `PatchGuard.Report`. The pure `Decide` takes `compatible` in place of `hasMod`. |
 | `Compat.cs` | GCO lookup (first use after activation), Debug plugin list. |
 | `Patches/HumanoidPatches.cs` | `StartAttack` prefix (skip while a move is starting, then `Decide`), postfix, finalizer. |
 | `Patches/AttackPatches.cs` | `Attack.Start` prefix. |
@@ -1561,6 +1570,10 @@ tested with `./tools/Test-Framework.ps1`; its multiplayer part is framework item
 - **M10 No invulnerability on other players' games (G2, G4, Decision 21):** server `FlowStart = 0`; player B next to a
   `Greyling` or a `Skeleton` first (B's game owns it and checks its hits); player A, without god mode, rolls through its
   swing and roll attacks at once, several times → a creature hit that lands during A's roll attack's swing damages A.
+- **M12 Refusal screen names the mod (0.1.1):** turned off while in, joining with it off, the other-version build of
+  the `TESTING.md` Setup (`-p:ModNetworkVersion=3 -p:Version=0.0.9`) and a game without the mod (with another MC mod
+  made to run on both the server and the players) → the "Incompatible version" screen lists only Weapon Moveset's line
+  under "MC mods:" (section 4, join check).
 
 **Cross-mod**
 
@@ -2031,3 +2044,25 @@ game again.
   original for a bash inside its `BashCooldown` (default bash `ShieldPunch`, network version 2), Dual Wielding's skips
   it while a hand swap is queued; Creature Morale's creatures are afraid (no longer calm): README, TESTING X03-X05 and
   6.1 say so. TESTING gained T23 (the first roll attack of a session with four weapon types).
+
+**Stage 11 (refusal screen, 0.1.1, 2026-10-16; framework fixes 2026-10-17)**
+
+- Code: `PlayerCheck.Refuse` calls `NetworkGate.Refuse(peer)` in place of its own `Error` call: the framework sends the
+  refused player one reason line (`MC.Framework.Refused`, section 4 RPC table), then the vanilla `Error`, and
+  `RefusalNotes` adds an "MC mods:" block to their "Incompatible version" screen (`docs/modding/framework.md`, "Who
+  needs to install it, and multiplayer"). Everything else is framework code (`src/Shared/Framework`).
+- What the player sees: only an MC mod made to run on both the server and the players (any mod a server can refuse
+  you for, or Sleep Through the Day) listens for the line and patches the screen, whether or not the server has that
+  mod; a game whose MC mods are all client-side shows only "Incompatible version". When the server sent a line, only
+  the server's lines are shown. One line per refusal: when a server refuses a player for several MC mods, the screen
+  names the first one that refused them; once that one is fixed, the next join names the next one. When the server
+  sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the screen
+  lists what the player's own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with theirs; that may not be why they were refused. With Jotunn on the server
+  and on the player's game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on the
+  player's game, the vanilla panel shows them.
+- Verified: `probe.mp.off.MC.Combat.Weapons.Moveset` and `probe.refusal` passed on 2026-10-17 on the code before the
+  framework fixes (the screen named only this mod, with the old wording of the line). The fixes (new wording, only
+  the server's lines when it sent any, notes kept per connection object) have not run yet.
+- Texts: section 4 (RPC table, join check), 7.1 (`PlayerCheck.cs`); README (config row, Multiplayer), CHANGELOG 0.1.1,
+  `TESTING.md` (Setup's other-version build with `-p:ModNetworkVersion=3 -p:Version=0.0.9`, M12).

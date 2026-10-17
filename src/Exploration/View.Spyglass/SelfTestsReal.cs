@@ -22,21 +22,20 @@ namespace MC.Exploration.ViewSpyglassMod;
 //                              never cut by the near plane on any frame at the eye; back to a real wall: own body
 //                              hidden and shown by the rule on every frame [T20 T21]
 //   spyglass.death             a real death: on fire, spyglass raised while burning, low health, killed by the fire;
-//                              nothing of the spyglass on any frame of the death camera, dead body drawn, clean log;
-//                              after the game's respawn the view is normal, the spyglass is in the tombstone, taken
-//                              back from it and raised by a click [T26]
-//   spyglass.bug.death-camera  one check that fails by the code as it is: after such a death the camera stays where
-//                              the dead player's eye was (the game only turns the camera of a dead player, it never
-//                              moves it), not at the third-person spot of the normal death view [T26]
-// Death tests last of the in-world ones: each leaves a new player object. They keep the bag aside and give it back,
-// with skills, food, health, place, death pin and death point (recipe of other MC mods' death tests).
+//                              nothing of the spyglass on any frame of the death camera, dead body drawn, death camera
+//                              out of head at once and until respawn, first dead frame look at body from behind eye's
+//                              last look, at third-person distance it had before raise (game only turn dead player's
+//                              camera while body there, never move it: left in eye, it look out of dead body's head),
+//                              clean log; after the game's respawn the view is normal, the spyglass is in the
+//                              tombstone, taken back from it and raised by a click [T26]
+// Death test last of the in-world ones: it leave a new player object. It keep the bag aside and give it back, with
+// skills, food, health, place, death pin and death point (recipe of other MC mods' death tests).
 internal static partial class SelfTests
 {
     private const string PictureTest = "spyglass.picture";
     private const string RenderScaleTest = "spyglass.render-scale";
     private const string CloseRealTest = "spyglass.close-real";
     private const string DeathTest = "spyglass.death";
-    private const string DeathCameraBugTest = "spyglass.bug.death-camera";
 
     // ---------- the frame as drawn ----------
 
@@ -706,7 +705,7 @@ internal static partial class SelfTests
         }
     }
 
-    // ---------- real death: spyglass.death, spyglass.bug.death-camera ----------
+    // ---------- real death: spyglass.death ----------
 
     // Me = what a real death takes from the test player, kept aside and given back to the player the game puts in.
     private sealed class DeathKit
@@ -934,6 +933,10 @@ internal static partial class SelfTests
         internal float AtDeathFog;
         internal float CameraFromEye = -1f;
         internal float CameraFromEyeMost = -1f;
+        internal float CameraFromEyeLeast = -1f;
+        internal float AtDeathLookOff = -1f;   // first dead frame: degrees from camera forward to body (-1 = no body)
+        internal float AtDeathShake;           // vanilla camera shake that frame, degrees per axis at most
+        internal float AtDeathAhead;           // camera from last living eye along its look (below 0 = behind)
         internal string Showed = "";
         internal float FovOff;
         internal bool RagdollMade;
@@ -983,6 +986,9 @@ internal static partial class SelfTests
         old.SetHealth(old.GetMaxHealth());
         old.SetGodMode(false);
         old.SetGhostMode(false);
+        // Wet player burn out 6 times faster (SE_Burning.UpdateStatusEffect add 5 dt more): me dry it first (weather
+        // Clear keep it dry). Parked runs of 2026-10-13/14: fire did not kill in first death of run, did in next one.
+        old.GetSEMan().RemoveStatusEffect(SEMan.s_statusEffectWet, true);
         var fire = new HitData { m_point = old.GetCenterPoint(), m_dir = Vector3.up, m_hitType = HitData.HitType.EnemyHit };
         fire.m_damage.m_fire = ThroughArmor(old, 10f);
         old.Damage(fire);
@@ -1026,6 +1032,7 @@ internal static partial class SelfTests
         old.SetHealth(Mathf.Clamp(burning.m_fireDamagePerHit * 0.5f, 0.12f, 1f));
         f.LowHealth = old.GetHealth();
         var eye = old.m_eye.position;
+        var look = old.m_eye.forward;
         var t0 = Time.realtimeSinceStartup;
         while (Time.realtimeSinceStartup - t0 < 12f)
         {
@@ -1034,8 +1041,14 @@ internal static partial class SelfTests
             {
                 break;
             }
+            // Health held low until fire kill: food regen (Player.UpdateFood) may lift it over the ticks left.
+            if (old.GetHealth() > f.LowHealth)
+            {
+                old.SetHealth(f.LowHealth);
+            }
             f.StayedUp &= Scope.State == ScopeState.Raised;
             eye = old.m_eye.position;
+            look = old.m_eye.forward;
         }
         if (old == null || !old.IsDead())
         {
@@ -1049,6 +1062,18 @@ internal static partial class SelfTests
         f.AtDeathFog = RenderSettings.fogDensity;
         f.CameraFromEye = (cam.transform.position - eye).magnitude;
         f.CameraFromEyeMost = f.CameraFromEye;
+        f.CameraFromEyeLeast = f.CameraFromEye;
+        // This frame the turn is DeathView's own (vanilla LookAt was from eye spot; later frames vanilla turn it
+        // itself): body straight ahead, but for the shake vanilla put on top (GameCamera.UpdateCameraShake, angle per
+        // axis at most intensity^3 x m_shakeMovement). No physics step since LateUpdate: body where camera looked at it.
+        f.AtDeathAhead = Vector3.Dot(cam.transform.position - eye, look);
+        f.AtDeathShake = cam.GetAttenuatedShakeIntensity() * Mathf.Abs(cam.m_shakeMovement);
+        var deadBody = old.GetRagdoll();
+        if (deadBody != null)
+        {
+            var toBody = deadBody.GetAverageBodyPosition() - cam.transform.position;
+            f.AtDeathLookOff = Vector3.Angle(cam.transform.forward, toBody);
+        }
 
         // Dead until the game puts a new player in: every frame of the death camera.
         var died = Time.realtimeSinceStartup;
@@ -1068,9 +1093,12 @@ internal static partial class SelfTests
                 f.Showed = OnScreen();
             }
             f.FovOff = Mathf.Max(f.FovOff, Mathf.Abs(cam.m_camera.fieldOfView - cam.m_fov));
+            // Camera drawn on every dead frame, also after game took old player away before respawn.
+            var fromEye = (cam.transform.position - eye).magnitude;
+            f.CameraFromEyeMost = Mathf.Max(f.CameraFromEyeMost, fromEye);
+            f.CameraFromEyeLeast = Mathf.Min(f.CameraFromEyeLeast, fromEye);
             if (old != null)
             {
-                f.CameraFromEyeMost = Mathf.Max(f.CameraFromEyeMost, (cam.transform.position - eye).magnitude);
                 var ragdoll = old.GetRagdoll();
                 if (ragdoll != null && !f.BodySeen)
                 {
@@ -1143,8 +1171,21 @@ internal static partial class SelfTests
                     ? $"nothing of the spyglass on any of the {f.DeadFrames} frames of the death camera, zoom never off by more than {F(f.FovOff)}"
                     : $"on the death camera: {f.Showed}");
             c.Check(f.RagdollMade && f.BodySeen, $"the dead body is there and drawn on the death camera (body made {f.RagdollMade}, drawn {f.BodySeen})");
-            c.Note($"death camera {F(f.CameraFromEye)} m from where the eye was on the first dead frame, at most {F(f.CameraFromEyeMost)} m later "
-                   + $"(third person before the raise: {F(f.ThirdPerson)} m): judged by {DeathCameraBugTest}");
+            // Game leave dead player's camera where it was while body there, only turn it to body: without spyglass
+            // that is third-person spot. At eye = look out of dead body's head (bug fixed in 0.1.3). Same distance as
+            // before raise within 0.5 m or 30% (player stood still in between, test never turn it).
+            var thirdPersonSlack = Mathf.Max(0.5f, f.ThirdPerson * 0.3f);
+            c.Check(f.CameraFromEye > 0.5f && f.CameraFromEyeLeast > 0.5f && Mathf.Abs(f.CameraFromEye - f.ThirdPerson) <= thirdPersonSlack,
+                $"the normal death view is back at once: death camera {F(f.CameraFromEye)} m from where the dead player's eye was on the first frame drawn dead "
+                + $"(between {F(f.CameraFromEyeLeast)} and {F(f.CameraFromEyeMost)} m until the respawn; above 0.5 m expected, out of the head), "
+                + $"third person before the raise {F(f.ThirdPerson)} m (within {F(thirdPersonSlack)} m expected)");
+            // First dead frame turned by DeathView itself: looks at the body, from behind the eye's last look (wrong
+            // turn or wrong side at right distance = fail here). Shake (none from fire: no stagger damage) allowed for.
+            var lookSlack = 3f + 1.5f * f.AtDeathShake;
+            c.Check(f.AtDeathLookOff >= 0f && f.AtDeathLookOff <= lookSlack && f.AtDeathAhead < 0f,
+                $"on the first frame drawn dead the camera looks at the dead body from behind: {F(f.AtDeathLookOff)} degrees off the way to the body "
+                + $"(at most {F(lookSlack)} expected with that frame's camera shake; -1 = no body yet), "
+                + $"{F(-f.AtDeathAhead)} m behind the eye along its last look (above 0 expected)");
 
             // After the respawn: normal view, spyglass down and in the tombstone.
             yield return Frames(5);
@@ -1219,48 +1260,6 @@ internal static partial class SelfTests
         }
     }
 
-    // One check alone: it fails as the mod is (see file header). When the mod is fixed, fold it into spyglass.death.
-    private static IEnumerator RunDeathCameraBug()
-    {
-        const string T = DeathCameraBugTest;
-        if (!Ready(T, out var old, out var cam))
-        {
-            yield break;
-        }
-        if (Game.instance == null || ZNet.instance == null || EnvMan.instance == null || _tap == null)
-        {
-            SelfTest.Fail(T, "no world or the log is not listened to");
-            yield break;
-        }
-        var kit = new DeathKit(old, cam);
-        var f = new DeathFacts();
-        try
-        {
-            yield return PlayDeath(kit, f, T);
-            if (f.Problems.Count > 0)
-            {
-                SelfTest.Fail(T, "the death could not be played, nothing judged: " + string.Join("; ", f.Problems.ToArray()));
-                yield break;
-            }
-            // The game leaves the camera of a dead player where it was and only turns it to the body: without a
-            // spyglass that is the third-person spot. At the eye = looking out of the dead body's head.
-            var detail = $"death camera {F(f.CameraFromEye)} m from where the dead player's eye was on the first frame drawn dead (at most {F(f.CameraFromEyeMost)} m "
-                         + $"until the respawn); third person before the raise was {F(f.ThirdPerson)} m";
-            if (f.CameraFromEye > 0.5f)
-            {
-                SelfTest.Pass(T, "the normal death view is back at death: " + detail);
-            }
-            else
-            {
-                SelfTest.Fail(T, "the death camera is left at the eye, not the normal third-person death view: " + detail);
-            }
-            kit.GiveBack(f.Now);
-        }
-        finally
-        {
-            kit.Finish(T);
-        }
-    }
     // Render scale of the game (UpscaledFrameBuffer statics, its picture field) through reflection, never a direct
     // reference: the dedicated server's assembly_valheim has the class without these fields, and the Debug JitCheck
     // failed there on a direct use (multiplayer run 2026-10-14). On the server all of it reads as absent.

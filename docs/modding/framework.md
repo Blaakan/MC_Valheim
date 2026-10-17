@@ -142,17 +142,21 @@ Rules:
 - **Copies only creatures carry are not player content.** A rule that picks items should leave out items that a
   creature prefab carries (`Humanoid` default and random gear) and no recipe makes, like `FW_ShieldBlackmetalTower`.
 
-Testing: `tests/Probes/Core.Probe.Content` is a stand-in content mod that the in-world and multiplayer scripts deploy
-on every side. Its prefabs are clones of vanilla prefabs under names that start with `MCProbeTP_`
-(`src/Shared/SelfTestContent.cs` lists them for the mods' tests), each registered the way a real library does it:
+Testing: `tests/Probes/Core.Probe.Content` is a stand-in content mod. `Test-InWorld.ps1` deploys it to the game
+folder and removes it afterwards; `Test-Multiplayer.ps1` puts it only in the run's own server and client BepInEx
+folders (on both sides, like a real content mod). It is idle unless one of those scripts started the game
+(environment variable `MC_INWORLD_DIR` or `MC_MP_SERVER_DIR`).
+Its prefabs are clones of vanilla prefabs under names that start with `MCProbeTP_` (`src/Shared/SelfTestContent.cs`
+lists them for the mods' tests), each registered the way a real library does it:
 the ItemManager way (`ObjectDB.Awake` prefix, `CopyOtherDB` postfix), the Jotunn way (data edited in the priority-0
 postfix), the Jotunn piece way (priority-200 postfix), the Jotunn creature way (a spawn list put in each `SpawnSystem`
 in its `Awake` prefix) and after the world loaded (a few seconds after the player spawned, like a server sync). The
 kit holds tower and round shields, a plain sword, a sword with its own attack animation name, a reload weapon and an
 axe on a custom skill (made the way SkillManager makes skills), a trophy, a creature that drops it with a Meadows spawn
 entry that never spawns (it needs a global key nobody sets) and a torch in the Hammer's table; add what a mod's test
-needs. Its own test `probe.content` always runs and proves the content is in the game (item
-database, prefab list, recipe, data as wanted, a copy made by name points back at the clone). A mod's
+needs. Its own test `probe.content` runs in every in-world run, whatever `-Only` picks, and proves the content is in
+the game (item database, prefab list, recipe, data as wanted, a copy made by name points back at the clone). It is an
+in-world test only: a multiplayer run has the content on both sides but does not run `probe.content`. A mod's
 `<prefix>.thirdparty` test checks it treats each stand-in like the vanilla thing it copies, and that a control
 (a stand-in that must not qualify) stays out; when a real content mod is installed (Warfare), the same test also
 checks its real items and notes when it is not installed. `probe.content` notes which real content mods are present.
@@ -198,15 +202,40 @@ What the framework does with them:
   check a player again when they turn the mod on or off. Gameplay mods use this to refuse players whose game would
   not play by the server's rules (see the `PlayerCheck` of the Combat mods).
 - **The refusal screen names the mod** (`RefusalNotes`). A `PlayerCheck` refuses with `NetworkGate.Refuse(peer)`:
-  it first sends the player one line ("this server requires it and your game does not have it", "the server has
-  version 0.1.0 and your game 0.2.0 ...", "it is turned off ... in your game"), then the game's own "Incompatible
-  version" error (vanilla's version error carries no mod name). The player's game also notes what it saw itself when
-  it joined: a server copy whose network version cannot talk to its own, or its own copy turned off while the
-  server's is on, so an older server that sends no line still gets explained. When the error screen opens, one patch
-  (the first MC mod that loads installs it) adds an "MC mods:" block with one line per mod, the server's line first.
-  Jotunn's mod compatibility window copies that error text under "Failed connection", so the block shows there too.
-  A player with no MC mod at all sees only the game's text. The notes are kept per connection in an AppDomain slot
-  shared by every MC mod.
+  it first sends the player one line through the rpc `MC.Framework.Refused` (missing: "this server requires it
+  (version 0.2.0) and your game does not have it. Install it."; other version: "the server has version 0.2.0 and your
+  game 0.1.0, and they cannot play together. Install version 0.2.0."; turned off: "it is turned off or cannot run in
+  your game, and this server requires it. Turn it on in Esc > MC Mods (or F1 when a configuration manager is
+  installed ...) and join again."), then the game's own "Incompatible version" error (vanilla's version error carries
+  no mod name). **Only the first MC mod that refuses a player sends its line**: the other mods' player checks skip a
+  player who is already being refused. So when a server refuses a player for several MC mods, the screen names the
+  first one that refused them; once that one is fixed, the next join names the next one.
+  - The player's game also writes down what it noticed itself while connected: a server copy whose version cannot play
+    with its own (another network version), or its own copy turned off (or unable to run) while the server's is on.
+    That line names the place to turn it on: Esc > MC Mods, or F1 and the mod's General > Enabled when a
+    configuration manager is installed.
+  - When the "Incompatible version" screen opens, a patch adds an "MC mods:" block, one line per mod sorted by name.
+    **The server's lines win**: when the server sent any, the block shows only those (the server knows which mod
+    refused; a mod the player's game noted may be one the server let in, for example with `AllowPlayersWithoutMod`).
+    When the server sends no line (a refusal that is not about an MC mod, or a server with an older version of the
+    MC mods), the block lists what the player's own game noticed while connected: an MC mod turned off while the
+    server has it on, or a server copy whose version cannot play with the player's. That may not be why the player
+    was refused: a mod that never refuses anyone (Sleep Through the Day turned off, for example) gets a line too.
+  - **It needs a Both mod in the player's game.** Each Both mod (`ModSide=Both`) listens for the server's line on
+    every server connection and writes its own notes, and the first Both mod that loads installs the screen patch,
+    whatever the mod's state (turned off, or inactive because the server does not have it: the framework patches
+    have their own Harmony id). So the block needs at least one MC mod in the player's game
+    that is made to run on both the server and the players (any mod a server can refuse a player for, or Sleep
+    Through the Day, which has no player check); the server does not need to have that mod. A game whose MC mods are
+    all client-side (`ModSide=Client`), or that has none, shows only "Incompatible version".
+  - With Jotunn on the server and on the player's game, Jotunn's mod compatibility window shows the same lines under
+    "Failed Connection:" (it copies the error text); with Jotunn only on the player's game, the vanilla panel shows
+    them.
+  - The notes are kept per connection in an AppDomain slot shared by every MC mod. A new connection, told by the
+    `ZRpc` object itself (not its hash, which a new connection can reuse), clears them, so a line from an earlier
+    connection never shows.
+  - To test the "other version" line, build a copy that differs in `<Version>` too, not only in `ModNetworkVersion`
+    (for example `-p:ModNetworkVersion=99 -p:Version=0.0.9`); otherwise the line names the same version twice.
 - **SinglePlayer**: switches itself off while other players are fully connected (players still logging in or being
   rejected don't count).
 
@@ -234,9 +263,11 @@ Each mod has a `TESTING.md` checklist (single-player and multiplayer). The frame
 
 MC mods turned off in their `.cfg` (`Enabled = false`) are turned on for the run (their files are put back afterwards
 like every other config change), so their tests run too; `-AsConfigured` keeps them off.
-builds and deploys the mods (all, or those matching `-Mod`) and the world probe (`tests/Probes/Core.Probe.World`),
-launches the game through `Start-Game.ps1` and waits. Mods already deployed in the game folder load too, so their
-tests run as well: every deployed mod's tests run unless `-Only` picks tests by name. Inside the game the probe:
+The script builds and deploys the mods (all, or those matching `-Mod`), the world probe
+(`tests/Probes/Core.Probe.World`) and the stand-in content mod (`tests/Probes/Core.Probe.Content`, see "Third-party
+content"), launches the game through `Start-Game.ps1` and waits. Mods already deployed in the game folder load too,
+so their tests run as well: every deployed mod's tests run unless `-Only` picks tests by name. Inside the game the
+probe:
 
 1. **Keeps your saves out of reach.** At plugin load, before the main menu reads anything, it points all save data
    at `%TEMP%\MC_Valheim_InWorld\<yyyyMMdd-HHmmss>\saves` (`Utils.SetSaveDataPath`) and turns Steam Cloud saves off
@@ -252,7 +283,8 @@ tests run as well: every deployed mod's tests run unless `-Only` picks tests by 
 4. **Runs the tests.** `probe.baseline` (player exists, position, biome, time of day, screenshots of the world and of
    the inventory), `probe.runner` (checks the test runner itself), then every registered test in registration order,
    each with a timeout. It logs `[selftest] BEGIN <name> (<mod GUID>)` / `[selftest] END <name>: passed|FAILED`
-   (tests that `-Only` skips are listed in `NOTE probe: filtered out: ...`).
+   (tests that `-Only` skips are listed in `NOTE probe: filtered out: ...`). `probe.baseline`, `probe.runner` and the
+   stand-in content check `probe.content` run whatever `-Only` picks.
 5. **Runs the staged tests** (see "Staged tests" below): `probe.input`, one relog for the probe's own checks
    (`probe.relog` and one `probe.relog.<GUID>` per mod), every relog test with its own relog, then the "leave" parts
    of the disabled-start tests. Then `[selftest] DONE pass=<tests passed> fail=<tests failed> tests=<tests run>`, and
@@ -265,13 +297,15 @@ and both together in `LogOutput.log`.
 
 The script prints every test's `PASS` / `FAIL` / `NOTE` / `SHOT` lines grouped by test, how many tests each mod ran,
 plus the errors that come from our mods (like the smoke test). It passes only when `DONE` was logged with `fail=0`, no
-error came from our mods, and at least one mod test ran: a run where only `probe.baseline` and `probe.runner` ran
-fails. With `-Only`, every piece must match a test; with `-Mod`, a test of the selected mods must have run, and each
-selected mod that has self tests must have run one (unless `-Only` filtered them out). When a mod ran no test,
-the script says why: it has no self tests, `-Only` filtered them out, it did not load, a Release build is deployed, or
-it is turned off in its `.cfg` (`Enabled = false`).
+error came from our mods, and at least one mod test ran: a run where only the probe's own checks ran
+(`probe.baseline`, `probe.runner`, `probe.content`) fails, unless `-Only` names probe tests only (a check of the
+harness itself). With `-Only`, every piece must match a test; with `-Mod`, a test of the selected mods must have
+run, and each selected mod that has self tests must have run one (unless `-Only` filtered them out). When a mod ran
+no test, the script says why: it has no self tests, `-Only` filtered them out, it did not load, a Release build is
+deployed, or it is turned off in its `.cfg` (`Enabled = false`).
 
-It always removes the probe from the game folder and deletes the run's saves; the screenshots (`shots\`) and a copy
+It always removes the probe and the stand-in content mod (folders and `.cfg` files; their `.cfg` files are left out
+of the config backup) from the game folder and deletes the run's saves; the screenshots (`shots\`) and a copy
 of the log stay in the run folder (the 10 newest run folders are kept). Tests should not write settings (force them in
 memory, see below), but a test or a tester can still change `BepInEx/config/MC.*.cfg` during a run, so before launch the script copies those files to the run folder's
 `config-backup\`, and once the game has exited it puts them back byte for byte (a config file created during the run
@@ -282,9 +316,9 @@ file went back) makes the next run stop and say so, instead of backing up the ch
 A new world is generated on every run: about 7 s to the main menu, 25-30 s from
 world start to spawn, about 1 minute from launch to quit plus the tests; a clean start is worth it. With
 `-KeepRunning` the game stays in the world after the tests and the clean-up (probe, saves, config files) happens when
-you close it; `cleanup.log` in the run folder then lists the config files that were put back. A probe left in the
-plugins folder by accident does nothing: it is idle unless the script launched the game (environment variable
-`MC_INWORLD_DIR`).
+you close it; `cleanup.log` in the run folder then lists the config files that were put back. A probe or stand-in
+content mod left in the plugins folder by accident does nothing: each is idle unless a test script launched the game
+(environment variable `MC_INWORLD_DIR`; for the content mod also `MC_MP_SERVER_DIR`), and says so in the log.
 
 **Writing a test** (Debug builds only; API in `src/Shared/SelfTest.cs`). Put the code in a file wrapped in
 `#if DEBUG`, register in `OnActivated`, unregister in `OnDeactivated`:
@@ -474,10 +508,10 @@ the server runs the server probe (`tests/Probes/Core.Probe.Server`). Scenarios:
 |---|---|---|---|
 | `modded` | every MC mod | every MC mod | `probe.mp.baseline` (every Both mod active on both sides), every mod test registered for `modded`, then `probe.mp.server-toggle` (the server turns each Both mod off and on: the client follows live) |
 | `vanilla-server` | probe only | every MC mod | `probe.mp.baseline`: every Both mod `ServerMissing`, every client mod active |
-| `vanilla-client` | every MC mod | probe only | `probe.mp.refused`: the server refuses the player ("Incompatible version"); the script checks a mod logged "Refused" |
+| `vanilla-client` | every MC mod | probe only | `probe.mp.refused`: the server refuses the player ("Incompatible version") and the screen lists, under "MC mods:", the mod that refused it as one this game does not have (the stand-in content mod is the client's only Both mod and shows the block); the script checks a mod logged "Refused" |
 | `open-server` | every MC mod, `AllowPlayersWithoutMod = true` | probe only | the player stays in; the script checks every refusing mod logged that it let the player in |
 | `refuse-each` (only when named, not in `all`) | one refusing mod at a time, alone (plus the mods it requires) | probe only | one server start per mod, about 2 minutes each: the player is refused and the script checks that the line `Refused ...: does not have the mod` comes from that mod's own log source (`probe.mp.refuse.<GUID>`). With every mod on the server only the first one to refuse writes it |
-| `each-off` | every MC mod | every MC mod | the script also checks each refusing mod's own server log lines, `<player> turned <Mod> off on their game.` and `Refused ...: has the mod turned off` twice (`probe.mp.off-log.<GUID>`), written as test lines to the scenario's `script-checks.log`; one `probe.mp.off.<GUID>` per Both mod: turned off on the client while in, the server refuses (live re-check), and again when joining with it off; mods without a player check let the player stay, and so do mods with the older player check (`NetworkGate.PeerHasMod` instead of `PeerCompatible`: it only refuses a player who does not have the mod), which the script and the test result name |
+| `each-off` | every MC mod | every MC mod | the script also checks each refusing mod's own server log lines, `<player> turned <Mod> off on their game.` and `Refused ...: has the mod turned off` twice (`probe.mp.off-log.<GUID>`), written as test lines to the scenario's `script-checks.log`; one `probe.mp.off.<GUID>` per Both mod: turned off on the client while in, the server refuses (live re-check), and again when joining with it off, and each time the error screen lists that mod as turned off under "MC mods:" and no other mod; mods without a player check let the player stay, and so do mods with the older player check (`NetworkGate.PeerHasMod` instead of `PeerCompatible`: it only refuses a player who does not have the mod), which the script and the test result name |
 
 **Writing a multiplayer test** (Debug builds only; same file as the mod's other self tests):
 
@@ -547,6 +581,9 @@ private static IEnumerator ServerRules(string arg, object[] reply)
   every mod carries its own copy of the framework types. Keys are never renamed; the highest framework version is the
   "leader" that draws the panel.
 - `NetworkGate`: per-mod connection handshake (`<GUID>.Hello` / `<GUID>.HelloAck`) and world/peer events.
+  `NetworkGate.Refuse` sends the shared refusal line (`MC.Framework.Refused`, payload `<mod name>` + tab + text) and
+  then the vanilla `Error` rpc; `RefusalNotes` keeps the lines in an AppDomain slot (keys never renamed) and adds the
+  "MC mods:" block to the error screen.
 - `PatchGuard`: every patch body catches its own exceptions and reports once, so a mod bug can never break a game
   method halfway.
 - `JitCheck` (Debug builds): JIT-compiles every method at startup (`MethodHandle.GetFunctionPointer`; note that

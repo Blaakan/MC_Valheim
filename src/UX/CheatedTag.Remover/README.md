@@ -12,7 +12,7 @@ the mark from the saved world, once, when you ask for it.
 > objects and on items, and stores new tags in a new way. This version was written for Valheim 1.0.17: on 1.0.20 it
 > still clears the tag of objects, but its count includes old object tags the game no longer sees, and it leaves the
 > tag of items saved by 1.0.20 alone (it only knows the item format of 1.0.17). Do not rely on it until a version for
-> 1.0.20 is out.
+> 1.0.20 is out. Until that rework, the mod is not on Nexus Mods and not in the all-mods pack.
 
 ## Features
 
@@ -132,7 +132,9 @@ Install it where the world runs (the dedicated server, or the player who hosts) 
 
 ## Installation
 
-Download from Nexus Mods and extract the zip into your Valheim folder. Full steps are added here when the mod is packaged (from packaging/nexus/install.md).
+Not available for download yet: the mod is not on Nexus Mods and not in the all-mods pack until its rework for
+Valheim 1.0.20 (see the note at the top). Once it is released, download it from Nexus Mods and extract the zip into
+your Valheim folder. Full steps are added here when the mod is packaged (from packaging/nexus/install.md).
 
 ## Compatibility
 

@@ -13,7 +13,8 @@ namespace MC.Exploration.MusicInstrumentsMod;
 // keyboard and mouse and of a test gamepad (SelfTest.Key / Pad / PadStick...), so ZInput, the game and the mod read a
 // press like from a person. One small test per thing: real input is new, one test can be fixed or dropped alone.
 //   music.input.pad-window    T22  test gamepad in the song window: D-pad chooses, Y toggles Repeat, X says "keyboard",
-//                                  A plays, B closes (no menu, no jump)
+//                                  A plays, B closes (no menu, no jump: six closes on default layout, where B is game's
+//                                  jump button too; me was bug test music.bug.pad-close-jump before 0.4.3)
 //   music.input.pad-open      T22  left stick held forward, window opened with the gamepad's attack button: the
 //                                  selection does not run up the list; pushed again it moves
 //   music.input.w-held        T22  W held, window opened with a real left click: selection and feet stay; real Up,
@@ -22,8 +23,6 @@ namespace MC.Exploration.MusicInstrumentsMod;
 //   music.input.pad-freeplay  T36  gamepad touched = in use; first song selected, not Free play; A on Free play says
 //                                  "keyboard"; free play started with the mouse, pad touched: hint names Start
 //   music.input.hide-hud      T23  real Ctrl+F3 while performing: the game's HUD hides, the rhythm game stays
-//   music.bug.pad-close-jump  T22  one check, suspected bug of the mod: B closes the window and the character must
-//                                  not jump (B is the game's jump button on the default controller layout)
 //   music.chair               T12  a real chair (the game's Use on it) and real mouse clicks: window, stops and
 //                                  closes never stand the player up or leave the block up; lyre on the lap on a chair
 // The game's PlayerController stays on in these tests: what the same press does in the game is part of the check.
@@ -35,8 +34,8 @@ internal static partial class SelfTests
     private const string InputPadHudName = "music.input.pad-hud";
     private const string InputPadFreeName = "music.input.pad-freeplay";
     private const string InputHideHudName = "music.input.hide-hud";
-    private const string BugPadCloseJumpName = "music.bug.pad-close-jump";
     private const string ChairName = "music.chair";
+    private const string PadJumpPath = "<Gamepad>/buttonEast"; // B: JoyJump of the default layout
 
     private const string LeftMousePath = "<Mouse>/leftButton";   // ZInput.MouseButtonToPath(MouseButton.Left)
     private const string RightMousePath = "<Mouse>/rightButton";
@@ -125,12 +124,22 @@ internal static partial class SelfTests
         }
         var rig = new Rig(player);
         var x = new Extra(player);
+        var layoutBefore = ZInput.InputLayout;
+        var layoutForced = false;
         try
         {
             if (!InputReady(c))
             {
                 c.Report();
                 yield break;
+            }
+            if (layoutBefore != InputLayout.Default)
+            {
+                // Me switch layout in memory only, like Settings > Controls do, but no saved choice.
+                ZInput.InputLayout = InputLayout.Default;
+                ZInput.instance.UpdateGamepadInputLayout();
+                layoutForced = true;
+                c.Note($"this player's gamepad layout is {layoutBefore}: the default layout (jump on B) is used for the test, in memory, and put back after");
             }
             rig.TakeControls();
             ServerRules.TestRules = TestRules(60f);
@@ -196,116 +205,62 @@ internal static partial class SelfTests
             c.Check(!jumped[0] && !InventoryGui.IsVisible() && Flat(player.transform.position, at) < 0.05f, "the same press does nothing else (no jump, no screen)");
             Performance.TestRequestStop();
             yield return Frames(3);
-            // B closes: no menu, no jump.
-            yield return WaitReal(() => !GameScreens.AnyOpen(), 2f);
-            Performance.TestRequestOpen();
-            yield return Frames(3);
-            c.Check(SongWindow.IsOpen, "window open again");
-            var menu = new bool[1];
-            jumped[0] = false;
-            SelfTest.Pad("East", 1f);
-            yield return WaitReal(() => !SongWindow.IsOpen, 1f);
-            yield return WatchJump(player, 8, jumped, menu);
-            SelfTest.Pad("East", 0f);
-            yield return WatchJump(player, 6, jumped, menu);
-            c.Check(!SongWindow.IsOpen && !Performance.WindowOpen, "B closes the window");
-            c.Check(!menu[0] && !MenuShown, "B opens no menu");
-            // Whether the character also jumps on that press (B is the game's jump button on the default layout) is
-            // music.bug.pad-close-jump's business.
-            c.Note($"B closed the window; the character jumped on that press: {jumped[0]} (jump button bound to '{ButtonPath("JoyJump")}')");
-            c.Report();
-        }
-        finally
-        {
-            SelfTest.ReleaseInput();
-            x.Restore();
-            rig.Restore();
-        }
-    }
-
-    // ---------- music.bug.pad-close-jump (T22: B closes the window; suspected bug) ----------
-
-    // One check alone: closing the song window with B must not make the character jump. On the default controller
-    // layout B is the game's jump button too (JoyJump), which PlayerController reads in the physics step: the press
-    // can reach it after the mod let the keys go (the mod forgets only "JoyButtonB"). Depends on how frames and physics
-    // steps fall, so the close is tried several times.
-    private static IEnumerator RunBugPadCloseJump()
-    {
-        var c = new Checks(BugPadCloseJumpName);
-        var player = Player.m_localPlayer;
-        if (player == null)
-        {
-            SelfTest.Fail(BugPadCloseJumpName, "no player");
-            yield break;
-        }
-        var rig = new Rig(player);
-        var x = new Extra(player);
-        var layoutBefore = ZInput.InputLayout;
-        var layoutForced = false;
-        try
-        {
-            if (!InputReady(c))
-            {
-                c.Report();
-                yield break;
-            }
-            if (layoutBefore != InputLayout.Default)
-            {
-                // In memory only, the way Settings > Controls switches it minus the saved preference.
-                ZInput.InputLayout = InputLayout.Default;
-                ZInput.instance.UpdateGamepadInputLayout();
-                layoutForced = true;
-                c.Note($"this player's gamepad layout is {layoutBefore}: the default layout (jump on B) is used for the test, in memory, and put back after");
-            }
-            rig.TakeControls();
-            ServerRules.TestRules = TestRules(60f);
-            x.NoShare();
-            x.SongsFolder("MC_MusicPadJumpTest");
-            rig.Hold(InstrumentKind.Flute);
-            yield return new WaitForSeconds(0.4f);
-            yield return WaitReal(() => !GameScreens.AnyOpen(), 2f);
-            x.Controller(true);
-            yield return WakePad();
+            // B close: no menu, no jump. Default layout: B is game's jump button too (JoyJump), PlayerController read it
+            // in physics step. If press reach it hang on how frames and physics steps fall, so me close six times, each
+            // at other moment (before 0.4.3: 1 jump in 6 closes).
             var jumpPath = ButtonPath("JoyJump");
-            if (!c.Check(ZInput.IsGamepadActive() && jumpPath == "<Gamepad>/buttonEast",
-                    $"the test gamepad is in use and B is the game's jump button (bound to '{jumpPath}', " + PadState() + ")"))
+            if (!c.Check(jumpPath == PadJumpPath, $"B is the game's jump button on this layout (bound to '{jumpPath}')"))
             {
                 c.Report();
                 yield break;
             }
+            var opened = 0;
             var closes = 0;
             var jumps = 0;
+            var menus = 0;
             for (var round = 0; round < 6; round++)
             {
                 yield return WaitReal(() => !GameScreens.AnyOpen() && player.IsOnGround(), 3f);
                 Performance.TestRequestOpen();
-                // A different moment against the physics steps each time.
                 yield return Frames(3 + round);
                 if (!SongWindow.IsOpen)
                 {
                     continue;
                 }
-                var jumped = new bool[1];
+                opened++;
+                var jumpedB = new bool[1];
+                var menu = new bool[1];
                 SelfTest.Pad("East", 1f);
                 yield return WaitReal(() => !SongWindow.IsOpen, 1f);
-                yield return WatchJump(player, 20, jumped, null);
+                yield return WatchJump(player, 20, jumpedB, menu);
                 SelfTest.Pad("East", 0f);
-                yield return WatchJump(player, 10, jumped, null);
-                if (!SongWindow.IsOpen)
+                yield return WatchJump(player, 10, jumpedB, menu);
+                if (!SongWindow.IsOpen && !Performance.WindowOpen)
                 {
                     closes++;
-                    if (jumped[0])
-                    {
-                        jumps++;
-                    }
                 }
                 else
                 {
                     Performance.CloseWindow();
                 }
+                if (jumpedB[0])
+                {
+                    jumps++;
+                }
+                if (menu[0] || MenuShown)
+                {
+                    menus++;
+                    if (Menu.instance != null && MenuShown)
+                    {
+                        Menu.instance.Hide();
+                    }
+                    Game.Unpause();
+                    yield return Real(0.3f);
+                }
             }
-            c.Check(closes >= 4, $"B closed the song window in {closes} of 6 tries");
-            c.Check(jumps == 0, $"closing the song window with B does not make the character jump ({jumps} jump(s) in {closes} closes; B is also the game's jump button on this layout)");
+            c.Check(opened >= 4 && closes == opened, $"B closes the window: {closes} closes in {opened} tries (window opened in {opened} of 6 rounds)");
+            c.Check(menus == 0, $"B opens no menu ({menus} time(s))");
+            c.Check(jumps == 0, $"the press that closes the window does not make the character jump ({jumps} jump(s) in {opened} tries; B is also the game's jump button on this layout)");
             c.Report();
         }
         finally

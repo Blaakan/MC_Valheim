@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+**Build under test:** 1.0.0 (first release; before that 0.1.1), build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
 MC Mods panel. 0.1.1 fixed four faults the self tests found in 0.1.0: far objects not following the far terrain when
 the mod is turned back on in a paused game (T25), far objects not following a simulation-distance change until the
 camera moved (T28), a near far tile built from approximate heights after the game's terrain builder dropped its exact

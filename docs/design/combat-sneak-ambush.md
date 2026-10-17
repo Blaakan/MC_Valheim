@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Sneak revamp` |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` in `.ref/`; runtime data dump of 1.0.16 from a Debug self-test (items, creatures, status effects, player animator) on 2026-09-29; asset-level values read from the game bundles by the research briefs (marked "asset read" below); sources of SecondaryAttacks, SmartSkills, SetUpSkills, Sneaky Viking, ImpactfulSkills and Valheim Legends read on GitHub (2026-09-29); sibling design docs (Creature Morale, Tower Shield Wall, Dual Wielding, Weapon Moveset) read on 2026-09-30, and again after that day's reworks of the four (Creature Morale's afraid creatures, the slower tower bash, the queued swap and crossed sheathed pair, the roll attack that flows out of the roll) |
-| Status | Implemented (v0.1.0 code), in-game testing |
+| Status | Implemented (v0.1.0 code), in-game testing. 0.1.1 (2026-10-08): two false log messages fixed (2.13, 7.7). 0.1.2 (2026-10-16, refined 2026-10-17): the refusal screen names the mod (4.3; Implementation notes, last point) |
 
 ## Goal
 
@@ -880,7 +880,12 @@ they are repeated at the pause.
 - Framework (`NetworkGate`, `ZRpc`): `MC.Combat.Sneak.Ambush.Hello` (client → server right after connecting: protocol,
   network version, version, and whether the client's copy is on), `.HelloAck` (server → client: the server's state;
   sent again to every player when the server's copy turns on or off) and `.HelloState` (client → server, `"on"` /
-  `"off"`, when the client's copy turns on or off while connected).
+  `"off"`, when the client's copy turns on or off while connected). Since 0.1.2 also `MC.Framework.Refused` (server →
+  client, `string` `"Sneak Ambush\t<line>"`: what is wrong and what to do), sent by `NetworkGate.Refuse` just before
+  vanilla `Error` when the join check refuses a player (4.3); the player's game shows the line under "MC mods:" on the
+  error screen (`RefusalNotes`, registered by every MC mod made to run on both the server and the players; a game
+  without one drops it silently, as vanilla `ZRpc.HandlePackage` does with any unknown RPC). The framework's
+  messages are not part of this mod's network version.
 - ZDO keys: the four cloud keys of 2.8, on the cloud ZDO; `MC.Combat.Sneak.Ambush.LastXp` (long, network time in ms of
   the last sneak-attack XP payout) on a creature's ZDO, written by its owner (2.1). No key on players (vanilla
   `Stealth` carries the stealth changes).
@@ -920,13 +925,20 @@ they are repeated at the pause.
   - **Verdict:** `PlayerCheck.Decide(isServer, connected, ready, beingKicked, compatible, allowWithoutMod)` (pure) →
     Skip / Compatible / Allowed / Refuse, with `compatible = NetworkGate.PeerCompatible(peer)`: the player has the
     mod, the same `ModNetworkVersion`, and has not turned it off on their game.
-  - **Refuse** (not compatible, `AllowPlayersWithoutMod` off): vanilla `Error` RPC with `ErrorVersion` (their game
-    shows "Incompatible version" and goes back to the menu) and the peer in vanilla's kick list, disconnected 4 s
-    later (`DisconnectDelay`, so the client reads the error first). Server log (Warning): "Refused <player>:
-    <reason>. This server requires Sneak Ambush on every player (everyone plays by the same stealth and smoke rules).
-    Their game shows "Incompatible version". To let such players in, set AllowPlayersWithoutMod = true." The reason
-    is `NetworkGate.PeerProblem(peer)`: "does not have the mod", "has another version of the mod (network version X,
-    the server has Y)" or "has the mod turned off".
+  - **Refuse** (not compatible, `AllowPlayersWithoutMod` off): `NetworkGate.Refuse(peer)` (since 0.1.2; before, a bare
+    vanilla `Error` RPC): first the framework's `MC.Framework.Refused` with one line for the player's error screen
+    (what is wrong and what to do: missing, another version with both version numbers, or turned off), then vanilla
+    `Error` with `ErrorVersion` (their game shows "Incompatible version" and goes back to the menu); the peer goes in
+    vanilla's kick list, disconnected 4 s later (`DisconnectDelay`, so the client reads the error first). The player's
+    game lists the line under "MC mods:" when it has at least one MC mod made to run on both the server and the
+    players (any mod a server can refuse a player for, or Sleep Through the Day; the server does not need to have that
+    mod); a game whose MC mods are all client-side shows only "Incompatible version". Only the first MC mod that
+    refuses a player sends its line: a later mod's check skips a player already being kicked (`Decide`), so the screen
+    names the first mod that refused; once that one is fixed, the next join names the next one. Server log (Warning):
+    "Refused <player>: <reason>. This server requires Sneak Ambush on every player (everyone plays by the same stealth
+    and smoke rules). Their game shows "Incompatible version". To let such players in, set
+    AllowPlayersWithoutMod = true." The reason is `NetworkGate.PeerProblem(peer)`: "does not have the mod", "has
+    another version of the mod (network version X, the server has Y)" or "has the mod turned off".
   - **Allowed** (not compatible, setting on): Warning "<player> <reason>; AllowPlayersWithoutMod is on, so they may
     play, but creatures their game controls ignore smoke and give nobody Sneak XP for sneak attacks, and their
     stealth follows the normal game." (Their game runs no `Character.RPC_Damage` patch, so a backstab on a creature it
@@ -958,7 +970,7 @@ they are repeated at the pause.
 | **A Smoke Screen in a chest, opened by a player without the mod** | Their game drops the unknown item from the chest it loaded. Opening and closing saves nothing, so the chest keeps it. If they **take or add any item** while their game owns the chest, the chest is saved without it: **the Smoke Screens are gone for everyone** (vanilla `Container`, 1.7). Test M06. |
 | A Smoke Screen dropped on the ground, near a player without the mod | Invisible to them, with the same warning spam in their log while near; it stays in the world for others. |
 | Server without the mod | Framework: the feature is inactive on every client. Registration still runs locally, the recipe is hidden, the throw guard refuses throws; Smoke Screens stay in inventories. A Smoke Screen dropped on the ground is deleted by a **vanilla host** once it is in the host player's active area ("Destroyed invalid prefab ZDO" in the host's log, 1.7). A **vanilla dedicated server** never deletes it: it creates no world objects, and at world load it keeps unknown prefabs with a warning (1.7), so the Smoke Screen stays in the save. Test M08. |
-| Player with the mod installed but turned off (`Enabled = false` at join, or unticked while connected) | **Refused** about a second after joining, or about a second after turning it off (their game shows "Incompatible version"; the server log says "has the mod turned off"), unless `AllowPlayersWithoutMod` (4.3, D33). With the setting on they stay: their stealth bonuses are off, the creatures their game owns ignore smoke and pay nobody sneak-attack XP, they cannot throw (guard); the XP handler exists (always on) and ignores calls, so no warnings, but their sneak attacks on creatures a game with the mod controls use up that creature's XP cooldown (2.1). Tests M12, M15. |
+| Player with the mod installed but turned off (`Enabled = false` at join, or unticked while connected) | **Refused** about a second after joining, or about a second after turning it off (their game shows "Incompatible version", since 0.1.2 with this mod and the reason under "MC mods:"; the server log says "has the mod turned off"), unless `AllowPlayersWithoutMod` (4.3, D33). With the setting on they stay: their stealth bonuses are off, the creatures their game owns ignore smoke and pay nobody sneak-attack XP, they cannot throw (guard); the XP handler exists (always on) and ignores calls, so no warnings, but their sneak attacks on creatures a game with the mod controls use up that creature's XP cooldown (2.1). Tests M12, M15. |
 | Player with another network version of the mod | **Refused** about a second after joining (server log: "has another version of the mod (network version X, the server has Y)"), unless `AllowPlayersWithoutMod`. With the setting on, their copy stays inactive (framework status: the versions cannot talk to each other) and behaves like one turned off; its always-on registration still keeps their Smoke Screens. Test M16. |
 | A client whose server rules have not arrived yet | Pending (4.3): vanilla stealth, no XP, smoke inert on creatures it owns, throws refused with the waiting message. Normally over before the player spawns. Self-test `sneak.pending`. |
 | Ownership of a creature changes during a blind or reveal | The new owner does not know it: vanilla senses plus the smoke geometry apply. Short windows (6-8 s). |
@@ -1233,8 +1245,10 @@ to `src/Shared` and needs no further framework change.
 - **`NetworkGate` join-check support:** the hello carries whether the client's copy is ready (on, dependencies active,
   no start error) and `HelloState` updates it live; server side, `NetworkGate.PeerCompatible(peer)`,
   `NetworkGate.PeerProblem(peer)` and the event `NetworkGate.PeerStateChanged(ZNetPeer)`. `PlayerCheck` (4.3) uses
-  exactly these three; no mod-specific RPC, timer or accessor. Framework tests N07 and N08 (`src/Shared/TESTING.md`)
-  check the hello and `HelloState` lines; this mod's M12, M15 and M16 check how its join check reacts.
+  exactly these three, and since 0.1.2 refuses with `NetworkGate.Refuse(peer)` (the reason line for the player's error
+  screen, then vanilla `Error`); no mod-specific RPC, timer or accessor. Framework tests N07 and N08
+  (`src/Shared/TESTING.md`) check the hello and `HelloState` lines; this mod's M12, M15 and M16 check how its join
+  check reacts, and M19 the refusal screen.
 - No change to `FeatureRegistry` or `PatchGuard`. `ItemKinds` now keeps tower shields in the Shield kind (Tower Shield
   Wall's run); the Smoke Screen (skill None, not the shield pose) stays a Weapon, and this mod does not call
   `ItemKinds`.
@@ -1523,11 +1537,16 @@ prefab, only used in T08). Ours: `MC_SmokeScreen`.
   game."; about a second later they are refused the same way. (c) Untick and tick it again within a second: they
   stay. (d) Another player with the mod on is never affected.
 - **M16 (G12, D33)** A second player's copy built with another network version (`dotnet build
-  src/Combat/Sneak.Ambush/MC.Combat.Sneak.Ambush.csproj -p:ModNetworkVersion=2 -p:DeployToGame=false`, that DLL
-  copied over the second player's copy; put the normal build back afterwards) joins a server with network version 1:
-  refused about a second after joining; the server log says "has another version of the mod (network version 2, the
-  server has 1)". With `AllowPlayersWithoutMod = true` they stay: their MC Mods panel says the versions cannot talk
-  to each other, Smoke Screens stay in their inventory and throws are refused.
+  src/Combat/Sneak.Ambush/MC.Combat.Sneak.Ambush.csproj -p:ModNetworkVersion=2 -p:Version=0.0.9
+  -p:DeployToGame=false`, that DLL copied over the second player's copy; put the normal build back afterwards; the
+  other version number since 0.1.2, so M19's screen line names two different versions) joins a server with network
+  version 1: refused about a second after joining; the server log says "has another version of the mod (network
+  version 2, the server has 1)". With `AllowPlayersWithoutMod = true` they stay: their MC Mods panel says the
+  versions cannot talk to each other, Smoke Screens stay in their inventory and throws are refused.
+- **M19 (0.1.2)** The refusal screen names the mod: turned off while in, and joining with it off, the "Incompatible
+  version" screen lists only Sneak Ambush under "MC mods:" with the server's "turned off" line; by hand also a game
+  without the mod but with another MC mod made to run on both the server and the players, M16's copy, and Jotunn on
+  the server and on the player's game, or only on the player's game.
 
 ### Cross-mod
 
@@ -1593,8 +1612,9 @@ prefab, only used in T08). Ours: `MC_SmokeScreen`.
    creature? (D19)
 10. **Turning the mod off while connected** to a server that requires it: the player is refused about a second later
     with the game's own "Incompatible version" screen, without a warning first (D33; same for every Combat mod of this
-    run). Enough, or should the player see a short message such as "This server requires Sneak Ambush: turning it
-    off disconnects you" when they untick it?
+    run). Since 0.1.2 that screen lists Sneak Ambush under "MC mods:" with where to turn it back on. Enough, or should
+    the player see a short message such as "This server requires Sneak Ambush: turning it off disconnects you" when
+    they untick it?
 
 ### Unverified names and values (and how to verify)
 
@@ -1663,3 +1683,26 @@ above; nothing in the Goal (G1-G12) or the extras (E1-E6) was dropped.
   `piece_workbench`, `ArrowWood`, `BoltBone`, `Bush01`, `RaspberryBush`, `Beech1`, `Karve` and the weather names.
 - **README:** the sentence "Smoke Screens stay in your inventory while it is off" is in the `Enabled` row (the
   framework writes that setting's description). The XP table lists only creatures whose health is in the 1.0.16 dump.
+- **0.1.2 (2026-10-16, refined 2026-10-17): the refusal screen names the mod.** A framework change shared by the 16 MC
+  mods that can refuse a player; this mod's code changed in one line: `PlayerCheck.Refuse` calls
+  `NetworkGate.Refuse(peer)` instead of sending the bare vanilla `Error` RPC (4.3). The framework first sends
+  `MC.Framework.Refused` with `"Sneak Ambush\t<line>"` (4.2), then `Error(ErrorVersion)`; on the player's game,
+  `RefusalNotes` adds an "MC mods:" block with the line to the "Incompatible version" text (the error-screen patch is
+  installed once, by the first loaded MC mod made to run on both the server and the players). With Jotunn on the
+  server and on the player's game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only
+  on the player's game, the vanilla panel shows them. Limits: the block needs at least one MC mod on the player's game
+  that is made to run on both the server and the players (any mod a server can refuse a player for, or Sleep Through
+  the Day); the server does not need to have that mod, and a game whose MC mods are all client-side shows only
+  "Incompatible version". When a server refuses a player for several MC mods, the screen names the first one that
+  refused them (a later mod's check skips a player already being kicked); once that one is fixed, the next join names
+  the next one. When the server sent a line, only the server's lines show. When the server sends no line (a refusal
+  that is not about an MC mod, or a server with an older version of the MC mods), the screen lists what the player's
+  own game noticed while connected: an MC mod turned off while the server has it on, or a server copy whose version
+  cannot play with theirs; that may not be why they were refused. Refined on 2026-10-17 (framework only, after that
+  day's dedicated-server run, where a refusal screen also listed a line of another mod left over from an earlier
+  connection): connections are told apart by the `ZRpc` object instead of its hash, only the server's lines show when
+  it sent any, and the "turned off" line names F1 for a configuration manager. No RPC, ZDO key or rule of this mod
+  changed (`ModNetworkVersion` stays 1). Tests: new item M19 (`TESTING.md`, section 0.1.2), M16's copy now also has
+  another version number; `probe.mp.off.MC.Combat.Sneak.Ambush` and `probe.refusal` passed on 2026-10-17 on the first
+  version and have not run again since the refinement. Documents: Status row, 4.2, 4.3, 4.4, 7.6, 8 (M16, M19), open
+  question 10; `README.md` (Multiplayer), `CHANGELOG.md` (0.1.2).

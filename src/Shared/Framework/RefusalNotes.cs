@@ -12,8 +12,10 @@ namespace MC.Shared;
 // Two sources, kept per connection:
 //   known: NetworkGate (client) saw a server copy whose network version cannot talk to ours, or its own copy is off
 //          while the server's is on (servers refuse such players);
-//   sent:  the server's NetworkGate.Refuse send "MC.Framework.Refused" with one line just before the Error rpc. Sent
-//          line win over known line of same mod. Needs one MC mod on this game to listen; vanilla ignore unknown rpc.
+//   sent:  the server's NetworkGate.Refuse send "MC.Framework.Refused" with one line just before the Error rpc. Needs
+//          one Both MC mod on this game to listen; vanilla ignore unknown rpc.
+// Server said why = me show only its lines (it know which mod refused; a known line can be a mod the server let in).
+// Server said nothing (older MC server, or not a mod refusal) = me show the known lines.
 // Every MC mod dll carry own copy of me: notes live in one AppDomain slot (BCL types only, like FeatureRegistry), and
 // only the first copy patch ShowConnectError (slot flag). Never rename slot keys; new keys ok.
 internal static class RefusalNotes
@@ -44,16 +46,21 @@ internal static class RefusalNotes
     }
 
     // Client: new connection to a server. Same ZRpc from every copy: only the first call of a connection clear.
-    internal static void NewConnection(ZRpc rpc)
+    // Connection told by the ZRpc object itself ("connRef", weak). Its hash alone ("conn") is not enough: a new ZRpc
+    // can get the hash of the one before (run 2026-10-17: a refusal screen kept a line of the connection before).
+    // "conn" still written for copies that only know it.
+    internal static void NewConnection(object rpc)
     {
         var id = rpc != null ? RuntimeHelpers.GetHashCode(rpc) : 0;
         var root = Root;
         lock (root)
         {
-            if (root["conn"] is int old && old == id)
+            if (rpc != null && root.TryGetValue("connRef", out var held) && held is WeakReference weak
+                && ReferenceEquals(weak.Target, rpc))
             {
                 return;
             }
+            root["connRef"] = new WeakReference(rpc);
             root["conn"] = id;
             ((Dictionary<string, string>)root["known"]).Clear();
             ((Dictionary<string, string>)root["sent"]).Clear();
@@ -68,6 +75,7 @@ internal static class RefusalNotes
         lock (root)
         {
             root["conn"] = -1;
+            root.Remove("connRef");
             ((Dictionary<string, string>)root["known"]).Clear();
             ((Dictionary<string, string>)root["sent"]).Clear();
         }
@@ -113,7 +121,7 @@ internal static class RefusalNotes
         }
     }
 
-    // "- <mod>: <text>" per mod, sorted by mod name; server's line when it sent one.
+    // "- <mod>: <text>" per mod, sorted by mod name: the server's lines when it sent any, else what this game knew.
     internal static List<string> Lines()
     {
         var root = Root;
@@ -121,12 +129,11 @@ internal static class RefusalNotes
         {
             var known = (Dictionary<string, string>)root["known"];
             var sent = (Dictionary<string, string>)root["sent"];
-            var mods = new SortedSet<string>(known.Keys, StringComparer.OrdinalIgnoreCase);
-            mods.UnionWith(sent.Keys);
+            var source = sent.Count > 0 ? sent : known;
             var lines = new List<string>();
-            foreach (var mod in mods)
+            foreach (var mod in new SortedSet<string>(source.Keys, StringComparer.OrdinalIgnoreCase))
             {
-                lines.Add($"- {mod}: {(sent.TryGetValue(mod, out var s) ? s : known[mod])}");
+                lines.Add($"- {mod}: {source[mod]}");
             }
             return lines;
         }

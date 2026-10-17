@@ -19,8 +19,10 @@ internal enum JoinVerdict : byte
 // check, verdict NetworkGate.PeerCompatible (has mod + same network version + side not off), reason
 // NetworkGate.PeerProblem. Host own player is not a peer, single player has none: me never touch them.
 // Flow: ZNet.RPC_PeerInfo postfix on server, peer ready = fully in -> me wait Grace s -> PeerCompatible. Not compatible
-// and setting off -> vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version") + peer in vanilla
-// kick list (ZNet.Update disconnect it DisconnectDelay s later, so client read Error first).
+// and setting off -> NetworkGate.Refuse: one reason line first (framework rpc MC.Framework.Refused, their Both MC
+// mods show it under "MC mods:"), then vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version")
+// + peer in vanilla kick list (ZNet.Update disconnect it DisconnectDelay s later, so client read Error first). Peer
+// already in kick list = Skip, so only first MC mod that refuse send its line.
 // Live re-check: player turn me off (or on) while connected -> NetworkGate.PeerStateChanged -> schedule again with
 // same grace. Peer already waiting keep first deadline. Timer = ZNet.Update postfix: empty list = one compare.
 // Feature off mid-grace = list cleared (cancel). Feature on later, or setting switched back to refuse = check all.

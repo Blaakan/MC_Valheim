@@ -21,7 +21,8 @@ namespace MC.Combat.ShieldsTowerWallMod;
 //                 item stands and armor stands still take a two-handed tower; every animator parameter and prefab me
 //                 use exist. NOTE: effect lists, stand lists, ShieldIronSquare recipe, armor slow values, NG+ game
 //                 numbers, training dummy prefab.
-//   tower.rules   wire round trip (layout 2: speed, cooldown, stagger lock), clamp, unknown layout, list parsing,
+//   tower.rules   wire round trip (layout 3: speed, cooldown, stagger lock, AutoTowers, ExcludedTowers), clamp,
+//                 unknown layout and layouts 1 and 2 refused, list parsing,
 //                 rules key, join verdicts, animation names (any case; old ShieldUp read as ShieldPunch), fallback chain, Custom
 //                 trigger set (held attacks refused), lowest BashStagger still a bash, player hits made blockable only
 //                 as PvP attacks, tooltip lines, generation rules, 0.5 s apply delay, Towers validation

@@ -6,11 +6,12 @@ push you back while your stamina lasts. The attack button bashes with the shield
 
 ## Features
 
-- **Which shields.** Every shield that cannot parry at all is a tower shield: the normal game's seven (wood, bone,
-  iron, serpent scale, black metal, flametal and the Nord greatshield) and the ones other mods add, found by their
-  data, for example Warfare's Bronze, Chitin and Carapace tower shields. Shields that arrive later (a server that sends
-  extra items after you join) are picked up too, without a restart. Copies of a tower shield that only creatures carry
-  stay normal. The log lists the shields found this way; `Towers` adds more and `ExcludedTowers` leaves some out.
+- **Which shields.** Every shield with a parry bonus below 1 (it cannot parry at all) is a tower shield: the normal
+  game's seven (wood, bone, iron, serpent scale, black metal, flametal and the Nord greatshield, all with a parry bonus
+  of 0) and the ones other mods add, found by their data, for example Warfare's Bronze, Chitin and Carapace tower
+  shields. Shields that arrive later (a server that sends extra items after you join) are picked up too, without a
+  restart. Copies of a tower shield that only creatures carry stay normal, and so does the iron square shield (parry
+  bonus 1). The log lists the shields found this way; `Towers` adds more and `ExcludedTowers` leaves some out.
 - **Two-handed.** Equipping a tower shield empties both hands. Equipping a one-handed weapon, a torch, another shield,
   a bow, a two-handed weapon or a tool while you hold one puts the tower shield away. It keeps its shield look: in the
   left hand, in the shield slot on your back when you put it away (R, or when you swim), in the shield slot of an
@@ -98,7 +99,8 @@ push you back while your stamina lasts. The attack button bashes with the shield
   | Nord Greatshield | 32 | 320 / 560 / 740 | 12.8 / 29.6 |
 
   Other tower shields (from other mods, or named in `Towers` without a number) get a bash damage from their block
-  armor on the same scale: Warfare's Bronze tower shield (34 armor) 8.4, Chitin (43) 10.2, Carapace (124) 24.4.
+  armor on the same scale: Warfare's Bronze tower shield (34 armor) 8.4, Chitin (43) 10.2, Carapace (124) 24.4 (the
+  tooltip rounds them: 8, 10 and 24).
 
   For scale, creatures stagger at: Greydwarf 12, Skeleton 20, Draugr 50, Draugr Elite 100, Troll 180, Lox 300. So an
   Iron tower shield staggers a Draugr in one bash and a Troll in two to four, now and then five (its stagger bar
@@ -137,7 +139,7 @@ upstream build list them as General, Tower shields, Bracing, Bash.
 | General | Enabled | `true` | Turn the feature on or off. Takes effect immediately. |
 | General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
 | General | AllowPlayersWithoutMod | `false` | Used only by the server (or the host). Off: a player whose game does not have this mod, has it turned off, or has a version that cannot talk to the server's, is refused about a second after joining (or after turning it off); their game shows "Incompatible version". On: such players may play; for them tower shields are normal shields. |
-| Tower shields | AutoTowers | `true` | On: every shield that cannot parry at all (parry bonus 0) is a tower shield, also shields added by other mods, except copies only creatures carry. Off: only the shields named in `Towers`. |
+| Tower shields | AutoTowers | `true` | On: every shield with a parry bonus below 1 (it cannot parry at all; the normal game's tower shields have 0) is a tower shield, also shields added by other mods, except copies only creatures carry. The iron square shield (parry bonus 1) is left out: add it to `Towers` if you want it. Off: only the shields named in `Towers`. |
 | Tower shields | Towers | `ShieldWoodTower:6, ShieldBoneTower:8, ShieldIronTower:12, ShieldSerpentscale:15, ShieldBlackmetalTower:20, ShieldFlametalTower:28, ShieldGoldTower:32` | More tower shields, and the bash damage of each: comma-separated prefab names (the names the spawn command uses), each with the blunt damage of its bash after a colon (0 to 200). Without a number, the bash damage comes from the shield's block armor, on the same scale as the normal-game towers (this is also how shields found by `AutoTowers` get theirs). Only shields are accepted; a shield that can parry loses its parry. Names the game does not know are reported in the log. |
 | Tower shields | ExcludedTowers | (empty) | Shields that are never tower shields, even when `AutoTowers` finds them or `Towers` names them: comma-separated prefab names. |
 | Tower shields | BlockArmorMultiplier | `2.5` | Tower shield block armor is multiplied by this, also the armor gained per quality level (1 to 10). |
@@ -158,10 +160,10 @@ upstream build list them as General, Tower shields, Bracing, Bash.
 | Bash | BashRange | `1.8` | Reach of the bash in meters (1 to 3). |
 | Bash | BashAngle | `60` | Width of the bash arc in degrees (10 to 180). Every enemy in it takes the bash's damage and push, but only the one nearest the middle of the swing takes its heavy stagger. |
 
-Shields from other mods that cannot parry are tower shields without any setting. To make another shield a tower
-shield, add its prefab name to `Towers` (for example `ShieldIronSquare:12` for the iron square shield, which keeps a
-parry bonus of 1 and is not found automatically). To keep one normal, add it to `ExcludedTowers`. An item that is not
-a shield is refused with a log warning.
+Shields from other mods with a parry bonus below 1 are tower shields without any setting. To make another shield a
+tower shield, add its prefab name to `Towers` (for example `ShieldIronSquare:12` for the iron square shield, which
+keeps a parry bonus of 1 and is not found automatically). To keep one normal, add it to `ExcludedTowers`. An item that
+is not a shield is refused with a log warning.
 
 ## Multiplayer
 
@@ -176,6 +178,17 @@ refuses players who cannot play by its rules, and its settings apply to everyone
   mod that cannot talk to the server's. The server log names the player and the reason. A player who turns the mod off
   while connected is refused about a second later. The server (or host) can let such players in with
   `AllowPlayersWithoutMod = true`; for them tower shields are normal shields.
+- **The refused player's screen says why**: below "Incompatible version" it lists Tower Shield Wall under "MC mods:"
+  with the reason (your game does not have it, has another version, or has it turned off or cannot run it) and what
+  to do. With Jotunn on the server and on your game, Jotunn's window shows the same lines under "Failed Connection:";
+  with Jotunn only on your game, the vanilla panel shows them. This needs at least one MC mod in your game that is
+  made to run on both the server and the players (any mod a server can refuse you for, this one included, or Sleep
+  Through the Day); the server does not need to have that mod. A game whose MC mods are all client-side shows only
+  "Incompatible version". When a server refuses you for several MC mods, the screen names the first one that refused
+  you; once that one is fixed, the next join names the next one. When the server sends no line (a refusal that is not
+  about an MC mod, or a server with an older version of the MC mods), the screen lists what your own game noticed
+  while connected: an MC mod turned off while the server has it on, or a server copy whose version cannot play with
+  yours. That may not be why you were refused.
 - **The server's settings apply to everyone** (your log says "Using the server's tower shield rules"), also when the
   host changes them during play (about a second later, without re-equipping). Your own settings apply again in
   single player and when you host. For the same reason `BashAnimation` and `BashAnimationSpeed` follow the server: try
@@ -215,7 +228,8 @@ refuses players who cannot play by its rules, and its settings apply to everyone
   normal world. A bash that staggers a creature always alerts it, so the hit that follows is never a sneak attack.
 - **The Serpent scale shield counts as a tower shield** (it has tower shield data: no parry, slow, heavy). The iron
   square shield (`ShieldIronSquare`) does not by default; add it to `Towers` if you want it.
-- **Shields from other mods**: whether a modded shield is a tower shield depends only on its data (no parry at all).
+- **Shields from other mods**: whether a modded shield is a tower shield depends only on its data (a parry bonus
+  below 1, so no parry at all).
   A content mod whose tower shield can parry needs `Towers`; one whose round shield cannot parry needs
   `ExcludedTowers`. The log line "Tower shields: ...; found automatically: ..." says which ones were found. A mod that
   makes its own copy of a normal-game tower shield after this mod changed it (some item editors do this after you

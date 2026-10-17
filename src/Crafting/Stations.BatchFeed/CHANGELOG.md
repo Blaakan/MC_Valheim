@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+- First release.
+
 ## 0.1.1
 
 - Fixed: the hover hint now follows a station that changes while you keep looking at it. When another mod turns a

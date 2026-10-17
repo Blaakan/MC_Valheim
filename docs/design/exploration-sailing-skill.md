@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Sailing revamp` |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/`; research briefs on ship physics, the custom skill and the Both-side framework (2026-10-01); sources of blaxxun-boop SkillManager, Jotunn SkillManager, Smoothbrain Sailing, GrindstoneSkills and ImpactfulSkills read on GitHub by the skill brief (2026-10-01). Ship prefab values are not in `.ref`: the in-world self tests measured them in 1.0.16 (section 9). |
-| Status | Implemented (v0.1.0 code), build OK; smoke test and all six in-world self tests passed 2026-10-01 on the final code (earlier runs: one wrong `sailing.math` check and one noisy `sailing.ship` sample, both fixed); in-game tests pending. v0.1.1 (the HUD wind icon follows the game that simulates the ship, D17; the sail response also scales the game's smoothing velocity, so the sail force no longer swings past its target, D18) builds; its self tests have not been run yet |
+| Status | Implemented (v0.1.0 code), build OK; smoke test and all six in-world self tests passed 2026-10-01 on the final code (earlier runs: one wrong `sailing.math` check and one noisy `sailing.ship` sample, both fixed); in-game tests pending. v0.1.1 (the HUD wind icon follows the game that simulates the ship, D17; the sail response also scales the game's smoothing velocity, so the sail force no longer swings past its target, D18) builds; its self tests have not been run yet. v0.1.2 (2026-10-16, framework screen fixes 2026-10-17): the join check refuses through `NetworkGate.Refuse`, so the refused player's error screen names the mod, the reason and what to do when their game has an MC mod made to run on both the server and the players (4.2, 4.3) |
 
 ## Goal
 
@@ -321,6 +321,12 @@ Flagged items are repeated at the pause.
 
 - RPCs `MC.Exploration.Sailing.Skill.Settings` (server -> client, `SailingRules` layout 1) and `.SettingsRequest`
   (client -> server, int layout). Vanilla peers ignore unknown RPCs.
+- The framework's own RPCs (`src/Shared/Framework/NetworkGate.cs`, not this mod's code): `<GUID>.Hello` (client ->
+  server, network version, release version and whether the client's copy is on), `<GUID>.HelloAck` (server -> client,
+  the server's state and versions) and `<GUID>.HelloState` (client -> server, `"on"` / `"off"` while connected); and
+  since 0.1.2 `MC.Framework.Refused` (server -> client, `"<mod name>\t<line>"`, one name shared by every MC mod), sent
+  by `NetworkGate.Refuse` just before the vanilla `Error` RPC when the join check refuses a player (4.3). Every Both MC
+  mod on the player's game registers it per connection (`RefusalNotes`).
 - ZDO key `MC.Exploration.Sailing.Skill.Level` (float) on each player's own player ZDO. Vanilla games ignore it; it is
   not saved with the world (player ZDOs are per session).
 - Skill id 697262889 in character saves: never change it.
@@ -332,7 +338,16 @@ Copy of Sneak Ambush's `PlayerCheck` / `ServerRules` / `ZNetPatches`, with Weapo
 the last change) and `_active` guard in `OnSettings`, and Creature Morale's push filter (`NetworkGate.PeerCompatible`).
 A client of a server never plays by its own config: until readable server rules arrive, no XP and no effect (vanilla).
 The server refuses players without the mod, with it turned off or with another network version, after a 1 s grace
-(`AllowPlayersWithoutMod`, default off).
+(`AllowPlayersWithoutMod`, default off). Since 0.1.2 it refuses through `NetworkGate.Refuse(peer)`: first the reason
+line `MC.Framework.Refused` (4.2), then the vanilla `Error` RPC with `ErrorVersion` ("Incompatible version" on their
+screen; when their game has at least one MC mod made to run on both the server and the players, whether or not the
+server has that mod, the screen adds an "MC mods:" block with the server's line: "this server requires it (version X)
+and your game does not have it. Install it.", "the server has version X and your game Y, and they cannot play
+together. Install version X.", or "it is turned off or cannot run in your game, and this server requires it. Turn it
+on in Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and join
+again."). Only the first MC mod that refuses a player sends its line (a later check skips a peer already in the kick
+list): when a server refuses a player for several MC mods, the screen names the first one that refused them; once
+that one is fixed, the next join names the next one.
 
 ### 4.4 Hand-off cases
 
@@ -462,8 +477,9 @@ skills changed by a test are restored from a `Skills.Save` copy; every ship is d
 
 ### 7.6 Shared framework used
 
-`ModPlugin`, `[AlwaysOnPatch]`, `NetworkGate` (`PeerCompatible`, `PeerProblem`, `PeerStateChanged`), `PatchGuard`,
-`Log`, `SelfTest`. No change to `src/Shared`.
+`ModPlugin`, `[AlwaysOnPatch]`, `NetworkGate` (`PeerCompatible`, `PeerProblem`, `PeerStateChanged`; `Refuse` since
+0.1.2, added to the framework for every mod that refuses players), `PatchGuard`, `Log`, `SelfTest`. No change to
+`src/Shared` for this mod.
 
 ### 7.7 Implementation notes
 
@@ -486,7 +502,7 @@ skills changed by a test are restored from a `Skills.Save` copy; every ship is d
   earns, M05 best sailor protects, M06 personal map reveal, M07 hand-off to a player without the mod, M08 server
   without the mod, M09 turned off refused, M10 other network version, M11 dedicated server, M12 rudder on a ship
   another game simulates, M13 wind icon on a ship a player without the mod simulates, M14 wind icon on a ship another
-  player with the mod simulates (0.1.1).
+  player with the mod simulates (0.1.1), M15 the refusal screen names the mod (0.1.2).
 - **Cross-mod:** X01 Encyclopedia, X02 Swim Dive, X03 Sneak Ambush, X04 other sailing mods.
 
 ## 9. Open questions and unverified
@@ -536,3 +552,20 @@ skills changed by a test are restored from a `Skills.Save` copy; every ship is d
   check: `CatchUp(100, 1, 1) < 1` is false in single precision (`1 - exp(-100)` rounds to exactly 1); the formula was
   right (the real maximum is 5/s x 0.02 s = 9.5% per step), the check now tests the largest setting and "never past
   the target".
+- Refusal screen (0.1.2, 2026-10-16; framework fixes 2026-10-17): `PlayerCheck.Refuse` calls `NetworkGate.Refuse(peer)`
+  in place of its own `Error` call, so the refused player first gets one reason line (`MC.Framework.Refused`, 4.2) and
+  `RefusalNotes` adds an "MC mods:" block to their "Incompatible version" screen (`docs/modding/framework.md`, "Who
+  needs to install it, and multiplayer"). Only an MC mod made to run on both the server and the players (any mod a
+  server can refuse you for, or Sleep Through the Day) listens for the line and patches the screen, whether or not the
+  server has that mod; a game whose MC mods are all client-side shows only "Incompatible version". When the server
+  sent a line, only the server's lines are shown. One line per refusal: when a server refuses a player for several MC
+  mods, the screen names the first one that refused them; once that one is fixed, the next join names the next one.
+  When the server sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC
+  mods), the screen lists what the player's own game noticed while connected: an MC mod turned off while the server
+  has it on, or a server copy whose version cannot play with theirs; that may not be why they were refused. With
+  Jotunn on the server and on the player's game, Jotunn's window shows the same lines under "Failed Connection:"; with
+  Jotunn only on the player's game, the vanilla panel shows them.
+  `probe.mp.off.MC.Exploration.Sailing.Skill` and `probe.refusal` passed on 2026-10-17 on the code before the framework
+  fixes (the screen named only this mod, with the old wording of the line); the fixes (new wording, only the server's
+  lines when it sent any, notes kept per connection object) have not run yet. Texts: 4.2, 4.3, 7.6; README (config
+  row, Multiplayer), CHANGELOG 0.1.2, `TESTING.md` (M10's build now also sets `-p:Version=0.0.9`, M15).

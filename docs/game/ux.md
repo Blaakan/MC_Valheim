@@ -442,7 +442,7 @@ Local, except player-position pins (`ZNet.GetOtherPublicPlayers`) and pings/shou
   - `GetKeyDown/GetKey/GetKeyUp(KeyCode)`: the low-level path through `Keyboard.current` / `Mouse.current` / `Gamepad.current`
   - `GetMouseButton*`
   - `GetButtonPressedTimer`, `GetButtonLastPressedTimer`
-  - `ResetButtonStatus(name)`: swallows a press for the rest of the frame (used heavily by `InventoryGui`)
+  - `ResetButtonStatus(name)`: forgets the press of that one button (`ButtonDef.ResetState` clears pressed and held, so it stays released until the control is pressed again); other buttons bound to the same control keep the press (used heavily by `InventoryGui`)
   - `IsGamepadActive()`, `IsExclusiveGamepadActive()`, `IsMouseActive()`, `IsTouchActive()`, `ZInput.pointerPosition`
 - Default keyboard and mouse buttons (from `ResetKBMButtons`; rebindable ones are marked):
   - Movement: `Forward/Left/Backward/Right` WASD, `Jump` Space, `Crouch` LCtrl, `Run` LShift, `AltPlace` LShift, `ToggleWalk` C, `AutoRun` Q, `Sit` X, `Hide` R

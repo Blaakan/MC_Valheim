@@ -4,7 +4,12 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.2.1 (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.0
+**Build under test:** 1.0.0 (first release; before that 0.2.1) (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.2.1
+was corrected on 2026-10-17 (screen texts, no line left from an earlier connection, `AutoTowers` description; built
+Debug and Release with no warning, not deployed and not run in the game yet). The same day T38 was reworded and reset
+(with `AutoTowers` on, a vanilla tower shield taken out of `Towers` stays a tower shield, so T38 turns `AutoTowers` off
+first, as its self-test does since 0.2.0), and T50, T54 and T56 now expect what the game shows (the tooltip rounds the
+bash damage; `ExcludedTowers` writes the "Tower shields: ..." Info line again). 0.2.0
 (2026-10-16) finds tower shields from other mods by their data (`AutoTowers`, `ExcludedTowers`, bash damage from block
 armor for towers without a number; rules layout 3, network version 3): T17 and T40 are reset, T50-T56 and M19 are new
 (section "0.2.0"). Verified on 2026-10-16 (Valheim 1.0.20, Warfare 1.9.4 and Jotunn 2.30.2 installed): built Debug and
@@ -232,12 +237,16 @@ to the hit, estimated from the clip data; T34).
   instead. Expected: nothing swings by itself, no punch and no sword swing: the press was waiting for the next bash
   only. (A press made less than half a second before the switch may still start an attack, as in the normal game.)
   *Automated: `tower.press`.*
-- [x] **T38 Tower shield leaves the list mid-bash:** set `BashAnimationSpeed = 0.3` (a slow swing), bash a `Troll`
-  and, during the swing, remove `ShieldIronTower` from `Towers` (on a server the host does it). Expected: no hit and
-  no damage number from that bash; the shield in your hand is a normal one-handed shield at once (no "Two-handed" on
-  its tooltip, normal block armor), the Braced icon is gone, the rest of the swing plays at its normal speed, and the
-  log has no "...; using ..." Warning about the bash animation. (Hard to time by hand: the `tower.switch` self-test
-  checks the same case, so mark this `[-]` if you cannot make it.)
+- [ ] **T38 Tower shield leaves the list mid-bash:** on a server, the host makes every setting change of this item
+  (the server's settings apply to everyone, so a change in a client's own config does nothing). Set
+  `AutoTowers = false` first (with it on, `ShieldIronTower` stays a tower shield without being in `Towers`: AutoTowers
+  finds it by its data) and `BashAnimationSpeed = 0.3` (a slow swing). Bash a `Troll` and, during the swing, remove
+  `ShieldIronTower` from `Towers`.
+  Expected: no hit and no damage number from that bash; the shield in your hand is a normal one-handed shield at once
+  (no "Two-handed" on its tooltip, normal block armor), the Braced icon is gone, the rest of the swing plays at its
+  normal speed, and the log has no "...; using ..." Warning about the bash animation. Put `Towers` and
+  `AutoTowers = true` back afterwards. (Hard to time by hand: the `tower.switch` self-test checks the same case, so
+  mark this `[-]` if you cannot make it.)
   *Automated: `tower.switch`.*
 - [x] **T39 No parry adrenaline, with a trinket:** as T27, but wear any trinket first (for example
   `TrinketBronzeHealth`, a name from Trinkets On Demand's `TESTING.md`), with its adrenaline bar not full. Without a
@@ -332,10 +341,12 @@ to the hit, estimated from the clip data; T34).
   staggered (the 8 s limit applies to both).
   *Partly automated (`tower.mp.creature`, `tower.lock`); by hand: Two tower shield players bashing the same Draugr in
   turn (and the cross-game part until tower.mp.creature has passed once).*
-- [ ] **M14 Other network version refused:** build a copy with another network version (`dotnet build
-  src/Combat/Shields.TowerWall/MC.Combat.Shields.TowerWall.csproj -p:ModNetworkVersion=4 -p:DeployToGame=false`), copy
-  `src/Combat/Shields.TowerWall/bin/Debug/MC.Combat.Shields.TowerWall.dll` over the friend's copy (put the normal build
-  back afterwards: build again without `-p:ModNetworkVersion=4` and copy it the same way). The friend joins. Expected:
+- [ ] **M14 Other network version refused:** build a copy with another network version and another version number
+  (`dotnet build src/Combat/Shields.TowerWall/MC.Combat.Shields.TowerWall.csproj -p:ModNetworkVersion=4
+  -p:Version=0.0.9 -p:DeployToGame=false`; without the version number the refusal screen of M20 would name the same
+  version twice), copy `src/Combat/Shields.TowerWall/bin/Debug/MC.Combat.Shields.TowerWall.dll` over the friend's copy
+  (put the normal build back afterwards: build again without the two overrides and copy it the same way). The friend
+  joins. Expected:
   refused ("Incompatible version") about a second after joining; the server log says "their game has another version
   of the mod (network version 4, the server has 3)". With `AllowPlayersWithoutMod = true` they may play: their MC Mods
   panel says the versions cannot talk to each other, and their tower shields are normal. (A friend still on 0.1.x,
@@ -450,21 +461,23 @@ turned off. Not run in the game yet.
 
 ## 0.2.0 — tower shields from other mods
 
-0.2.0 (2026-10-16) makes every shield that cannot parry at all a tower shield, also shields added by other mods
-(design 2.0.2): `AutoTowers` (on by default), `ExcludedTowers`, and a bash damage from block armor for towers without
-a number in `Towers`. The self-test `tower.thirdparty` uses the stand-in content mod of the test scripts
-(`tests/Probes/Core.Probe.Content`: shields added the way blaxxun ItemManager and Jotunn add them, and one added after
-the world loaded) and, when Warfare is installed, Warfare's real shields. Setup for the Warfare items: install Warfare
-(Therzie) 1.9.4; its shield prefabs: `ShieldBronzeTower_TW`, `ShieldChitinTower_TW`, `ShieldCarapaceTower_TW` (tower
-shields), `ShieldBronzeBanded_TW`, `ShieldChitin_TW` (round), `ShieldChitinBuckler_TW`, `ShieldSilverBuckler_TW`,
-`ShieldBlackmetalBuckler_TW` (bucklers), read from the game data on 2026-10-16.
+0.2.0 (2026-10-16) makes every shield with a parry bonus below 1 (it cannot parry at all) a tower shield, also shields
+added by other mods (design 2.0.2): `AutoTowers` (on by default), `ExcludedTowers`, and a bash damage from block armor
+for towers without a number in `Towers`. The self-test `tower.thirdparty` uses the stand-in content mod of the test
+scripts (`tests/Probes/Core.Probe.Content`: shields added the way blaxxun ItemManager and Jotunn add them, and one
+added after the world loaded) and, when Warfare is installed, Warfare's real shields. Setup for the Warfare items:
+install Warfare (Therzie) 1.9.4; its shield prefabs: `ShieldBronzeTower_TW`, `ShieldChitinTower_TW`,
+`ShieldCarapaceTower_TW` (tower shields), `ShieldBronzeBanded_TW`, `ShieldChitin_TW` (round),
+`ShieldChitinBuckler_TW`, `ShieldSilverBuckler_TW`, `ShieldBlackmetalBuckler_TW` (bucklers), read from the game data
+on 2026-10-16.
 
 - [ ] **T50 Warfare's tower shields:** with Warfare installed, load a world while `./tools/Watch-Log.ps1 -Mine` runs.
   Expected: the line "Tower shields: ...; found automatically: ShieldBronzeTower_TW, ShieldCarapaceTower_TW,
   ShieldChitinTower_TW; left out as creature-only: FW_ShieldBlackmetalTower, SP_ShieldBlackmetalTower." Then
   `spawn ShieldBronzeTower_TW 1 1 p` (and the Chitin and Carapace ones) and equip each with a sword in hand. Expected:
   the sword is put away, the shield is two-handed, its tooltip says "Two-handed" and "Cannot parry" and lists a bash
-  of 8.4 (Bronze), 10.2 (Chitin) or 24.4 (Carapace) blunt; jogging is slow (as T05); a bash plays (as T12).
+  of 8 (Bronze), 10 (Chitin) or 24 (Carapace) blunt (the tooltip rounds the real values 8.4, 10.2 and 24.44); jogging
+  is slow (as T05); a bash plays (as T12).
   *Partly automated (`tower.thirdparty`); by hand: A real game with Warfare: the log line as read, the tooltip and
   equipping as seen, one bash.*
 - [ ] **T51 Warfare's other shields stay normal:** `spawn ShieldBronzeBanded_TW 1 1 p`, `ShieldChitin_TW` and
@@ -481,8 +494,10 @@ shields), `ShieldBronzeBanded_TW`, `ShieldChitin_TW` (round), `ShieldChitinBuckl
   *Automated: `tower.thirdparty`, `tower.creature`.*
 - [ ] **T54 ExcludedTowers:** set `ExcludedTowers = ShieldIronTower` (with a `ShieldIronTower` in your inventory).
   Expected: it is a normal one-handed shield at once (tooltip, equip with a sword); the other tower shields are
-  unchanged; the log says nothing about it. Clear the setting. Expected: two-handed again. With Warfare:
-  `ExcludedTowers = ShieldBronzeTower_TW` does the same to Warfare's Bronze tower shield.
+  unchanged; no Warning in the log, only the Info line "Tower shields: N; found automatically: ..." again, with N one
+  lower than before. Clear the setting. Expected: two-handed again, and the Info line with N back up. With Warfare:
+  `ExcludedTowers = ShieldBronzeTower_TW` does the same to Warfare's Bronze tower shield (it also leaves the line's
+  "found automatically" list).
   *Partly automated (`tower.thirdparty` on a stand-in tower); by hand: The same with a vanilla or Warfare tower shield
   in a real game.*
 - [ ] **T55 AutoTowers off:** set `AutoTowers = false`. Expected: the seven normal-game tower shields stay tower
@@ -490,8 +505,9 @@ shields), `ShieldBronzeBanded_TW`, `ShieldChitin_TW` (round), `ShieldChitinBuckl
   Towers (AutoTowers is off)". Set it back to true.
   *Partly automated (`tower.thirdparty`); by hand: With Warfare installed, Warfare's tower shields as seen.*
 - [ ] **T56 Bash damage from block armor:** add `ShieldIronSquare` (no number) to `Towers`. Expected: the iron square
-  shield becomes a tower shield whose tooltip lists a bash of 8.6 blunt (block armor 35); with `ShieldIronSquare:12`
-  it lists 12. The seven normal-game towers keep 6 / 8 / 12 / 15 / 20 / 28 / 32.
+  shield becomes a tower shield whose tooltip lists a bash of 9 blunt (8.6 from its normal block armor 35, rounded by
+  the tooltip); with `ShieldIronSquare:12` it lists 12. The seven normal-game towers keep 6 / 8 / 12 / 15 / 20 / 28 /
+  32.
   *Partly automated (`tower.rules`, `tower.thirdparty`); by hand: The iron square shield's tooltip as read.*
 - [ ] **M19 Server's AutoTowers and ExcludedTowers:** the host sets `ExcludedTowers = ShieldBronzeTower_TW` (Warfare
   on both games), then `AutoTowers = false`. Expected: for the client, Warfare's Bronze tower shield is a normal shield
@@ -502,14 +518,34 @@ shields), `ShieldBronzeBanded_TW`, `ShieldChitin_TW` (round), `ShieldChitinBuckl
 
 0.2.1 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
 under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
-needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
-connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Combat.Shields.TowerWall` passed, the screen named this
-mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+needs to install it, and multiplayer"). This needs at least one MC mod in your game that is made to run on both the
+server and the players (any mod a server can refuse you for, this one included, or Sleep Through the Day); the server
+does not need to have that mod. A game whose MC mods are all client-side shows only "Incompatible version". When a
+server refuses you for several MC mods, the screen names the first one that refused you; once that one is fixed, the
+next join names the next one. When the server sends no line (a refusal that is not about an MC mod, or a server with
+an older version of the MC mods), the screen lists what your own game noticed while connected: an MC mod turned off
+while the server has it on, or a server copy whose version cannot play with yours (that may not be why you were
+refused). With Jotunn on the server and on your game, Jotunn's window shows the same lines under
+"Failed Connection:"; with Jotunn only on your game, the vanilla panel shows them. Run on 2026-10-17 (dedicated test
+server) on the first version of these texts: `probe.mp.off.MC.Combat.Shields.TowerWall` passed, the screen named
+this mod both times (turned off while in, joining with it off); `probe.refusal` passed. Changed after that run
+(2026-10-17, framework): the turned-off line also names F1 for players with a configuration manager, a line from an
+earlier connection can no longer show up, and `probe.mp.off.MC.Combat.Shields.TowerWall` now also fails when the
+block lists a mod that did not refuse the player. Not run again yet.
 
-- [ ] **M20 Refusal screen names the mod:** on a server with Tower Shield Wall, turn Tower Shield Wall off in Esc > MC Mods while you
-  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Tower Shield Wall: it is turned
-  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
-  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
-  join: you stay in.
-  *Partly automated (`probe.mp.off.MC.Combat.Shields.TowerWall`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
-  window, and a game with another version of the mod than the server's (the line names both versions).*
+- [ ] **M20 Refusal screen names the mod:** on a server with Tower Shield Wall, turn Tower Shield Wall off in Esc > MC
+  Mods while you are in. Expected: you go back to the menu, and the "Incompatible version" screen lists under
+  "MC mods:" only "- Tower Shield Wall: it is turned off or cannot run in your game, and this server requires it. Turn
+  it on in Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and
+  join again." (With Jotunn on the server and on your game: the same lines in Jotunn's window, under
+  "Failed Connection:"; with Jotunn only on your game: in the vanilla panel.) Join again with it off: the same. Turn it
+  on and join: you stay in. A friend with the copy built as in M14 joins. Expected: their line reads
+  "- Tower Shield Wall: the server has version X and your game 0.0.9, and they cannot play together. Install version
+  X." (X = the server's version of the mod). A friend without Tower Shield Wall joins who has another MC mod made to
+  run on both the server and the players (any mod a server can refuse you for, or Sleep Through the Day; the server
+  does not need to have it) and no other reason to be refused (else the screen may name the first MC mod that refused
+  them).
+  Expected: their line reads "- Tower Shield Wall: this server requires it (version X) and your game does not have it.
+  Install it."
+  *Partly automated (`probe.mp.off.MC.Combat.Shields.TowerWall`, `probe.refusal`); by hand: The screen as seen, also
+  inside Jotunn's window; the lines of the friend with the copy built as in M14 and of the friend without the mod.*

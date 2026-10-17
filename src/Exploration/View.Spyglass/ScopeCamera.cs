@@ -16,11 +16,21 @@ namespace MC.Exploration.ViewSpyglassMod;
 //   fog      thinner in clear weather, only with Distant Horizons (same curve as the overlay)
 //   far view Distant Horizons told where we look and how strong the zoom (ViewBoost)
 // Mouse wheel zoom of vanilla (camera distance) kept still while the spyglass is up (prefix save, postfix put back).
+// Death is the one place vanilla does NOT rewrite the position: dead player with a body = camera only turned to the
+// body, left where the last living frame put it (GameCamera.UpdateCamera). That spot was me eye spot, so first dead
+// frame me put it back where vanilla (and camera mods) had it before me slide that last frame (DeathView).
 internal static class ScopeCamera
 {
     internal const string DistantHorizonsGuid = "MC.Exploration.View.DistantHorizons";
     private const float BodyHideDistance = 0.45f;   // camera this close to the eye = inside the head
     private const float VanillaHideDistance = 2f;   // Player.FixedUpdate: camera this close to the feet = body hidden
+
+    // Last frame me slid the camera (Time.frameCount), where me left it, where it was before me slide, and the near
+    // plane vanilla had set before me lowered it. Restore never clear them: death abort come before the dead frame.
+    private static int _slidFrame = -10;
+    private static Vector3 _slidTo;
+    private static Vector3 _slidFrom;
+    private static float _slidFromNear;
 
     private static bool _applied;
     private static bool _bodyHidden;
@@ -53,6 +63,8 @@ internal static class ScopeCamera
     // UpdateCamera postfix.
     internal static void After(GameCamera cam, float savedDistance)
     {
+        // Me slid the camera on the frame just before this one? Only then can a dead frame have it in the eye.
+        var slidLastFrame = _slidFrame == Time.frameCount - 1;
 #if DEBUG
         if (TestPoseView)
         {
@@ -77,6 +89,10 @@ internal static class ScopeCamera
                 Restore();
             }
             _dhChecked = false;
+            if (slidLastFrame)
+            {
+                DeathView(cam);
+            }
             return;
         }
         var player = Player.m_localPlayer;
@@ -84,6 +100,10 @@ internal static class ScopeCamera
             || (Game.instance != null && Game.instance.IsShuttingDown()))
         {
             Scope.Abort();
+            if (slidLastFrame)
+            {
+                DeathView(cam);
+            }
             return;
         }
         if (!_dhChecked)
@@ -102,13 +122,22 @@ internal static class ScopeCamera
 
         var t = cam.transform;
         var eye = player.m_eye;
-        t.position = Vector3.Lerp(t.position, eye.position, c);
+        var from = t.position;
+        var fromNear = cam.m_camera.nearClipPlane;
+        t.position = Vector3.Lerp(from, eye.position, c);
         t.rotation = Quaternion.Slerp(t.rotation, eye.rotation, c);
         // Vanilla near plane (0.5 m in the open) was picked for its own spot behind the player: at the eye a wall or
         // roof right before the face would be cut away. Vanilla write its value again next frame.
         if (c > 0f && cam.m_camera.nearClipPlane > cam.m_nearClipPlaneMin)
         {
             cam.m_camera.nearClipPlane = cam.m_nearClipPlaneMin;
+        }
+        if (c > 0f)
+        {
+            _slidFrame = Time.frameCount;
+            _slidTo = t.position;
+            _slidFrom = from;
+            _slidFromNear = fromNear;
         }
 
         var baseFov = cam.m_camera.fieldOfView;
@@ -153,8 +182,45 @@ internal static class ScopeCamera
         return Mathf.Atan(half) * 2f * Mathf.Rad2Deg;
     }
 
+    // First frame after a slide, spyglass dropped. Local player dead with a body: vanilla UpdateCamera only turned the
+    // camera to the body (LookAt) from where it was, me eye spot, and never move it again while body there (till
+    // Ragdoll.DestroyNow). Me put it where it was before me slide (vanilla's third-person spot of that last frame,
+    // behind the eye's look then, or a camera mod's), turned to the body the same way with vanilla's shake kept, and
+    // give back the near plane vanilla had there (dead path never set it). Camera moved by someone else this frame (a
+    // camera mod's own death view) = theirs, left alone. No body = vanilla place the camera itself every frame
+    // (GetCameraPosition): nothing to do.
+    private static void DeathView(GameCamera cam)
+    {
+        var player = Player.m_localPlayer;
+        if (player == null || !player.IsDead() || GameCamera.InFreeFly() || cam.m_camera == null)
+        {
+            return;
+        }
+        var ragdoll = player.GetRagdoll();
+        if (ragdoll == null)
+        {
+            return;
+        }
+        var t = cam.transform;
+        if ((t.position - _slidTo).sqrMagnitude > 0.0001f)
+        {
+            return;
+        }
+        var body = ragdoll.GetAverageBodyPosition();
+        var fromEye = body - t.position;
+        var fromBack = body - _slidFrom;
+        t.position = _slidFrom;
+        if (fromEye.sqrMagnitude > 0.000001f && fromBack.sqrMagnitude > 0.000001f)
+        {
+            // Rotation now = look at body from eye spot, then shake (UpdateCameraShake): same shake on the new look.
+            var shake = Quaternion.Inverse(Quaternion.LookRotation(fromEye)) * t.rotation;
+            t.rotation = Quaternion.LookRotation(fromBack) * shake;
+        }
+        cam.m_camera.nearClipPlane = _slidFromNear;
+    }
+
     // Everything this class changed back (Scope.Abort, end of lowering, feature off). Camera itself: vanilla next
-    // frame.
+    // frame (not after a death: DeathView).
     internal static void Restore()
     {
         _applied = false;

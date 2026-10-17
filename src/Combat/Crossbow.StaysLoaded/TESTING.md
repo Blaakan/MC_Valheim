@@ -4,6 +4,8 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
+**Build under test:** 1.0.0 (first release), build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the MC Mods panel. The history below lists the earlier builds.
+
 **Builds:**
 - *Draft* — deployed 2026-09-28 (built from `645be49` + local changes). The one being tested first. T01–T17, M01–M05.
 - *v0.2* (still version 0.1.0) — **deployed 2026-09-28 evening**, build id = the git commit shown in the `[MC:ready]`

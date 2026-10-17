@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
+**Build under test:** 1.0.0 (first release; before that 0.1.3) (the death camera fix, section "0.1.3"; before that 0.1.2, the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Smoke
 test (`./tools/Test-Smoke.ps1 -Mod Spyglass`) passed 2026-10-02 (loads, patches cleanly, JitCheck clean). In-world
 self-tests (`./tools/Test-InWorld.ps1 -Mod View.Spyglass`) passed 2026-10-02, with Distant Horizons on:
 `spyglass.network`, `spyglass.item` (registration, recipe, tool taking both hands, no punch, dropped copy),
@@ -55,6 +55,13 @@ Items: `spawn MC_Spyglass` drops a spyglass at your feet, `spawn Bronze 2` and `
 Creatures: `spawn Greyling`, `spawn Boar`. Time and weather: `tod 0.5` (noon), `tod -1` (normal time); `env Clear`
 forces clear weather, `resetenv` gives the normal weather back. `goto <x> <z>` (whole numbers) teleports you far away;
 `debugmode` then `Z` flies. A good far view: a mountain top or a hill above the sea, in clear weather at noon.
+Multiplayer: a dedicated server or a host with the mod, and a second game. For M09's other-version case, make a copy
+with another version without deploying it: `dotnet build
+src/Exploration/View.Spyglass/MC.Exploration.View.Spyglass.csproj -p:ModNetworkVersion=99 -p:Version=0.0.9
+-p:DeployToGame=false` (both properties: with only another network version the line would name the same version
+twice), copy `src/Exploration/View.Spyglass/bin/Debug/MC.Exploration.View.Spyglass.dll` over the second game's copy in
+`BepInEx/plugins/MC_Valheim/Exploration/MC.Exploration.View.Spyglass/`, and put the normal build back afterwards
+(build again without the two properties and copy it the same way).
 
 **Names checked:** `MC_Spyglass`, `Bronze`, `Crystal`, `Torch`, `KnifeFlint` and `forge` are resolved by the
 `spyglass.item` self-test (1.0.16); `Greyling` and `Boar` are spawned by other MC test lists; every console command
@@ -176,7 +183,7 @@ changed one back afterwards.
   *Automated: `spyglass.lowers`, `spyglass.input.esc`, `spyglass.relog.logout`.*
 - [ ] **T23 Clean log:** after T01-T22, the log has no error or warning from Spyglass (`./tools/Watch-Log.ps1 -Mine`).
   *Partly automated (`spyglass.log`, `spyglass.item`); by hand: After the parts only a person can do (T17 render
-  scale, T19 restart, T22 logout and reload, T26 real death), check the log for Spyglass warnings or errors.*
+  scale, T19 restart, T22 logout and reload), check the log for Spyglass warnings or errors.*
 - [x] **T24 Click at a ship's helm:** hold the spyglass, take the helm of a ship (`spawn Karve` on water) and left
   click. Expected: the click lets go of the helm, as in the normal game, and the spyglass does not go up (this is the
   right result for the helm, where T10 says "nothing happens").
@@ -186,12 +193,14 @@ changed one back afterwards.
   only limits the view, it does not change the zoom you picked. If you used the wheel while the limit was 3, the zoom
   it reached is kept instead.
   *Automated: `spyglass.zoom-pick`, `spyglass.wheel`.*
-- [!] **T26 Death while looking:** `god` off, low health; stand in a fire, raise the spyglass while burning and die
-  from the burning without lowering it. Expected: at death the normal view comes back at once (no round view, blur,
-  dark ring, cleared fog or missing body on the death camera) and the log has no error; after you respawn the view is
-  normal and the spyglass is down (it is on the tombstone); once picked up again it can be raised.
-  **FAILED:** automated test: after dying with the spyglass raised, the death camera stays at the dead player's eye
-  until the respawn, instead of the normal view from outside the body (self-test `spyglass.bug.death-camera`)
+- [ ] **T26 Death while looking:** `god` off, low health; stand in a fire, raise the spyglass while burning and die
+  from the burning without lowering it. Expected: at death the normal death view comes back at once: the camera looks
+  at your body from the normal third-person spot behind you (where it would be without the spyglass; not from inside
+  your head), with no round view, blur, dark ring, cleared fog or missing body, and it stays out of your head until
+  you respawn; the log has no error; after you respawn the view is normal and the spyglass is down (it is on the
+  tombstone); once picked up again it can be raised. Its self-test `spyglass.death` is parked
+  (`tests/parked-selftests.txt`) until a run shows it passes: until then it ticks nothing (section "0.1.3").
+  *Automated: `spyglass.death`.*
 - [x] **T27 Click while it comes down:** raise, left click to lower, and click again before it is fully down.
   Expected: it goes back up from where it was (the camera and the round view do not jump), and the next click lowers
   it as usual.
@@ -275,14 +284,53 @@ changed one back afterwards.
 
 0.1.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
 under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
-needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
-connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Exploration.View.Spyglass` passed, the screen named this
-mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+needs to install it, and multiplayer"). The server sends the line just before its refusal. The block needs at least
+one MC mod on the refused game that is made to run on both the server and the players (any mod a server can refuse
+you for, or Sleep Through the Day); the server does not need to have that mod. A game whose MC mods are all
+client-side shows only "Incompatible version". When a server refuses a player for several MC mods, the screen names
+the first one that refused them; once that one is fixed, the next join names the next one. When the server sent a
+line, the block shows only the server's lines. When the server sends no line (a refusal that is not about an MC mod,
+or a server with an older version of the MC mods), the screen lists what the player's own game noticed while
+connected: an MC mod turned off while the server has it on, or a server copy whose version cannot play with theirs.
+That may not be why they were refused. With Jotunn on the server and on the player's game, Jotunn's window shows the
+same lines under "Failed Connection:"; with Jotunn only on the player's game, the vanilla panel shows them. Run on
+2026-10-17 (dedicated test server): `probe.mp.off.MC.Exploration.View.Spyglass` passed, the screen named this mod
+both times (turned off while in, joining with it off); `probe.refusal` passed. That probe then only checked that this
+mod's line was on the screen: in the same run, one refusal screen for Breeding Star Inheritance also listed a
+Spyglass line left over from the connection before, although Spyglass was on. Fixed in the framework after that run
+(the notes are now kept per connection object rather than per hash of it, the block shows only the server's lines
+when it sent any, and the "turned off" line has new wording); `probe.mp.off.<GUID>` now also fails when the block
+lists a mod that did not refuse the player. Not run again on this code yet.
 
-- [ ] **M09 Refusal screen names the mod:** on a server with Spyglass, turn Spyglass off in Esc > MC Mods while you
-  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Spyglass: it is turned
-  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
-  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
-  join: you stay in.
-  *Partly automated (`probe.mp.off.MC.Exploration.View.Spyglass`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
-  window, and a game with another version of the mod than the server's (the line names both versions).*
+- [ ] **M09 Refusal screen names the mod:** on a server with Spyglass, turn Spyglass off while you are in (Esc > MC
+  Mods, or F1 when a configuration manager is installed). Expected: you go back to the menu, and the "Incompatible
+  version" screen lists, under "MC mods:", only "- Spyglass: it is turned off or cannot run in your game, and this
+  server requires it. Turn it on in Esc > MC Mods (or F1 when a configuration manager is installed; its status there
+  says what stops it) and join again." Join again with it off: the same. Turn it on and join: you stay in. Then join
+  with the other-version copy from the Setup: the block lists only "- Spyglass: the server has version X and your game
+  0.0.9, and they cannot play together. Install version X." (X = the server's Spyglass version). Then join with a game
+  that does not have Spyglass but has another MC mod made to run on both the server and the players (for example
+  Sleep Through the Day, which the server does not need to have), on a server where Spyglass is the only mod that
+  refuses it: the block lists only "- Spyglass: this server requires it (version X) and your game does not have it.
+  Install it." With Jotunn on the server and on your game, Jotunn's window shows these lines under "Failed
+  Connection:"; with Jotunn only on your game, the vanilla panel shows them.
+  *Partly automated (`probe.mp.off.MC.Exploration.View.Spyglass`, `probe.refusal`); by hand: The screen as seen, with
+  Jotunn on the server and on your game, and with Jotunn only on your game; the other-version copy from the Setup
+  (the line names both versions); and the game without Spyglass but with another MC mod made to run on both the
+  server and the players (the line the server sends for a missing mod).*
+
+## 0.1.3 — the death camera
+
+0.1.3 (2026-10-17): after a death with the spyglass at your eye, the camera now goes back at once to the normal
+third-person spot behind you (where it would be without the spyglass, behind your last look) and turns to your body,
+as in the normal game. Before, it stayed inside the dead character's head while the dead body lay there: while the
+body is there, the game only turns the camera toward it and never moves it. T26 is reset to `[ ]`. The check of the
+removed self-test `spyglass.bug.death-camera` is back in `spyglass.death`, which now also checks that on the first
+frame drawn dead the camera looks at the body (within the camera shake of that frame) from behind where the eye
+looked, that it is out of the head on every frame until the respawn, and that it is close to the third-person
+distance it had before the raise (the test does not turn the player). `spyglass.death` is parked
+(`tests/parked-selftests.txt`, since 2026-10-13: in those runs the fire did not kill the player in the first death of
+a run, while the same death played in the bug test right after it), so it ticks nothing until it passes a run of its
+own (`./tools/Test-InWorld.ps1 -Mod View.Spyglass -Only spyglass.death`) and comes off that list. Its set-up now dries
+the player before the fire and holds the low health until the fire kills (possible causes, not confirmed). 0.1.3 is
+built (Debug and Release) but not run in the game yet: no smoke test, in-world or multiplayer run on it.

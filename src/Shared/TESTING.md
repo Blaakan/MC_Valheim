@@ -3,7 +3,8 @@
 Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skipped / not applicable.
 Automated coverage: `./tools/Test-Framework.ps1` (live toggle, config watching, dependency gating),
 `./tools/Test-Smoke.ps1` and `./tools/Test-InWorld.ps1` (in-world self tests; its own checks `probe.baseline` and
-`probe.runner` run on every call). The items below need eyes and hands.
+`probe.runner`, and `probe.content` for the stand-in content mod, run on every call). The items below need eyes and
+hands.
 
 **Build under test:** framework v1 (build id shown next to each mod in the MC Mods panel).
 
@@ -90,30 +91,43 @@ is installed, every test that says "Esc → MC Mods" is done in its window inste
 - [ ] **N06 Dedicated server loads a Both mod:** install BepInEx and Sleep Through the Day on a dedicated server
   (`valheim_server.exe`, updated to the same game version as the clients): the server log shows the mod's
   `[MC:ready]` line and "Activated", and no error from the MC Mods panel (the server has no screen).
-- [ ] **N09 The refusal screen names the mod** (2026-10-16): get refused by a server with a Combat mod in three ways:
-  (a) the mod turned off in your game, (b) another version of the mod than the server's (build one with another
-  `ModNetworkVersion`, as in the mod's network version item), (c) a game without that mod but with another MC mod.
-  Expected each time: the "Incompatible version" screen ends with "MC mods:" and one line for that mod, saying what
-  is wrong ((a) turned off, (b) both versions, (c) your game does not have it) and what to do; with Jotunn installed
-  the same lines show in its mod compatibility window under "Failed connection". On an older server (MC mods before
-  2026-10-16) case (b) still shows, from what your own game saw. A game with no MC mod sees only the game's text.
+- [ ] **N09 The refusal screen names the mod** (2026-10-17): get refused by a dedicated server that has a mod with a
+  player check (for example Swim Dive, `AllowPlayersWithoutMod = false`) in three ways: (a) the mod turned off in your
+  game, (b) another version of the mod than the server's (build one with another `<Version>` and another
+  `ModNetworkVersion`, for example `-p:ModNetworkVersion=99 -p:Version=0.0.9`; with the network version alone the
+  line names the same version twice), (c) a game without that mod but with another MC mod that is made to run on both
+  the server and the players, for example Sleep Through the Day, once with that mod on the server and once without it
+  (the server does not need to have that mod). Expected each time: the "Incompatible version" screen ends with "MC
+  mods:" and one line for that mod only, saying what is wrong ((a) turned off or cannot run, (b) both versions, (c)
+  your game does not have it, with the server's version) and what to do ((a) names Esc > MC Mods, or F1 when a
+  configuration manager is installed). With Jotunn on the server and on your game, Jotunn's window shows the same
+  lines under "Failed Connection:"; with Jotunn only on your game, the vanilla panel shows them. Also: (d) a game
+  whose MC mods are all client-side (for example Crossbow Stays Loaded alone), or that has no MC mod, shows only
+  "Incompatible version"; (e) a game as in (c) that misses two mods the server requires: the screen names the first
+  one that refused you; install that one and join again: the next join names the next one; (f) after a refusal for
+  one mod, fix it and get refused for another: the block names only the new one (no line left from the join before).
+  On a server with older MC mods (from before the refusal screen), which sends no line, the screen lists what your
+  own game noticed while connected, so cases (a) and (b) still show; that may not be why you were refused (Sleep
+  Through the Day turned off on your game while the server has it on gets a line too, although it never refuses).
   *Partly automated (`probe.refusal`, `probe.mp.refused`, `probe.mp.off.<GUID>`); by hand: The screens as seen, with
-  and without Jotunn, and case (b) with a real build of another network version.*
+  Jotunn on both sides and on your game only, case (b) with a real build of another version, case (c) with a server
+  that does not have the other mod, and cases (d) to (f).*
 
 ## In-world self-test harness (`tools/Test-InWorld.ps1`, world probe 0.1.0)
 
 Build under test: the probe's build id is the commit in the `[MC:ready] MC.Core.Probe.World` log line (the run
-folder keeps a copy of the log). Every run checks itself with `probe.baseline` and `probe.runner`; an unfiltered run
-also checks the staged tests and the input driver with `probe.input`, `probe.relog`, `probe.stage.relog` and
-`probe.stage.disabled` (W14 to W17); parked and skipped tests and the clean-up between tests are W18 to W20. The items
-below check what the script cannot see by itself.
+folder keeps a copy of the log). Every run checks itself with `probe.baseline` and `probe.runner`, and the stand-in
+content mod (`tests/Probes/Core.Probe.Content`, deployed and removed by the script) with `probe.content`: these three
+run whatever `-Only` picks (W21); an unfiltered run also checks the staged tests and the input driver with
+`probe.input`, `probe.relog`, `probe.stage.relog` and `probe.stage.disabled` (W14 to W17); parked and skipped tests
+and the clean-up between tests are W18 to W20. The items below check what the script cannot see by itself.
 
 - [ ] **W01 End to end:** close the game, run `./tools/Test-InWorld.ps1`. After `probe.baseline` and `probe.runner`,
-  every deployed mod's self tests run; the summary groups each test's lines under its name and prints
-  `mod tests run: N (<mod GUID> <count>, ...)`. The run ends with "IN-WORLD TEST PASSED" (exit code 0) only when every
-  test passed, else with "IN-WORLD TEST FAILED" (exit code 1) and the failed tests in red. This item passes when both
-  probe tests pass, the verdict matches the tests' results, and the game quits by itself (about 1 minute plus the mod
-  tests: about 3 minutes with today's mods).
+  every deployed mod's self tests and `probe.content` run; the summary groups each test's lines under its name and
+  prints `mod tests run: N (<mod GUID> <count>, ...)`. The run ends with "IN-WORLD TEST PASSED" (exit code 0) only
+  when every test passed, else with "IN-WORLD TEST FAILED" (exit code 1) and the failed tests in red. This item passes
+  when the three probe checks pass, the verdict matches the tests' results, and the game quits by itself (about 1
+  minute plus the mod tests: about 3 minutes with today's mods).
 - [ ] **W02 Screenshots:** open the run's `shots` folder (path printed at the end): `probe.baseline__world.png` shows
   the character at the spawn stones, `probe.baseline__inventory.png` shows the open inventory.
 - [ ] **W03 Your saves untouched:** before a run, note the "date modified" of your files in
@@ -124,17 +138,20 @@ below check what the script cannot see by itself.
   there, unchanged.
 - [ ] **W04 Menu still remembers you:** after a run, start the game normally: your usual character is preselected on
   the character screen and your usual world in the world list.
-- [ ] **W05 Clean game folder:** after a run there is no `BepInEx/plugins/MC_Valheim/Core/MC.Core.Probe.World` folder
-  and no `BepInEx/config/MC.Core.Probe.World.cfg`; the run folder holds `shots\`, `config-backup\` and `LogOutput.log`
-  but no `saves\`. The "Clean up" step prints "mod config files as before the run" or names each config file it put
-  back; every `MC.*.cfg` in `BepInEx/config` is identical to its copy in `config-backup\`.
+- [ ] **W05 Clean game folder:** after a run there is no `BepInEx/plugins/MC_Valheim/Core/MC.Core.Probe.World` or
+  `BepInEx/plugins/MC_Valheim/Core/MC.Core.Probe.Content` folder and no `BepInEx/config/MC.Core.Probe.World.cfg` or
+  `BepInEx/config/MC.Core.Probe.Content.cfg`; the run folder holds `shots\`, `config-backup\` and `LogOutput.log`
+  but no `saves\`, and `config-backup\` holds no copy of the two probe `.cfg` files. The "Clean up" step prints "mod
+  config files as before the run" or names each config file it put back; every `MC.*.cfg` in `BepInEx/config` is
+  identical to its copy in `config-backup\`.
 - [ ] **W06 Failures are reported:** run `./tools/Test-InWorld.ps1 -NoBuild -TestTimeoutSec 1`. It ends with
-  "IN-WORLD TEST FAILED" (exit code 1): both probe tests show `FAIL ... timed out after 1 s`, the second test still
-  runs after the first one failed, and the game quits by itself.
+  "IN-WORLD TEST FAILED" (exit code 1): `probe.baseline` and `probe.runner` show `FAIL ... timed out after 1 s`, the
+  second test still runs after the first one failed, and the game quits by itself.
 - [ ] **W07 Keep running:** run `./tools/Test-InWorld.ps1 -NoBuild -KeepRunning`. After the verdict (PASSED or FAILED,
-  depending on the mod tests as in W01) the game stays in the world. Close it: within about 10 s the probe folder, its
-  `.cfg` and the run's `saves\` are gone, and every `MC.*.cfg` in `BepInEx/config` is identical to its copy in the
-  run's `config-backup\` (`cleanup.log` in the run folder names any file that was put back).
+  depending on the mod tests as in W01) the game stays in the world. Close it: within about 10 s the probe and
+  stand-in content folders, their `.cfg` files and the run's `saves\` are gone, and every `MC.*.cfg` in
+  `BepInEx/config` is identical to its copy in the run's `config-backup\` (`cleanup.log` in the run folder names any
+  file that was put back).
 - [ ] **W08 A stray probe does nothing:** deploy the probe by hand
   (`dotnet build tests/Probes/Core.Probe.World/MC.Core.Probe.World.csproj`) and start the game normally with
   `./tools/Start-Game.ps1`: the main menu lists your real characters, nothing starts by itself, and the log says
@@ -144,8 +161,9 @@ below check what the script cannot see by itself.
 - [ ] **W09 Steam closed:** quit Steam and run the script: it stops at once with "Steam is not running", without
   launching the game.
 - [ ] **W10 Mod tests and filter:** with a mod that registers self tests deployed (e.g. Sleep Through Day), run
-  `./tools/Test-InWorld.ps1 -NoBuild -Only sleep.`: only the `sleep.*` tests run after the two probe tests, each test's
-  lines are grouped under its name in the summary, and screenshots taken by those tests are listed with their size.
+  `./tools/Test-InWorld.ps1 -NoBuild -Only sleep.`: only the `sleep.*` tests run besides the three probe checks
+  (`probe.baseline`, `probe.runner`, `probe.content`), each test's lines are grouped under its name in the summary,
+  and screenshots taken by those tests are listed with their size.
   Each `BEGIN` line names the mod that owns the test (`BEGIN sleep.morning (MC.Exploration.Sleep.ThroughDay)`), the
   other mods' tests are listed in `NOTE probe: filtered out: ...`, and `mod tests run` counts only
   `MC.Exploration.Sleep.ThroughDay`.
@@ -160,9 +178,10 @@ below check what the script cannot see by itself.
   for the probe, close its console window (the script itself dies, nothing is put back); close the game. Run the
   script again: it stops at once with "the run <folder> ended before it put the MC mod config files back", naming
   the backup folder. After deleting that run's `config-backup\pending.txt`, the next run starts normally.
-- [ ] **W12 A run that tests nothing fails:** run `./tools/Test-InWorld.ps1 -NoBuild -Only nosuchtest`: both probe tests
-  pass, yet it ends with "IN-WORLD TEST FAILED" (exit code 1), saying `-Only 'nosuchtest' matched no test` (with the
-  tests the mods registered) and "no mod test ran, only the probe's own". Run
+- [ ] **W12 A run that tests nothing fails:** run `./tools/Test-InWorld.ps1 -NoBuild -Only nosuchtest`: the three
+  probe checks (`probe.baseline`, `probe.runner`, `probe.content`) pass, yet it ends with "IN-WORLD TEST FAILED" (exit
+  code 1), saying `-Only 'nosuchtest' matched no test` (with the tests the mods registered) and "no mod test ran,
+  only the probe's own". Run
   `./tools/Test-InWorld.ps1 -Mod Crossbow -Only sleep.` (every mod has self tests since 2026-10-13, so the filter
   stands in for a mod without any): the sleep tests still run, it warns `MC.Combat.Crossbow.StaysLoaded ran no test:
   its tests were filtered out by -Only` and fails with "no test of the mods picked with -Mod Crossbow ran". Set `Enabled = false` in
@@ -208,3 +227,18 @@ below check what the script cannot see by itself.
   held, with forced weather, or just respawned). Expected: each one names the test and says what was put back, and the
   test after it passes or fails for its own reasons (no run of failures after a death test, no fishing test without a
   shore).
+- [ ] **W21 Stand-in content mod:** run `./tools/Test-InWorld.ps1 -NoBuild -Only sleep.`. Expected: the script prints
+  "stand-in content mod deployed"; the log has "Stand-in third-party content on: N prefab(s): ..." and, a few seconds
+  after the spawn, "Stand-in content added after load: ..."; `probe.content` runs although `-Only` does not name it,
+  passes ("N checks OK: M stand-in prefab(s) in the game") and notes the real third-party content mods installed
+  ("none" without any). Then check that a stray copy does nothing: deploy it by hand
+  (`dotnet build tests/Probes/Core.Probe.Content/MC.Core.Probe.Content.csproj`) and start the game normally with
+  `./tools/Start-Game.ps1`: the log says "MC_INWORLD_DIR and MC_MP_SERVER_DIR not set: stand-in content idle", has no
+  "Stand-in third-party content on" line, and in a world (`devcommands`) `spawn MCProbeTP_ShieldTower` says "Missing
+  object MCProbeTP_ShieldTower". Close the game, then remove it
+  (`dotnet build tests/Probes/Core.Probe.Content/MC.Core.Probe.Content.csproj -t:UndeployMod`) and delete
+  `BepInEx/config/MC.Core.Probe.Content.cfg`. In a multiplayer run (`./tools/Test-Multiplayer.ps1 -Scenario modded
+  -Only sleep.`) the server's and the client's logs both have "Stand-in third-party content on" (no
+  `probe.content` test runs there).
+  *Partly automated (`probe.content`); by hand: The script and log lines, the stray copy staying idle (log line and
+  `spawn`), and both logs of a multiplayer run.*

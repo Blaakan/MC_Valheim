@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+- First release.
+
 ## 0.1.1
 
 - Turning the mod back on while the game is paused: the far trees, rocks and buildings now follow the far terrain as

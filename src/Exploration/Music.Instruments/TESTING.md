@@ -4,7 +4,9 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.4.2 (the refusal screen names the mod, section "0.4.2"; before that 0.4.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.4.1
+**Build under test:** 1.0.0 (first release; before that 0.4.3) (B on a gamepad closes the song window without making the character jump: T22 reset;
+not run in game yet), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). Before that
+0.4.2 (the refusal screen names the mod, section "0.4.2") and 0.4.1. 0.4.1
 fixes false recipe warnings when leaving a server without the mod (new M20; `music.badrecipe` checks it on a stand-in
 item database; run 2026-10-08 on game 1.0.17: in-world self-tests 52 of 52 with `music.play` and
 `music.freeplay.keys` on a second run alone, multiplayer scenarios all passed, and no Music Instruments line after
@@ -183,12 +185,15 @@ busy one with drums) in `BepInEx/config/MC_Valheim/Songs`.
   `probe.quit.MC.Exploration.Music.Instruments`, `probe.disabled.MC.Exploration.Music.Instruments`); by hand: The log
   after the items still done by hand (T02, T05, T06, T07, T12, T23, T34, X03 and the multiplayer items with a second
   player).*
-- [!] **T22 Window keys:** open the song window while holding W (or the stick forward): the selection does not run up
+- [ ] **T22 Window keys:** open the song window while holding W (or the stick forward): the selection does not run up
   the list. Up/Down choose a song, Left/Right cycle a MIDI file's part, Enter plays (the chat does not open); with a
-  gamepad: D-pad up/down choose, A plays, Y toggles Repeat, B closes; X starts nothing and says the rhythm game is
-  played on the keyboard (the gamepad help line does not offer it). Double-click a row: it plays.
-  **FAILED:** automated test: on a controller (default layout) B closes the song window and can also make the
-  character jump (B is the game's jump button too: 1 jump in 6 closes) (self-test `music.bug.pad-close-jump`)
+  gamepad: D-pad up/down choose, A plays, Y toggles Repeat, B closes (no menu opens, and on the default controller
+  layout, where B is also the jump button, the character never jumps; close it with B several times); X starts
+  nothing and says the rhythm game is played on the keyboard (the gamepad help line does not offer it). Double-click
+  a row: it plays. (0.4.3: before, B could also make the character jump, about 1 close in 6.)
+  *Partly automated (`music.windowkeys`, `music.pad`, `music.keys`, `music.input.pad-window`, `music.input.pad-open`,
+  `music.input.w-held`); by hand: Once with a physical gamepad (the tests press a virtual test gamepad): D-pad, A, Y,
+  X, the stick held forward while opening, and B several times on the default layout (never a jump, no menu opens).*
 - [ ] **T23 HUD:** perform: the lanes sit to the right of your character (it stays visible), a 3-2-1 countdown, key
   labels under the line, "Perfect"/"Good"/"Miss" near the line, the meter beside the lanes (gold "In tune: the meter
   fills", red "Hit more notes: the meter waits", grey during rests), "Encore! +3 comfort" when it fills. Hide the
@@ -434,16 +439,40 @@ config folder). The friend's own songs folder should not have these files.
 
 ## 0.4.2 — the refusal screen names the mod
 
-0.4.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
-under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
-needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
-connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Exploration.Music.Instruments` passed, the screen named this
-mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+0.4.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it under
+"MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who needs to
+install it, and multiplayer"). This needs at least one MC mod in your game that is made to run on both the server and
+the players (any mod a server can refuse you for, or Sleep Through the Day); the server does not need to have that
+mod. A game whose MC mods are all client-side shows only "Incompatible version". With Jotunn on the server and on your
+game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on your game, the vanilla
+panel shows them. When a server refuses you for several MC mods, the screen names the first one that refused you;
+once that one is fixed, the next join names the next one. When the server sends no line (a refusal that is not about
+an MC mod, or a server with an older version of the MC mods), the screen lists what your own game noticed while
+connected: an MC mod turned off while the server has it on, or a server copy whose version cannot play with yours.
+That may not be why you were refused. Run on 2026-10-17 (dedicated test server):
+`probe.mp.off.MC.Exploration.Music.Instruments` passed, the screen named this mod both times (turned off while in,
+joining with it off); `probe.refusal` passed. That run was on the code before the framework fix of the same day (new
+line texts; only the server's lines when it sent any; no line left over from an earlier connection, which
+`probe.mp.off` now also checks), so M21 waits for a new run; M22 is new.
 
-- [ ] **M21 Refusal screen names the mod:** on a server with Music Instruments, turn Music Instruments off in Esc > MC Mods while you
-  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Music Instruments: it is turned
-  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
-  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
-  join: you stay in.
-  *Partly automated (`probe.mp.off.MC.Exploration.Music.Instruments`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
-  window, and a game with another version of the mod than the server's (the line names both versions).*
+- [ ] **M21 Refusal screen names the mod:** on a server with Music Instruments, turn Music Instruments off in Esc > MC
+  Mods while you are in. Expected: you go back to the menu, and under "MC mods:" the "Incompatible version" screen
+  lists only "- Music Instruments: it is turned off or cannot run in your game, and this server requires it. Turn it
+  on in Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and join
+  again." With Jotunn on the server and on your game, Jotunn's window shows the same lines under "Failed
+  Connection:"; with Jotunn only on your game, the vanilla panel shows them. Join again with it off: the same. Turn it
+  on and join: you stay in. Then join with a test copy of another version: build it with `dotnet build
+  src/Exploration/Music.Instruments/MC.Exploration.Music.Instruments.csproj -p:ModNetworkVersion=99 -p:Version=0.0.9
+  -p:DeployToGame=false` and copy `src/Exploration/Music.Instruments/bin/Debug/MC.Exploration.Music.Instruments.dll`
+  over your game's copy (put the normal build back afterwards). Expected: "- Music Instruments: the server has
+  version X and your game 0.0.9, and they cannot play together. Install version X." (X = the server's version).
+  *Partly automated (`probe.mp.off.MC.Exploration.Music.Instruments`, `probe.refusal`); by hand: The screen as seen
+  (in Jotunn's window with Jotunn on the server and on your game, on the vanilla panel otherwise), and the line for
+  the test copy of another version (it names both versions).*
+- [ ] **M22 Only the mod that refused is listed:** a server with Music Instruments set to AllowPlayersWithoutMod =
+  true and another MC mod that refuses players (for example Swim Dive, default settings). Turn both off in your game
+  and join. Expected: you are refused by the other mod, and under "MC mods:" the screen lists only that mod, not
+  Music Instruments (the server lets you in for Music Instruments, so your game's own note about it is not shown when
+  the server sent its reason).
+  *Partly automated (`probe.refusal`); by hand: The screen with a real server, where your game also had its own note
+  about Music Instruments.*

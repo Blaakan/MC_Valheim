@@ -2,7 +2,7 @@
   <!-- Me = mod project. Guid, id, category come from file name. Build rules live in Directory.Build.props/.targets. -->
   <PropertyGroup>
     <ModName>Tower Shield Wall</ModName>
-    <Version>0.2.1</Version>
+    <Version>1.0.0</Version>
     <ModScope>Revamp</ModScope>
     <!-- Idea from the sheet this mod implement (tools/Update-Backlog.ps1 link them). -->
     <ModIdea>Better tower shields</ModIdea>
@@ -12,8 +12,9 @@
     <ModSide>Both</ModSide>
     <ModMultiplayer>Compatible</ModMultiplayer>
     <ModMultiplayerNotes>Install it on the server (or the host) and on every player's game. It changes combat for everyone, so the server refuses players who do not have the mod (their game shows Incompatible version), unless its AllowPlayersWithoutMod setting is on, and the settings of the server (or host) apply to everyone. A player whose copy of the mod is turned off, or cannot talk to the server's version, is refused like a player without it. On a server without the mod it turns itself off. Tower shields handed to a player without the mod are normal one-handed shields for them.</ModMultiplayerNotes>
-    <!-- RPC <guid>.Settings / <guid>.SettingsRequest (TowerRules layout 2 since 2026-09-30: bash speed and cooldown).
-         Bump when names or layout change. -->
+    <!-- RPC <guid>.Settings / <guid>.SettingsRequest (TowerRules layout 3 since 0.2.0, 2026-10-16: AutoTowers and
+         ExcludedTowers at end; layout 2 since 2026-09-30: bash speed and cooldown). Framework MC.Framework.Refused not
+         counted: game without listener drop it. Bump when names or layout change. -->
     <ModNetworkVersion>3</ModNetworkVersion>
     <ModRequires></ModRequires>
     <ModDescription>Tower shields become a two-handed wall: very slow, 2.5 times the block armor, no parry. Braced, they block poison clouds and area attacks from the front and resist stagger and knockback. The attack button bashes: low damage, heavy stagger.</ModDescription>

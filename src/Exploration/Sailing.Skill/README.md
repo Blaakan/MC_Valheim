@@ -64,7 +64,7 @@ Every "AtMax" setting is the value at Sailing 100; lower levels get a share in p
 |---|---|---|---|
 | General | Enabled | `true` | Turn the feature on or off. Takes effect immediately. Your Sailing level is kept while it is off. |
 | General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
-| General | AllowPlayersWithoutMod | `false` | Server (or host) only. Off: a player whose game does not have this mod, has it turned off or has another version of it is refused about a second after joining, or about a second after turning it off (their game shows "Incompatible version"). On: they may play; a ship their game simulates sails and takes damage like in the normal game (only the rudder of a helmsman who has the mod still swings faster), they earn no Sailing, and their level gives no bonus to ships they steer. |
+| General | AllowPlayersWithoutMod | `false` | Server (or host) only. Off: a player whose game does not have this mod, has it turned off or has another version of it is refused about a second after joining, or about a second after turning it off (their game shows "Incompatible version", with a line that names this mod, the reason and what to do when their game has an MC mod made to run on both the server and the players; see Multiplayer). On: they may play; a ship their game simulates sails and takes damage like in the normal game (only the rudder of a helmsman who has the mod still swings faster), they earn no Sailing, and their level gives no bonus to ships they steer. |
 | Skill | XpPerKm | `50` | Sailing XP the helmsman earns per kilometre the ship travels (0-1000; 0 = no XP). |
 | Handling | WindFloorAtMax | `0.9` | How well the sail pulls with the wind straight from behind or close to the bow, compared with the best angle (0.7-1; the normal game gives 0.7). |
 | Handling | NoGoShiftAtMax | `0.1` | Shrinks the no-go zone around the bow (0-0.15): 0.1 takes it from about 37 to about 26 degrees on each side, 0.15 to about 18. |
@@ -94,6 +94,24 @@ the Sailing skill from your character at its next save.
   reason. Turning the mod off in the MC Mods panel while connected gets you refused the same way about a second later
   (turning it off and on again within that second is fine). The server (or host) can let such players in with
   AllowPlayersWithoutMod = true.
+- **The refusal screen says why.** When a server refuses you, your game's "Incompatible version" screen lists
+  "MC mods:" with a line for the mod that refused you, the reason and what to do:
+  - turned off: "- Sailing Skill: it is turned off or cannot run in your game, and this server requires it. Turn it on
+    in Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and join
+    again.";
+  - another version: "- Sailing Skill: the server has version X and your game Y, and they cannot play together.
+    Install version X.";
+  - not installed: "- Sailing Skill: this server requires it (version X) and your game does not have it. Install it."
+
+  This needs at least one MC mod in your game that is made to run on both the server and the players (any mod a
+  server can refuse you for, or Sleep Through the Day); the server does not need to have that mod. A game whose MC
+  mods are all client-side shows only "Incompatible version". When a server refuses you for several MC mods, the
+  screen names the first one that refused you; once that one is fixed, the next join names the next one. When the
+  server sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the
+  screen lists what your own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with yours. That may not be why you were refused. With Jotunn on the server
+  and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on your game,
+  the vanilla panel shows them.
 - **The server's settings apply to everyone** (your game logs "Using the server's rules"); your own settings apply
   again in single player and when you host. Until the server's settings arrive (normally before your character
   appears), the mod changes nothing and you earn no Sailing XP.

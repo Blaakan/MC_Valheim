@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 2. Creature AI runs on whichever game simulates each creature, and a player's progression only exists on that player's own game, so every game needs the mod, turned on; the server refuses players without it, with it turned off or with another network version (`AllowPlayersWithoutMod`, default off) and sends its rules to everyone (section 4). |
 | Sheet idea | `Mob AI revamp` |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`), decompiled `assembly_valheim` in `.ref/`; every creature prefab (Character, BaseAI and MonsterAI fields, factions, tokens, boss order, defeat keys), the world spawn table and the weapons' attack noise values dumped at runtime from a real world (2026-09-29); sources of The Mark of Oden 0.4.0, TruePassiveMobs 1.1.0 and FearMe 1.0.1 read on GitHub (research brief, 2026-09-29); HarmonyX 2.9.0 in the installed `BepInEx/core` |
-| Status | Implemented (v0.1.0 code), in-game testing. Reworked on 2026-09-30 after the user's first in-game test (two bosses ahead, biome by spawn place, afraid instead of calm: section 3, decisions 25-35; section 10, stage 8). Later the same day: the name plate label (E1) removed, running and routed creatures show the game's own alerted state (G7, decision 36; section 10, stage 9) |
+| Status | Implemented (v0.1.0 code), in-game testing. Reworked on 2026-09-30 after the user's first in-game test (two bosses ahead, biome by spawn place, afraid instead of calm: section 3, decisions 25-35; section 10, stage 8). Later the same day: the name plate label (E1) removed, running and routed creatures show the game's own alerted state (G7, decision 36; section 10, stage 9). 0.1.1 (2026-10-08): the sneak attack on a sleeping afraid creature is back. 0.1.2 (2026-10-16, refined 2026-10-17): the refusal screen names the mod (4.5; history at the end) |
 
 ## Goal
 
@@ -369,13 +369,17 @@ dump unless marked otherwise.
   `ZNet.cs:2108-2118`) and holds every player ZDO.
 - The MC framework's handshake (`src/Shared/Framework/NetworkGate.cs`, `docs/modding/framework.md` "Who needs to
   install it") tells the server, for each connected player, whether their game has the mod, its network version, and
-  whether their copy is **ready** (turned on, dependencies active, started without error: `ModPlugin.ComputeLocalState`,
-  `ModPlugin.cs:318-358`, sent in the hello, `:94`). The client tells the server again whenever that changes while
-  connected (`<GUID>.HelloState`, `NetworkGate.OnLocalReadyChanged`, `:153-174`). Server-side mod code asks
-  `NetworkGate.PeerCompatible(peer)` (has the mod, same network version, not turned off: `:202-203`),
-  `NetworkGate.PeerProblem(peer)` (a short reason for logs, or null: `:206-218`), and subscribes to the server-side
-  event `NetworkGate.PeerStateChanged(ZNetPeer)` (`:51`, raised by `OnClientState`, `:301-327`). A copy built before
-  this check reports no ready state and counts as compatible.
+  whether their copy is **ready** (turned on, dependencies active, started without error:
+  `ModPlugin.ComputeLocalState`, sent in the hello). The client tells the server again whenever that changes while
+  connected (`<GUID>.HelloState`, `NetworkGate.OnLocalReadyChanged`). Server-side mod code asks
+  `NetworkGate.PeerCompatible(peer)` (has the mod, same network version, not turned off),
+  `NetworkGate.PeerProblem(peer)` (a short reason for logs, or null), and subscribes to the server-side event
+  `NetworkGate.PeerStateChanged(ZNetPeer)` (raised by `NetworkGate.OnClientState`). A copy built before this check
+  reports no ready state and counts as compatible. Since 0.1.2 a join check refuses with `NetworkGate.Refuse(peer)`:
+  one line for the player's error screen through the framework RPC `MC.Framework.Refused`, then vanilla
+  `Error(ErrorVersion)`; the player's game adds the line under "MC mods:" to the "Incompatible version" text when it
+  has at least one MC mod made to run on both the server and the players (`RefusalNotes`, 4.5;
+  `docs/modding/framework.md`, "Who needs to install it, and multiplayer").
 
 ### 1.10 Name plates
 
@@ -1076,7 +1080,8 @@ vanilla-consistent option over them.
     the framework now reports the client's state); a framework rule that keeps required Both mods on while connected
     (a player who turns a mod off would find it still on). **FLAG:** a player who turns the mod off in the MC Mods
     panel while on a server is disconnected about a second later ("Incompatible version"), with no warning of this
-    mod's own (open question 9), unless `AllowPlayersWithoutMod` is on.
+    mod's own (open question 11), unless `AllowPlayersWithoutMod` is on. Since 0.1.2 the error screen then names the
+    mod and says where to turn it back on (4.5).
 20. **Provocation per player in the creature's ZDO** (up to 4 players, 2.6), not one shared deadline plus vanilla's
     attacker flags. Reason: the flags are set by zero-damage hits, never cleared, saved with the creature and keyed by
     name, so an old touch would revive a provocation, and one shared "last provoker" dropped the first player in
@@ -1212,7 +1217,8 @@ there):
 | `MC.Combat.Creatures.Morale.SettingsRequest` | `ZRpc` | client → server | `int` layout (2) | client `RPC_PeerInfo`; client turned on while connected |
 | `MC.Combat.Creatures.Morale.Settings` | `ZRpc` | server → client | `ZPackage` of `MoraleRules` (5.2) | answer; to every modded peer when the server's settings change or its copy turns on |
 | `MC.Combat.Creatures.Morale.Rout` | `ZRoutedRpc`, to `Everybody` | leader's owner → all | `Vector3` death position, `int` leader prefab hash | a pack leader died (multiplayer only; single player applies directly) |
-| `Error` (vanilla) | `ZRpc` | server → client | `int` 3 (`ErrorVersion`) | the join check refuses a player |
+| `MC.Framework.Refused` (framework, since 0.1.2) | `ZRpc` | server → client | `string` `"<mod name>\t<line>"`: what is wrong and what to do | the join check refuses a player: `NetworkGate.Refuse` sends it just before `Error` (4.5); the player's game shows the line under "MC mods:" on the error screen (`RefusalNotes`, registered by every MC mod made to run on both the server and the players; a game without one ignores it, as vanilla `ZRpc.HandlePackage` drops unknown RPCs) |
+| `Error` (vanilla) | `ZRpc` | server → client | `int` 3 (`ErrorVersion`) | the join check refuses a player, right after `MC.Framework.Refused` |
 
 The routed RPC is registered once per `ZRoutedRpc` instance (a `ZNet.Awake` postfix, and `OnActivated` when a session
 already exists), remembering the instance it registered on because a second `Register` throws (1.9). The handler
@@ -1236,7 +1242,9 @@ Vanilla keys read: `Attackers` (int) and the per-player attacker flags (kill cre
 
 `ModNetworkVersion` = 2 (covers the three RPC names and payloads, the three creature keys, the standing layout 1, the
 provokers layout 1 and the rules layout 2). Any change of those bumps it, released or not: the rules layout went from 1
-to 2 on 2026-09-30 (the settings of 5.1 changed, decision 35), so the version went from 1 to 2.
+to 2 on 2026-09-30 (the settings of 5.1 changed, decision 35), so the version went from 1 to 2. The framework's
+messages (hello, `HelloState`, `MC.Framework.Refused`) are not part of it: they belong to the framework
+(`NetworkGate`), not to this mod.
 
 ### 4.4 Server rules (`ServerRules`, copy of Forge Idol Upgrades')
 
@@ -1270,13 +1278,20 @@ check as the other Combat mods of this run:
   changes nothing. `PlayerCheck.Start` (in `OnActivated`) subscribes to `PeerStateChanged` (unsubscribing first, so it
   is never subscribed twice) and checks every ready peer; `PlayerCheck.Stop` (in `OnDeactivated`) unsubscribes and
   cancels the pending checks.
-- **Refusal** (not compatible, `AllowPlayersWithoutMod` off): vanilla `Error(ErrorVersion)` (their game shows
-  "Incompatible version" and goes back to the main menu) and disconnect 4 s later through vanilla's kick list. Server
-  log (Warning): "Refused <player>: their game <`NetworkGate.PeerProblem(peer)`, for example "has the mod turned off">.
-  Creature Morale is required on every player of this server (the creatures their game controls must follow the same
-  rules). To let such players in, set AllowPlayersWithoutMod = true." So a player is refused about a second after
-  joining (usually while their game still loads the world, before their character appears), or about a second after
-  turning the mod off while connected.
+- **Refusal** (not compatible, `AllowPlayersWithoutMod` off): `NetworkGate.Refuse(peer)` (since 0.1.2; before, a bare
+  vanilla `Error` rpc): first the framework's `MC.Framework.Refused` with one line for the player's error screen
+  (`"Creature Morale\t<line>"`, the line saying what is wrong and what to do: missing, another version with both
+  version numbers, or turned off), then vanilla `Error(ErrorVersion)` (their game shows "Incompatible version" and
+  goes back to the main menu); disconnect 4 s later through vanilla's kick list. The player's game lists the line
+  under "MC mods:" when it has at least one MC mod made to run on both the server and the players (any mod a server
+  can refuse a player for, or Sleep Through the Day; the server does not need to have that mod); a game whose MC mods
+  are all client-side shows only "Incompatible version". Only the first MC mod that refuses a player sends its line: a
+  later mod's check skips a player already being kicked (`Decide`, below), so the screen names the first mod that
+  refused; once that one is fixed, the next join names the next one. Server log (Warning): "Refused <player>: their
+  game <`NetworkGate.PeerProblem(peer)`, for example "has the mod turned off">. Creature Morale is required on every
+  player of this server (the creatures their game controls must follow the same rules). To let such players in, set
+  AllowPlayersWithoutMod = true." So a player is refused about a second after joining (usually while their game still
+  loads the world, before their character appears), or about a second after turning the mod off while connected.
 - **Allowed** (not compatible, `AllowPlayersWithoutMod` on): a Warning naming the problem; the player stays and is
   treated as a player without the mod (4.6). A compatible player gets a Debug line.
 - `PlayerCheck.Decide(isServer, connected, ready, beingKicked, compatible, allowWithoutMod)` stays pure → Skip /
@@ -1286,8 +1301,9 @@ check as the other Combat mods of this run:
   off as vanilla at once.
 - **No warning of this mod's own** on the player's screen when they turn it off while connected: the refusal comes
   about a second later, too soon for "turn it back on", and a warning that every required Both mod needs belongs in
-  the framework (open question 9). A refused player who turns it back on during the 4 s before the disconnect stays
-  refused (`Decide` skips a player being kicked).
+  the framework (open question 11). Since 0.1.2 the error screen afterwards names the mod and says where to turn it
+  back on (the framework's line above). A refused player who turns it back on during the 4 s before the disconnect
+  stays refused (`Decide` skips a player being kicked).
 
 ### 4.6 Hand-off cases
 
@@ -1296,7 +1312,7 @@ check as the other Combat mods of this run:
 | A creature simulated by a game **without** the mod (server allows such players) | vanilla AI: it attacks everyone, ignores `Rout`, and our ZDO keys; when a game with the mod takes it back, the keys still apply (a rout still running resumes, a provocation still counts) |
 | A player **without** the mod near creatures simulated by modded games (server allows it) | no standing: every creature is hostile toward them, shaken ones included, as in vanilla; their sneak attacks and Sneak XP are vanilla (nothing is ever afraid of them); their game shows the alert icon of creatures running from other players and of routed packs, since it is vanilla state (G7, M07) |
 | Alert icon on a creature simulated by a game **without** the mod (server allows it), seen by a modded player | vanilla's state of that creature, the same on every screen (it attacks everyone the normal way). The first builds' label was each viewer's own judgement and could say "afraid" on a creature attacking the viewer; that limit went with the label (decision 36) |
-| A player with the mod installed but **turned off** (or failed to start), or in **another network version** | refused about a second after joining, or about a second after they turn it off while connected (4.5); their game shows "Incompatible version". With `AllowPlayersWithoutMod` on: like a player without the mod (a turned-off copy withdrew its standing, 2.2; a copy in another network version is kept off by the framework and never publishes one) |
+| A player with the mod installed but **turned off** (or failed to start), or in **another network version** | refused about a second after joining, or about a second after they turn it off while connected (4.5); their game shows "Incompatible version", with this mod and the reason under "MC mods:" (since 0.1.2). With `AllowPlayersWithoutMod` on: like a player without the mod (a turned-off copy withdrew its standing, 2.2; a copy in another network version is kept off by the framework and never publishes one) |
 | Ownership changes mid-fight | the new owner's creature has no target (private state); the provocation in the ZDO lets it pick the player again at its next search; a player it is afraid of is not picked (it runs from them if they are close and sensed) |
 | Ownership changes while it runs from a player | the new owner's memory has no fear and no `FleeAlert` (7.3): the creature, alerted with no target (ZDO `alert`, so its icon stays on every screen), is judged at the new owner's first check: it runs again if the player is still close and sensed (its frames take the alert over, and their calm takes it back later), else piece 6 calms it when a player it is afraid of is near, or vanilla's 30 s give-up does (2.5 piece 6) |
 | Spawn level on different games | every game computes it from the same ZDO spawn point with the same world generator, so the rank agrees; a game without a `WorldGenerator` yet (none in a loaded world) would use the home biome only until it has one |
@@ -1766,6 +1782,11 @@ its review M07 and M14 set up again and T34 new); IDs are kept, new items come a
   plate range), P1 walking in at a right angle; a creature running from P1 (controlled by P2's game, then by P1's)
   shows the icon on both screens and loses it on both when it calms; the same for a routed pack (rank 0 for both,
   15-25 m from the followers) and the rout's end.
+- **M15 (0.1.2)** The refusal screen names the mod: turned off while in, and joining with it off, the "Incompatible
+  version" screen lists only Creature Morale under "MC mods:" with the server's "turned off" line; by hand also a game
+  without the mod but with another MC mod made to run on both the server and the players, a copy of another version
+  (built with `-p:ModNetworkVersion=99 -p:Version=0.0.9`), and Jotunn on the server and on the player's game, or only
+  on the player's game.
 
 ### Cross-mod
 
@@ -1817,10 +1838,11 @@ its review M07 and M14 set up again and T34 new); IDs are kept, new items come a
    raids also be afraid of strong players (Later)?
 10. Taming is back to the normal game (decision 33): afraid tameable creatures run from a close player they sense.
     Keep, or make tameable kinds tolerate a player who carries their food?
-11. A player who turns the mod off while on a server is disconnected about a second later, with only "Incompatible
-    version" on their screen (the framework now reports it; the same for every Combat mod of this run). Acceptable, or
-    should the framework warn in the MC Mods panel before a required mod is turned off on a server that has it (one
-    change for every MC Both mod)?
+11. A player who turns the mod off while on a server is disconnected about a second later (the framework now reports
+    it; the same for every Combat mod of this run). Since 0.1.2 their "Incompatible version" screen also lists the mod
+    under "MC mods:" with where to turn it back on, but nothing warns them before. Acceptable, or should the framework
+    warn in the MC Mods panel before a required mod is turned off on a server that has it (one change for every MC
+    Both mod)?
 12. With no plate label (G7, decision 36), a creature that is afraid of you but not running looks like any other: you
     learn it is afraid when it runs from you or never comes for you. Enough, or is some other vanilla-looking hint
     wanted (for example in the hover text)?
@@ -2363,3 +2385,39 @@ the mod's Debug and Release builds are clean; the self-tests were not run on it.
 - **Documents:** 2.2 (one sentence on what never shows the message), 8 (T04). `README.md` already describes the rule
   ("when a boss kill raises your boss rank far enough to make more creatures afraid of you") and is unchanged, so
   `CHANGELOG.md` has no new line.
+
+**0.1.2 (2026-10-16, refined 2026-10-17): the refusal screen names the mod.** A framework change shared by the 16 MC
+mods that can refuse a player; this mod's code changed in one line.
+
+- **What changed.** `PlayerCheck.Refuse` calls `NetworkGate.Refuse(peer)` instead of sending the bare vanilla `Error`
+  RPC (4.5). The framework first sends `MC.Framework.Refused` with `"Creature Morale\t<line>"` (4.2), then
+  `Error(ErrorVersion)`. The line says what is wrong and what to do: the player's game does not have the mod (with the
+  server's version), has another version (both version numbers), or has it turned off or cannot run it (where to turn
+  it on: Esc > MC Mods, or F1 when a configuration manager is installed). On the player's game, `RefusalNotes` (in
+  every MC mod's copy of the framework; the error-screen patch is installed once, by the first loaded MC mod made to
+  run on both the server and the players) adds an "MC mods:" block to the "Incompatible version" text. With Jotunn on
+  the server and on the player's game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn
+  only on the player's game, the vanilla panel shows them.
+- **Limits.** The block needs at least one MC mod on the player's game that is made to run on both the server and the
+  players (any mod a server can refuse a player for, or Sleep Through the Day); the server does not need to have that
+  mod. A game whose MC mods are all client-side, or that has none, shows only "Incompatible version". Only the first
+  MC mod that refuses a player sends its line (a later check skips a player already being kicked): when a server
+  refuses a player for several MC mods, the screen names the first one that refused them; once that one is fixed, the
+  next join names the next one. When the server sent a line, the block shows only the server's lines. When the server
+  sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the block
+  lists what the player's own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with theirs. That may not be why they were refused.
+- **Refined on 2026-10-17** (framework only, after the dedicated-server run of that day): a refusal screen there also
+  listed a line of another mod (Spyglass) left over from an earlier connection, because connections were told apart by
+  the hash of their `ZRpc`; they are now told apart by the object itself. The block shows only the server's lines when
+  it sent any (a line this game knew could name a mod the server let in), and the "turned off" line names F1 for a
+  configuration manager. Same version (0.1.2): the change was never released.
+- **Unchanged:** no RPC, ZDO key or rule of this mod (`ModNetworkVersion` stays 2: the new RPC is the framework's, and
+  a game without an MC mod that listens for it drops it silently, as vanilla `ZRpc.HandlePackage` does with any
+  unknown RPC).
+- **Tests:** new item M15 (`TESTING.md`, section 0.1.2). `probe.mp.off.MC.Combat.Creatures.Morale` and `probe.refusal`
+  passed on 2026-10-17 on the first version; after the refinement `probe.mp.off.<GUID>` also fails when the screen
+  lists another mod, and both have not run again yet.
+- **Documents:** Status row, 1.9, 4.2, 4.3 (the framework's messages are not part of `ModNetworkVersion`), 4.5, 4.6, 8
+  (M15), decision 19, open question 11; `README.md` (Multiplayer, "The refusal screen says why"), `CHANGELOG.md`
+  (0.1.2), `TESTING.md` (build line, section 0.1.2).

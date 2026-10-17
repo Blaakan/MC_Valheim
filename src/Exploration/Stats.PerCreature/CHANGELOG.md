@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+- First release.
+
 ## 0.1.1
 
 - Fixed a tame that was never counted: a creature that finished taming while you had no character in the world (in

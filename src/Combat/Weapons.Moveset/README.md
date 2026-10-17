@@ -74,7 +74,7 @@ the server).
 |---|---|---|---|
 | General | Enabled | `true` | Turn the feature on or off. Takes effect immediately. |
 | General | Status | — | Written by the mod: shows whether the feature is active, and if not, why. |
-| General | AllowPlayersWithoutMod | `false` | Server (or host) only. Off: a player whose game does not have this mod, has a version that cannot talk to this one, or has it turned off is refused about a second after joining or after turning it off (their game shows "Incompatible version"). On: such players may play; their own jumps and rolls stay normal. |
+| General | AllowPlayersWithoutMod | `false` | Server (or host) only. Off: a player whose game does not have this mod, has a version that cannot talk to this one, or has it turned off is refused about a second after joining or after turning it off (their game shows "Incompatible version", with a line that names this mod, the reason and what to do when their game has an MC mod made to run on both the server and the players; see Multiplayer). On: such players may play; their own jumps and rolls stay normal. |
 | Moves | JumpAttack | `true` | Jump, then attack before you land: the first attack of the jump becomes a jump attack. Off: attacks in the air after a jump stay normal swings, even right after a roll. |
 | Moves | RollAttack | `true` | Roll, then attack: the first attack of the roll becomes a roll attack, and it flows straight out of the end of the roll. |
 | Moves | Cooldown | `1` | Minimum time in seconds (0-10) between the start of one jump or roll attack and the next one (either kind); an attack inside that time is a normal swing. 0 = no limit. |
@@ -140,6 +140,25 @@ player fights with the same moves and numbers. On a server without the mod it tu
   server's, and a player who has it turned off (Enabled = false, or unticked in the MC Mods panel). A player who turns
   it off while connected is refused about a second later. The server (or host) can let such players in with
   AllowPlayersWithoutMod = true: their own jumps and rolls stay normal, and the server log names each of them.
+- **The refusal screen says why.** When a server refuses you, your game's "Incompatible version" screen lists
+  "MC mods:" with a line for the mod that refused you, the reason and what to do:
+  - turned off: "- Weapon Moveset: it is turned off or cannot run in your game, and this server requires it. Turn it
+    on in Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and
+    join again.";
+  - another version: "- Weapon Moveset: the server has version X and your game Y, and they cannot play together.
+    Install version X.";
+  - not installed: "- Weapon Moveset: this server requires it (version X) and your game does not have it. Install
+    it."
+
+  This needs at least one MC mod in your game that is made to run on both the server and the players (any mod a
+  server can refuse you for, or Sleep Through the Day); the server does not need to have that mod. A game whose MC
+  mods are all client-side shows only "Incompatible version". When a server refuses you for several MC mods, the
+  screen names the first one that refused you; once that one is fixed, the next join names the next one. When the
+  server sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the
+  screen lists what your own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with yours. That may not be why you were refused. With Jotunn on the server
+  and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on your game,
+  the vanilla panel shows them.
 - **The server's settings apply to everyone** (your game logs "Using the server's move settings"). Until they arrive
   after you join, your attacks are normal swings. Your own settings apply again in single player and when you host.
   When the server's settings change, players get them half a second after the last change (dragging a slider sends

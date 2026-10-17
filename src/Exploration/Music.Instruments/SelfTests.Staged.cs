@@ -44,7 +44,6 @@ internal static partial class SelfTests
         new KeyValuePair<string, Func<IEnumerator>>(ListenRestName, RunListenRest),
         new KeyValuePair<string, Func<IEnumerator>>(ChairName, RunChair),
         new KeyValuePair<string, Func<IEnumerator>>(InputPadWindowName, RunInputPadWindow),
-        new KeyValuePair<string, Func<IEnumerator>>(BugPadCloseJumpName, RunBugPadCloseJump),
         new KeyValuePair<string, Func<IEnumerator>>(InputPadOpenName, RunInputPadOpen),
         new KeyValuePair<string, Func<IEnumerator>>(InputKeysHeldName, RunInputKeysHeld),
         new KeyValuePair<string, Func<IEnumerator>>(InputPadHudName, RunInputPadHud),

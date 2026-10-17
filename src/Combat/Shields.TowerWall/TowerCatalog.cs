@@ -201,7 +201,7 @@ internal static class TowerCatalog
         TellOnce(rules);
     }
 
-    // AutoTowers pass: every not-yet-listed item whose vanilla data is a shield that cannot parry at all.
+    // AutoTowers pass: every not-yet-listed item whose vanilla data is a shield with parry bonus below 1 (IsAutoTower).
     private static void AddAutomatic(ObjectDB db, TowerRules rules)
     {
         HashSet<GameObject> crafted = null;
@@ -249,8 +249,8 @@ internal static class TowerCatalog
     }
 
     // The rule, on vanilla data: the snapshot when me wrote this prefab before (live data carry tower data), else the
-    // live data (never written). Parry bonus below 1 = no parry at all (vanilla towers 0; ShieldIronSquare 1 stays out,
-    // a parry needs above 1).
+    // live data (never written). Parry bonus below 1 = tower (vanilla towers 0; ShieldIronSquare 1 stays out, though a
+    // parry needs above 1 so it cannot parry either).
     private static bool IsAutoTower(GameObject go, ItemDrop.ItemData.SharedData shared)
     {
         if (SnapshotsByName.TryGetValue(go.name, out var snap) && ReferenceEquals(snap.PrefabObject, go)

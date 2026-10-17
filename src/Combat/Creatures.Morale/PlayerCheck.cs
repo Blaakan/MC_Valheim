@@ -24,8 +24,10 @@ internal enum JoinVerdict : byte
 // server copy turn on (Start: every ready peer), AllowPlayersWithoutMod back to off (every ready peer). Each one wait
 // the same Grace; peer already waiting keep its deadline; check read state at the deadline (off and on again inside
 // the grace = nothing).
-// Refuse = vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version", go back to menu) + peer in
-// vanilla kick list (ZNet.Update disconnect it DisconnectDelay s later: slow loading game still read the Error first).
+// Refuse = NetworkGate.Refuse: one reason line first (framework rpc MC.Framework.Refused, their Both MC mods show it
+// under "MC mods:"), then vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version", go back to
+// menu) + peer in vanilla kick list (ZNet.Update disconnect it DisconnectDelay s later: slow loading game still read
+// the Error first). Peer already in kick list = Skip, so only first MC mod that refuse send its line.
 // Timer = ZNet.Update postfix: empty list = one compare. Feature off = list cleared, event unsubscribed.
 internal static class PlayerCheck
 {

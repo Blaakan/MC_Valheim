@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 2 (RPCs `<guid>.Settings` / `<guid>.SettingsRequest`, no ZDO key; 2 since the knife pair block added a rules field, 2026-10-02). Technically everything runs on the attacking player's own game and other games only need vanilla data (4.1), but the mod changes combat, so under the house rule the server refuses players whose game does not run it (`AllowPlayersWithoutMod`) and sends its combat settings to everyone (4.3, 4.4). |
 | Sheet idea | `Dual wielding` ("Make so that one handed weapons can be dual wielded") |
 | Game version checked | Valheim 1.0.16 (`Version.CurrentVersion`; `.ref/game-version.json` is missing), decompiled `assembly_valheim` in `.ref/`. Every weapon, shield, tool and torch (SharedData scalars, damages, both `Attack` objects' scalars, the equip status effect name), the Player animator (layers, parameters with types, every clip with its length and animation events) and every creature prefab dumped at runtime from a Debug self-test on 2026-09-29 (`Weapons.Moveset/DataDump.cs`, temporary). Food prefab names from the installed game's SoftRef `manifest_extended`. Smoothbrain DualWield and RustyMods DualWielder sources and the Goo's Combat Overhaul README read on 2026-09-29 (research briefs). BepInEx 5 `BepInIncompatibility` from the installed `BepInEx.xml`. Revised on 2026-09-30 after three adversarial reviews (vanilla rules, multiplayer and robustness, player experience); every finding was checked against `.ref` and the dump. Aligned on 2026-09-30 with the framework's new join-check support (`NetworkGate.PeerCompatible`, `PeerProblem`, `PeerStateChanged`, the `HelloState` RPC; `src/Shared/Framework`) and with the four sibling Combat designs (integration review). Revised again on 2026-09-30 after the user's first in-game test (build `3cda33b+dirty`): the swap key plays the equip and draw animations and takes a vanilla equip's time (G4, 2.3, D22, D26), and a sheathed pair is shown crossed in an X (G11, 2.7, D27); the equip queue, `VisEquipment.AttachBackItem` and the back joints were read in `.ref` for it (1.7, 1.8). After the in-world run of that build (2026-09-30), the crossed pair is kept level every frame (2.7, D27), and the cross-mod texts follow the siblings' second round (6.1). Revised once more on 2026-09-30 for the user's holster rule (swords, maces and axes on the back, daggers and knives on the side hip): two knives hang one per hip and a knife with a back weapon keeps vanilla's spots (G11, 2.7, D27); `AttachBackItem`'s joint choice and the body mesh's bind pose were read for it (1.7). Revised on 2026-10-02 for the user's request that two knives play like Skoll and Hati, block included (G12): `Humanoid.BlockAttack`, `GetCurrentBlocker`, `ItemData.GetBlockPower` and every reader of block values were read in `.ref`, and the stats of every knife, shield and vanilla dual item (Early Axes and the fist weapons included) were read from the installed game's asset bundles (offline, AssetsTools.NET; they match the 2026-09-29 runtime dump where both have them). |
-| Status | Implemented (v0.1.0 code), in-game testing; user feedback of the first in-game test implemented, not run in game yet; knife pair block (G12, 2026-10-02) implemented, its in-world self-test passed, not tested by hand yet (section 10: implementation notes and deviations; their short list closes the section) |
+| Status | Implemented (v0.1.0 code), in-game testing; user feedback of the first in-game test implemented, not run in game yet; knife pair block (G12, 2026-10-02) implemented, its in-world self-test passed, not tested by hand yet; v0.1.1 (2026-10-16, framework screen fixes 2026-10-17): the join check refuses through `NetworkGate.Refuse`, so the refused player's error screen names the mod, the reason and what to do when their game has an MC mod made to run on both the server and the players (4.2, 4.4, 4.5) (section 10: implementation notes and deviations; their short list closes the section) |
 
 `Weapons` is the system and `DualWield` the feature, so other weapon mods (for example `Weapons.Moveset`, built in the
 same run) sit next to it under their own GUIDs. The GUID and the display name are permanent after release.
@@ -1305,6 +1305,9 @@ own game. Hooks on the victim's side see a normal `HitData` and never the weapon
       player when the server's copy turns on or off;
     - client → server `<GUID>.HelloState` `"on"` / `"off"`, when the client's copy turns on or off while connected.
       The server then raises `NetworkGate.PeerStateChanged`, which the join check listens to (4.4).
+    - server → client `MC.Framework.Refused` `"<mod name>\t<line>"` (since 0.1.1; one name shared by every MC mod),
+      sent by `NetworkGate.Refuse` just before the vanilla `Error` RPC when the join check refuses the player (4.4).
+      Every Both MC mod on the player's game registers it per connection (`RefusalNotes`); vanilla games ignore it.
 - **ZDO keys: none new.** Vanilla keys carry everything (left item, back items, stance, triggers). The swap and the
   sheathed pair placement add nothing to the wire. The knife pair block (G12) adds one rules field, `KnifePairBlock`
   (layout 2, `ModNetworkVersion` 2); the block itself is worked out on the blocking player's own game (the victim's
@@ -1363,12 +1366,21 @@ host's own player is not a peer, single player has none):
   connected; a copy that failed to start counts as off, and so does a copy blocked by another dual wield mod through the
   hook of 7.6). `PlayerCheck.Decide(isServer, connected, ready, beingKicked, compatible, allowWithoutMod)` stays pure
   (Skip / Compatible / Allowed / Refuse; self-tested).
-- **Refusal** (not compatible, `AllowPlayersWithoutMod` off): vanilla `Error` RPC with `ErrorVersion` (their game shows
-  "Incompatible version" and goes back to the main menu), peer added to `ZNet.PeersToDisconnectAfterKick` with a 4 s
-  delay (so a slow-loading game reads the error first). Warning in the server log naming the player and
-  `NetworkGate.PeerProblem(peer)`: "Refused <name>: their game <does not have the mod | has the mod turned off | has
-  another version of the mod (network version N, the server has M)>. This server requires Dual Wielding on every player
-  (everyone fights with the same rules). To let such players in, set AllowPlayersWithoutMod = true."
+- **Refusal** (not compatible, `AllowPlayersWithoutMod` off): `NetworkGate.Refuse(peer)` (since 0.1.1): first the
+  reason line `MC.Framework.Refused` (4.2), then the vanilla `Error` RPC with `ErrorVersion` (their game shows
+  "Incompatible version" and goes back to the main menu; when their game has at least one MC mod made to run on both
+  the server and the players, whether or not the server has that mod, the screen adds an "MC mods:" block with the
+  server's line, `RefusalNotes`: "this server requires it (version X) and your game does not have it. Install it.",
+  "the server has version X and your game Y, and they cannot play together. Install version X.", or "it is turned off
+  or cannot run in your game, and this server requires it. Turn it on in Esc > MC Mods (or F1 when a configuration
+  manager is installed; its status there says what stops it) and join again."), peer added to
+  `ZNet.PeersToDisconnectAfterKick` with a 4 s delay (so a slow-loading game reads the error first). Only the first MC
+  mod that refuses a player sends its line (a later check skips a peer already in the kick list): when a server refuses
+  a player for several MC mods, the screen names the first one that refused them; once that one is fixed, the next
+  join names the next one. Warning in the server log naming the player and `NetworkGate.PeerProblem(peer)`: "Refused
+  <name>: their game <does not have the mod | has the mod turned off | has another version of the mod (network version
+  N, the server has M)>. This server requires Dual Wielding on every player (everyone fights with the same rules). To
+  let such players in, set AllowPlayersWithoutMod = true."
 - **Allowed** (`AllowPlayersWithoutMod` on): let in, with a Warning naming the player and the same reason. Their own
   copy is inactive (missing, off, or `ServerMismatch`), so they play without this mod's rules (hand-offs in 4.5). A
   player whose copy is off because of another dual wield mod (6.3) reports "turned off" too and may still dual wield
@@ -1390,15 +1402,15 @@ keeps the server's rules for the moment it turns back on.
 |---|---|
 | Single player | Own settings; everything local. |
 | Player with the mod on a server with the mod | Server's settings; pairs work; other players see them. |
-| Player joins without the mod, with it turned off, or with another network version (setting off) | Refused about 1 s after joining ("Incompatible version" on their screen); the server log names the reason (`PeerProblem`). |
+| Player joins without the mod, with it turned off, or with another network version (setting off) | Refused about 1 s after joining ("Incompatible version" on their screen; since 0.1.1 with an "MC mods:" line naming Dual Wielding, the reason and what to do, when their game has an MC mod made to run on both the server and the players, 4.4); the server log names the reason (`PeerProblem`). |
 | Player turns the mod off while connected (setting off) | Their copy puts the off-hand weapon away (7.4) and tells the server (`HelloState`); refused about 1 s later. Turned back on within that second: stays. |
 | Player without the mod, with it turned off, or with another network version, `AllowPlayersWithoutMod` on (**hand-off**) | Let in, with a server log warning naming the reason. Their copy (if any) is inactive, so they can never make a pair with this mod (the equip rule is local); a player whose copy is off because of another dual wield mod may still pair with that mod, by its own rules. They see a dual wielder's two weapons, dual stance, dual moves and the swap's draw animation (all vanilla data) and take their hits normally; they see no off-hand trail and the two sheathed weapons overlapping on one back joint (vanilla's placement). |
 | Two players with the mod | Each places the other's sheathed pair on its own screen (from the synced back items: an X on the back, knives one per hip), per its own `CrossSheathedPair`, and sees the other's swap animation. |
 | Weapon carrying the off-hand marker reaches a player without the mod (trade, chest, tombstone) (**hand-off**) | A normal weapon for them; the marker is kept in its data and ignored. Back with a modded player it only matters when it is re-equipped in the same frame as its partner; a stale marker on a main-hand weapon is cleared on activation, on login and when a pair forms. |
 | A saved pair loads where the mod is off (vanilla server, mod disabled, uninstalled) (**hand-off**) | Vanilla `EquipInventoryItems`: the later of the two in inventory order ends in the right hand, the other is unequipped (`m_equipped` cleared). No error. The pair has to be made again. |
 | Player with the mod on a server without it | The framework turns the feature off for the session before the player spawns: vanilla equip and moves. |
-| Player with Smoothbrain DualWield next to this mod | This mod does not load (6.3); on a server with the mod the player is refused like a player without it. |
-| Player with another dual wield mod found by name (DualWielder, DualWieldCore, DualMastery) | Their copy is inactive with a status naming that mod (6.3) and reports "off" to the server: refused like a player who turned the mod off (through the framework hook of 7.6, in place). |
+| Player with Smoothbrain DualWield next to this mod | This mod does not load (6.3); on a server with the mod the player is refused like a player without it. Their screen's line (only with another MC mod in their game made to run on both the server and the players) is the "does not have it. Install it." one: the server cannot tell a copy that did not load from none; the BepInEx log says why it did not load (README Compatibility, X08). |
+| Player with another dual wield mod found by name (DualWielder, DualWieldCore, DualMastery) | Their copy is inactive with a status naming that mod (6.3) and reports "off" to the server: refused like a player who turned the mod off (through the framework hook of 7.6, in place). Their screen's line is the "turned off or cannot run" one, which sends them to the MC Mods panel (or F1), where the status names the other mod (README Compatibility, X08). |
 | The server turns the mod off (or back on) live | Every client's copy follows (framework): off puts each player's off-hand weapon away; on allows pairs again and resends the settings. |
 | The server changes a rule live | Every client revalidates on the next frame: an excluded off-hand weapon is put away, the stance follows the moves settings. |
 | PvP | Off-hand hits are normal hits of that weapon; the other player blocks or parries them with their own blocker (with two knives, the knife pair's block of G12, worked out on that player's game); both games use the server's settings. A both-hands event is two blocked hits: the per-block rewards count twice (2.6). |
@@ -1945,10 +1957,12 @@ hand unless said otherwise.
   X04 `MC_SmokeScreen` (with Sneak Ambush). For the stamina test turn god mode off and use a world without the stamina
   modifier.
 - Put the weapons on the hotbar. Keep `BepInEx/LogOutput.log` open (`./tools/Watch-Log.ps1 -Mine`).
-- Multiplayer: a dedicated server or a host with the mod, and a second game. For M01 "other network version": a build
-  of this mod with another network version, made without deploying (`dotnet build
-  src/Combat/Weapons.DualWield/MC.Combat.Weapons.DualWield.csproj -p:ModNetworkVersion=2 -p:DeployToGame=false`) and
-  copied by hand over the second game's copy (put the normal build back afterwards).
+- Multiplayer: a dedicated server or a host with the mod, and a second game. For M01 and M18 (`TESTING.md` M03 and
+  M18), the other-version build: this mod with another network version and another release version, made without
+  deploying (`dotnet build src/Combat/Weapons.DualWield/MC.Combat.Weapons.DualWield.csproj -p:ModNetworkVersion=3
+  -p:Version=0.0.9 -p:DeployToGame=false`) and copied by hand over the second game's copy (put the normal build back
+  afterwards). The other release version matters for M18: with only another network version, the refusal line would
+  name the same version twice.
 
 ### Single player
 
@@ -2103,8 +2117,11 @@ hand unless said otherwise.
   (with `AllowPlayersWithoutMod = true` on the server): overlapping at once, and placed again when turned back on. The
   observer toggles `CrossSheathedPair` off and on while the other lies in a bed with a sheathed sword pair: crossed
   within a moment once that player stands up. A player without the mod sees both pairs overlapping (vanilla).
+- **M18 Refusal screen names the mod (0.1.1):** turned off while in, joining with it off, the other-version build and a
+  game without the mod (with another MC mod made to run on both the server and the players): the "Incompatible
+  version" screen lists only Dual Wielding's line under "MC mods:" (4.4).
 
-(Multiplayer ids in `TESTING.md` follow the stage 4 numbering of section 10; M16 and M17 are the same there.)
+(Multiplayer ids in `TESTING.md` follow the stage 4 numbering of section 10; M16, M17 and M18 are the same there.)
 
 ### Cross-mod
 
@@ -2133,7 +2150,9 @@ hand unless said otherwise.
   Install RustyMods DualWielder instead: the MC Mods panel shows "Inactive: <its plugin name> also handles dual
   wielding. Remove one of them." (note the name, R17), the spawn notice lists it, and a server with the mod refuses
   that player ("has the mod turned off"). (With the fallback of 6.3: the center message at the first would-be
-  pairing, and the player is not refused.)
+  pairing, and the player is not refused.) Since 0.1.1 the item also reads each refusal screen: the "does not have it"
+  line next to Smoothbrain DualWield (with another MC mod made to run on both the server and the players), the "turned
+  off or cannot run" line next to DualWielder (4.5).
 
 ### Live toggle, Enabled = false, clean log
 
@@ -2691,6 +2710,31 @@ it is.
 - Texts: G12, E6, 1.3 (who reads block values, block wear, when a parry staggers), 1.5 (the other vanilla dual items),
   2.6 (blocking), D11, D29, 4.1, 4.2, 4.5, section 5, 6.1, 6.2, 6.3, 7.1-7.5, 7.7, T14, T34, M02; README, CHANGELOG,
   `TESTING.md` (build-under-test line, T14, T34, M03's network version, M06).
+
+**Refusal screen (0.1.1, 2026-10-16; framework fixes 2026-10-17).** The framework's `NetworkGate.Refuse` sends the
+refused player one reason line (`MC.Framework.Refused`, 4.2) before the vanilla `Error`, and `RefusalNotes` adds an
+"MC mods:" block to their "Incompatible version" screen (`docs/modding/framework.md`, "Who needs to install it, and
+multiplayer").
+
+- Code: `PlayerCheck.Refuse` calls `NetworkGate.Refuse(peer)` in place of its own `Error` call; the rest is framework
+  code (`src/Shared/Framework`).
+- What the player sees: only an MC mod made to run on both the server and the players (any mod a server can refuse
+  you for, or Sleep Through the Day) listens for the line and patches the screen, whether or not the server has that
+  mod; a game whose MC mods are all client-side shows only "Incompatible version". When the server sent a line, only
+  the server's lines are shown. One line per refusal: when a server refuses a player for several MC mods, the screen
+  names the first one that refused them; once that one is fixed, the next join names the next one. When the server
+  sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the screen
+  lists what the player's own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with theirs; that may not be why they were refused. With Jotunn on the server
+  and on the player's game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on the
+  player's game, the vanilla panel shows them. A game whose copy is kept off by another dual wield mod gets the
+  "turned off or cannot run" line, whose "its status there says what stops it" leads to the status naming that mod; a
+  game next to Smoothbrain DualWield gets the "does not have it" line (4.5).
+- Verified: `probe.mp.off.MC.Combat.Weapons.DualWield` and `probe.refusal` passed on 2026-10-17 on the code before the
+  framework fixes (the screen named only this mod, with the old wording of the line). The fixes (new wording, only the
+  server's lines when it sent any, notes kept per connection object) have not run yet.
+- Texts: 4.2, 4.4, 4.5; README (config row, Multiplayer, Compatibility), CHANGELOG 0.1.1, `TESTING.md` (Setup's
+  other-version build with `-p:Version=0.0.9`, X08, M18).
 
 ### Deviations from the design, in short
 

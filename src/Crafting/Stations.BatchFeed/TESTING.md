@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+**Build under test:** 1.0.0 (first release; before that 0.1.1), build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
 MC Mods panel. Smoke test passed 2026-09-29 on 0.1.0 (loads, patches cleanly, JitCheck clean: 236 methods, 0
 failures). No in-game test yet. 0.1.1 fixed the hover hint that stayed wrong when another mod changed a fire while you
 kept looking at it (the hint now asks the spot under the crosshair again every half second): C05 was reset, and the

@@ -4,15 +4,18 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
-Mods panel). 0.1.1 fixed the wake-up message of T21 (a sleep that started after nightfall and ended on the same day
-without a time skip was taken for a daytime sleep and showed "Good evening"): T21 is reset to `[ ]` and T23 is new;
-the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded):
-all of this mod's tests passed. History, on 0.1.0: committed build `1254c75` (2026-09-29): Debug and Release build
-without warnings; smoke test (`./tools/Test-Smoke.ps1`, all MC mods) passed (loads, patches apply, JIT check clean);
-automated in-world self-tests (T17, `./tools/Test-InWorld.ps1`) passed on the same code: `sleep.morning`,
-`sleep.night`, `sleep.afternoon.default` and `sleep.afternoon.included` (17/17 tests of the run). No hands-on in-game
-test yet.
+**Build under test:** 1.0.0 (first release; before that 0.1.2), build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+Mods panel). 0.1.2 carries the framework's refusal screen (when a server refuses the player because of another MC mod,
+the "Incompatible version" screen lists that mod under "MC mods:"; Sleep is enough on its own and the server does not
+need to have it; framework item N09): M12 is new; sleeping is unchanged, so no other item is reset. Built without
+warnings (`-p:DeployToGame=false`); not yet run in the game. 0.1.1 fixed the wake-up message of T21 (a sleep that
+started after nightfall and ended on the same day without a time skip was taken for a daytime sleep and showed "Good
+evening"): T21 is reset to `[ ]` and T23 is new; the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world
+and with a dedicated server, every MC mod loaded): all of this mod's tests passed. History, on 0.1.0: committed build
+`1254c75` (2026-09-29): Debug and Release build without warnings; smoke test (`./tools/Test-Smoke.ps1`, all MC mods)
+passed (loads, patches apply, JIT check clean); automated in-world self-tests (T17, `./tools/Test-InWorld.ps1`)
+passed on the same code: `sleep.morning`, `sleep.night`, `sleep.afternoon.default` and `sleep.afternoon.included`
+(17/17 tests of the run). No hands-on in-game test yet.
 
 **Automated checks (2026-10-15):** 40 of 40 self-tests named in this list's notes passed in real game runs on Valheim
 1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
@@ -268,6 +271,22 @@ framework tests N02-N05 in `src/Shared/TESTING.md` (this is the first mod that n
   seen. (unverified: how long the dream videos last)
   *Partly automated (`sleep.latewake`); by hand: The real case: a host with another player online watches a dream
   video (cinematicsleep) while the world time runs on past midnight; both games' Debug lines say daytime sleep.*
+
+## 0.1.2 — multiplayer: refusal screen (needs a dedicated server or a host)
+
+- [ ] **M12 Refused for another MC mod, Sleep as the only MC mod** (framework N09): a server (or host) with Sleep
+  Through the Day and Swim Dive (`AllowPlayersWithoutMod = false`, the default). Your game has Sleep Through the Day
+  and no other MC mod. Join. Expected: shortly after the join you are back at the main menu, and the
+  "Incompatible version" screen ends with "MC mods:" and one line, "- Swim Dive: this server requires it (version
+  ...) and your game does not have it. Install it.", with the server's Swim Dive version; no line for Sleep Through
+  the Day. With Jotunn on the server and on your game, Jotunn's window shows the same lines under "Failed
+  Connection:"; with Jotunn only on your game, the vanilla panel shows them. Then turn Sleep Through the Day off on
+  your game (`Enabled = false`) and join again: the screen still names only Swim Dive (Sleep does not get you
+  refused, and the server's line wins). Turn it on again. Remove Sleep Through the Day from the server (it keeps Swim
+  Dive) and join: the same Swim Dive line (the server does not need to have Sleep Through the Day). Remove Sleep
+  Through the Day from your game too (no MC mod at all) and join: only "Incompatible version". No error in your log.
+  (The multiplayer probe `probe.mp.refused` checks the same framework code with the stand-in content mod as the only
+  MC mod that runs on both sides; this item checks Sleep Through the Day's own copy.)
 
 ## 0.1.0 — compatibility (optional, needs another mod)
 

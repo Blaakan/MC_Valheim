@@ -12,8 +12,9 @@ namespace MC.Core.ProbeWorldMod;
 //                    view and of inventory (InventoryGui.Show(null)), inventory closed again.
 //   probe.runner   = SafeRunner itself: nested enumerators, WaitForSeconds, WaitForSecondsRealtime, WaitUntil work;
 //                    a throw is caught; a never-ending test is stopped at timeout and its finally block runs.
-//   probe.refusal  = RefusalNotes (framework): the "MC mods:" block a refused player sees, sorted by mod, server line
-//                    wins over what the game knew, once only, empty when nothing is wrong. Single player only.
+//   probe.refusal  = RefusalNotes (framework): the "MC mods:" block a refused player sees, sorted by mod, known lines
+//                    only when the server sent none, once only, cleared for a new connection (not for the same one),
+//                    empty when nothing is wrong. Single player only.
 internal static class ProbeTests
 {
     internal const string Baseline = "probe.baseline";
@@ -31,13 +32,23 @@ internal static class ProbeTests
             {
                 problems.Add("no notes, yet the text changed");
             }
+            // Only what this game knew: known lines, sorted by mod.
+            var conn = new object();
+            RefusalNotes.NewConnection(conn);
             RefusalNotes.SetKnown("Mod B", "known b");
             RefusalNotes.SetKnown("Mod A", "known a");
-            RefusalNotes.OnServerLine(null, "Mod A\tsent a");
+            var known = RefusalNotes.AddTo("Incompatible version");
+            const string wantKnown = "Incompatible version\n\nMC mods:\n- Mod A: known a\n- Mod B: known b";
+            if (known != wantKnown)
+            {
+                problems.Add($"known only: text '{known.Replace("\n", "/")}', expected '{wantKnown.Replace("\n", "/")}'");
+            }
+            // Server said why: only its lines (Mod B was let in by the server, so its known line is no reason).
             RefusalNotes.OnServerLine(null, "Mod C\tsent c");
+            RefusalNotes.OnServerLine(null, "Mod A\tsent a");
             RefusalNotes.OnServerLine(null, "a line without a tab");
             var text = RefusalNotes.AddTo("Incompatible version");
-            const string want = "Incompatible version\n\nMC mods:\n- Mod A: sent a\n- Mod B: known b\n- Mod C: sent c";
+            const string want = "Incompatible version\n\nMC mods:\n- Mod A: sent a\n- Mod C: sent c";
             if (text != want)
             {
                 problems.Add($"text '{text.Replace("\n", "/")}', expected '{want.Replace("\n", "/")}'");
@@ -46,6 +57,19 @@ internal static class ProbeTests
             {
                 problems.Add("the block was added a second time");
             }
+            // Same connection again (every MC mod's copy call it): notes stay.
+            RefusalNotes.NewConnection(conn);
+            if (!RefusalNotes.AddTo("x").Contains("Mod C"))
+            {
+                problems.Add("the second copy's call for the same connection cleared the notes");
+            }
+            // New connection: nothing of the one before (run 2026-10-17: a line of the connection before stayed).
+            RefusalNotes.NewConnection(new object());
+            if (RefusalNotes.AddTo("x") != "x")
+            {
+                problems.Add($"a new connection still shows notes of the one before: '{RefusalNotes.AddTo("x").Replace("\n", "/")}'");
+            }
+            RefusalNotes.SetKnown("Mod B", "known b");
             RefusalNotes.SetKnown("Mod B", null);
             if (RefusalNotes.AddTo("x").Contains("Mod B"))
             {
@@ -58,7 +82,8 @@ internal static class ProbeTests
         }
         if (problems.Count == 0)
         {
-            SelfTest.Pass(T, "refusal notes: sorted by mod, the server's line wins, added once, removed lines gone");
+            SelfTest.Pass(T, "refusal notes: sorted by mod, known lines when the server said nothing, only the server's lines "
+                             + "when it did, added once, kept for the same connection, cleared for a new one, removed lines gone");
         }
         else
         {

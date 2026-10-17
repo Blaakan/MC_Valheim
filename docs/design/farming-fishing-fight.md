@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Better fishing` |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` and `assembly_utils` in `.ref/` (FishingFloat, Fish, Utils, Player, Character, Humanoid, PlayerController, Hud, MonoUpdaters, ZDO, ZDOExtraData, Terminal); research briefs of 2026-10-01 (vanilla fishing, repo conventions, existing fishing mods, MC overlaps, plus a verifier pass); sources of GrindstoneSkills, FeastMaster, ComfyFishing, Angler's Eye, EpicLoot, Trolling Fishing and VHVR read on GitHub for GUIDs and patch shapes (2026-10-01); Stardew Valley 1.5 `BobberBar.update` (decompile mirror) for the catch bar maths |
-| Status | Implemented (v0.1.1 code: 0.1.1 fixes the struggle reel, D15, and fights of a fish out of the water, D16; both builds compile, the self-tests have not been run on 0.1.1 yet). History of 0.1.0: smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (`fishing.network`, `fishing.logic`, `fishing.pending`, `fishing.fight`: a live fight on a sea shore; an earlier run failed the struggle reel check, fixed by D13); multi-agent review (11 findings confirmed, all fixed: D11, D12, D14, E6 and test robustness); not yet tested by hand in game |
+| Status | Implemented (v0.1.2 code). 0.1.2 (2026-10-16): the join check refuses through `NetworkGate.Refuse`, so the refused player's "Incompatible version" screen names the mod, the reason and what to do (section 4.3); the framework fix of 2026-10-17 (only the server's lines when it sent any, no line left from an earlier connection, new line texts) belongs to the same version and has not been run in game yet (TESTING.md M07, M08). 0.1.1 fixes the struggle reel, D15, and fights of a fish out of the water, D16; its self-tests passed on 2026-10-13 (game 1.0.17, in-world and with a dedicated server); in the later count of 2026-10-15 (TESTING.md, "Automated checks") 22 of 26 passed, with `fishing.phases`, `fishing.exits`, `fishing.toggle` and `fishing.swim` failing. History of 0.1.0: smoke test passed 2026-10-01; in-world self-tests passed 2026-10-01 on the final code (`fishing.network`, `fishing.logic`, `fishing.pending`, `fishing.fight`: a live fight on a sea shore; an earlier run failed the struggle reel check, fixed by D13); multi-agent review (11 findings confirmed, all fixed: D11, D12, D14, E6 and test robustness); not yet tested by hand in game |
 
 ## Goal
 
@@ -284,13 +284,28 @@ way to turn the rod (fish runs right -> arrow left), green when the verdict is g
   Swim Dive.
 - No ZDO key of its own; it writes vanilla's fish `s_escape` float with vanilla's meaning.
 - `ModNetworkVersion` 1; bump with the RPCs or the rules layout.
+- Framework RPC `MC.Framework.Refused` (string `<mod name>\t<line>`, server → client, since 0.1.2): sent by
+  `NetworkGate.Refuse` just before the vanilla `Error` RPC when the join check refuses a player (section 4.3). A game
+  without a listener ignores it, so it needs no network version change.
 
 ### 4.3 Server settings and join check
 
 As Swim Dive: the server sends its Fight section to every compatible player (0.5 s after the last change); a client
 uses its own config only in single player or when hosting; until the server's rules arrive the client is **pending**
 and fishes vanilla. Players without the mod, with it off or another network version are refused after a 1 s grace
-unless `AllowPlayersWithoutMod`.
+unless `AllowPlayersWithoutMod`. Since 0.1.2 the refusal goes through `NetworkGate.Refuse(peer)`: first the reason
+line for the player's screen (`MC.Framework.Refused`: missing, other version with both version numbers, or turned off
+/ cannot run, each with what to do), then vanilla `Error(ErrorVersion)` ("Incompatible version"). The player's game
+adds an "MC mods:" block to that screen (framework `RefusalNotes`) when it has at least one Both MC mod, which the
+server does not need to have; a game whose MC mods are all client-side shows only "Incompatible version". The block
+shows the server's lines when it sent any. When it sent none (a refusal that is not about an MC mod, or a server with
+an older version of the MC mods), it shows what the player's own game noted while connected (any MC mod turned off
+while the server's is on, or a server copy whose network version cannot talk to its own), which may not be why it was
+refused. Only the first MC mod that refuses a player sends its line (the other checks skip a player already being
+kicked), so when a server refuses a player for several MC mods, the screen names the first one that refused them; once
+that one is fixed, the next join names the next one. With Jotunn on the server and on the player's game, Jotunn's
+window shows the block under "Failed Connection:"; with Jotunn only on the player's game, the vanilla panel does.
+Details: `docs/modding/framework.md`, "Who needs to install it, and multiplayer".
 
 ### 4.4 Hand-off cases
 
@@ -421,7 +436,8 @@ lying out of the water, D16) and multiplayer tests in `SelfTests.Mp.cs`. See the
 (G7), T09 (G8), T10 (G9), T11 (E2), T12-T15 (catch, loss, difficulty E1, cancel E4), T16-T19 (input, menus, display
 E3), T20-T22 (live toggle, Enabled = false, clean log), T23-T25 (logout mid-fight D11, shallows D12, struggle reel
 D13 and D15), T26 (fish out of the water D16), T27 (hooked fish picked up), T28 (fish pulled out of the water during a
-fight D16); M01-M06 (rules, refusal, hand-offs, E6); X01-X05 (MC mods).
+fight D16); M01-M06 (rules, refusal, hand-offs, E6); M07-M08 (0.1.2: the refusal screen names the mod, turned off,
+other version and missing; only the mod that refused is listed); X01-X05 (MC mods).
 
 ## 9. Open questions and unverified
 
@@ -452,3 +468,9 @@ fight D16); M01-M06 (rules, refusal, hand-offs, E6); X01-X05 (MC mods).
 - The vanilla "waypoint reached" test compares x and y (`Vector2.Distance` on a `Vector3`), so the steering waypoint
   is set 1 m below the run point to stay "far" in every run direction.
 - `Set(s_escape, 0)` in vanilla is the int overload; the mod always writes the float.
+- Refusal screen (0.1.2, 2026-10-16; framework fix 2026-10-17): `PlayerCheck.Refuse` calls `NetworkGate.Refuse`
+  instead of sending the vanilla `Error` RPC itself (section 4.3). Nothing else in the mod changed: no setting, no
+  network change, network version still 1. Tests: M07 (turned off; other version: a test copy built with
+  `-p:ModNetworkVersion=99 -p:Version=0.0.9`, so the line names two different versions; missing: a game without the
+  mod that keeps another Both MC mod) and M08 (a mod the server lets in is not listed when another mod refuses);
+  `probe.mp.off.MC.Farming.Fishing.Fight` and `probe.refusal` check the turned-off line and the block.

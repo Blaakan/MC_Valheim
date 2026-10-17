@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.2.1 (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+**Build under test:** 1.0.0 (first release; before that 0.2.1) (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
 Mods panel). The 0.2.0 paragraph below says what changed and what ran on it. First smoke test
 (`./tools/Test-Smoke.ps1`) passed 2026-09-30: loads, patches cleanly, JitCheck clean (494 methods, 0 failures).
 Automated in-world self-tests (`./tools/Test-InWorld.ps1 -Mod Forge.IdolUpgrades`) pass: `forge.catalog`,
@@ -39,8 +39,11 @@ game's new rule, so a Forge tagged by an older version no longer marks what is r
 self-tests `forge.refine.seeded` and `forge.refine.station-tag`). On Valheim 1.0.20, 2026-10-15: smoke test passed
 (every MC mod loads, patches and passes JitCheck); in-world self-tests: all 46 of this mod's tests and the 2 Cultivator
 Replant tests at the Forge passed, and so did the Forge tests of five other MC mods (`tower.x.forge`, `dual.x.forge`,
-`replant.x.idol`, `replant.x.idol-refine`, `csearch.potential`, `sneak.x-forge`). The multiplayer self-tests have not
-run on 0.2.0 yet: the dedicated server copy still runs 1.0.17, which refuses a 1.0.20 game.
+`replant.x.idol`, `replant.x.idol-refine`, `csearch.potential`, `sneak.x-forge`). Multiplayer run on 2026-10-16
+(`./tools/Test-Multiplayer.ps1`, dedicated server and client both on Valheim 1.0.20, 0.2.0 from the working tree of
+commit `c34ad72`): all six of this mod's multiplayer self-tests passed, `forge.mp.dedicated`, `forge.mp.rules`,
+`forge.mp.tiers` and `forge.mp.items` in the `modded` scenario, `forge.mp.vanilla-server` and `forge.mp.handoff` in
+the `vanilla-server` scenario.
 
 **Automated checks (2026-10-15):** 49 of 49 self-tests named in this list's notes passed in real game runs on Valheim
 1.0.17 and 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the working
@@ -318,16 +321,35 @@ the idol and refinement tests: it makes everything free.
 
 ## 0.2.1 — the refusal screen names the mod
 
-0.2.1 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
-under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
-needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
-connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Crafting.Forge.IdolUpgrades` passed, the screen named this
-mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+0.2.1 (2026-10-16, the framework's screen fixes 2026-10-17): when a server refuses you because of this mod, the
+"Incompatible version" screen lists it under "MC mods:" with the reason and what to do (framework `RefusalNotes`,
+`docs/modding/framework.md`, "Who needs to install it, and multiplayer"). This needs at least one MC mod in your game
+that is made to run on both the server and the players (any mod a server can refuse you for, or Sleep Through the
+Day); the server does not need to have that mod. A game whose MC mods are all client-side shows only "Incompatible
+version". When a server refuses you for several MC mods, the screen names the first one that refused you; once that
+one is fixed, the next join names the next one. When the server sends no line (a refusal that is not about an MC mod,
+or a server with an older version of the MC mods), the screen lists what your own game noticed while connected: an MC
+mod turned off while the server has it on, or a server copy whose version cannot play with yours. That may not be why
+you were refused. With Jotunn on the server and on your game, Jotunn's window shows the same lines under "Failed
+Connection:"; with Jotunn only on your game, the vanilla panel shows them. Run on 2026-10-17 (dedicated test server,
+code before the screen fixes): `probe.mp.off.MC.Crafting.Forge.IdolUpgrades` passed, and the screen named this mod,
+and only this mod, both times (turned off while in, joining with it off).
+Fixed since in the framework: a new connection clears the notes (told by the connection object, not by its hash; in
+the same run another mod's screen kept a line of an earlier connection), `probe.mp.off.<GUID>` now fails when the
+screen lists any other mod, and the "turned off" line also names F1 for a game with a configuration manager. Not run
+yet on the fixed code. `probe.refusal` passed on 2026-10-17 (before its new checks of the connection reset).
 
-- [ ] **M08 Refusal screen names the mod:** on a server with Forge Idol Upgrades, turn Forge Idol Upgrades off in Esc > MC Mods while you
-  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Forge Idol Upgrades: it is turned
-  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
-  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
-  join: you stay in.
-  *Partly automated (`probe.mp.off.MC.Crafting.Forge.IdolUpgrades`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
-  window, and a game with another version of the mod than the server's (the line names both versions).*
+- [ ] **M08 Refusal screen names the mod:** on a server with Forge Idol Upgrades, turn Forge Idol Upgrades off in Esc >
+  MC Mods while you are in. Expected: you go back to the menu, and the "Incompatible version" screen lists under "MC
+  mods:" only "- Forge Idol Upgrades: it is turned off or cannot run in your game, and this server requires it. Turn
+  it on in Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and
+  join again." (with Jotunn on the server and on your game: in Jotunn's window, under "Failed Connection:"; with
+  Jotunn only on your game: on the vanilla panel). Join again with it off: the same. Turn it on and join: you stay in.
+  A game with a test build of this mod made with another version (for example
+  `-p:ModNetworkVersion=99 -p:Version=0.0.9`; with only another network version the line names the same version
+  twice): the line reads "the server has version <server's> and your game 0.0.9, and they cannot play together.
+  Install version <server's>." A friend without this mod, with Sleep Through the Day (or another MC mod made to run on
+  both the server and the players) and with every other MC mod the server needs: the line reads "this server requires
+  it (version <server's>) and your game does not have it. Install it."
+  *Partly automated (`probe.mp.off.MC.Crafting.Forge.IdolUpgrades`, `probe.refusal`); by hand: The screen as seen,
+  also inside Jotunn's window; the test build with another version; the friend without this mod.*

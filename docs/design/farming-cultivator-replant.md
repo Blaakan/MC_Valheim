@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Cultivator revamp` |
 | Game version checked | Valheim 1.0.16 (Unity 6000.0.75f1), decompiled `assembly_valheim`, `assembly_utils` and `assembly_guiutils` in `.ref/` (Player, Humanoid, Hud, ZInput, Localization, InventoryGui, Inventory, ItemDrop, Recipe, Piece, PieceTable, ObjectDB, ZNetScene, ZNetView, ZRoutedRpc, Pickable, Plant, TreeBase, Destructible, ResourceRoot, SapCollector, CraftingStation, StationExtension, PrivateArea, Location, Heightmap, Attack); prefab values read offline from the installed game's SoftRef bundles (2026-10-03, scratch tools built on AssetsTools.NET); research briefs of 2026-10-03 (crafting, plants, input, repo patterns, external mods, prefab data, critic pass); PlantEverything, PlantEasily, Groundwork, EarthWright (GPL-3.0) and RestlessPlant source read on GitHub for ideas and compatibility only |
-| Status | Implemented (v0.1.0 code); review of 2026-10-03: 22 findings confirmed and fixed (section 9); smoke test passed 2026-10-03; in-world self-tests passed 2026-10-03 (all 7 `replant.*`; runs made with the test machine's third-party mods installed: Jotunn, Warfare, PlantEasily and others); not yet tested by hand in game |
+| Status | Implemented (v0.1.0 code); review of 2026-10-03: 22 findings confirmed and fixed (section 9); smoke test passed 2026-10-03; in-world self-tests passed 2026-10-03 (all 7 `replant.*`; runs made with the test machine's third-party mods installed: Jotunn, Warfare, PlantEasily and others); not yet tested by hand in game. v0.1.1: grow time of young transplants while the feature is off, and the root rule and no-build refusal kept on transplant ghosts with PlantEasily (section 9); its self-tests passed on 2026-10-13 (game 1.0.17, in-world with PlantEasily 2.2.2 and with a dedicated server; `replant.rootplace` on a second run alone). v0.1.2 (2026-10-16): the join check refuses through `NetworkGate.Refuse`, so the refused player's "Incompatible version" screen names the mod, the reason and what to do (section 4.3); the framework fix of 2026-10-17 (only the server's lines when it sent any, no line left from an earlier connection, new line texts) belongs to the same version and has not been run in game yet (TESTING.md M15, M16) |
 
 ## Goal
 
@@ -407,7 +407,10 @@ they need cultivated ground and most have Meadows, Black Forest, Plains and Ashl
 ### 4.2 RPCs, ZDO keys, network version
 
 RPCs `<guid>.Settings` / `<guid>.SettingsRequest` (`CultivatorRules` layout 1). Prefabs `MC_Transplant_<Key>`,
-`MC_Sapling_<Key>`. No ZDO keys of our own. Network version 1.
+`MC_Sapling_<Key>`. No ZDO keys of our own. Network version 1. Framework RPC `MC.Framework.Refused` (string
+`<mod name>\t<line>`, server → client, since 0.1.2): sent by `NetworkGate.Refuse` just before the vanilla `Error` RPC
+when the join check refuses a player (section 4.3); a game without a listener ignores it, so it needs no network
+version change.
 
 ### 4.3 Server settings and join check
 
@@ -417,6 +420,20 @@ pushes its rules; clients wait for them (pending: pieces hidden, tiers vanilla, 
 roots never drained). On a server without the mod the framework turns the feature off for the session (the server
 never answers the handshake), so the client plays as with the feature off (§2.2): no Replant, sapling pieces hidden,
 tiers vanilla, and transplant saplings its game runs grow by vanilla rules.
+
+Since 0.1.2 the refusal goes through `NetworkGate.Refuse(peer)`: first the reason line for the player's screen
+(`MC.Framework.Refused`: missing, other version with both version numbers, or turned off / cannot run, each with what
+to do), then vanilla `Error(ErrorVersion)` ("Incompatible version"). The player's game adds an "MC mods:" block to
+that screen (framework `RefusalNotes`) when it has at least one Both MC mod, which the server does not need to have; a
+game whose MC mods are all client-side shows only "Incompatible version". The block shows the server's lines when it
+sent any. When it sent none (a refusal that is not about an MC mod, or a server with an older version of the MC mods),
+it shows what the player's own game noted while connected (any MC mod turned off while the server's is on, or a server
+copy whose network version cannot talk to its own), which may not be why it was refused. Only the first MC mod that
+refuses a player sends its line (the other checks skip a player already being kicked), so when a server refuses a
+player for several MC mods, the screen names the first one that refused them; once that one is fixed, the next join
+names the next one. With Jotunn on the server and on the player's game, Jotunn's window shows the block under "Failed
+Connection:"; with Jotunn only on the player's game, the vanilla panel does. Details: `docs/modding/framework.md`,
+"Who needs to install it, and multiplayer".
 
 ### 4.4 Hand-off cases
 
@@ -553,7 +570,10 @@ In-world self tests (`./tools/Test-InWorld.ps1 -Mod Cultivator.Replant`):
 
 In-game tests by hand: `TESTING.md` (G1-G5, E1-E7, live toggle, `Enabled = false` + restart, clean log, multiplayer
 hand-off to a player without the mod, to a player with it turned off and to a host without it, PlantEasily /
-PlantEverything / recipe-config mods, and the review items T33-T37, M10-M13).
+PlantEverything / recipe-config mods, and the review items T33-T37, M10-M13). Added with 0.1.2: M15 (the refusal
+screen names the mod: turned off; a test copy of another version built with `-p:ModNetworkVersion=99
+-p:Version=0.0.9`, so the line names two different versions; and a game without the mod that keeps another Both MC
+mod) and M16 (only the mod that refused is listed).
 
 ## 9. Open questions and unverified
 
@@ -647,3 +667,9 @@ Found by the self-test runs (2026-10-07), fixed in 0.1.1:
   PlantEasily's placement patches back (every other part of the tests runs with them lifted), first shows with the
   second look off that PlantEasily alone turns the ghost green on that spot, then checks the refusal and a real press
   of the place button (E04); the former `replant.bug.planteasily` is gone.
+
+Changed in 0.1.2 (2026-10-16; framework fix 2026-10-17):
+
+- **Refusal screen.** `PlayerCheck.Refuse` calls `NetworkGate.Refuse` instead of sending the vanilla `Error` RPC
+  itself (§4.3). No setting, payload or ZDO change: network version 1 stays. Tests: M15, M16;
+  `probe.mp.off.MC.Farming.Cultivator.Replant` and `probe.refusal` check the turned-off line and the block.

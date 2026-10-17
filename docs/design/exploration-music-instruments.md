@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 5. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), sends its gameplay settings to everyone and relays the music (section 4). |
 | Sheet idea | `music instruments` ("prerecorded songs + midi support for buffs well rested") |
 | Game version checked | Valheim 1.0.16 (Unity 6000.0.75f1, Mono), decompiled `assembly_valheim`, `assembly_utils`, `assembly_guiutils` in `.ref/` (SE_Rested, SE_Cozy, SEMan, StatusEffect, Player, Humanoid, VisEquipment, ItemDrop, ObjectDB, ZNetScene, ZNet, ZRpc, ZRoutedRpc, ZPackage, ZDOMan, AudioMan, MusicMan, MusicVolume, GameCamera, Menu, Chat, Terminal, ZInput, PlayerController, Emotes, Chair); research briefs of 2026-10-05 (comfort, audio, existing mods, items, input and UI, network, pose, MIDI and preset songs), each fact-checked by a second agent |
-| Status | In development (v0.4.0 code) |
+| Status | In development (v0.4.3 code). 0.4.1 (2026-10-08): false recipe warnings when leaving a server fixed (2.1). 0.4.2 (2026-10-16, refined 2026-10-17): the refusal screen names the mod (4.2, 4.3). 0.4.3 (2026-10-17): B that closes the song window no longer makes the character jump (1.4, 2.2, D20) |
 
 ## Goal
 
@@ -94,6 +94,14 @@ shipped or loaded).
 - `ZInput` reads the Unity Input System. Vanilla gates (walking, mouse look, hotbar, Use, inventory, map, camera zoom)
   all ask `Chat.HasFocus`; `Menu.Update` (Esc) does not.
 - Console key binds fire from `Chat.Update` through `Terminal.TryRunCommand(skipAllowedCheck: true)`.
+- Each game button (`ZInput.ButtonDef`) keeps its own press state, one for frames and one for physics steps, even
+  when several buttons sit on the same control: on the default controller layout B is `JoyButtonB` (what windows
+  read), `JoyJump`, `JoyDodge` (with the alt key) and `JoyRadialClose`. `ZInput.ResetButtonStatus(name)` forgets the
+  press of that one button only; a button reset this way stays released until the control is pressed again.
+  `PlayerController.FixedUpdate` reads the jump as `GetButtonDown("JoyJump")` in the physics step, which can come a
+  frame or two after the frame that read B. Vanilla windows that close on B (`InventoryGui`, `StoreGui`) reset
+  `JoyButtonB`, not `JoyJump`; `Menu.Hide` also sets `PlayerController.SetTakeInputDelay(0.1f)` when a gamepad is in
+  use.
 
 ### 1.5 Network
 
@@ -143,7 +151,9 @@ Holding an instrument, **Attack** opens the song window (cursor shown, game keys
 songs, then the MIDI files of the songs folder (`BepInEx/config/MC_Valheim/Songs` unless `SongsFolder` says
 otherwise; `.mid`, `.midi`, `.kar`, `.rmi`; listed at every opening, read when picked). For a MIDI file a part chooser
 offers "Automatic" and every part (track and channel). Buttons: **Play** (the song plays by itself), **Perform** (the
-mini-game), **Repeat**, **Close** (Esc and the gamepad B also close).
+mini-game), **Repeat**, **Close** (Esc and the gamepad B also close; `Menu.Update` prefix, so Esc never also opens the
+pause menu). Since 0.4.3 B that closes the window is forgotten on every game button bound to the same control
+(`Performance.ForgetPadButton`), so the jump button on B never sees the press (D20).
 
 - **Play (autoplay):** the arranged notes are scheduled 0.5 s ahead on the player's own sound source and streamed
   (2.4). The bard may walk (no running, jumping or dodging). Attack or Block stops; the song also ends by itself
@@ -390,6 +400,16 @@ keys also the note), lit while held; the tambourine's unused keys greyed. Free p
   on the row above at the piano's gaps, two octaves and three notes, all semitones (no scale setting needed), Space
   for an octave up; keys by place keep the shape on every layout. The first draft (three diatonic rows, Shift for
   sharps, scale and root settings) was dropped before it was committed. Keys are not configurable in v0.4.
+- **D20 B that closes the window reaches nothing else** (0.4.3, fix of T22, `ZInput` and `PlayerController` read in
+  the 1.0.20 `.ref`; the self-test found the character jumping on about 1 close in 6 with the default controller
+  layout, where B is also the jump button): the mod used to forget only `JoyButtonB`, so `JoyJump` kept the press and
+  `PlayerController.FixedUpdate` could read it in a physics step after the key capture had ended (1.4). Now every
+  game button bound to the same control as
+  `JoyButtonB` (its effective path, so rebinds and swapped face buttons count) is reset at the close: the jump,
+  dodge and radial close on B never see that press, even while B stays held. Not chosen: vanilla's
+  `SetTakeInputDelay` alone (it covers only what `PlayerController` and `HasInputDelay` gate, and it would also keep
+  the window from opening again for 0.1 s), or holding the key capture until B is let go (every game key dead while
+  B is held).
 
 ## 4. Multiplayer
 
@@ -412,12 +432,38 @@ prefabs `MC_Flute`, `MC_Lyre`, `MC_Tambourine`; recipes `Recipe_MC_Flute`, `Reci
 status effect `SE_MC_Music`. Network version 5 (1 had a shelter flag in the rules, 2 had no server songs, 3 the old
 Encore rule, 4 no note off; none released).
 
+Framework messages (`NetworkGate`, not part of this mod's network version): `MC.Exploration.Music.Instruments.Hello`,
+`.HelloAck` and `.HelloState` (the join check's view of each player's copy), and since 0.4.2 `MC.Framework.Refused`
+(server → client, `string` `"Music Instruments\t<line>"`: what is wrong and what to do), sent by `NetworkGate.Refuse`
+just before vanilla `Error` when the join check refuses a player (4.3). The player's game shows the line under "MC
+mods:" on the error screen (`RefusalNotes`, registered by every MC mod made to run on both the server and the players,
+whether or not the server has that mod; a game without one drops it, as vanilla `ZRpc` does with any unknown RPC).
+
 ### 4.3 Server settings and join check
 
 Copied from Cultivator Replant (itself Spyglass and Swim Dive): the server pushes its rules 0.5 s after the last
 change to compatible players; a client uses them for that session and is pending (recipes hidden, no playing, no
 bonus) until they arrive; recipes are rebuilt 0.5 s after the rules stop changing. Players without the mod, with it off
 or another network version are refused after a 1 s grace unless `AllowPlayersWithoutMod`.
+
+Refusal (`PlayerCheck.Refuse`): a Warning in the server log naming the player and the reason
+(`NetworkGate.PeerProblem`), then `NetworkGate.Refuse(peer)` (since 0.4.2; before, a bare vanilla `Error` RPC): first
+`MC.Framework.Refused` with one line for the player's error screen (missing: "this server requires it (version X) and
+your game does not have it. Install it."; another version: "the server has version X and your game Y, and they cannot
+play together. Install version X."; turned off: "it is turned off or cannot run in your game, and this server requires
+it. Turn it on in Esc > MC Mods (or F1 when a configuration manager is installed; ...) and join again."), then vanilla
+`Error` with `ErrorVersion` ("Incompatible version"). The line shows under "MC mods:" when the player's game has at
+least one MC mod made to run on both the server and the players (any mod a server can refuse a player for, or Sleep
+Through the Day); the server does not need to have that mod. A game whose MC mods are all client-side shows only
+"Incompatible version". With Jotunn on the server and on the player's game, Jotunn's window shows the same lines under
+"Failed Connection:"; with Jotunn only on the player's game, the vanilla panel shows them. The peer goes in vanilla's
+kick list, disconnected `DisconnectDelay` later so the client reads the error first. Only the first MC mod that
+refuses a player sends its line: a later mod's check skips a player already being kicked (`PlayerCheck.Decide`), so a
+player refused for several MC mods sees the first one that refused them; once that one is fixed, the next join names
+the next one. When the server sends no line (a refusal that is not about an MC mod, or a server with an older version
+of the MC mods), the player's game lists what it noticed while connected: an MC mod turned off while the server has it
+on, or a server copy whose version cannot play with its own (`NetworkGate.UpdateKnownNote`). That may not be why the
+player was refused. A server line, when there is one, replaces those.
 
 ### 4.4 Hand-off cases
 

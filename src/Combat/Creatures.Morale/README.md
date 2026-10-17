@@ -167,6 +167,17 @@ progress, whichever game controls the creature.
   playing on such a server disconnects you** about a second later. The server (or host) can let such players in with
   AllowPlayersWithoutMod = true: creatures then behave as in the normal game toward them, and the creatures their
   game controls attack everyone the normal way.
+- **The refusal screen says why.** When the server refuses you because of this mod, the "Incompatible version" screen
+  lists Creature Morale under "MC mods:" with the reason (your game does not have it, has another version, or has it
+  turned off or cannot run it) and what to do. This needs at least one MC mod in your game that is made to run on both
+  the server and the players (any mod a server can refuse you for, or Sleep Through the Day); the server does not need
+  to have that mod. A game whose MC mods are all client-side shows only "Incompatible version". When a server refuses
+  you for several MC mods, the screen names the first one that refused you; once that one is fixed, the next join
+  names the next one. When the server sends no line (a refusal that is not about an MC mod, or a server with an older
+  version of the MC mods), the screen lists what your own game noticed while connected: an MC mod turned off while the
+  server has it on, or a server copy whose version cannot play with yours. That may not be why you were refused. With
+  Jotunn on the server and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn
+  only on your game, the vanilla panel shows them.
 - **The server's settings apply to everyone** (your log says "Using the server's creature rules", again each time
   the server changes them); your own settings apply again in single player and when you host. ShowProgressMessages
   stays your own. While your game waits for the server's settings as you join (normally before your character

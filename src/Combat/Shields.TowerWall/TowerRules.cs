@@ -60,8 +60,9 @@ internal sealed class TowerRules
     internal const float MaxBashAngle = 180f;
     internal const float MaxBashDamage = 200f;
 
-    // Defaults (design 5). Config binding use them, self tests too. AutoTowers (design 2.0.2): every shield that
-    // cannot parry at all is a tower, mods' shields too; Towers add more and set bash damage; ExcludedTowers win.
+    // Defaults (design 5). Config binding use them, self tests too. AutoTowers (design 2.0.2): every shield with parry
+    // bonus below 1 is a tower (ShieldIronSquare, bonus 1, stay out), mods' shields too; Towers add more and set bash
+    // damage; ExcludedTowers win.
     internal const bool DefaultAutoTowers = true;
     internal const string DefaultTowers =
         "ShieldWoodTower:6, ShieldBoneTower:8, ShieldIronTower:12, ShieldSerpentscale:15, ShieldBlackmetalTower:20, "

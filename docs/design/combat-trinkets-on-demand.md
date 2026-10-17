@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet ideas | `Trinket revamp` (all of it) and `Adrenaline revamp` (part: income while fighting, no drain, ranged catch-up; see Non-goals) |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` and `assembly_utils` in `.ref/`; research briefs of 2026-10-01 (adrenaline core, adrenaline sources, framework patterns); repo runtime dumps cited in `docs/game/combat.md` §8 (trinket prefabs, Player `m_maxAdrenaline` 0, miss penalty 0) and `docs/design/combat-crossbow-stays-loaded.md` (Arbalest reload 3.5 s); this mod's in-world self-test NOTE dumps of 2026-10-01 (7.5) |
-| Status | Implemented (v0.1.0). Smoke test and all 8 in-world self-tests passed on 2026-10-01 on the final code (with the 1.5 s `RangedReferenceSeconds` default, D14); no hands-on in-game test yet |
+| Status | Implemented (v0.1.0). Smoke test and all 8 in-world self-tests passed on 2026-10-01 on the final code (with the 1.5 s `RangedReferenceSeconds` default, D14); no hands-on in-game test yet. 0.2.0 (2026-10-13): other players count like creatures while PvP is on for both (D24). 0.2.1 (2026-10-16, refined 2026-10-17): the refusal screen names the mod (4.3; Implementation notes, last point) |
 
 ## Goal
 
@@ -336,12 +336,27 @@ RPC `MC.Combat.Trinkets.OnDemand.SettingsRequest` (int layout) and `.Settings` (
 income, linger, refuse flag, reference, cap). No ZDO key, no prefab, no item data. `ModNetworkVersion` 1; bump with
 the layout.
 
+Framework (`NetworkGate`, not part of this mod's network version): the hello RPCs (`.Hello`, `.HelloAck`,
+`.HelloState`), and since 0.2.1 `MC.Framework.Refused` (server → client, `string` `"Trinkets on Demand\t<line>"`:
+what is wrong and what to do), sent by `NetworkGate.Refuse` just before vanilla `Error` when the join check refuses a
+player (4.3). The player's game shows the line under "MC mods:" on the error screen (`RefusalNotes`, registered by
+every MC mod made to run on both the server and the players; a game without one drops it silently, as vanilla
+`ZRpc.HandlePackage` does with any unknown RPC).
+
 ### 4.3 Server settings and join check
 
 Copy of Sneak Ambush's `PlayerCheck` and `ServerRules`, with the three upgrades of the framework brief §2.1: push
 debounce (`PushDelay` 0.5 s, pure `Settled`), push only to `NetworkGate.PeerCompatible` peers, and a client stores
 rules only while active. Pending = vanilla (2.8). Players without the mod, with it off or another network version are
-refused about a second after joining unless `AllowPlayersWithoutMod`.
+refused about a second after joining unless `AllowPlayersWithoutMod`. The refusal is `NetworkGate.Refuse(peer)` (since
+0.2.1; before, a bare vanilla `Error` RPC): first the framework's `MC.Framework.Refused` with one line for the
+player's error screen (missing, another version with both version numbers, or turned off, and what to do), then
+vanilla `Error` with `ErrorVersion` ("Incompatible version"); the peer goes in vanilla's kick list, disconnected 4 s
+later. The player's game lists the line under "MC mods:" when it has at least one MC mod made to run on both the
+server and the players (any mod a server can refuse a player for, or Sleep Through the Day; the server does not need
+to have that mod); a game whose MC mods are all client-side shows only "Incompatible version". Only the first MC mod
+that refuses a player sends its line: a later mod's check skips a player already being kicked (`Decide`), so the
+screen names the first mod that refused; once that one is fixed, the next join names the next one.
 
 `ModMultiplayerNotes`: "Install it on the server (or the host) and on every player's game. It changes combat for
 everyone, so the server refuses players who do not have the mod, have it turned off or have another version of it
@@ -497,8 +512,10 @@ rig restores equipment, ammo, bar, drain timer, effects (trinket and tier), cont
 
 ### 7.6 Shared framework used
 
-`ModPlugin` (life cycle, `LocalBlocker`), `NetworkGate` (`PeerCompatible`, `PeerProblem`, `PeerStateChanged`),
-`PatchGuard`, `Log`, `SelfTest`, `ConfigurationManagerAttributes`. Nothing added to `src/Shared`.
+`ModPlugin` (life cycle, `LocalBlocker`), `NetworkGate` (`PeerCompatible`, `PeerProblem`, `PeerStateChanged`; since
+0.2.1 `Refuse`), `PatchGuard`, `Log`, `SelfTest`, `ConfigurationManagerAttributes`. Nothing added to `src/Shared` by
+this mod (`NetworkGate.Refuse` and `RefusalNotes` are a framework change shared by every MC mod that can refuse a
+player).
 
 ### 7.7 Implementation notes
 
@@ -518,8 +535,9 @@ rig restores equipment, ammo, bar, drain timer, effects (trinket and tier), cont
   after), L02 `Enabled = false` + restart, L03
   clean log.
 - Multiplayer: M01 server rules, M02 refusal and AllowPlayersWithoutMod, M03 hand-off, M04 server without the mod, M05
-  personal settings, M06 another game's creatures and stagger credit, M07 turned off, M08 network version, M09
-  dedicated server.
+  personal settings, M06 another game's creatures and stagger credit, M07 turned off, M08 network version (since
+  0.2.1 its copy also has another version number, `-p:Version=0.0.9`), M09 dedicated server; later M10-M12 (PvP,
+  0.2.0) and M13 (the refusal screen names the mod, 0.2.1).
 - Other mods: X01 Dual Wielding, X02 Weapon Moveset, X03 Crossbow Stays Loaded, X04 Harpoon Hooks Tames, X05 Tower
   Shield Wall, X06 Sneak Ambush, X07 Creature Morale, X08 external trinket and adrenaline mods.
 
@@ -570,3 +588,26 @@ shot (x3, 2 → 6, at the old 1 s reference); `ArrowWood` and `BoltBone`; `piece
 - 2026-10-01, after the melee-pay NOTE: `RangedReferenceSeconds` default 1 s → 1.5 s (D14). `trinkets.ranged-shot`
   now reads the reference and cap from the rules it sets (it had 1 s and 4 written in), and `trinkets.ranged-factor`
   checks the default numbers the README, `TESTING.md` and 2.5 give. T17, T18 and X03 follow the new numbers.
+- 0.2.1 (2026-10-16, refined 2026-10-17): the refusal screen names the mod. A framework change shared by the 16 MC
+  mods that can refuse a player; this mod's code changed in one line: `PlayerCheck.Refuse` calls
+  `NetworkGate.Refuse(peer)` instead of sending the bare vanilla `Error` RPC (4.3). The framework first sends
+  `MC.Framework.Refused` with `"Trinkets on Demand\t<line>"` (4.2), then `Error(ErrorVersion)`; on the player's game,
+  `RefusalNotes` adds an "MC mods:" block with the line to the "Incompatible version" text (the error-screen patch is
+  installed once, by the first loaded MC mod made to run on both the server and the players). With Jotunn on the
+  server and on the player's game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only
+  on the player's game, the vanilla panel shows them. Limits: the block needs at least one MC mod on the player's game
+  that is made to run on both the server and the players (any mod a server can refuse a player for, or Sleep Through
+  the Day); the server does not need to have that mod, and a game whose MC mods are all client-side shows only
+  "Incompatible version". When a server refuses a player for several MC mods, the screen names the first one that
+  refused them (a later mod's check skips a player already being kicked); once that one is fixed, the next join names
+  the next one. When the server sent a line, only the server's lines show. When the server sends no line (a refusal
+  that is not about an MC mod, or a server with an older version of the MC mods), the screen lists what the player's
+  own game noticed while connected: an MC mod turned off while the server has it on, or a server copy whose version
+  cannot play with theirs; that may not be why they were refused. Refined on 2026-10-17 (framework only, after that
+  day's dedicated-server run, where a refusal screen also listed a line of another mod left over from an earlier
+  connection): connections are told apart by the `ZRpc` object instead of its hash, only the server's lines show when
+  it sent any, and the "turned off" line names F1 for a configuration manager. No RPC or rule of this mod changed
+  (`ModNetworkVersion` stays 1). Tests: new item M13 (`TESTING.md`, section 0.2.1), M08's copy now also has another
+  version number; `probe.mp.off.MC.Combat.Trinkets.OnDemand` and `probe.refusal` passed on 2026-10-17 on the first
+  version and have not run again since the refinement. Documents: Status row, 4.2, 4.3, 7.6, 8; `README.md`
+  (Multiplayer), `CHANGELOG.md` (0.2.1).

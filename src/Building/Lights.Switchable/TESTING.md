@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.2.1 (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+**Build under test:** 1.0.0 (first release; before that 0.2.1) (the refusal screen names the mod, section "0.2.1"; before that 0.2.0), build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
 Mods panel). 0.2.0 changed the server's player check: it now also refuses a player who has the mod turned off or has
 another version of it, when they join and about a second after they turn it off while connected (0.1.0 only refused a
 player without the mod). M05 and M06 are reworded and stay `[ ]`, M08 to M11 are new; the self-tests ran on 0.2.0 on
@@ -153,16 +153,35 @@ Both players have the mod. Unless a test says otherwise, `AllowPlayersWithoutMod
 
 ## 0.2.1 — the refusal screen names the mod
 
-0.2.1 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
-under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
-needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
-connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Building.Lights.Switchable` passed, the screen named this
-mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+0.2.1 (2026-10-16, the framework's screen fixes 2026-10-17): when a server refuses you because of this mod, the
+"Incompatible version" screen lists it under "MC mods:" with the reason and what to do (framework `RefusalNotes`,
+`docs/modding/framework.md`, "Who needs to install it, and multiplayer"). This needs at least one MC mod in your game
+that is made to run on both the server and the players (any mod a server can refuse you for, or Sleep Through the
+Day); the server does not need to have that mod. A game whose MC mods are all client-side shows only "Incompatible
+version". When a server refuses you for several MC mods, the screen names the first one that refused you; once that
+one is fixed, the next join names the next one. When the server sends no line (a refusal that is not about an MC mod,
+or a server with an older version of the MC mods), the screen lists what your own game noticed while connected: an MC
+mod turned off while the server has it on, or a server copy whose version cannot play with yours. That may not be why
+you were refused. With Jotunn on the server and on your game, Jotunn's window shows the same lines under "Failed
+Connection:"; with Jotunn only on your game, the vanilla panel shows them. Run on 2026-10-17 (dedicated test server,
+code before the screen fixes): `probe.mp.off.MC.Building.Lights.Switchable` passed, and the screen named this mod, and
+only this mod, both times (turned off while in, joining with it off).
+Fixed since in the framework: a new connection clears the notes (told by the connection object, not by its hash; in
+the same run another mod's screen kept a line of an earlier connection), `probe.mp.off.<GUID>` now fails when the
+screen lists any other mod, and the "turned off" line also names F1 for a game with a configuration manager. Not run
+yet on the fixed code. `probe.refusal` passed on 2026-10-17 (before its new checks of the connection reset).
 
-- [ ] **M12 Refusal screen names the mod:** on a server with Switchable Lights, turn Switchable Lights off in Esc > MC Mods while you
-  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Switchable Lights: it is turned
-  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
-  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
-  join: you stay in.
-  *Partly automated (`probe.mp.off.MC.Building.Lights.Switchable`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
-  window, and a game with another version of the mod than the server's (the line names both versions).*
+- [ ] **M12 Refusal screen names the mod:** on a server with Switchable Lights, turn Switchable Lights off in Esc > MC
+  Mods while you are in. Expected: you go back to the menu, and the "Incompatible version" screen lists under "MC
+  mods:" only "- Switchable Lights: it is turned off or cannot run in your game, and this server requires it. Turn it
+  on in Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and join
+  again." (with Jotunn on the server and on your game: in Jotunn's window, under "Failed Connection:"; with Jotunn
+  only on your game: on the vanilla panel). Join again with it off: the same. Turn it on and join: you stay in. A game
+  with a test build of this mod made with another version (for example `-p:ModNetworkVersion=99 -p:Version=0.0.9`;
+  with only another network version the line names the same version twice): the line reads "the server has version
+  <server's> and your game 0.0.9, and they cannot play together. Install version <server's>." A friend without this
+  mod, with Sleep Through the Day (or another MC mod made to run on both the server and the players) and with every
+  other MC mod the server needs: the line reads "this server requires it (version <server's>) and your game does not
+  have it. Install it."
+  *Partly automated (`probe.mp.off.MC.Building.Lights.Switchable`, `probe.refusal`); by hand: The screen as seen, also
+  inside Jotunn's window; the test build with another version; the friend without this mod.*

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+- First release.
+
 ## 0.1.1
 
 - Fixed: after a Sort click that had nothing to move (for example right after you dragged a stack out of the chest and

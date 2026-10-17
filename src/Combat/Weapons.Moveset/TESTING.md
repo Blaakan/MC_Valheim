@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1 (the refusal screen names the mod, section "0.1.1"; before that 0.1.0) with the roll flow (user feedback of 2026-09-30: the roll attack flows out of the roll;
+**Build under test:** 1.0.0 (first release; before that 0.1.1) (the refusal screen names the mod, section "0.1.1"; before that 0.1.0) with the roll flow (user feedback of 2026-09-30: the roll attack flows out of the roll;
 network version 2), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). The build before
 the roll flow passed the smoke test (`./tools/Test-Smoke.ps1`, 2026-09-30: loads, patches cleanly, JitCheck clean) and
 the in-world self-tests (`./tools/Test-InWorld.ps1 -Mod Weapons.Moveset`, 2026-09-30, a full run with every MC mod, 71
@@ -49,6 +49,14 @@ that mod). Most expected results name Debug log lines: turn on Debug logging wit
 `maxfps 20` in the console (it changes the graphics setting: put your usual limit back afterwards). Settings are changed with
 ConfigurationManager (F1) or in `BepInEx/config/MC.Combat.Weapons.Moveset.cfg`; put each one back to its default after
 the item that changed it. Use a world with the default stamina world modifier (a lowered one hides stamina costs).
+
+Multiplayer: a dedicated server or a host with the mod, and a second game. For M07 and M12, make a build with another
+network version and another release version without deploying it: `dotnet build
+src/Combat/Weapons.Moveset/MC.Combat.Weapons.Moveset.csproj -p:ModNetworkVersion=3 -p:Version=0.0.9
+-p:DeployToGame=false`, copy `src/Combat/Weapons.Moveset/bin/Debug/MC.Combat.Weapons.Moveset.dll` over the second
+game's copy in `BepInEx/plugins/MC_Valheim/Combat/MC.Combat.Weapons.Moveset/`, and put the normal build back afterwards
+(build again without `-p:ModNetworkVersion=3 -p:Version=0.0.9` and copy it the same way). The other release version
+matters for M12: with only another network version, the refusal line would name the same version twice.
 
 ## 0.1.0 — single player
 
@@ -362,16 +370,34 @@ the item that changed it. Use a world with the default stamina world modifier (a
 
 ## 0.1.1 — the refusal screen names the mod
 
-0.1.1 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
-under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
-needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
-connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Combat.Weapons.Moveset` passed, the screen named this
-mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+0.1.1 (2026-10-16, screen fixes 2026-10-17): when a server refuses you because of this mod, the "Incompatible version"
+screen lists it under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`,
+"Who needs to install it, and multiplayer"). This needs at least one MC mod in the refused game that is made to run on
+both the server and the players (any mod a server can refuse you for, this one included, or Sleep Through the Day);
+the server does not need to have that mod. A game whose MC mods are all client-side shows only "Incompatible
+version". When a server refuses a game for several MC mods, the screen names the first one that refused it; once that
+one is fixed, the next join names the next one. When the server sends no line (a refusal that is not about an MC mod,
+or a server with an older version of the MC mods), the screen lists what the refused game noticed while connected: an
+MC mod turned off while the server has it on, or a server copy whose version cannot play with its own; that may not
+be why it was refused. With Jotunn on the server and on the refused game, Jotunn's window shows the same lines under
+"Failed Connection:"; with Jotunn only on the refused game, the vanilla panel shows them. Run on 2026-10-17 (dedicated
+test server), on the code before the screen fixes: `probe.mp.off.MC.Combat.Weapons.Moveset` passed, the screen named
+only this mod both times (turned off while in, joining with it off), with the line's old wording; `probe.refusal`
+passed. The screen fixes of 2026-10-17 (new wording of the "turned off" line, only the server's lines when it sent
+any, notes cleared for each new connection; `probe.mp.off.<GUID>` now also fails when the screen lists a mod that did
+not refuse, and `probe.refusal` checks the new rules) have not run yet.
 
-- [ ] **M12 Refusal screen names the mod:** on a server with Weapon Moveset, turn Weapon Moveset off in Esc > MC Mods while you
-  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Weapon Moveset: it is turned
-  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
-  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
-  join: you stay in.
-  *Partly automated (`probe.mp.off.MC.Combat.Weapons.Moveset`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
-  window, and a game with another version of the mod than the server's (the line names both versions).*
+- [ ] **M12 Refusal screen names the mod:** on a server with Weapon Moveset, turn Weapon Moveset off in Esc > MC Mods
+  while you are in. Expected: you go back to the menu, and the "Incompatible version" screen lists under "MC mods:"
+  only "- Weapon Moveset: it is turned off or cannot run in your game, and this server requires it. Turn it on in
+  Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and join again."
+  (With Jotunn on the server and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with
+  Jotunn only on your game, the vanilla panel shows them.) Join again with it off: the same. Turn it on and join: you
+  stay in. Join with the other-version build of the Setup (network version 3, version 0.0.9). Expected: "- Weapon
+  Moveset: the server has version <the server's version> and your game 0.0.9, and they cannot play together. Install
+  version <the server's version>." Remove Weapon Moveset from that game (keep every other MC mod the server has, at
+  least one of them made to run on both the server and the players, such as Dual Wielding), and join. Expected:
+  "- Weapon Moveset: this server requires it (version <the server's version>) and your game does not have it. Install
+  it."
+  *Partly automated (`probe.mp.off.MC.Combat.Weapons.Moveset`, `probe.refusal`); by hand: The screen as seen, also
+  inside Jotunn's window, the other-version line with the Setup's build, and the line for a game without the mod.*

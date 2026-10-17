@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.2 (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
+**Build under test:** 1.0.0 (first release; before that 0.1.2) (the refusal screen names the mod, section "0.1.2"; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also in the MC Mods panel). 0.1.1
 fixed the grow time of young transplants while the mod is off (T39: they kept the grow time of the last rules in force
 instead of the player's own GrowTimeMultiplier, and a change of that setting while the mod was off never reached
 them): T39 is reset to `[ ]`, T40 and M14 are new. 0.1.1 also keeps a transplant refused away from an Ancient Root and
@@ -452,16 +452,46 @@ changed one back afterwards.
 
 ## 0.1.2 — the refusal screen names the mod
 
-0.1.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it
-under "MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who
-needs to install it, and multiplayer"); Jotunn's mod compatibility window shows the same lines under "Failed
-connection". Run on 2026-10-17 (dedicated test server): `probe.mp.off.MC.Farming.Cultivator.Replant` passed, the screen named this
-mod both times (turned off while in, joining with it off); `probe.refusal` passed.
+0.1.2 (2026-10-16): when a server refuses you because of this mod, the "Incompatible version" screen lists it under
+"MC mods:" with the reason and what to do (framework `RefusalNotes`, `docs/modding/framework.md`, "Who needs to
+install it, and multiplayer"). With Jotunn on the server and on your game, Jotunn's window shows the same lines under
+"Failed Connection:"; with Jotunn only on your game, the vanilla panel shows them. The list needs at least one MC mod
+in your game that is made to run on both the server and the players (any mod a server can refuse you for, or Sleep
+Through the Day); the server does not need to have that mod. A game whose MC mods are all client-side shows only
+"Incompatible version". When a server refuses you for several MC mods, the screen names the first one that refused
+you; once that one is fixed, the next join names the next one. When the server sends no line (a refusal that is not
+about an MC mod, or a server with an older version of the MC mods), the screen lists what your own game noticed
+while connected: an MC mod turned off while the server has it on, or a server copy whose version cannot play with
+yours. That may not be why you were refused. Run on 2026-10-17 (dedicated test server):
+`probe.mp.off.MC.Farming.Cultivator.Replant` passed, the screen named this mod both times (turned off while in,
+joining with it off); `probe.refusal` passed. That run was on the code before the framework fix of the same day (new
+line texts; only the server's lines when it sent any; no line left over from an earlier connection, which
+`probe.mp.off` now also checks). M15 and M16 are written for the fixed code: the self-tests they name wait for a new
+run, and both items still need their by-hand part.
 
-- [ ] **M15 Refusal screen names the mod:** on a server with Cultivator Replant, turn Cultivator Replant off in Esc > MC Mods while you
-  are in. Expected: you go back to the menu, and the "Incompatible version" screen lists "- Cultivator Replant: it is turned
-  off (or not working) in your game, and this server requires it. ..." under "MC mods:" (with Jotunn installed:
-  in its mod compatibility window, under "Failed connection"). Join again with it off: the same. Turn it on and
-  join: you stay in.
-  *Partly automated (`probe.mp.off.MC.Farming.Cultivator.Replant`, `probe.refusal`); by hand: The screen as seen, also inside Jotunn's
-  window, and a game with another version of the mod than the server's (the line names both versions).*
+- [ ] **M15 Refusal screen names the mod:** on a server with Cultivator Replant, turn Cultivator Replant off in Esc >
+  MC Mods while you are in. Expected: you go back to the menu, and under "MC mods:" the "Incompatible version" screen
+  lists only "- Cultivator Replant: it is turned off or cannot run in your game, and this server requires it. Turn it
+  on in Esc > MC Mods (or F1 when a configuration manager is installed; its status there says what stops it) and join
+  again." With Jotunn on the server and on your game the lines are in Jotunn's window, under "Failed Connection:";
+  with Jotunn only on your game, on the vanilla panel. Join again with it off: the same. Turn it on and join: you stay
+  in. Then join with a test copy of another version: build it with `dotnet build
+  src/Farming/Cultivator.Replant/MC.Farming.Cultivator.Replant.csproj -p:ModNetworkVersion=99 -p:Version=0.0.9
+  -p:DeployToGame=false` and copy `src/Farming/Cultivator.Replant/bin/Debug/MC.Farming.Cultivator.Replant.dll` over
+  your game's copy (put the normal build back afterwards). Expected: "- Cultivator Replant: the server has version X
+  and your game 0.0.9, and they cannot play together. Install version X." (X = the server's version). Last, join
+  without the mod: move the folder `BepInEx/plugins/MC_Valheim/Farming/MC.Farming.Cultivator.Replant` out of your game
+  (put it back afterwards), keep at least one other MC mod made to run on both the server and the players (for example
+  Sleep Through the Day), and join a server where only Cultivator Replant would refuse you (your game has every other
+  MC mod the server has, turned on and in the server's version). Expected: the list shows only "- Cultivator Replant:
+  this server requires it (version X) and your game does not have it. Install it."
+  *Partly automated (`probe.mp.off.MC.Farming.Cultivator.Replant`, `probe.refusal`); by hand: The screen as seen (in
+  Jotunn's window when Jotunn runs on both sides, on the vanilla panel otherwise), the line for the test copy of
+  another version (it names both versions) and the line for a game without the mod.*
+- [ ] **M16 Only the mod that refused is listed:** a server with Cultivator Replant set to AllowPlayersWithoutMod =
+  true and another MC mod that refuses players (for example Swim Dive, default settings). Turn both off in your game
+  and join. Expected: you are refused by the other mod, and under "MC mods:" the screen lists only that mod, not
+  Cultivator Replant (the server lets you in for Cultivator Replant, so your game's own note about it is not shown
+  when the server sent its reason).
+  *Partly automated (`probe.refusal`); by hand: The screen with a real server, where your game also had its own note
+  about Cultivator Replant.*

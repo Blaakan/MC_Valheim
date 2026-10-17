@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
+**Build under test:** 1.0.0 (first release; before that 0.1.1), build id = the commit in the `[MC:ready]` log line (also shown next to the mod in the MC
 Mods panel). 0.1.0, committed build `1254c75` (2026-09-29), nested under the Valheim Compendium and named
 Encyclopedia: Debug and Release build without warnings; smoke test (`./tools/Test-Smoke.ps1`, all MC mods) passed;
 automated in-world self-tests (T00, `./tools/Test-InWorld.ps1`) passed on the same code at 2560x1440: all 6

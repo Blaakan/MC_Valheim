@@ -91,8 +91,8 @@ dist/                     packaged zips (git-ignored)
 
 If the game is running, deploy fails with a "file locked" warning: close the game first. **While the user is
 testing in-game, build with `-p:DeployToGame=false`** so the DLL under test doesn't change under them. **Every run
-leaves the game folder as it found it** (mod builds and `MC.*.cfg`; how: backlog workflow steps 1 and 7), also runs
-outside that workflow.
+leaves the game folder as it found it** (which MC mod folders are deployed, their builds, and `MC.*.cfg`; how: backlog
+workflow steps 1 and 7), also runs outside that workflow.
 Tool scripts must stay ASCII-only (Windows PowerShell 5.1 reads BOM-less scripts as ANSI); build non-ASCII
 characters at runtime (`[char]0x2014`).
 
@@ -121,8 +121,11 @@ every deployed mod's tests (~900 tests, about 3 hours): only when the user asks 
   `docs/modding/framework.md`, "In-world self-tests"). Like the smoke test it launches the game (close it first)
   and takes ~1-2 min plus the tests. Every deployed mod's tests run unless `-Only` filters them; the run fails when
   no mod test ran, or when `-Mod` / `-Only` picked tests that did not run (it says why). It puts
-  `BepInEx/config/MC.*.cfg` back as before the run, also after Ctrl+C or a timeout. Both scripts also deploy the
-  stand-in third-party content mod (`tests/Probes/Core.Probe.Content`); its check `probe.content` always runs.
+  `BepInEx/config/MC.*.cfg` back as before the run, also after Ctrl+C or a timeout. `Test-InWorld.ps1` also deploys
+  the stand-in third-party content mod (`tests/Probes/Core.Probe.Content`) to the game folder and removes it
+  afterwards; `Test-Multiplayer.ps1` puts it only in the run's own server and client BepInEx folders (the smoke test
+  does not use it). Its check `probe.content` runs in every in-world run whatever `-Only` picks (it is not a
+  multiplayer test).
 - Multiplayer self-tests: a mod registers client tests with `SelfTest.RegisterMultiplayer(name, scenario, run)` and
   their server halves with `SelfTest.RegisterServerStep` (called from the client test with `SelfTest.CallServer`);
   `./tools/Test-Multiplayer.ps1` runs them with a real dedicated server (`docs/modding/framework.md`, "Multiplayer
@@ -155,8 +158,9 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
 
 1. **Understand.** First run `git status` and `git log --oneline origin/main..HEAD`: if the tree is dirty or commits
    are waiting to be pushed, tell the user and ask whether they belong to this run. Note the game folder's start state
-   for step 7: the deployed build id (`[MC:ready] ... build <hash>` in `BepInEx/LogOutput.log`) and a copy of
-   `BepInEx/config/MC.*.cfg` (the first `Test-InWorld.ps1` run's `config-backup` folder is one). Read the idea's
+   for step 7: the deployed build id (`[MC:ready] ... build <hash>` in `BepInEx/LogOutput.log`), the list of MC mod
+   folders deployed under `BepInEx/plugins/MC_Valheim/<Category>/` and a copy of `BepInEx/config/MC.*.cfg` (the first
+   `Test-InWorld.ps1` run's `config-backup` folder is one). Read the idea's
    section in `docs/backlog.md` and `docs/research/existing-mods-*.md`, its notes in `docs/game/<chapter>.md`, the `.ref` code
    of every method involved (callers, guards, messages), and the MC mods that patch the same methods or touch the same
    items/state. Look at how existing mods hook it (GitHub source, Thunderstore "source" pages) and for compatibility
@@ -203,10 +207,12 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
    no Claude credit (in commits and in the issue), `git push origin main`. Then put the game folder back as it was
    when the run started (user rule, 2026-10-16: it is their play setup, e.g. the versions their server accepts; they
    deploy the new build themselves when they test): build the start commit in a temporary `git worktree` (copy
-   `Local.props` in) with `dotnet build ValheimMods.slnx -c Debug`, which deploys it, and copy back every
-   `BepInEx/config/MC.*.cfg` whose bytes differ from the start copy (a new build rewrites its config with new keys
-   the first time the game runs). Only with the game closed; if it is running, ask the user to close it. Then re-run
-   `./tools/Update-Backlog.ps1` and give the user its list of sheet cells to change (never edit the sheet yourself).
+   `Local.props` in) with `dotnet build ValheimMods.slnx -c Debug`, which deploys it; then delete every MC mod folder
+   and every `BepInEx/config/MC.*.cfg` that was not there at the start (the run's new mod, or a mod the start commit
+   has but the user had not deployed), and copy back every `BepInEx/config/MC.*.cfg` whose bytes differ from the start
+   copy (a new build rewrites its config with new keys the first time the game runs). Only with the game closed; if
+   it is running, ask the user to close it. Then re-run `./tools/Update-Backlog.ps1` and give the user its list of
+   sheet cells to change (never edit the sheet yourself).
 8. **Test list as a GitHub issue**, after the push so the commit and file paths resolve on GitHub:
    `gh issue create --repo Blaakan/MC_Valheim --title "In-game tests: <ModName> <Version>" --body-file <scratch file>`.
    Body in normal English: build under test (commit hash), `TESTING.md` as the source of truth, the design doc path,
@@ -244,7 +250,10 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   backlog row then shows the sheet Status instead of the mod), `ModSide` (`Client` | `Server` | `Both`), `ModMultiplayer` (`Compatible` | `Limited` |
   `SinglePlayer`), `ModMultiplayerNotes` (player-facing; required unless Client + Compatible), `ModRequires`
   (GUIDs of MC mods needed at runtime, `;`-separated, no cycles), `ModDependencies` (external Thunderstore strings),
-  `ModNetworkVersion` (Both mods: bump when RPC names/payloads or ZDO keys/formats change), `ModDescription`.
+  `ModNetworkVersion` (Both mods: bump when RPC names/payloads or ZDO keys/formats change), `ModDescription`,
+  `ModShip` + `ModShipNote` (optional; `<ModShip>false</ModShip>` keeps the mod out of the Nexus release and the
+  all-mods pack, `ModShipNote` says why and is required then; the mod still builds, deploys and runs its tests;
+  `Get-Mods.ps1` shows `Ship`, `Get-TestTodo.ps1` marks its tests as no release gate).
 - **Mods that change the experience are required everywhere** (user rule): odds, costs, fuel, combat, balance, world
   rules. `ModSide=Both`, the server refuses players without the mod after a short grace and sends its gameplay
   settings to every player (copy Swim Dive's `PlayerCheck`, `ServerRules`, `<X>Rules` and `Patches/ZNetPatches.cs`,
@@ -296,9 +305,15 @@ commit, the push and the test issue (steps 7-8). Work on `main` (solo repo: no f
   page sheet); set the release version + CHANGELOG entry (first release: 1.0.0, see "Versions"; pack: `pack.json`
   version + PACK_CHANGELOG); commit; `./tools/Package-Mod.ps1 -Release` (refuses a dirty tree, an already-released
   version, a first release that is not 1.0.0, a version not above the last release, failed tests; tags
-  `nexus/<GUID>/v<ver>` and `nexus/pack/v<ver>` locally); then follow each `dist/nexus/.../nexus-page.md`
+  `nexus/<GUID>/v<ver>` and `nexus/pack/v<ver>` locally; skips every `ModShip=false` mod, printing why: no page
+  files, no tag, not in the pack, which must hold every other mod; refuses a shipped mod whose `ModRequires` names
+  a skipped one); then follow each `dist/nexus/.../nexus-page.md`
   (step-by-step guide: `docs/publishing/nexus.md`). After a first upload, save the page URL in `packaging/nexus/pages.json`.
+  **The pack can go first** (user decision 2026-10-17: 1.0 publishes only the pack page, single mod pages later):
+  `-Release` still tags and writes page files for every shipped mod (a later single page uploads that same version),
+  and the pack's texts send Vortex users to single pages only once every packed mod has a URL in `pages.json`
+  (until then: manual install only).
   After tagging, run `./tools/Update-Backlog.ps1` and commit `docs/backlog.md` (the backlog shows "released" from the
-  tag; the sheet Status stays `Implemented`).
+  tag, also for a mod that is so far only in the pack; the sheet Status stays `Implemented`).
   **Nexus AI tags for every page: "AI Assisted" + "AI Media"** (AI Assisted needs visible evidence of human-led development on the page), and untested AI mods count as spam: tag every
   release and never publish without the in-game tests.

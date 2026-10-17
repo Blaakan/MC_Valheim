@@ -8,7 +8,7 @@
 | Side | Both: the server (or the host) and every player install it (3.8); multiplayer Compatible; network version 2 (RPCs `<guid>.Settings` / `<guid>.SettingsRequest`; rules layout 2 since the idol tier rule) |
 | Sheet idea | `Forge of potential revamp` (also covers part of `Boss summon revamp`: boss trophies get a lasting use) |
 | Game version checked | Valheim 1.0.16, decompiled `assembly_valheim` in `.ref/`; idols, trophies, creatures, recipes, stations, UI layout and English strings dumped at runtime (Unity 6000.0.75f1) on 2026-09-29; other Forge and UI mods' sources read on GitHub (2026-09-29) |
-| Status | Implemented (0.1.0), in-world self-tests pass (`forge.catalog`, `forge.icons`, `forge.tooltip`, `forge.popup`, `forge.idols`, `forge.refine`, `forge.tiers`); in-game tests pending |
+| Status | Implemented (0.2.1: the refused player's "Incompatible version" screen names the mod and the reason, 3.8 and decision 18; 0.2.0: the game's own refinement roll and cheated-tag rule of Valheim 1.0.20, decision 17). In-world self-tests pass (`forge.catalog`, `forge.icons`, `forge.tooltip`, `forge.popup`, `forge.idols`, `forge.refine`, `forge.tiers` and the later ones; on 0.2.0 and Valheim 1.0.20 on 2026-10-15), and the multiplayer self-tests passed on 0.2.0 with a 1.0.20 dedicated server (2026-10-16); in-game tests pending |
 
 ## Goal
 
@@ -299,8 +299,11 @@ client-side, but the user wants every player of a server on the same rules:
   the server (dedicated or host) waits 1 s after a player is ready, then refuses a player that is not
   `NetworkGate.PeerCompatible`: no mod, another network version (the build before the idol tier rule), or the mod
   turned off on their game; a player who turns it on or off while connected (`NetworkGate.PeerStateChanged`) is
-  checked again after the same grace. Refusal = vanilla "Error" RPC with ErrorVersion (their game shows "Incompatible
-  version"; socket closed 4 s later); the log gives the framework's reason (`PeerProblem`).
+  checked again after the same grace. Refusal through `NetworkGate.Refuse` (since 0.2.1, decision 18): the framework
+  RPC `MC.Framework.Refused` (server to client, `"<mod name>\t<line>"`: what is wrong and what to do), then the
+  vanilla "Error" RPC with ErrorVersion (their game shows "Incompatible version", with an "MC mods:" block holding
+  that line when their game has at least one MC mod made to run on both the server and the players, decision 18;
+  socket closed 4 s later); the log gives the framework's reason (`PeerProblem`).
   `AllowPlayersWithoutMod` lets them in (log warning). Until 2026-09-30 the check only asked `PeerHasMod`; with the
   network version bump that would have let the older build in, whose mod then turns itself off (server mismatch)
   and refines the vanilla way.
@@ -453,6 +456,25 @@ restores the vanilla tab look, so the next station does not show both vanilla ta
     + target level) and compares it with its own chance; `TestRoll` (Debug) still forces it. The station's tag is read
     with the game's `CheatUtils.IsCheated` (`ForgeRefine.StationCheated`, used by refinements and idol upgrades): a
     Forge tagged by an older version no longer marks what is made there. The mod needs 1.0.20 or later from 0.2.0 on.
+18. **The refusal screen names the mod** (0.2.1, framework change for every MC mod that refuses players, 2026-10-16;
+    framework fixes 2026-10-17). Vanilla's ErrorVersion carries no mod name, so a refused player could not tell which
+    mod to install or turn on. `PlayerCheck.Refuse` calls `NetworkGate.Refuse(peer)`: one reason line through
+    `MC.Framework.Refused` (missing: "this server requires it (version X) and your game does not have it. Install
+    it."; other version: "the server has version X and your game Y, and they cannot play together. Install version
+    X."; turned off: "it is turned off or cannot run in your game, and this server requires it. Turn it on in Esc > MC
+    Mods (or F1 when a configuration manager is installed; ...) and join again."), then the same vanilla Error and
+    4 s disconnect as before. The player's game shows the line under "MC mods:" on the "Incompatible version" screen
+    when it has at least one MC mod that is made to run on both the server and the players (any mod a server can
+    refuse it for, or Sleep Through the Day; the server does not need to have that mod). Vanilla games ignore the
+    unknown RPC, and a game whose MC mods are all client-side shows only "Incompatible version". With Jotunn on the
+    server and on the player's game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn
+    only on the player's game, the vanilla panel shows them. When the server sent a line, the block shows only the
+    server's lines. When it sends no line (a refusal that is not about an MC mod, or a server with an older version of
+    the MC mods), the block lists what the player's own game noticed while connected (an MC mod turned off while the
+    server has it on, or a server copy whose version cannot play with theirs), which may not be why they were refused.
+    The check skips a peer already in the kick list, so only the first MC mod that refuses a player sends its line;
+    once that one is fixed, the next join names the next one. No RPC, payload or rules layout of this mod changed: the
+    network version stays 2. Details: `docs/modding/framework.md`, "Who needs to install it, and multiplayer".
 
 ### Added beyond the request
 

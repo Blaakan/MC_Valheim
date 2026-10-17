@@ -8,7 +8,7 @@
 | Side | **Both** (server or host and every player), multiplayer **Compatible**, network version 1. The server refuses players without the mod, with it turned off or with another network version of it (setting `AllowPlayersWithoutMod`), and sends its gameplay settings to everyone (section 4). |
 | Sheet idea | `Spyglass` |
 | Game version checked | Valheim 1.0.16 (Unity 6000.0.75f1, built-in render pipeline, deferred), decompiled `assembly_valheim`, `assembly_utils` and `assembly_postprocessing` in `.ref/` (GameCamera, Player, PlayerController, Humanoid, Character, CharacterAnimEvent, VisEquipment, ItemDrop, ObjectDB, Hud, EnvMan, ZoneSystem, ZNetScene, ZDOMan, TerrainLod, Heightmap, PostProcessingBehaviour, CameraEffects, UpscaledFrameBuffer, FrameBufferScaler); research briefs of 2026-10-02 (camera, input, items, Distant Horizons, rendering, repo patterns, existing mods); Advize's Spyglass (GPL-3.0, read for ideas only), Azumatt's FirstPersonMode (AGPL-3.0), Landoria FirstPerson, ImmersiveFirstPerson, Customizable Camera, CameraTweaks and ValheimPlayerModels read on GitHub (2026-10-02); runtime facts from the in-world self-tests (2026-10-02) |
-| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-02; in-world self-tests passed 2026-10-02 (`spyglass.network`, `spyglass.item`, `spyglass.view`, `spyglass.pose`, `spyglass.far`, `spyglass.export`, and Distant Horizons' `horizons.boost`), then a multi-agent review (11 findings, all fixed: section 9); on the fixes (with that day's Distant Horizons near-ground update) the smoke test of all 25 mods, the framework test and the in-world run (14/14) passed again; after the change to a tool taking both hands (user request, D2) the smoke test of all 25 mods and the in-world run (12/12) passed again; not yet tested by hand in game |
+| Status | Implemented (v0.1.0 code); smoke test passed 2026-10-02; in-world self-tests passed 2026-10-02 (`spyglass.network`, `spyglass.item`, `spyglass.view`, `spyglass.pose`, `spyglass.far`, `spyglass.export`, and Distant Horizons' `horizons.boost`), then a multi-agent review (11 findings, all fixed: section 9); on the fixes (with that day's Distant Horizons near-ground update) the smoke test of all 25 mods, the framework test and the in-world run (14/14) passed again; after the change to a tool taking both hands (user request, D2) the smoke test of all 25 mods and the in-world run (12/12) passed again; not yet tested by hand in game. 0.1.1: false log messages, zoom pick and blur fixes; 0.1.2: the refusal screen names the mod (4.3); 0.1.3: the death camera leaves the eye at once (2.3), built but not run in the game yet |
 
 ## Goal
 
@@ -169,7 +169,22 @@ one look under a lower limit replaced the pick until the wheel was used again; t
 | Distant Horizons message (zoom, weight o, forward, field of view) | every frame |
 
 Vanilla fields are never written (`m_fov`, `m_distance`): vanilla rewrites position, rotation and field of view every
-frame, so lowering gives the normal camera back by itself. The prefix keeps `m_distance` and the postfix puts it back
+frame, so lowering gives the normal camera back by itself. The one exception is death: for a dead local player with a
+ragdoll, `GameCamera.UpdateCamera` only turns the camera toward the body (`LookAt` on the ragdoll's average body
+position) and never moves it while the body is there (until `Ragdoll.DestroyNow` after its time to live; then
+`GetCameraPosition` places it again), so the camera stays where the last living frame left it. Each frame the
+postfix slides the camera, it records where the camera was before the slide (vanilla's spot, or a camera mod's), where
+it left it, and the near plane vanilla had set. On the next frame, if the spyglass was dropped, the local player is dead
+with a ragdoll and the camera is still where the postfix left it (nobody else moved it this frame), `DeathView` puts it
+back at the recorded spot, turns it toward the body the same way (keeping vanilla's camera shake of that frame) and
+gives back the near plane (the dead path never sets it). A camera mod that moves the dead player's camera itself is
+left alone; without a ragdoll vanilla places the camera every frame and nothing is needed. The recorded spot is
+vanilla's spot on the last living frame, computed from the eye's look of that frame (`GetCameraPosition`: eye minus
+`m_eye.forward` × distance), so after a pan with the spyglass up the death view is behind the last look, not where the
+camera was before the raise. (Fixed in 0.1.3: the camera stayed in the dead player's eye while the body was there;
+test T26, self-test `spyglass.death`.)
+
+The prefix keeps `m_distance` and the postfix puts it back
 while the spyglass is up, so the wheel zooms the spyglass instead of the camera. Aim: `SetMouseLook` prefix scales the
 input by `AimSensitivity / magnification` (the angle a mouse movement turns shrinks with the field of view, so the
 view moves on screen at the same speed). `AlwaysRotateCamera` postfix turns the body with the aim. `UpdateHover`
@@ -268,7 +283,9 @@ code paths are unchanged.
 
 RPCs `MC.Exploration.View.Spyglass.Settings` / `.SettingsRequest` (rules layout 1); player ZDO bool
 `MC.Exploration.View.Spyglass.Raised` (stable hash); prefab `MC_Spyglass`, recipe `Recipe_MC_Spyglass`. Network
-version 1.
+version 1. Framework RPC (since 0.1.2, shared by every MC mod, not part of this mod's network version): server to
+client `MC.Framework.Refused`, one string `"<mod name>\t<line>"`, sent by `NetworkGate.Refuse` just before the vanilla
+`Error` RPC (4.3).
 
 ### 4.3 Server settings and join check
 
@@ -276,7 +293,29 @@ Copied from Swim Dive (`ServerRules`, `PlayerCheck`, `Patches/ZNetPatches.cs`) w
 the server pushes its rules 0.5 s after the last change to compatible players; a client uses them instead of its own
 config for that session and is pending (recipe hidden, no raise) until they arrive; the recipe is rebuilt 0.5 s after
 the rules stop changing (`SpyglassContent.RequestRebuild`, driven by the `ZNet.Update` postfix). Players without the
-mod, with it off or another network version are refused after a 1 s grace unless `AllowPlayersWithoutMod`.
+mod, with it off or another network version are refused after a 1 s grace unless `AllowPlayersWithoutMod`
+(`NetworkGate.PeerCompatible`, re-checked on `NetworkGate.PeerStateChanged` when a player turns the mod off or on while
+connected).
+
+Refusal (0.1.2): `PlayerCheck.Refuse` calls `NetworkGate.Refuse`, which sends the reason line through
+`MC.Framework.Refused` (missing: "this server requires it (version X) and your game does not have it. Install it.";
+other network version: "the server has version X and your game Y, and they cannot play together. Install version X.";
+turned off: "it is turned off or cannot run in your game, and this server requires it. Turn it on in Esc > MC Mods (or
+F1 when a configuration manager is installed; its status there says what stops it) and join again."), then the
+vanilla `Error` RPC with `ErrorVersion`. `PlayerCheck` then puts the peer in the vanilla kick list (`ZNet.Update`
+disconnects it `DisconnectDelay` s later), and its `Decide` skips a peer that is already there, so only the first MC
+mod that refuses a player sends its line: when a server refuses a player for several MC mods, the screen names the
+first one that refused them; once that one is fixed, the next join names the next one. On the player's game the
+framework's `RefusalNotes` (registered by every MC mod made to run on both the server and the players; the first copy
+patches the error screen) adds an "MC mods:" block to the "Incompatible version" screen. This needs at least one such
+MC mod in the player's game (any mod a server can refuse a player for, or Sleep Through the Day); the server does not
+need to have that mod. A game whose MC mods are all client-side shows only "Incompatible version". When the server
+sent a line, the block shows only the server's lines. When the server sends no line (a refusal that is not about an
+MC mod, or a server with an older version of the MC mods), the block lists what the player's own game noticed while
+connected: an MC mod turned off while the server has it on, or a server copy whose network version cannot play with
+theirs; that may not be why they were refused. With Jotunn on the server and on the player's game, Jotunn's window
+shows the same lines under "Failed Connection:"; with Jotunn only on the player's game, the vanilla panel shows them.
+Framework details: `docs/modding/framework.md`, "Who needs to install it, and multiplayer"; test M09.
 
 ### 4.4 Hand-off cases
 
@@ -383,7 +422,11 @@ dropped copy with collider), `spyglass.view` (raise, zoom, camera at the eye, bo
 Horizons slot and fog, feet locked, aim scale, zoom cap, lower restores everything, put away = instant, pending =
 no raise), `spyglass.pose` (eyepiece at the eye and tube along the look, local and remote paths), `spyglass.far`
 (far view from a shore at x3/x8, clear weather), `spyglass.export` (icons, rig and canvas dumps); Distant Horizons
-`horizons.boost`. Hands-on list: `src/Exploration/View.Spyglass/TESTING.md` (G1 T01, G2 T02, G3 T03, G4 T04, G5
+`horizons.boost`. Later: `spyglass.death` (a real death by fire with the spyglass raised: nothing of it on the death
+camera, the camera out of the head at once, looking at the body from behind the last look at about its third-person
+distance from before the raise, clean log, respawn, tombstone, raise again; parked in `tests/parked-selftests.txt`
+since 2026-10-13, see TESTING.md "0.1.3").
+Hands-on list: `src/Exploration/View.Spyglass/TESTING.md` (G1 T01, G2 T02, G3 T03, G4 T04, G5
 T05, G6 T11-T13, G7 T01/T14).
 
 ## 9. Open questions and unverified

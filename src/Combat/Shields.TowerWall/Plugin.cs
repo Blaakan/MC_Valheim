@@ -61,8 +61,10 @@ internal sealed partial class Plugin : ModPlugin
 
         // Tower shields.
         AutoTowers = Config.Bind(TowersSection, "AutoTowers", TowerRules.DefaultAutoTowers, new ConfigDescription(
-            "On: every shield that cannot parry at all (parry bonus 0) is a tower shield, also shields added by other "
-            + "mods, except copies only creatures carry. Off: only the shields named in Towers." + ServerWins,
+            "On: every shield with a parry bonus below 1 (it cannot parry at all; the normal game's tower shields have "
+            + "0) is a tower shield, also shields added by other mods, except copies only creatures carry. The iron "
+            + "square shield (parry bonus 1) is left out: add it to Towers if you want it. Off: only the shields named "
+            + "in Towers." + ServerWins,
             null, new ConfigurationManagerAttributes { Order = 110 }));
         Towers = Config.Bind(TowersSection, "Towers", TowerRules.DefaultTowers, new ConfigDescription(
             "More tower shields, and the bash damage of each: comma-separated prefab names (the names the spawn "

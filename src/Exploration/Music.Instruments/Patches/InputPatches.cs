@@ -68,8 +68,6 @@ internal static class ChatUpdatePatches
     }
 }
 
-// Me = Esc (or the gamepad menu button) closes the song window without opening the pause menu on the same press.
-// Prefix: runs before Menu.Update reads the key; hidden-frames counter back to 0 = vanilla waits (needs > 1).
 // Me hold back the Console key (F5) during the rhythm game: Console.Update not ask Chat.HasFocus, so a lane key on it
 // would open the console (and the open console end the run).
 [HarmonyPatch]
@@ -94,6 +92,9 @@ internal static class ConsolePatches
     }
 }
 
+// Me = Esc (or the gamepad menu button, or B) closes the song window without opening the pause menu on the same press.
+// Prefix: runs before Menu.Update reads the key; hidden-frames counter back to 0 = vanilla waits (needs > 1). B is the
+// jump button too (default layout): me forget that press on every game button on B, so the character never jumps.
 [HarmonyPatch]
 internal static class MenuPatches
 {
@@ -111,11 +112,19 @@ internal static class MenuPatches
             {
                 return;
             }
-            if (ZInput.GetKeyDown(KeyCode.Escape, false) || ZInput.GetButtonDown("JoyMenu") || ZInput.GetButtonDown("JoyButtonB"))
+            var padB = ZInput.GetButtonDown("JoyButtonB");
+            if (ZInput.GetKeyDown(KeyCode.Escape, false) || ZInput.GetButtonDown("JoyMenu") || padB)
             {
                 Performance.CloseWindow();
                 __instance.m_hiddenFrames = 0;
-                ZInput.ResetButtonStatus("JoyButtonB");
+                if (padB)
+                {
+                    Performance.ForgetPadButton("JoyButtonB");
+                }
+                else
+                {
+                    ZInput.ResetButtonStatus("JoyButtonB");
+                }
             }
         }
         catch (Exception e)

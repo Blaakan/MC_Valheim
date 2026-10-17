@@ -20,8 +20,10 @@ internal enum JoinVerdict : byte
 // reason NetworkGate.PeerProblem. Host own player is not a peer, single player has none: me never touch them.
 // Flow: ZNet.RPC_PeerInfo postfix on server, peer ready (m_uid set) = fully in -> me wait Grace s (our hello always
 // come before PeerInfo on same connection, so grace only safety) -> PeerCompatible. Not compatible and setting off ->
-// vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version", go back to menu, like vanilla version
-// check) + peer in vanilla kick list (ZNet.Update disconnect it DisconnectDelay s later). Me check early and cut late:
+// NetworkGate.Refuse: one reason line first (framework rpc MC.Framework.Refused, their Both MC mods show it under
+// "MC mods:"), then vanilla "Error" rpc with ErrorVersion (their game show "Incompatible version", back to menu, like
+// vanilla version check) + peer in vanilla kick list (ZNet.Update disconnect it DisconnectDelay s later). Peer already
+// in kick list = Skip, so only first MC mod that refuse send its line. Me check early and cut late:
 // refused game sit on loading screen (long frames); if socket close before it read Error, vanilla UpdatePeers drop
 // the Error and menu say "Disconnected". Many seconds = many frames to read it and log out alone.
 // Live re-check: player turn me off (or on) while connected -> framework HelloState -> NetworkGate.PeerStateChanged

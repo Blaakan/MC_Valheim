@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    List all mods in the repo with their metadata and whether they are deployed to the game.
+    List all mods in the repo with their metadata, whether they ship in releases (Ship = False: <ModShip>false</ModShip>,
+    left out of the Nexus release and the pack) and whether they are deployed to the game.
 .EXAMPLE
     ./tools/Get-Mods.ps1 | Format-Table
 #>
@@ -23,6 +24,7 @@ foreach ($p in Get-ModProjects $Mod) {
         Side     = & $prop 'ModSide'
         MP       = & $prop 'ModMultiplayer'
         Requires = & $prop 'ModRequires'
+        Ship     = (& $prop 'ModShip') -ne 'false'
         Deployed = $deployed
         Path     = $p.DirectoryName.Substring((Get-RepoRoot).Length + 1)
     }

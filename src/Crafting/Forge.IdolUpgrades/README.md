@@ -110,7 +110,22 @@ stars and its Forge cannot spend a starred idol on its own.
 
 - **Players without the mod are refused** about a second after they join, and so are players with an older version
   that cannot talk to this one or with the mod turned off on their game (also when they turn it off while playing);
-  their game shows "Incompatible version". The server (or host) can let them in with AllowPlayersWithoutMod = true.
+  their game shows "Incompatible version", with the mod and the reason listed below it (next point). The server (or
+  host) can let them in with AllowPlayersWithoutMod = true.
+- **The refusal screen names the mod.** Below "Incompatible version", the screen lists Forge Idol Upgrades under "MC
+  mods:" with the reason and what to do: the game does not have it (install it; the line names the server's version),
+  has another version that cannot play with the server's (install the server's version; the line names both
+  versions), or has it turned off or cannot run it (turn it on in Esc > MC Mods, or with F1 when a configuration
+  manager is installed, and join again). The server sends this line, so it shows even when your game does not have
+  this mod. This needs at least one MC mod in your game that is made to run on both the server and the players (any
+  mod a server can refuse you for, or Sleep Through the Day); the server does not need to have that mod. A game whose
+  MC mods are all client-side shows only "Incompatible version". When a server refuses you for several MC mods, the
+  screen names the first one that refused you; once that one is fixed, the next join names the next one. When the
+  server sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the
+  screen lists what your own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with yours. That may not be why you were refused. With Jotunn on the server
+  and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on your game,
+  the vanilla panel shows them.
 - **The server's settings apply to everyone** (your game logs "Using the server's Forge rules"); your own settings
   apply again in single player and when you host. Only IdolChoice stays your own.
 - **On a server without the mod** the mod turns itself off on your game (the MC Mods panel says why): the Forge is

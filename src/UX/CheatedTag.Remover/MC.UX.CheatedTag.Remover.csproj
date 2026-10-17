@@ -19,5 +19,12 @@
     <ModNetworkVersion>1</ModNetworkVersion>
     <ModRequires></ModRequires>
     <ModDescription>Console commands that remove the vanilla cheated tag from a whole world: building pieces, creatures, stations, items in chests, on the ground and on stands, and the items you carry. Nothing is deleted.</ModDescription>
+    <!-- Decision (2026-10-17): me stay out of 1.0 release and all-mods pack until me reworked for Valheim 1.0.20.
+         Package-Mod skip me (no page, no tag, not in pack). Me still build, deploy and run tests like others.
+         Me keep 0.x Version: no 1.0.0 bump with the others; me first real release = 1.0.0 later.
+         Framework refusal-screen code (2026-10-17) also in my dll since then. Me not shipped, so no bump for it now:
+         rework version note it in CHANGELOG. -->
+    <ModShip>false</ModShip>
+    <ModShipNote>Needs a rework for Valheim 1.0.20, which changed how the game stores the cheated tag (see the README). Left out of the 1.0 release and the all-mods pack until then.</ModShipNote>
   </PropertyGroup>
 </Project>

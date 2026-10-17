@@ -4,7 +4,7 @@ Legend: `[ ]` to test · `[x]` passed · `[!]` failed (add a note) · `[-]` skip
 When a code change affects a behaviour, its tests go back to `[ ]`.
 Run `./tools/Get-TestTodo.ps1` to see every pending test across the project.
 
-**Build under test:** 0.1.1, build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
+**Build under test:** 1.0.0 (first release; before that 0.1.1), build id = the git commit shown in the `[MC:ready]` log line and next to the mod in the
 MC Mods panel. 0.1.1 fixes the tame that finished while there was no character in the world (respawn wait, world still
 loading) and was never counted: T21 is reset and T24 is new (both checked by the self-test `percreature.respawn-gap`);
 the self-tests ran on 0.1.1 on 2026-10-13 (game 1.0.17, in-world and with a dedicated server, every MC mod loaded):

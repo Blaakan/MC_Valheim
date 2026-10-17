@@ -56,9 +56,24 @@ Install it on the server (or the host) and on every player's game: the server mo
   in vanilla.
 - **Dedicated servers:** the mod runs on `valheim_server.exe` too (install BepInEx there and put the mod in its
   `BepInEx/plugins` folder). The server's settings file decides the wake-up hour and the afternoon rule.
+- **It never gets you refused by a server**, but it explains refusals by other MC mods: when a server refuses you
+  because of another MC mod (one your game does not have, has in another version, or has turned off or cannot run),
+  the "Incompatible version" screen lists that mod under "MC mods:" with the reason and what to do. This needs at
+  least one MC mod in your game that is made to run on both the server and the players (any mod a server can refuse
+  you for, or Sleep Through the Day), so Sleep Through the Day is enough on its own; the server does not need to have
+  it. A game whose MC mods are all client-side shows only "Incompatible version".
+  - When a server refuses you for several MC mods, the screen names the first one that refused you; once that one is
+    fixed, the next join names the next one.
+  - When the server sends no line (a refusal that is not about an MC mod, or a server with an older version of the
+    MC mods), the screen lists what your own game noticed while connected: an MC mod turned off while the server has
+    it on, or a server copy whose version cannot play with yours. That may not be why you were refused: Sleep Through
+    the Day turned off on your game while the server has it on gets a line too, although it never refuses you.
+  - With Jotunn on the server and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with
+    Jotunn only on your game, the vanilla panel shows them.
 - The mod saves nothing, and the time jump is the game's own world time. On the network it only exchanges a short
   version check with the server when you join (and when the server turns it on or off), and the server sends the
-  world time once more when a sleep ends.
+  world time once more when a sleep ends. It also listens for the one line a server's MC mod sends when it refuses
+  you.
 
 ## Good to know
 

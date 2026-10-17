@@ -80,12 +80,26 @@ Install it on the server (or the host) and on every player's game. A birth is de
   turned off (`Enabled = false`, or unticked in the MC Mods panel) and a player whose version of the mod cannot talk
   to the server's. About a second after such a player has joined (usually while their game is still loading the
   world), the server refuses them: their game goes back to the main menu with the game's own message "Incompatible
-  version" (the game cannot show a mod name there), and the server closes the connection a few seconds later if their
-  game is still there. On a very slow machine the message can be lost, and the menu then shows the game's plain
-  disconnection message instead. The server's log names the player and says why (does not have the mod, has it
-  turned off, or has another version). To let such players play anyway, set `AllowPlayersWithoutMod = true` on the
-  server: the animals their game simulates then breed the normal game way, and they never count as farmers. Setting it
-  back to `false` refuses the ones who are online about a second later.
+  version", with the mod and the reason listed below it (next point), and the server closes the connection a few
+  seconds later if their game is still there. On a very slow machine the message can be lost, and the menu then shows
+  the game's plain disconnection message instead. The server's log names the player and says why (does not have the
+  mod, has it turned off, or has another version). To let such players play anyway, set
+  `AllowPlayersWithoutMod = true` on the server: the animals their game simulates then breed the normal game way, and
+  they never count as farmers. Setting it back to `false` refuses the ones who are online about a second later.
+- **The refusal screen names the mod.** Below "Incompatible version", the screen lists Breeding Star Inheritance under
+  "MC mods:" with the reason and what to do: the game does not have it (install it; the line names the server's
+  version), has another version that cannot play with the server's (install the server's version; the line names both
+  versions), or has it turned off or cannot run it (turn it on in Esc > MC Mods, or with F1 when a configuration
+  manager is installed, and join again). The server sends this line, so it shows even when your game does not have
+  this mod. This needs at least one MC mod in your game that is made to run on both the server and the players (any
+  mod a server can refuse you for, or Sleep Through the Day); the server does not need to have that mod. A game whose
+  MC mods are all client-side shows only "Incompatible version". When a server refuses you for several MC mods, the
+  screen names the first one that refused you; once that one is fixed, the next join names the next one. When the
+  server sends no line (a refusal that is not about an MC mod, or a server with an older version of the MC mods), the
+  screen lists what your own game noticed while connected: an MC mod turned off while the server has it on, or a
+  server copy whose version cannot play with yours. That may not be why you were refused. With Jotunn on the server
+  and on your game, Jotunn's window shows the same lines under "Failed Connection:"; with Jotunn only on your game,
+  the vanilla panel shows them.
 - **The server's settings apply to everyone.** When you join a server that has the mod, your game asks for its five
   breeding settings (`ChanceAtFarming0`, `ChanceAtFarming100`, `ChanceWithoutFarmer`, `FarmerRange`, `MaxStars`),
   uses them for the births it handles, and says so once in its log ("Using the server's breeding settings: ...").
@@ -98,12 +112,12 @@ Install it on the server (or the host) and on every player's game. A birth is de
   players whose game does not run the mod and who are online are refused about a second later (unless they are
   allowed).
 - **A player who turns the mod off on their own game** while connected is refused about a second later, like a player
-  without the mod: their game goes back to the main menu with "Incompatible version". To play on that server again,
-  turn the mod back on (the MC Mods button is also in the main menu; or set `Enabled = true` in the config file) and
-  join again. Joining with the mod turned off is refused the same way. On a server with
-  `AllowPlayersWithoutMod = true` such a player stays connected: while the mod is off, the animals their game
-  simulates breed the normal game way and they do not count as a farmer. When they turn it back on, their game takes
-  the server's current settings again and says so in its log.
+  without the mod: their game goes back to the main menu with "Incompatible version", which lists this mod as turned
+  off under "MC mods:". To play on that server again, turn the mod back on (the MC Mods button is also in the main
+  menu; or set `Enabled = true` in the config file) and join again. Joining with the mod turned off is refused the
+  same way. On a server with `AllowPlayersWithoutMod = true` such a player stays connected: while the mod is off, the
+  animals their game simulates breed the normal game way and they do not count as a farmer. When they turn it back
+  on, their game takes the server's current settings again and says so in its log.
 - **Dedicated servers:** the mod runs on `valheim_server.exe` too (install BepInEx there and put the mod in its
   `BepInEx/plugins` folder). The server's settings file decides the settings for everyone. A dedicated server does not
   run the animals itself: it checks joining players and shares its settings.
