@@ -22,7 +22,7 @@ last transplant while it is selected (see E02). No hands-on in-game test yet.
 
 **Automated checks (2026-10-17):** 64 of 67 self-tests named in this list's notes passed in real game runs on Valheim
 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
-`ec1b7dc`; failing: `replant.x.spyglass-view`, `replant.e.planteasily.grid`, `replant.e.planteasily.root`. An item
+`f68eafe`; failing: `replant.x.spyglass-view`, `replant.e.planteasily.grid`, `replant.e.planteasily.root`. An item
 ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly
 automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 

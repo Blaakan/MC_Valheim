@@ -47,7 +47,7 @@ the `vanilla-server` scenario.
 
 **Automated checks (2026-10-17):** 56 of 57 self-tests named in this list's notes passed in real game runs on Valheim
 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
-`ec1b7dc`; failing: `forge.refine.station-tag`. An item ending in "Automated: ..." is checked in full by the named
+`f68eafe`; failing: `forge.refine.station-tag`. An item ending in "Automated: ..." is checked in full by the named
 self-tests and is ticked by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated
 test" names the self-test that fails.
 

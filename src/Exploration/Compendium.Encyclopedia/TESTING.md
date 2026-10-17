@@ -15,7 +15,7 @@ reset to `[ ]`. Debug and Release build of 0.1.1 without warnings; the self-test
 
 **Automated checks (2026-10-17):** 56 of 59 self-tests named in this list's notes passed in real game runs on Valheim
 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
-`ec1b7dc`; failing: `compendium.window`, `compendium.aim`, `compendium.aim-greyling`. An item ending in "Automated:
+`f68eafe`; failing: `compendium.window`, `compendium.aim`, `compendium.aim-greyling`. An item ending in "Automated:
 ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item still needs its
 by-hand part; "FAILED: automated test" names the self-test that fails.
 

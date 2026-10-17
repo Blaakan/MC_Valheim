@@ -15,7 +15,7 @@ below (their NOTE lines). No hands-on in-game test yet.
 
 **Automated checks (2026-10-17):** 56 of 56 self-tests named in this list's notes passed in real game runs on Valheim
 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
-`ec1b7dc`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+`f68eafe`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
 a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`

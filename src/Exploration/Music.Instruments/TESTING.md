@@ -46,11 +46,11 @@ the wire, legato, same-frame tap, Space octave up, tambourine keys and sound, no
 freed after End); offline harness 5406 checks (piano map, note off in the synth); same two errors from Sneak Ambush
 and Spyglass only.
 
-**Automated checks (2026-10-15):** 80 of 80 self-tests named in this list's notes passed in real game runs on Valheim
-1.0.17 (the 1.0.20 update changed nothing this mod uses: docs/game/core-engine.md) (`./tools/Test-InWorld.ps1`,
-`./tools/Test-Multiplayer.ps1` with a dedicated server) on the working tree of commit `9afc663`. An item ending in
-"Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly automated" item
-still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+**Automated checks (2026-10-17):** 84 of 85 self-tests named in this list's notes passed in real game runs on Valheim
+1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
+`f68eafe`; failing: `music.drop.rest`. An item ending in "Automated: ..." is checked in full by the named self-tests
+and is ticked by them alone; a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names
+the self-test that fails.
 
 **Setup:** F5 for the console: `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `god`
 keeps you alive (type it again to turn it off), `heal` refills health and stamina. Items: `spawn MC_Flute`,

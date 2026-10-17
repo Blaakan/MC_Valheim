@@ -17,13 +17,10 @@ their own; `lootfilter.stations` passed twice and then failed most runs that day
 its sap collector step (drops that do not appear in time, or two sap drops tagged as harvested that are not picked up
 in time); it failed the same way in 2 of 3 runs on the code before the fixes, so T24 and T37 keep their marks.
 
-**Automated checks (2026-10-17):** 24 of 38 self-tests named in this list's notes passed in real game runs on Valheim
+**Automated checks (2026-10-17):** 38 of 38 self-tests named in this list's notes passed in real game runs on Valheim
 1.0.20 (`./tools/Test-InWorld.ps1`, `./tools/Test-Multiplayer.ps1` with a dedicated server) on the code of commit
-`ec1b7dc`; failing: `lootfilter.skip`, `lootfilter.mark-colours`, `lootfilter.marks`, `lootfilter.owndrops`,
-`lootfilter.chest`, `lootfilter.persist`, `lootfilter.gamepad`, `lootfilter.markkey`, `lootfilter.layout`,
-`lootfilter.toggle`, `lootfilter.stations`, `lootfilter.dialogs`, `lootfilter.handoff`, `lootfilter.outside-grid`. An
-item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone; a "Partly
-automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
+`f68eafe`. An item ending in "Automated: ..." is checked in full by the named self-tests and is ticked by them alone;
+a "Partly automated" item still needs its by-hand part; "FAILED: automated test" names the self-test that fails.
 
 **Setup:** use a **test character and a test world** (cheats mark the character). Press F5 for the console →
 `devcommands` (if the console asks you to confirm cheats, run `confirmcheats`). `nocost` lets you build any piece
